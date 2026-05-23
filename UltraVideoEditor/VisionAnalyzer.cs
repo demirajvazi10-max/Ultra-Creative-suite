@@ -31,6 +31,12 @@ namespace UltraVideoEditor
         /// sistem treba da potrazi novi video za ovaj segment.
         /// </summary>
         public bool RetryNeeded { get; set; }
+
+        /// <summary>
+        /// Qwen je detektovao osmeh/radost na licima u kadru.
+        /// Koristi se za bonus score kada je stih pozitivnog sentimenta.
+        /// </summary>
+        public bool HasSmile { get; set; }
     }
 
     public static class VisionAnalyzer
@@ -61,6 +67,23 @@ namespace UltraVideoEditor
         private const string QWEN_MODEL      = "qwen2-vl";
         private const string QWEN_MODEL_ALT  = "qwen2.5-vl";
         private const string QWEN_MODEL_ALT2 = "qwen2.5vl"; // instaliran bez crtice
+
+        // Keširani naziv modela — detektuje se jednom u InitializeQwenAsync, ne per-frejm
+        private static string _resolvedQwenModel = null;
+
+        // Log helper za statički kontekst (Qwen analiza)
+        private static void LogToMainWindowStatic(string msg)
+        {
+            try
+            {
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    if (System.Windows.Application.Current?.MainWindow is MainWindow mw)
+                        mw.LogMessage(msg, true);
+                });
+            }
+            catch { }
+        }
 
         // QWEN_PROMPT se više ne koristi direktno — koristiti BuildContextualQwenPrompt()
         // Ostaje kao fallback za pozive koji ne prosljeđuju kontekst
@@ -179,6 +202,7 @@ namespace UltraVideoEditor
 
             // Color temperature field
             sb.AppendLine("\nAdd to JSON: \"warm\": true/false (is the color palette warm/golden or cool/blue?)");
+            sb.AppendLine("Add to JSON: \"smile\": true/false (are there visible smiling/joyful faces in the frame?)");
             if (!string.IsNullOrWhiteSpace(lyricLine))
             {
                 sb.AppendLine($"\nCONTEXTUAL LOGIC — lyric: \"{lyricLine}\"");
@@ -304,15 +328,19 @@ namespace UltraVideoEditor
                     return false;
                 }
 
-                // Provjeri da li je model dostupan
-                bool hasQwen = await _ollamaClient.IsModelAvailable(QWEN_MODEL)      ||
-                               await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT)  ||
-                               await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT2);
+                // Detektuj i keširaj tačan naziv modela — jednom za ceo video
+                if (await _ollamaClient.IsModelAvailable(QWEN_MODEL))
+                    _resolvedQwenModel = QWEN_MODEL;
+                else if (await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT))
+                    _resolvedQwenModel = QWEN_MODEL_ALT;
+                else if (await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT2))
+                    _resolvedQwenModel = QWEN_MODEL_ALT2;
 
+                bool hasQwen = _resolvedQwenModel != null;
                 if (hasQwen)
                 {
                     _qwenAvailable = true;
-                    log?.Invoke($"✅ VisionAnalyzer: Qwen2-VL aktivan — AI analiza slike omogućena");
+                    log?.Invoke($"✅ VisionAnalyzer: Qwen2-VL aktivan ({_resolvedQwenModel}) — AI analiza slike omogućena");
                 }
                 else
                 {
@@ -414,9 +442,8 @@ namespace UltraVideoEditor
             try
             {
                 // Biramo model koji je dostupan
-                string model = await _ollamaClient.IsModelAvailable(QWEN_MODEL)    ? QWEN_MODEL :
-                               await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT) ? QWEN_MODEL_ALT :
-                               QWEN_MODEL_ALT2;
+                // Koristimo keširani model — bez 3x IsModelAvailable per frejm
+                string model = _resolvedQwenModel ?? QWEN_MODEL_ALT2;
 
                 // Koristimo dinamicki prompt ako imamo kontekst, inace fallback na staticki
                 string prompt = (lyricLine != null || season != null || mood != null)
@@ -425,10 +452,21 @@ namespace UltraVideoEditor
 
                 var (response, error) = await _ollamaClient.VisionAsyncEx(imagePath, prompt, model, ct);
                 if (!string.IsNullOrWhiteSpace(error))
-                    System.Diagnostics.Debug.WriteLine($"QwenAnalyzeFrame error: {error}");
-                if (string.IsNullOrWhiteSpace(response)) return null;
+                {
+                    // Log vidljivo u MainWindow, ne samo Debug
+                    LogToMainWindowStatic($"   ⚠️ Qwen VisionError: {error.Substring(0, Math.Min(120, error.Length))}");
+                    return null;
+                }
+                if (string.IsNullOrWhiteSpace(response))
+                {
+                    LogToMainWindowStatic("   ⚠️ Qwen: prazan odgovor");
+                    return null;
+                }
 
-                return ParseQwenResponse(response);
+                var parsed = ParseQwenResponse(response);
+                if (parsed == null)
+                    LogToMainWindowStatic($"   ⚠️ Qwen: parse neuspješan. Response: {response.Substring(0, Math.Min(200, response.Length))}");
+                return parsed;
             }
             catch
             {
@@ -436,12 +474,24 @@ namespace UltraVideoEditor
             }
         }
 
-        private static VisionResult ParseQwenResponse(string json)
+        private static VisionResult ParseQwenResponse(string raw)
         {
             try
             {
-                // Čistimo potencijalni markdown wrap
+                // Qwen2.5vl može da vrati tekst ispred JSON-a — izvuci samo JSON blok
+                string json = raw ?? "";
+
+                // Ukloni markdown wrap
                 json = Regex.Replace(json, @"```json?\s*|\s*```", "").Trim();
+
+                // Ako ima tekst ispred { — uzmi samo od prvog { do zadnjeg }
+                int braceStart = json.IndexOf('{');
+                int braceEnd   = json.LastIndexOf('}');
+                if (braceStart > 0 && braceEnd > braceStart)
+                    json = json.Substring(braceStart, braceEnd - braceStart + 1);
+
+                if (string.IsNullOrWhiteSpace(json) || !json.Contains("score"))
+                    return null;
 
                 // Jednostavan parser bez Newtonsoft ovisnosti na ovom nivou
                 double  GetDouble(string key, double def = 0) {
@@ -486,6 +536,7 @@ namespace UltraVideoEditor
                     IsOutdoor   = GetBool("outdoor"),
                     HasChildren = GetBool("children"),
                     HasFaces    = GetBool("faces"),
+                    HasSmile    = GetBool("smile"),
                     IsWarm      = GetBool("warm"),
                     HasMotion   = GetBool("motion"),
                     Luminance   = GetDouble("luminance", 0.5),

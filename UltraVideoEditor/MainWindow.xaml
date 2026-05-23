@@ -117,6 +117,12 @@
                 <MenuItem x:Name="mnuMarkers" Tag="mnu_markers" Click="ShowMarkersDialog_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuGPU" Tag="gpu_acceleration" IsCheckable="True" IsChecked="True" Click="ToggleGPUAcceleration_Click"/>
+                <MenuItem x:Name="mnuMediaProviders"
+                          Header="🌐 Media Provajderi (API ključevi)"
+                          Click="MnuMediaProviders_Click"
+                          InputGestureText="Ctrl+M"
+                          AutomationProperties.Name="Podešavanja media provajdera — Pixabay, Pexels, Coverr"/>
+                <Separator/>
                 <MenuItem x:Name="mnuSettings" Tag="mw_settings" Click="ShowPreferences_Click"/>
             </MenuItem>
             <MenuItem x:Name="mnuHelp" Tag="mw_help_menu">
@@ -326,6 +332,7 @@
                             <Button x:Name="btnPreviewTreble" Content="👂 PREVIEW" Click="PreviewTreble_Click" Width="100" Height="25" Margin="10,0" Background="#FF9800" Foreground="White"/>
                         </StackPanel>
                         <CheckBox x:Name="chkGPUAcceleration" Content="🎮 GPU ubrzanje" Foreground="White" Margin="0,15" IsChecked="True" Checked="GPUAcceleration_Checked" Unchecked="GPUAcceleration_Checked"/>
+                        <CheckBox x:Name="chkEnableSubtitles" Content="📝 Titlovi u videu" Foreground="White" Margin="0,5" IsChecked="True" ToolTip="Uključi/isključi prikaz titlova u finalnom renderu. Isključi za čist video bez teksta."/>
                         <TextBlock x:Name="txtReverb" Text="Reverb:" Foreground="White"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="sldReverb" Minimum="0" Maximum="100" Value="0" Width="200" ValueChanged="AudioEffect_ValueChanged"/>

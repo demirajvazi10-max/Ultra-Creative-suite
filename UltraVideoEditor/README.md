@@ -1,224 +1,270 @@
-# Ultra Creative Suite
+# UltraVideoEditor — AI-Powered Music Video Creator
 
-[![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/ultracreativesuite)
-
-**The world's first professional video editor that is fully accessible to blind, low-vision, and sighted users — without compromise.**
-
-Built by a blind developer. Tested daily with JAWS for Windows.
+> Automatski generator video spotova za dječije pjesme, sa dubokom integracijom AI analize teksta, beat detectiona i semantičkog matchinga kadrova.
 
 ---
 
-## Demo
+## Šta je ovo?
 
-This video was created entirely by the author — who is blind — using Ultra Creative Suite with JAWS for Windows. No sighted assistance.
+UltraVideoEditor je WPF desktop aplikacija (.NET 8) koja prima audio fajl i tekst pjesme, a vraća gotov video spot. Sistem koristi lokalni LLM (Ollama/Qwen), computer vision (Qwen2-VL + ONNX MobileNet), Whisper transkripiju i FFmpeg render pipeline da automatski:
 
-[![Ultra Creative Suite Demo](https://img.youtube.com/vi/K1mXPN4hEFs/maxresdefault.jpg)](https://www.youtube.com/watch?v=K1mXPN4hEFs)
-
-> A children's song video: lyrics analyzed by AI, stock footage automatically selected and downloaded, mood-based color grading applied, ambient sounds mixed, rendered to 4K. Created independently by a blind user.
-
----
-
-## What is this?
-
-Ultra Creative Suite is a professional video editor for Windows, built from the ground up with full accessibility as a core requirement — not an afterthought.
-
-Every feature works for blind, low-vision, and sighted users equally. Blind users can independently create professional-quality videos, edit timelines, apply AI effects, transcribe audio, and render 4K output — without sighted assistance, and without a stripped-down "accessible mode" that hides features.
-
-> "I am blind and I use JAWS for Windows. I built this because no professional video editor on the market is actually usable with a screen reader."
-> — Author
+- Analizira stihove i dodijeli semantički, emocionalni i sezonski kontekst svakom kadru
+- Preuzme relevantne stock video klipove sa Pixabay API-ja
+- Sinhronizuje rezove sa muzičkim frazama (beat detection + piano mode)
+- Renderuje finalni video sa color gradingom, cross-dissolve prelazima i ambientalnim zvukovima
 
 ---
 
-## Current Status
+## Arhitektura sistema
 
-**Fully functional.** Source code is provided as-is — the application works and is actively used in real-world production by the author.
-
-**Current language: Serbian.** The entire UI, log messages, and AI output are currently in Serbian (ekavica dialect). English localization is planned for a future release. Contributions welcome.
-
-**Want to test it?** Clone the repo, follow the installation steps below, and try it. If you find issues, open a GitHub issue.
-
----
-
-## Key Accessibility Features
-
-**Native Win32 ListView timeline** — Uses the same Windows control as File Explorer. JAWS and NVDA read every clip natively without plugins or workarounds: clip name, type, duration, position, and AI-generated audio description.
-
-**Live region status bar** — Every action, render progress, error, and confirmation is announced automatically. No need to manually navigate to find what happened.
-
-**Full keyboard control** — Every feature is reachable without a mouse. No drag-and-drop required for any core workflow.
-
-**AI audio descriptions** — Every image and video clip on the timeline receives an AI-generated description that JAWS reads aloud, giving blind users full situational awareness of visual content.
-
-**Screen reader optimized dialogs** — All dialogs use proper focus management, labeled controls, and logical tab order.
-
----
-
-## Technical Stack
-
-| Component | Technology |
-| --- | --- |
-| Language | C# / .NET 8 |
-| UI Framework | WPF (Windows Presentation Foundation) |
-| Render Engine | FFmpeg with NVENC GPU acceleration |
-| Audio | NAudio |
-| Video Preview | LibVLC |
-| AI Transcription | faster-whisper (large-v3 model) |
-| AI Text/Story | Ollama (llama3.2, local inference) |
-| Image Generation | Cloudflare Workers AI / Pollinations.ai |
-| Stock Media | Pixabay API |
-| Screen Reader | JAWS for Windows (primary), NVDA (compatible) |
-| Platform | Windows 10/11 (64-bit) |
-
----
-
-## Core Features
-
-### AIVideoCreator
-
-Generates a complete video from a single audio file (song):
-
-- AI analyzes lyrics and detects mood, theme, and energy level
-- Automatically downloads matching stock footage from Pixabay
-- Applies mood-based color grading (warm, cool, desaturated, vivid)
-- Multi-clip scenes: long scenes use 2–4 different clips for visual variety
-- Ken Burns effect with smart crop (subject detection via FFmpeg cropdetect)
-- Ambient sound mixing with audio ducking (sidechain compression)
-- Karaoke subtitle burn-in with Whisper timestamp sync
-- B-roll intelligence for instrumental sections
-- Preview list before render — JAWS reads all scenes with timing
-
-### Render Engine
-
-- NVENC GPU-accelerated encoding (RTX/GTX cards)
-- Automatic fallback to CPU (libx264) if GPU unavailable
-- 4K (3840×2160) output tested on RTX 2060 Max-Q
-- Parallel clip processing (up to 4 simultaneous)
-- Smart zoompan pipeline — trim before filter prevents CPU hangs on long clips
-- FastRender mode for quick previews
-
-### AI Transcription
-
-- faster-whisper-xxl integration (large-v3 model)
-- float16 compute type on CUDA for GPU-accelerated transcription
-- SRT subtitle output with timestamp synchronization
-- Serbian language support
-
-### Timeline Editor
-
-- Win32 native ListView (JAWS/NVDA compatible out of the box)
-- Undo/redo system
-- Keyframe animation support
-- Audio waveform display
-- Export profiles: YouTube 1080p/4K, TikTok 9:16, Instagram 1:1, Compact
+```
+Audio fajl + Tekst pjesme
+        │
+        ▼
+┌─────────────────────┐
+│   AITranscription   │  Whisper → timestampovani stihovi
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│   BeatDetection     │  FFmpeg RMS energy → beat timestamps
+│   + Piano Mode      │  Spectral flux → melodijske fraze
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  AIVideoCreator     │  Glavni orchestrator
+│  ┌───────────────┐  │
+│  │ StrictQuery   │  │  SLOJ 1: Ollama/Qwen → semantički query
+│  │ Engine        │  │  SLOJ 2: _actionMap (552+ B/H/S → EN)
+│  │               │  │  SLOJ 3: SmartFallback
+│  └───────────────┘  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  Pixabay API        │  Stock video pretraga + deduplication
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  VisionAnalyzer     │  Qwen2-VL / ONNX → score, HasChildren,
+│                     │  HasSmile, IsOutdoor, season, motion
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  MotionAnalyzer     │  FFmpeg optical flow → direction matching
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│  RenderEngine       │  FFmpeg filter_complex → finalni video
+│                     │  xfade + color grading + denoise
+└─────────────────────┘
+```
 
 ---
 
-## Hardware Tested On
+## Zahtjevi
 
-- **CPU:** Intel Core i9-10885H
-- **GPU:** NVIDIA RTX 2060 Max-Q (NVENC)
-- **RAM:** 32GB DDR4 3200MHz
-- **Output:** 4K H.264 via NVENC
+### Runtime
+| Komponenta | Verzija | Napomena |
+|---|---|---|
+| Windows | 10 / 11 | WPF aplikacija |
+| .NET | 8.0 | `net8.0-windows` |
+| FFmpeg | 6.0+ | Mora biti u `Ffmpeg/` folderu uz exe |
+| Ollama | Bilo koja | Lokalni LLM server |
+| Qwen2.5 14B | Via Ollama | `ollama pull qwen2.5:14b` |
+| Qwen2-VL | Via Ollama | `ollama pull qwen2.5vl:latest` |
+| Whisper | whisper.exe / faster-whisper-xxl.exe | U `Whisper/` folderu |
 
----
+### API Ključevi
+- **Pixabay** — besplatan API ključ sa [pixabay.com/api/docs](https://pixabay.com/api/docs/)
 
-## Installation
-
-### Prerequisites
-
-- Windows 10 or 11 (64-bit)
-- [.NET 8.0 Runtime](https://dotnet.microsoft.com/download)
-- FFmpeg — download from [ffmpeg.org](https://ffmpeg.org/download.html) and place `ffmpeg.exe` in `Ffmpeg\` subfolder
-- VLC media player — for video preview
-
-### Optional (for AI features)
-
-- [Ollama](https://ollama.ai) with `llama3.2` model pulled
-- Cloudflare Workers AI API key (for image generation)
-- faster-whisper-xxl (for transcription)
-
-### Build
-
-1. Clone the repository
-2. Open `UltraVideoEditor.csproj` in Visual Studio 2022
-3. Build (Ctrl+Shift+B)
-4. Place `ffmpeg.exe` in `bin\Debug\net8.0-windows\Ffmpeg\`
-5. Run
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-| --- | --- |
-| Arrow Up/Down | Navigate timeline clips |
-| Page Up/Down | Jump 5 clips |
-| Ctrl+Space | Play / Pause |
-| Ctrl+R / F5 | Render video |
-| Ctrl+O | Open media files |
-| Ctrl+S | Save project |
-| Ctrl+Z / Ctrl+Y | Undo / Redo |
-| Ctrl+C / V / X | Copy / Paste / Cut clip |
-| Delete | Remove selected clip |
-| Ctrl+K | Add keyframe |
-| Ctrl+M | Add marker |
-| Ctrl+Shift+A | Toggle accessibility mode |
-| Menu key / Right-click | Context menu on timeline |
+### NuGet Paketi
+```xml
+<PackageReference Include="LibVLCSharp" Version="3.9.6" />
+<PackageReference Include="LibVLCSharp.WPF" Version="3.9.6" />
+<PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.13.0" />
+<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
+<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.6" />
+<PackageReference Include="NAudio" Version="2.3.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+<PackageReference Include="PixabaySharp" Version="1.1.0" />
+<PackageReference Include="SkiaSharp" Version="2.88.6" />
+<PackageReference Include="SkiaSharp.Views.WPF" Version="2.88.6" />
+<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
+```
 
 ---
 
-## Project Structure
+## Instalacija
 
+```bash
+git clone https://github.com/YOUR_REPO/UltraVideoEditor.git
+cd UltraVideoEditor
+dotnet restore
+dotnet build -c Release
+```
+
+Smjesti eksterne alate:
 ```
 UltraVideoEditor/
-├── RenderEngine.cs            # FFmpeg pipeline, NVENC, GPU/CPU encoding
-├── CinematicProcessor.cs      # Ken Burns, SmartCrop, AudioDucking, VisionAI
-├── AIVideoCreator.xaml.cs     # AI video generation engine
-├── AITranscription.cs         # faster-whisper integration
-├── MainWindow.xaml.cs         # Main UI, Win32 ListView, accessibility
-├── Models.cs                  # Data models (TimelineItem, SubtitleItem, etc.)
-├── NativeListViewBridge.cs    # Win32 interop for accessible timeline
-├── BeatDetection.cs           # Audio beat/rhythm analysis
-├── OllamaClient.cs            # Local AI inference (llama3.2)
-├── HardwareEncoderDetector.cs # NVENC auto-detection
-└── Ffmpeg/
-    └── ffmpeg.exe             # (not included — download separately)
+├── Ffmpeg/
+│   └── ffmpeg.exe
+├── Whisper/
+│   └── faster-whisper-xxl.exe   # ili whisper.exe
+└── ...
+```
+
+Pokrni Ollama i pull modele:
+```bash
+ollama pull qwen2.5:14b
+ollama pull qwen2.5vl:latest
 ```
 
 ---
 
-## Why This Matters
+## Kako radi
 
-There is no professional video editing software that blind users can actually use independently. Adobe Premiere, DaVinci Resolve, Final Cut — none of them work meaningfully with screen readers.
+### 1. Query pipeline (3 sloja)
 
-Ultra Creative Suite exists to change that. It is the only editor where a blind person can open the application, import audio, generate a complete video with stock footage, effects, and subtitles, and render to 4K — all without sighted assistance.
+Svaki stih prolazi kroz tri sloja da dobije search query za Pixabay:
 
-This project is being developed as part of an [NLnet Foundation](https://nlnet.nl) grant application under the NGI0 Commons Fund.
+**Sloj 1 — Ollama/Qwen (primarni)**
+Qwen dobija stih + `LyricTagType` (Action/Atmospheric/Object/Narrative) + `SentimentPolarity` (Positive/Negative/Neutral) + `needsCloseUp` flag i generiše engleski search query od 3-5 riječi.
+
+**Sloj 2 — `_actionMap` (552+ unosa)**
+Direktan match srpskih/bosanskih/hrvatskih ključnih riječi na engleski vizuelni query. Prioritetni scoring favorizuje konkretne objekte nad apstraktnim stanjima — "sladoled" (score 50) uvijek pobijedi "leti" (score 14) u istom stihu.
+
+**Sloj 3 — SmartFallback**
+Kontekstualni fallback baziran na detektovanoj sezoni i moodu — nikad ne vraća null, nikad crni ekran.
+
+### 2. Beat Detection + Piano Mode
+
+Za standardnu muziku sa bubnjom: RMS energy spikevi → beat timestamps → rezovi na downbeatovima.
+
+Za klavirsku/melodijsku muziku (niska confidence ili neravnomjerni beati):
+- **Phrase detection**: smoothovani energy profil → spectral flux → granice melodijskih fraza
+- **Dynamic pacing**: `NoteDensity` (0-1) mapiran na trajanje kadrova — tiha fraza → 4.5s, gust pasaž → 1.8s
+- **VibeScore modifikator**: high energy scene dobijaju 25% kraći kadar
+
+Log: `🎹 Piano mode aktivan: 12 melodijskih fraza, gustoća=0.43 → 3.3s prosječno`
+
+### 3. Vision Analysis
+
+Svaki preuzeti klip analizira **Qwen2-VL** (ako dostupan) ili **ONNX MobileNetV2** (fallback):
+
+- `Score` 1-10 (opšti vizuelni kvalitet)
+- `HasChildren`, `HasFaces`, `HasSmile` — prisutnost djece i emocija
+- `IsOutdoor`, `IsWarm` — ambijent i temperatura boje
+- `RetryNeeded` — Qwen označava da klip ne odgovara kontekstu stiha
+
+**Smile bonus**: ako `HasSmile=true` i stih je `Positive` sentiment → VisionScore +1.5
+
+### 4. Sezonski Color Grading (per-kadar)
+
+Svaki kadar dobija FFmpeg `curves` + `eq` filter baziran na sezoni **tog stiha**, ne globalne pesme:
+
+| Sezona | Efekat |
+|---|---|
+| `winter` | Plavi toni, snižen R, podignut B, desaturacija -12% |
+| `summer` | Zlatni toni, podignut R/G, snižen B, saturacija +18% |
+| `spring` | Svježi zelenkast, blago podignut G |
+| `autumn` | Topao narandžast, podignut R, snižen B |
+
+### 5. Shot Composition
+
+Sistem prati niz kadrova i izbjegava:
+- Dva uzastopna `wide` kadrova bez djece (PATCH9 30% Rule)
+- Dva uzastopna `medium` kadrova (Shot composition filter)
+- Ekstreman preskok `wide → close` bez bridge kadra
+
+### 6. Motion Matching
+
+`MotionAnalyzer` analizira optički tok prvog i **zadnjeg** frame-a svakog klipa. Sljedeći klip mora imati kompatibilan smjer kretanja — eliminacija jump-cut problema.
+
+### 7. Query Cooldown
+
+Ista vizuelna tema (prvih 2 ključne riječi querija) ne smije se ponoviti unutar 4 uzastopne scene (~12-16s). Ako se detektuje ponavljanje, query dobija sezonsku varijantu.
 
 ---
 
-## Support the Project
+## Ključne klase
 
-If Ultra Creative Suite is useful to you, or you believe accessible creative tools matter, consider supporting development:
-
-[![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/ultracreativesuite)
-
-Every contribution helps keep this project alive and growing.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Code of Conduct
-
-See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-
-## License
-
-GPL-3.0 License — see [LICENSE](LICENSE) file.
+| Klasa | Odgovornost |
+|---|---|
+| `AIVideoCreator` | Glavni orchestrator — scene loop, query pipeline, selekcija medija |
+| `StrictQueryEngine` | B/H/S → EN keyword mapa, Ollama prompt builder, ClassifyLyric/Sentiment |
+| `BeatDetection` | Audio analiza, beat timestamps, piano mode phrase detection |
+| `VisionAnalyzer` | Qwen2-VL / ONNX analiza kadrova, score, labels, smile |
+| `MotionAnalyzer` | FFmpeg optical flow, direction matching |
+| `RenderEngine` | FFmpeg filter_complex build, xfade, color grading, denoise |
+| `SkiaAnimationEngine` | Skia-based text overlay i animacije naslova |
+| `CinematicProcessor` | Ken Burns, zoom/pan efekti |
+| `LocalSoundLibrary` | 1279+ ambijentalnih zvukova, kategorizacija i matching |
 
 ---
 
-*Ultra Creative Suite — Because creativity has no boundaries.*
+## Konfiguracija
+
+Sve se podešava direktno u kodu. Najvažniji parametri:
+
+```csharp
+// BeatDetection.cs
+const int QUERY_COOLDOWN_SCENES = 4;     // Anti-ponavljanje tema
+double baseDuration = 4.5 - NoteDensity * 2.7; // Piano pacing: 1.8-4.5s
+
+// RenderEngine.cs
+// Pacing-aware fade durations:
+"fast"     => 0.25s
+"standard" => 0.50s
+"slow"     => 0.70s
+
+// hqdn3d=1.5:1.5:6:6  — denoise
+// unsharp=3:3:0.4      — sharpening
+```
+
+---
+
+## Log poruke (referenca)
+
+```
+🥁 Beat detection: 120 BPM, 148 udaraca, confidence=0.72
+🎹 Piano mode aktivan: 12 melodijskih fraza, gustoća=0.43 → 3.3s prosječno
+🗓 Sezona: globalna=spring, po stihu=winter → ✅ Sezona promijenjena na: winter
+🏷 LyricTag: Action | Sentiment: Positive | CloseUp: True
+🤖 Ollama query: 'child running park joy sunlight'
+😊 Smile bonus +1.5 (sentiment=Positive): 6.0 → 7.5
+🎬 Shot composition: dva uzastopna 'medium' — trazim drugi tip...
+📐 PATCH9 30%Rule: wide kadar bez djece — tražim medium/close plan...
+🔄 Cooldown varijanta (tema 'children stream' bila scena 3): '...'
+✅ Score 7.5/10 [Qwen] | Motion:Right | Shot:medium | Season:winter | Children:True Smile:True
+✨ Cross-dissolve: 45 klipova, avg fade 0.50s (pacing-aware)
+```
+
+---
+
+## Poznata ograničenja
+
+- **Pixabay pool**: Za dugačke pjesme (3+ minute) deduplication pool može biti iscrpljen za ponavljajuće query teme. Sistem ima cooldown varijantu kao mitigation.
+- **Beat detection na klaviru**: Piano mode se oslanja na energy flux detekciju — za solo klavir bez pratnje može generisati manje phrase boundaryja nego što je optimalno.
+- **Magick.NET**: Verzija 14.13.0 sadrži security advisories za ImageMagick C biblioteku. Ne utiče na rad programa (ne obrađuje eksterne/untrusted slike), ali preporučuje se update na najnoviju verziju kada bude dostupna bez breaking changes.
+- **GPU enkoder**: Koristi `h264_nvenc` (NVIDIA). Na sistemima bez NVIDIA GPU, automatski fallback na `libx264`.
+
+---
+
+## Razvoj
+
+Projekt je aktivan. Sljedeće planirane funkcionalnosti:
+
+- Contrast boost za dječije playground scene (`eq=contrast` when `HasChildren=true`)
+- Preview renderer (30s test render prije punog rendera)
+- Podrška za više stock API providera (Pexels, Unsplash video)
+
+---
+
+## Licenca
+
+Privatni projekt. Sva prava zadržana.

@@ -48,11 +48,28 @@ namespace UltraVideoEditor
         private string _audioPath;
         private double _totalDuration;
         private BeatInfo _beatInfo;
+        private double _audioStartSeconds = 0.0;  // Sekunde tišine na početku audio fajla
+        private double _cutAdvanceMs = 120.0;      // ms ranije od beat peaka (default 120ms)
+        private List<AITranscription.WordTiming> _wordTimings = new();  // Whisper word timestamps
+        private Dictionary<int, double> _lyricEndTimestamps = new Dictionary<int, double>(); // Whisper end times
+        private readonly Dictionary<string, string> _lyricQueryCache
+            = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // Refren cache
+
+        /// <summary>Exposes BeatInfo za RenderEngine beat-sync rezove.</summary>
+        public BeatInfo GetBeatInfo() => _beatInfo;
+
         private MotionResult _lastClipMotion;
+        private MotionResult _lastClipEndMotion;   // EndDirection prethodnog klipa za precizni jump-cut matching
         private double _lastDownloadedVisionScore = 6.0;
         private bool _lastDownloadedIsStatic = false;
         private string _detectedMood = "neutral";
         private string _detectedContext = "";
+        private SongContext _songContext = new SongContext(); // Iskra AI-First: kontekst za StrictQueryEngine
+
+        // ── Auto-Render: pokreni render automatski posle generisanja ─────────
+        // Korisnik postavi putanju, čekirа checkbox, krene spavati :)
+        public string AutoRenderOutputPath { get; set; } = "";
+        public bool   AutoRenderEnabled    { get; set; } = false;
         // Setuju se iz scene loopa da bi bili dostupni unutar SearchAndDownloadMedia
         private string _currentLyric = null;
         private string _currentSeason = null;
@@ -123,6 +140,14 @@ namespace UltraVideoEditor
         private readonly SemaphoreSlim _apiRateLimiter = new SemaphoreSlim(1, 1);
 
         private readonly HashSet<string> _usedMediaUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // FIX-COOLDOWN: Prati kada je određeni query tematski tip zadnji put korišćen
+        // Sprječava vizuelno ponavljanje sličnih kadrova (potok, šuma) u kratkom periodu
+        // Key = normalized query tema (npr "stream water nature"), Value = zadnji timestamp scene
+        private readonly Dictionary<string, int> _queryThemeCooldown =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private int _currentSceneIndex = 0;
+        private const int QUERY_COOLDOWN_SCENES = 4; // Ne ponavljaj istu temu unutar 4 scene (~12-16s)
         private readonly HashSet<string> _seenPixabayIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _queryUseCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -511,7 +536,7 @@ namespace UltraVideoEditor
             try
             {
                 LogToMainWindow(L("ai_song_analyzing"));
-                string response = await _ollama.GenerateAsync(prompt, ct: ct);
+                string response = await _ollama.GenerateAsync(prompt, model: OllamaClient.QueryModel, ct: ct);
                 string jsonStr = ExtractJson(response);
                 if (!string.IsNullOrEmpty(jsonStr))
                 {
@@ -642,56 +667,28 @@ namespace UltraVideoEditor
 
                 string batchText = string.Join("\n", batch.Select((l, idx) => $"{batchStart + idx + 1}. {l}"));
 
-                string prompt = $@"VIDEO REŽIJA – SIMBOLIČKA I KONTEKSTUALNA INTERPRETACIJA
-
-Tema pjesme: {analysis.Theme} | Stil: {analysis.VisualStyle} | Mood: {analysis.Mood}
-
-Stihovi:
-{batchText}
-
-=== HIJERARHIJA INTERPRETACIJE (primijeni redom) ===
-
-KORAK 1 – GLAGOL RADNJE (Action Priority):
-Ako stih sadrži glagol radnje (trčati, skakati, gledati, smijati se, hodati, plesati...),
-ta RADNJA mora biti dominantna u kadru. Primjeri:
-- 'gledam u nebo' → person looking up at sky (OSOBA koja gleda, ne samo nebo)
-- 'trčim poljem' → child running through meadow (dijete trči, ne samo polje)
-- 'skačem' → child jumping joyful outdoor
-
-KORAK 2 – SIMBOLIKA vs. BUKVALNOST (Subject Hierarchy):
-Ako stih pominje objekt KAO DETALJ (npr. 'imam kucu na majici'), PRIMIJENI:
-- Primarni fokus: AKTIVNOST ili ODJEĆA/KONTEKST, ne bukvalni objekt
-- 'imam kucu na majici' → child wearing graphic tee clothing detail (odjeća, ne kuća)
-- 'nosi srce na dlanu' → child with open hands giving (gesta ljubaznosti, ne anatomija)
-- Zabranjeno: tražiti bukvalni objekt iz metafore kao dominantni element
-
-KORAK 3 – VIZUELNA METAFORA (za apstraktne stihove):
-Ako stih je apstraktan ili emotivan ('srce mi se smije', 'svijetlim kao zvijezda'):
-- Traži EMOCIJU u vizualnom ekvivalentu:
-  - 'srce mi se smije' → child laughing sunlight warm rays (radost, ne srce)
-  - 'lako mi je' → child arms open spinning outdoor freedom
-  - 'sve je lijepo' → children laughing together golden hour park
-- Cilj: slika OSJEĆA emociju, ne ilustruje imenicu
-
-KORAK 4 – ADAPTIVNA PRETRAGA (fallback_keywords):
-Ako bukvalni kadar nije lako pronaći, daj alternativni asocijativni query:
-- Bukvalno: 'majica s psićem' → graphic tee child clothing
-- Asocijativno: child getting dressed smiling, child in colorful outfit
-
-=== PRAVILA PRETRAGE ===
-✅ DOZVOLJENO: specifična radnja, lica s emocijom, kontekstualni detalji
-❌ ZABRANJENO: generički 'happy child in park', pejzaži bez osobe, apstraktni clipart
-
-Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
-[
-  {{""line"": {batchStart + 1}, ""keywords"": ""primary Pixabay query (EN, max 6 words)"", ""fallback_keywords"": ""asocijativni fallback query (EN, max 5 words)"", ""ambient"": ""ambient sound""}},
-  {{""line"": {batchStart + 2}, ""keywords"": ""..."", ""fallback_keywords"": ""..."", ""ambient"": ""...""}}
-]";
+                string prompt =
+                    "VIDEO REZIJA - SIMBOLICKA I KONTEKSTUALNA INTERPRETACIJA\n\n" +
+                    "Tema pjesme: " + analysis.Theme + " | Stil: " + analysis.VisualStyle + " | Mood: " + analysis.Mood + "\n\n" +
+                    "Stihovi:\n" + batchText + "\n\n" +
+                    "KORAK 1 - GLAGOL RADNJE: ta RADNJA mora biti dominantna u kadru.\n" +
+                    "Primjeri: gledam u nebo -> person looking up at sky\n" +
+                    "trcim poljem -> child running through meadow\n\n" +
+                    "KORAK 2 - SIMBOLIKA: fokus na AKTIVNOSTI, ne bukvalnom objektu.\n" +
+                    "imam kucu na majici -> child wearing graphic tee clothing\n\n" +
+                    "KORAK 3 - VIZUELNA METAFORA: trazi EMOCIJU u vizualnom ekvivalentu.\n" +
+                    "srce mi se smije -> child laughing sunlight warm rays\n" +
+                    "lako mi je -> child arms open spinning outdoor freedom\n\n" +
+                    "PRAVILA: specificna radnja, lica s emocijom.\n" +
+                    "ZABRANJENO: genericno happy child in park, pejzazi bez osobe.\n\n" +
+                    "Odgovori ISKLJUCIVO JSON:\n[\n" +
+                    "  {\"line\": " + (batchStart + 1) + ", \"keywords\": \"primary EN query max 6 words\", \"fallback_keywords\": \"fallback EN max 5 words\", \"ambient\": \"sound\"},\n" +
+                    "  {\"line\": " + (batchStart + 2) + ", \"keywords\": \"...\", \"fallback_keywords\": \"...\", \"ambient\": \"...\"}\n]";
 
                 try
                 {
                     AnnounceToUser(LF("ai_analyzing_lyrics", i + 1, Math.Min(i + batchSize, total)), 5 + (i * 20 / total));
-                    string response = await _ollama.GenerateAsync(prompt, ct: ct);
+                    string response = await _ollama.GenerateAsync(prompt, model: OllamaClient.QueryModel, ct: ct);
                     string jsonStr = ExtractJson(response, isArray: true);
 
                     if (!string.IsNullOrEmpty(jsonStr))
@@ -2259,6 +2256,19 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             _detectedMood    = string.IsNullOrWhiteSpace(analysis.Mood)    ? "happy" : analysis.Mood;
             _detectedSeason  = string.IsNullOrWhiteSpace(analysis.Season)  ? ""      : analysis.Season;
 
+            // Iskra AI-First: build SongContext za Ollama + StrictQueryEngine
+            _songContext = new SongContext
+            {
+                AgeGroup    = StrictQueryEngine.DetectAgeGroup(string.Join(" ", lyrics), _detectedContext),
+                Context     = _detectedContext,
+                Mood        = _detectedMood,
+                Season      = _detectedSeason,
+                Setting     = analysis.Setting ?? "outdoor",
+                Theme       = analysis.Theme ?? _detectedContext,
+                VisualStyle = analysis.VisualStyle ?? "bright colorful outdoor children"
+            };
+            LogToMainWindow($"🎯 SongContext: uzrast={_songContext.AgeGroup}, kontekst={_songContext.Context}, sezona={_songContext.Season}");
+
             if (_contextKeywords.TryGetValue(_detectedContext, out var ctxList))
                 _universalKeywords = new List<string>(ctxList);
 
@@ -2278,6 +2288,7 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 {
                     SceneNumber = i + 1,
                     Description = lyrics[i].Length > 60 ? lyrics[i].Substring(0, 57) + "..." : lyrics[i],
+                    FullLyric   = lyrics[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
                     Emotion = analysis.Mood ?? "happy",
                     Energy = energy,
                     Characters = analysis.MainSubject ?? "children",
@@ -2582,6 +2593,7 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 {
                     SceneNumber = i + 1,
                     Description = _lyricLines[i].Length > 50 ? _lyricLines[i].Substring(0, 47) + "..." : _lyricLines[i],
+                    FullLyric   = _lyricLines[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
                     Emotion = emotions[i % emotions.Length],
                     Energy = energy,
                     Characters = mainCharacter,
@@ -3475,6 +3487,58 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
 
         #region Video Processing sa B-roll za instrumentalne dijelove
 
+        // ── RHYTHMIC PACING VARIATION ─────────────────────────────────────────────
+        // Distribucija: 30% fast (1.5-2s), 50% standard (2.8-3.2s), 20% slow (5-6s)
+        // Ne radi se nasumično — prati Energy: visoka=fast, srednja=standard, niska=slow
+        // Poziva se POSLE beat-snap korekcije da ne remeti audio sync,
+        // ali SAMO ako nema lyric timestamps (instrumentalna muzika).
+        // Ako postoje timestamps, trajanje je vezano za stihove — ne diramo ga.
+        // ─────────────────────────────────────────────────────────────────────────
+        private void ApplyRhythmicPacing(List<StoryScene> scenes, bool hasLyricTimestamps)
+        {
+            if (scenes == null || scenes.Count < 3) return;
+            // Kada postoje lyric timestamps, trajanje je određeno audio pozicijama — ne menjamo
+            if (hasLyricTimestamps) return;
+
+            var rng = new Random(42); // seed=42 → reproducibilnost između rendera
+            int total = scenes.Count;
+
+            var byEnergy = scenes
+                .Select((sc, idx) => new { sc, idx })
+                .OrderByDescending(x => x.sc.Energy)
+                .ToList();
+
+            int fastCount = Math.Max(1, (int)Math.Round(total * 0.30));
+            int slowCount = Math.Max(1, (int)Math.Round(total * 0.20));
+
+            var fastIdxs = byEnergy.Take(fastCount).Select(x => x.idx).ToHashSet();
+            var slowIdxs = byEnergy.TakeLast(slowCount).Select(x => x.idx).ToHashSet();
+
+            for (int i = 0; i < scenes.Count; i++)
+            {
+                var sc = scenes[i];
+                double prev = sc.Duration;
+
+                if (fastIdxs.Contains(i))
+                {
+                    sc.PacingCategory = "fast";
+                    sc.Duration = Math.Round(1.5 + rng.NextDouble() * 0.5, 2); // 1.5–2.0s
+                }
+                else if (slowIdxs.Contains(i))
+                {
+                    sc.PacingCategory = "slow";
+                    sc.Duration = Math.Round(5.0 + rng.NextDouble() * 1.0, 2); // 5.0–6.0s
+                }
+                else
+                {
+                    sc.PacingCategory = "standard";
+                    sc.Duration = Math.Round(2.8 + rng.NextDouble() * 0.4, 2); // 2.8–3.2s
+                }
+
+                LogToMainWindow($"🎬 Pacing [{sc.PacingCategory}] Scena {sc.SceneNumber} E={sc.Energy}: {prev:F1}s→{sc.Duration:F1}s");
+            }
+        }
+
         private async Task ProcessVideoCreation(string audioPath, double totalDuration)
         {
             _seenPixabayIds.Clear();
@@ -3504,6 +3568,24 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             else
                 LogToMainWindow("🥁 Beat detection: nije pronađen ritam, koristim Whisper trajanja");
 
+            // Piano Mode log
+            if (_beatInfo.PianoMode)
+                LogToMainWindow($"🎹 Piano mode aktivan: {_beatInfo.PhraseBeats.Count} melodijskih fraza, gustoća nota={_beatInfo.NoteDensity:F2} " +
+                    $"({(_beatInfo.NoteDensity < 0.3 ? "tiha/spora" : _beatInfo.NoteDensity > 0.7 ? "brza/gusta" : "umjerena")}) " +
+                    $"→ dinamički pacing kadrova {(4.5 - _beatInfo.NoteDensity * 2.7):F1}s prosječno");
+
+            _audioStartSeconds = _beatInfo.AudioStartSeconds;
+            // ── LOOK-AHEAD: dinamički cut-advance na osnovu BPM ─────────────────
+            // 80BPM→80ms, 120BPM→100ms, 160BPM→120ms — skalira sa tempom pesme
+            double bpmBasedAdvance = 60.0 + (_beatInfo.BPM / 120.0) * 50.0;
+            _cutAdvanceMs = Math.Max(60, Math.Min(150, bpmBasedAdvance));
+
+            if (_audioStartSeconds > 0.05)
+                LogToMainWindow($"🔇 Audio start offset: {_audioStartSeconds:F2}s tišine na početku → video kreće tačno kad muzika");
+            LogToMainWindow($"✂️ Cut-advance: {_cutAdvanceMs:F0}ms look-ahead (BPM={_beatInfo.BPM:F0}) — rez ide ispred beata");
+
+            _lyricQueryCache.Clear();  // reset refrain cache za svaki novi video
+
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX aktivan" : "🧠 VisionAnalyzer: FFmpeg mod");
 
@@ -3514,6 +3596,9 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
 
             MotionAnalyzer.ClearCache();
             _lastClipMotion = null;
+            _lastClipEndMotion = null;
+            _queryThemeCooldown.Clear();
+            _currentSceneIndex = 0;
             _lastSeasonTag  = "none";
             _lastClipWarm   = true;
             _lastClipWasOutdoor = true; // PATCH 10: reset
@@ -3532,25 +3617,39 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 ? Math.Round(totalDuration / sceneCount, 2)
                 : 0;
 
-            double MAX_LYRIC_SCENE_DURATION;
-            if (_beatInfo != null && _beatInfo.IsValid)
+            // ── OutputProfile: koliko udaraca po kadru ────────────────────────────
+            // YouTube Kids → 4 udarca (sporiji rez, manje stresno za decu)
+            // Instagram/TikTok → 2 udarca (brzi rez)
+            // Autorski → 6 udaraca (slobodniji ritam)
+            // Lullaby uvek → 8 udaraca (maksimalno spoро)
+            int beatsPerCut = _detectedContext switch
             {
-                if (_beatInfo.BPM > 120) MAX_LYRIC_SCENE_DURATION = 6.0;
-                else if (_beatInfo.BPM > 80) MAX_LYRIC_SCENE_DURATION = 9.0;
-                else MAX_LYRIC_SCENE_DURATION = 12.0;
-                LogToMainWindow($"🥁 BPM {_beatInfo.BPM:F0} → max trajanje scene: {MAX_LYRIC_SCENE_DURATION}s");
+                "lullaby"   => 8,
+                "sad"       => 6,
+                "adventure" or "dance" => 2,
+                _           => 4  // YouTube Kids default
+            };
+
+            double MAX_LYRIC_SCENE_DURATION;
+            if (_beatInfo != null && _beatInfo.IsValid && _beatInfo.BPM > 0)
+            {
+                // Formula: (60s / BPM) * beatsPerCut = sekunde po kadru
+                double bpmBasedMax = Math.Round((60.0 / _beatInfo.BPM) * beatsPerCut, 2);
+                // Clamp: nikad manje od 1.5s (ne stiže da se vidi), nikad više od 8s
+                MAX_LYRIC_SCENE_DURATION = Math.Max(1.5, Math.Min(8.0, bpmBasedMax));
+                LogToMainWindow($"🥁 BPM {_beatInfo.BPM:F0} × {beatsPerCut} udarca = max {MAX_LYRIC_SCENE_DURATION:F1}s po kadru");
             }
             else
             {
+                // Nema BeatInfo → context-based default
                 MAX_LYRIC_SCENE_DURATION = _detectedContext switch
                 {
-                    "children" or "lullaby" or "fun" or "party" => 9.0,
-                    "wedding" or "love" or "romantic" => 12.0,
-                    "adventure" or "sport" or "action" => 6.0,
-                    "sad" or "melancholy" or "documentary" => 15.0,
-                    _ => 9.0
+                    "lullaby"   => 6.0,
+                    "sad"       => 5.0,
+                    "adventure" or "dance" => 2.5,
+                    _           => 3.5   // YouTube Kids default bez BPM-a
                 };
-                LogToMainWindow($"🎬 Context '{_detectedContext}' → max trajanje scene: {MAX_LYRIC_SCENE_DURATION}s");
+                LogToMainWindow($"🎬 Nema BPM, context '{_detectedContext}' → max {MAX_LYRIC_SCENE_DURATION}s po kadru");
             }
 
             for (int si = 0; si < storyBoard.Scenes.Count; si++)
@@ -3558,7 +3657,11 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 var sc = storyBoard.Scenes[si];
                 if (_lyricTimestamps.Count > 0 && _lyricTimestamps.ContainsKey(si))
                 {
-                    sc.StartTime = _lyricTimestamps[si];
+                    // CUT-ADVANCE: rez se pravi _cutAdvanceMs ranije od audio peaka
+                    // da oko doživi promjenu slike u istoj milisekundi kad uho čuje vokal
+                    double cutAdvanceSec = _cutAdvanceMs / 1000.0;
+                    sc.StartTime = Math.Max(0, _lyricTimestamps[si] - cutAdvanceSec);
+
                     double nxt = _lyricTimestamps.ContainsKey(si + 1)
                         ? _lyricTimestamps[si + 1]
                         : sc.StartTime + MAX_LYRIC_SCENE_DURATION;
@@ -3619,6 +3722,10 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
 
             double lyricsTotalDuration = Math.Round(actualLyricsEnd, 2);
             double remainingDuration = Math.Round(totalDuration - lyricsTotalDuration, 2);
+
+            // ── Rhythmic Pacing: varirajemo trajanje scena po 30/50/20 distribuciji ──
+            // Pozivamo POSLE računanja StartTime/Duration, ali SAMO za instrumentalnu muziku
+            ApplyRhythmicPacing(storyBoard.Scenes, _lyricTimestamps.Count > 0);
 
             LogToMainWindow($"📊 Trajanje audio: {FormatTime(totalDuration)} | Stihovi: {FormatTime(lyricsTotalDuration)} | Instrumentalni rep: {FormatTime(Math.Max(0, remainingDuration))}");
 
@@ -3778,15 +3885,26 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                                 bRollKeywords.AddRange(new[] { "family together outdoor happy warm", "parents children hugging love", "home family cozy warm happy" });
                         }
                         if (bRollKeywords.Count == 0)
+                            // FIX-BROLL: Proširena lista querija za default/fun context
+                            // Stara lista imala 8 querija za 26 outro klipova → pool se iscrpljivao
+                            // Nova lista ima 16 + season-aware varijante za duže outre
                             bRollKeywords.AddRange(new[] {
                                 "children playing park nature sunny day cinematic",
+                                "child running meadow happy slow motion",
+                                "kids jumping playing outdoor joyful bright",
+                                "child closeup smiling face happy warm light",
+                                "family walking park holding hands warm golden",
+                                "children laughing together outdoor playground",
+                                "nature path sunlight dappled morning forest",
+                                "child exploring curiosity outdoor nature bokeh",
+                                "parent child hands holding walking outdoor",
+                                "children friends playing together sunny park",
                                 "birds chirping morning trees nature peaceful",
-                                "stream brook water nature sounds peaceful outdoor",
-                                "children laughing running park sunny slow motion",
-                                "nature landscape beautiful trees sky cinematic",
-                                "flowers garden colorful spring bokeh nature",
-                                "family outdoor together park warm golden light",
-                                "child wonder exploring nature curiosity bokeh",
+                                "flowers garden colorful bokeh soft light nature",
+                                "stream brook water peaceful outdoor nature sounds",
+                                "nature landscape beautiful sky cinematic aerial",
+                                "child closeup eyes wonder curious nature",
+                                "family outdoor together golden hour warm light",
                             });
                         break;
                 }
@@ -3808,26 +3926,30 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 for (int i = 0; i < introClips; i++)
                 {
                     string kw = bRollKeywords[i % bRollKeywords.Count];
+                    // FIX-CINEMATIC: Dodani filmski kvalitetni termini za premijum stock osećaj
+                    // "soft cinematic lighting" → toplija, mekša rasvjeta
+                    // "shallow depth of field" → bokeh efekat, ne flat stock look
+                    // "candid moment" → autentično, ne posed
                     string styleEnhance = _detectedContext switch
                     {
-                        "lullaby" => "soft light peaceful calm",
-                        "party" => "colorful joyful energetic",
-                        "sad" => "gentle melancholy quiet",
-                        "adventure" => "exciting dynamic outdoor",
-                        "dance" => "rhythmic colorful movement",
-                        "christmas" => "warm cozy magical",
-                        "nature" => "peaceful natural soft",
-                        _ => "warm colors happy cheerful"
+                        "lullaby" => "soft cinematic lighting gentle bokeh calm",
+                        "party" => "colorful joyful candid moment bright",
+                        "sad" => "soft cinematic lighting melancholy gentle mood",
+                        "adventure" => "cinematic dynamic outdoor natural light",
+                        "dance" => "rhythmic colorful soft cinematic lighting",
+                        "christmas" => "warm cinematic cozy magical soft light",
+                        "nature" => "cinematic natural light shallow depth of field",
+                        _ => "soft cinematic lighting warm candid moment"
                     };
                     string enhancedQuery = $"{kw} {styleEnhance}";
 
                     AnnounceToUser(LF("b_roll_intro", i + 1, introClips), 5);
-                    string bMediaPath = await SearchAndDownloadMedia(enhancedQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None);
+                    string bMediaPath = await SearchAndDownloadMedia(enhancedQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
 
                     if (string.IsNullOrEmpty(bMediaPath))
                     {
                         string altKw = bRollKeywords[(i + 1) % bRollKeywords.Count];
-                        bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None);
+                        bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                     }
 
                     if (!string.IsNullOrEmpty(bMediaPath) && bRollMediaType == "video")
@@ -3875,24 +3997,24 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                         string kw = bRollKeywords[(introClips + i) % bRollKeywords.Count];
                         string styleEnhance = _detectedContext switch
                         {
-                            "lullaby" => "soft light peaceful calm ending",
-                            "party" => "colorful joyful fading out",
-                            "sad" => "gentle melancholy quiet fade",
-                            "adventure" => "exciting dynamic conclusion",
-                            "dance" => "rhythmic colorful fade",
-                            "christmas" => "warm cozy magical ending",
-                            "nature" => "peaceful natural soft conclusion",
-                            _ => "warm colors happy cheerful ending"
+                            "lullaby" => "soft cinematic lighting peaceful calm bokeh",
+                            "party" => "colorful joyful candid moment warm fade",
+                            "sad" => "soft cinematic melancholy gentle mood ending",
+                            "adventure" => "cinematic dynamic outdoor natural conclusion",
+                            "dance" => "rhythmic colorful soft cinematic fade",
+                            "christmas" => "warm cinematic cozy magical bokeh ending",
+                            "nature" => "cinematic shallow depth of field natural soft",
+                            _ => "soft cinematic lighting warm candid moment"
                         };
                         string enhancedQuery = $"{kw} {styleEnhance}";
 
                         AnnounceToUser(LF("b_roll_outro", i + 1, outroClips), 92);
-                        string bMediaPath = await SearchAndDownloadMedia(enhancedQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None);
+                        string bMediaPath = await SearchAndDownloadMedia(enhancedQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
 
                         if (string.IsNullOrEmpty(bMediaPath))
                         {
                             string altKw = bRollKeywords[(introClips + i + 1) % bRollKeywords.Count];
-                            bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None);
+                            bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                         }
 
                         if (!string.IsNullOrEmpty(bMediaPath) && bRollMediaType == "video")
@@ -3947,33 +4069,164 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                         "music" => "children joyful colorful bright fun",
                         "outdoor" => "children park playground sunny green happy",
                         "health" => "children running active park outdoor healthy sunny",
-                        _ => "children warm colors happy atmosphere soft light"
+                        _ => "children soft cinematic lighting warm candid moment"
                     };
                     string energyBoost = scene.Energy >= 4 ? " action fast dynamic exciting" : scene.Energy <= 2 ? " calm peaceful slow gentle" : "";
                     string emotionBoost = scene.Emotion;
 
-                    string primaryQuery = BuildLiteralSearchQuery(scene.Keywords, scene.Action, energyBoost, styleConsistency);
-                    string fallbackQuery = BuildLiteralSearchQuery(scene.Keywords, "", "", "");
+                    // ── ZERO-FALLBACK: StrictQueryEngine je jedini izvor query-a ─────────
+                    // GetHardCodedQuery vrši TAČAN match na _actionMap.
+                    // Ako nema mape → NULL → GenerateBlackFrame (vidljiv debug signal).
+                    // BuildLiteralSearchQuery se NE koristi kao fallback.
+                    // ─────────────────────────────────────────────────────────────────────
+                    // ── ISKRA AI-FIRST: 3 sloja, nikad null ──────────────────────────────
+                    // SLOJ 1: Ollama — glavni, dobija stih + kontekst pesme
+                    // SLOJ 2: StrictQueryEngine._actionMap — fallback
+                    // SLOJ 3: SmartFallback — nikad null, nikad crni ekran
+                    // ─────────────────────────────────────────────────────────────────────
+                    string lyricForQuery = !string.IsNullOrEmpty(scene.FullLyric) ? scene.FullLyric : scene.Description;
+                    string primaryQuery = null;
 
-                    string faceStyleQuery = _detectedContext switch
+                    // ── DINAMIČKA SEZONA PO STIHU ─────────────────────────────────────────
+                    // Svaki stih može pomenuti drugu sezonu — ne zakucavamo globalnu
+                    // "Leti kupite sladoled" → summer, "Kad je zima nosi čizme" → winter
+                    string lyricSeason = StrictQueryEngine.DetectSeasonFromLyric(lyricForQuery);
+                    LogToMainWindow($"   🗓 Sezona: globalna={_songContext.Season}, po stihu={lyricSeason ?? "nema"}");
+
+                    // FIX-SEASON: Uvijek sinkronizuj _currentSeason sa lyric sezonom
+                    // Ranije: mijenjalo se samo ako lyricSeason != globalna sezona
+                    // Problem: _currentSeason ostajao na staroj vrijednosti, StrictSeason filtrirao krive klipove
+                    // Fix: ako stih ima sezonu, ona je authoritative; ako nema, zadrži prethodnu lyric sezonu
+                    if (lyricSeason != null)
                     {
-                        "outdoor" or "health" => "child face smiling laughing outdoor park happy",
-                        "music" => "child face singing smiling joyful happy",
-                        "dance" => "child face dancing smiling happy joyful",
-                        _ => "child face smiling happy closeup"
-                    };
-                    string fallback2Query = (i % 3 == 2)
-                        ? BuildLiteralSearchQuery(faceStyleQuery, "", "", styleConsistency)
-                        : BuildLiteralSearchQuery("", scene.Action, "", styleConsistency);
+                        // Stih eksplicitno pominje sezonu — koristi je za ovaj kadar
+                        _currentSeason = lyricSeason;
+                        if (lyricSeason != _songContext.Season)
+                        {
+                            _songContext = new SongContext
+                            {
+                                AgeGroup    = _songContext.AgeGroup,
+                                Context     = _songContext.Context,
+                                Mood        = _songContext.Mood,
+                                Season      = lyricSeason,
+                                Setting     = _songContext.Setting,
+                                Theme       = _songContext.Theme,
+                                VisualStyle = _songContext.VisualStyle
+                            };
+                            LogToMainWindow($"   🗓 ✅ Sezona promijenjena na: {lyricSeason}");
+                        }
+                    }
+                    // Ako lyricSeason == null → _currentSeason ostaje isti kao prethodni stih (ispravno)
+
+                    // SLOJ 1: Ollama — sa semantičkom klasifikacijom stiha (FIX Tag-Semantic Gap)
+                    if (_ollamaRunning)
+                    {
+                        try
+                        {
+                            var lyricTag = StrictQueryEngine.ClassifyLyric(lyricForQuery);
+                            var lyricSentiment = StrictQueryEngine.ClassifySentiment(lyricForQuery);
+
+                            // FIX-CLOSEUP: Detekcija close-up stihova
+                            // Kada stih pominje dete/lice/ruku/osmeh → forsiraj close-up hint u promptu
+                            // Close-up kadrovi drže pažnju dece 3-7g mnogo bolje od wide kadrova
+                            bool needsCloseUp = false;
+                            {
+                                string lyricLow = lyricForQuery.ToLower();
+                                var closeUpTriggers = new[] {
+                                    "dete","dijete","decu","djece","mali","mala","malo","klinac","klinka",
+                                    "ruku","rukicu","rukom","ruke","ručica","ručice",
+                                    "oči","oče","očima","lice","licem","lica",
+                                    "osmeh","osmijeh","smeška","smešak","smije","smeje","smeje",
+                                    "mama","tata","baka","deka","mamu","tatu"
+                                };
+                                needsCloseUp = closeUpTriggers.Any(t => lyricLow.Contains(t));
+                            }
+                            LogToMainWindow($"   🏷 LyricTag: {lyricTag} | Sentiment: {lyricSentiment} | CloseUp: {needsCloseUp}");
+                            string ollamaPrompt = StrictQueryEngine.BuildOllamaPrompt(lyricForQuery, _songContext, lyricTag, lyricSentiment, needsCloseUp);
+                            string ollamaRaw = await _ollama.GenerateAsync(ollamaPrompt, model: OllamaClient.QueryModel, ct: _cts?.Token ?? CancellationToken.None);
+                            string ollamaFiltered = StrictQueryEngine.FilterOllamaQuery(ollamaRaw, _songContext);
+                            if (!string.IsNullOrEmpty(ollamaFiltered))
+                            {
+                                primaryQuery = StrictQueryEngine.ValidateAndFilter(ollamaFiltered, _songContext);
+                                if (!string.IsNullOrEmpty(primaryQuery))
+                                    LogToMainWindow($"   🤖 Ollama query: '{primaryQuery}'");
+                                else
+                                    LogToMainWindow($"   ⚠️ Ollama query odbijen filterom: '{ollamaFiltered}'");
+                            }
+                            else
+                                LogToMainWindow($"   ⚠️ Ollama nije dala upotrebljiv query");
+                        }
+                        catch (Exception ollamaEx)
+                        {
+                            LogToMainWindow($"   ⚠️ Ollama greška: {ollamaEx.Message}");
+                        }
+                    }
+
+                    // SLOJ 2: StrictQueryEngine fallback
+                    if (string.IsNullOrEmpty(primaryQuery))
+                    {
+                        string mapQuery = StrictQueryEngine.GetHardCodedQuery(lyricForQuery);
+                        if (!string.IsNullOrEmpty(mapQuery))
+                        {
+                            primaryQuery = StrictQueryEngine.ValidateAndFilter(mapQuery, _songContext);
+                            if (!string.IsNullOrEmpty(primaryQuery))
+                                LogToMainWindow($"   📖 Mapa fallback: '{primaryQuery}'");
+                        }
+                    }
+
+                    // SLOJ 3: SmartFallback — nikad crni ekran
+                    if (string.IsNullOrEmpty(primaryQuery))
+                    {
+                        primaryQuery = StrictQueryEngine.GetSmartFallback(_songContext);
+                        LogToMainWindow($"   🔄 SmartFallback: '{primaryQuery}'");
+                    }
+
+                    // FIX-COOLDOWN: Anti-ponavljanje vizuelnih tema unutar 4 scene (~12-16s)
+                    // Gemini: "određeni vizuelni motivi se ponavljaju (kadrovi potoka/šume)"
+                    // Rješenje: normalizuj query na 2-3 ključne riječi, prati cooldown po temi
+                    // Ako je ista tema bila korištena unutar QUERY_COOLDOWN_SCENES scena → varira query
+                    _currentSceneIndex++;
+                    if (!string.IsNullOrEmpty(primaryQuery))
+                    {
+                        // Normalizuj query na prvih 2-3 riječi = "tema" (npr. "children stream water" → "children stream")
+                        var queryWords = primaryQuery.ToLower()
+                            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                            .Where(w => w.Length > 3) // filtriraj kratke function words
+                            .Take(2)
+                            .ToArray();
+                        string queryTheme = string.Join(" ", queryWords);
+
+                        if (!string.IsNullOrEmpty(queryTheme) &&
+                            _queryThemeCooldown.TryGetValue(queryTheme, out int lastUsed) &&
+                            _currentSceneIndex - lastUsed < QUERY_COOLDOWN_SCENES)
+                        {
+                            // Ista tema se ponovila prebrzo — varira query sa energy/season kontekstom
+                            string variant = _currentSeason switch
+                            {
+                                "winter" => $"{primaryQuery} snow frost winter",
+                                "summer" => $"{primaryQuery} sunshine golden hour",
+                                "spring" => $"{primaryQuery} blooming fresh spring",
+                                "autumn" => $"{primaryQuery} golden leaves autumn",
+                                _ => $"{primaryQuery} different angle perspective"
+                            };
+                            LogToMainWindow($"   🔄 Cooldown varijanta (tema '{queryTheme}' bila scena {lastUsed}): '{variant}'");
+                            primaryQuery = variant;
+                        }
+
+                        // Ažuriraj cooldown za ovu temu
+                        _queryThemeCooldown[queryTheme] = _currentSceneIndex;
+                    }
+
+                    // Multi-anchor za duge scene
+                    var multiMatches = StrictQueryEngine.GetAllHardCodedMatches(lyricForQuery);
 
                     // Setujemo instance fields da budu dostupni unutar SearchAndDownloadMedia
                     _currentLyric  = scene.Description;
                     _currentSeason = _detectedSeason;
 
                     LogToMainWindow($"🎬 Scena {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
-                    LogToMainWindow($"   📝 Stih: '{(scene.Description.Length > 50 ? scene.Description.Substring(0, 50) + "..." : scene.Description)}'");
-                    LogToMainWindow($"   🔑 Keywords: '{scene.Keywords}'" + (scene.FallbackKeywords != null ? $" | Fallback: '{scene.FallbackKeywords}'" : ""));
-                    LogToMainWindow($"   🔍 Pixabay query: '{primaryQuery}'");
+                    LogToMainWindow($"   📝 Stih: '{(lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)}'");
+                    LogToMainWindow($"   🎯 Query: '{primaryQuery}'" + (multiMatches.Count > 1 ? $" (+ {multiMatches.Count - 1} multi-anchor)" : ""));
 
                     // ── HYBRID CONTENT SELECTOR ────────────────────────────────────────────────
                     scene.ContentTag = DetermineContentTag(scene);
@@ -4010,58 +4263,63 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                         scene.Duration = effectiveDuration;
                     }
 
-                    // Hybrid: effectiveMediaType umjesto globalnog mediaType
-                    if (effectiveMediaType == "video" && scene.Duration > 6.0)
+                    // ── ZERO-FALLBACK: Multi-anchor za duge scene ─────────────────────────
+                    // Ako postoji više hard-coded mapa za ovaj stih → montaža.
+                    // Ako postoji samo jedna → jedini API poziv.
+                    // Ako nema mape (primaryQuery iz BuildLiteral) → jedan pokušaj pa crni ekran.
+                    if (multiMatches.Count >= 2 && effectiveMediaType == "video" && scene.Duration > 4.0)
                     {
+                        LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded upita → montaža klipova");
+                        mediaPath = await BuildSubSceneVideo(multiMatches, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
+                        if (mediaPath != null)
+                            LogToMainWindow($"   ✅ Multi-anchor video kreiran");
+                    }
+
+                    if (string.IsNullOrEmpty(mediaPath) && effectiveMediaType == "video" && scene.Duration > 6.0 && !string.IsNullOrEmpty(primaryQuery))
+                    {
+                        // Duga scena → pokušaj multi-clip sa istim query
                         mediaPath = await SearchAndDownloadMultipleMedia(
-                            primaryQuery, fallbackQuery, effectiveMediaType,
+                            primaryQuery, primaryQuery, effectiveMediaType,
                             scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                     }
 
-                    if (string.IsNullOrEmpty(mediaPath))
-                        mediaPath = await SearchAndDownloadMedia(primaryQuery, _pixabayMinHeight, effectiveMediaType, _cts?.Token ?? CancellationToken.None, scene.Duration);
+                    // ── 3-POKUŠAJA SISTEM ─────────────────────────────────────────────────
+                    // Pokušaj 1: primaryQuery (Ollama/mapa)
+                    // Pokušaj 2: SmartFallback (kontekstualni)
+                    // Pokušaj 3: Apsolutni sigurni query
+                    // Qwen screening je ugrađen unutar SearchAndDownloadMedia —
+                    // on odbacuje loše klipove i traži bolji unutar iste pretrage.
+                    // Ovaj sistem menja SAM QUERY između pokušaja.
+                    // Nikad crni ekran — bar jedan pokušaj uvek daje rezultat.
+                    // ─────────────────────────────────────────────────────────────────────
+                    var queryAttempts = new List<string>();
+                    if (!string.IsNullOrEmpty(primaryQuery))
+                        queryAttempts.Add(primaryQuery);
+                    queryAttempts.Add(StrictQueryEngine.GetSmartFallback(_songContext));
+                    queryAttempts.Add("children playing outdoor sunny");
 
-                    if (string.IsNullOrEmpty(mediaPath))
-                        mediaPath = await SearchAndDownloadMedia(fallbackQuery, _pixabayMinHeight, effectiveMediaType, _cts?.Token ?? CancellationToken.None, scene.Duration);
-
-                    // Adaptive Search Expansion — asocijativni fallback iz AI interpretacije stiha
-                    if (string.IsNullOrEmpty(mediaPath) && !string.IsNullOrEmpty(scene.FallbackKeywords))
+                    for (int attempt = 0; attempt < queryAttempts.Count && string.IsNullOrEmpty(mediaPath); attempt++)
                     {
-                        LogToMainWindow($"   🔄 Asocijativni fallback: '{scene.FallbackKeywords}'");
-                        mediaPath = await SearchAndDownloadMedia(scene.FallbackKeywords, _pixabayMinHeight, effectiveMediaType, _cts?.Token ?? CancellationToken.None, scene.Duration);
-                    }
-
-                    if (string.IsNullOrEmpty(mediaPath))
-                    {
-                        var rng = new Random(i);
-                        string fallback = _universalKeywords[rng.Next(_universalKeywords.Count)];
-                        mediaPath = await SearchAndDownloadMedia(fallback, _pixabayMinHeight, effectiveMediaType, _cts?.Token ?? CancellationToken.None, scene.Duration);
-                    }
-
-                    if (string.IsNullOrEmpty(mediaPath))
-                    {
-                        // PATCH 7: Garantirani fallback pool — čisti park/nature snimci visoke rezolucije
-                        var safePool = new[] {
-                            "children playing park sunny day",
-                            "green park path sunny outdoor",
-                            "nature trail forest path sunlight",
-                            "meadow flowers sunny spring outdoor",
-                            "park bench trees green sunlight"
-                        };
-                        string safeQuery = safePool[i % safePool.Length];
-                        mediaPath = await SearchAndDownloadMedia(safeQuery, _pixabayMinHeight, effectiveMediaType, _cts?.Token ?? CancellationToken.None, scene.Duration);
+                        string attemptQuery = queryAttempts[attempt];
+                        string attemptLabel = attempt == 0 ? "Pokušaj 1 (primary)" :
+                                              attempt == 1 ? "Pokušaj 2 (SmartFallback)" :
+                                                            "Pokušaj 3 (safe)";
+                        LogToMainWindow($"   🔍 {attemptLabel}: '{attemptQuery}'");
+                        mediaPath = await SearchAndDownloadMedia(
+                            attemptQuery, _pixabayMinHeight, effectiveMediaType,
+                            _cts?.Token ?? CancellationToken.None, scene.Duration);
                         if (!string.IsNullOrEmpty(mediaPath))
-                            LogToMainWindow($"   🌿 Safe fallback pool: '{safeQuery}'");
-                    }
-
-                    if (string.IsNullOrEmpty(mediaPath))
-                    {
-                        mediaPath = await GenerateMoodGradient(scene.Emotion ?? _detectedMood, scene.Duration, _tempVideoFolder);
-                        LogToMainWindow($"   🎨 Fallback: mood gradient za scenu {i + 1}");
+                            LogToMainWindow($"   ✅ {attemptLabel} uspješan");
+                        else
+                            LogToMainWindow($"   ⚠️ {attemptLabel} nije vratio medij");
                     }
 
                     if (!string.IsNullOrEmpty(mediaPath))
                     {
+                        // _lastShotType je setovan unutar SearchAndDownloadMedia — prepisujemo na scenu
+                        if (!string.IsNullOrEmpty(_lastShotType))
+                            scene.ShotType = _lastShotType;
+
                         string finalPath = mediaPath;
                         if (effectiveMediaType == "video")
                         {
@@ -4102,10 +4360,12 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                             AmbientSoundPath = ambientPath,
                             Energy = scene.Energy,
                             Emotion = scene.Emotion,
-                            MoodTag = $"mood:{scene.Emotion ?? _detectedMood}|context:{_detectedContext}",
+                            MoodTag = $"mood:{scene.Emotion ?? _detectedMood}|context:{_detectedContext}|pacing:{scene.PacingCategory}|shottype:{scene.ShotType}|season:{_currentSeason ?? _detectedSeason ?? _songContext.Season ?? "none"}",
                             VisionScore = scene.VisionScore,
                             IsStaticClip = scene.IsStaticClip,
-                            ContentTag = scene.ContentTag        // Hybrid Content Selector
+                            ContentTag = scene.ContentTag,        // Hybrid Content Selector
+                            Sentiment = StrictQueryEngine.ClassifySentiment(
+                                i < _lyricLines?.Count ? _lyricLines[i] : "").ToString()
                         });
                         LogToMainWindow($"✅ Scena {i + 1}: medij preuzet");
                     }
@@ -4175,6 +4435,26 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 AnnounceToUser(LF("review_done_creating", _segments.Count), 97);
 
                 await CreateVideo(storyBoard);
+
+                // ── AUTO-RENDER: pokreni odmah ako je korisnik postavio putanju ────
+                if (AutoRenderEnabled)
+                {
+                    // Uzmi putanju direktno iz TextBox (korisnik je mogao da je promeni)
+                    string autoPath = !string.IsNullOrEmpty(txtAutoRenderPath?.Text)
+                        ? txtAutoRenderPath.Text.Trim()
+                        : AutoRenderOutputPath;
+
+                    if (string.IsNullOrEmpty(autoPath))
+                    {
+                        LogToMainWindow("⚠️ Auto-Render: nije postavljena putanja za čuvanje");
+                    }
+                    else
+                    {
+                        AutoRenderOutputPath = autoPath;
+                        LogToMainWindow($"🚀 Auto-Render: pokrećem render → {autoPath}");
+                        await TriggerAutoRender(autoPath);
+                    }
+                }
             }
             catch (Exception ex) { WpfMessageBox.Show(LF("generic_error", ex.Message), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error); }
             finally { btnGenerate.IsEnabled = true; btnGenerate.Content = "🎬 KREIRAJ VIDEO"; }
@@ -4183,6 +4463,71 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
         #endregion
 
         #region TrimVideoToDuration
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  TriggerAutoRender — automatski render posle generisanja
+        //  Poziva FinalRender_Click sa predefinisanom putanjom, bez dijaloga
+        // ══════════════════════════════════════════════════════════════════════
+        // ── Auto-Render UI event handlers ────────────────────────────────────
+        private void chkAutoRender_Checked(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (pnlAutoRenderPath == null) return;
+            bool isChecked = chkAutoRender.IsChecked == true;
+            pnlAutoRenderPath.Visibility = isChecked
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+            AutoRenderEnabled = isChecked;
+            if (isChecked && !string.IsNullOrEmpty(txtAutoRenderPath.Text))
+                AutoRenderOutputPath = txtAutoRenderPath.Text;
+        }
+
+        private void btnAutoRenderBrowse_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            var dlg = new WpfSaveFileDialog
+            {
+                Filter = "MP4 video|*.mp4",
+                DefaultExt = "mp4",
+                FileName = "iskra_video.mp4",
+                Title = "Odaberi gdje čuvati video"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                txtAutoRenderPath.Text = dlg.FileName;
+                AutoRenderOutputPath   = dlg.FileName;
+            }
+        }
+
+        private async Task TriggerAutoRender(string outputPath)
+        {
+            try
+            {
+                var mainWindow = System.Windows.Application.Current?.MainWindow as MainWindow;
+                if (mainWindow == null)
+                {
+                    LogToMainWindow("⚠️ Auto-Render: MainWindow nije dostupan");
+                    return;
+                }
+
+                // Osiguraj da folder postoji
+                string folder = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
+                    Directory.CreateDirectory(folder);
+
+                // Postavi currentProjectFolder ako nije postavljen
+                if (string.IsNullOrEmpty(mainWindow.currentProjectFolder))
+                    mainWindow.currentProjectFolder = folder ?? string.Empty;
+
+                LogToMainWindow($"🎬 Auto-Render: output → {outputPath}");
+                AnnounceToUser("Pokrećem render...", 99);
+
+                // Direktno pokretanje rendera sa output putanjom
+                await mainWindow.StartRenderToPath(outputPath);
+            }
+            catch (Exception ex)
+            {
+                LogToMainWindow($"⚠️ Auto-Render greška: {ex.Message}");
+            }
+        }
 
         private void GenerateValidationReport()
         {
@@ -4201,7 +4546,11 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 s.Description.Contains("family") || s.Description.Contains("deca") ||
                 s.Description.Contains("djeca") || s.Description.Contains("dete") ||
                 s.Description.Contains("baby")));
-            double totalDur = segs.Sum(s => s.Duration);
+            // BUG-4 FIX: Oduzmi crossfade overlap da prikaz bude tačan
+            // Crossfade oduzima (N-1) * avgFade od ukupnog trajanja
+            double avgFadeEst = 0.346; // prosječni fade iz pacing logike
+            double crossfadeOverlapEst = segs.Count > 1 ? (segs.Count - 1) * avgFadeEst : 0.0;
+            double totalDur = Math.Max(0, segs.Sum(s => s.Duration) - crossfadeOverlapEst);
             int highEnergy = segs.Count(s => s.Energy >= 4);
             int lowEnergy = segs.Count(s => s.Energy <= 2);
 
@@ -4452,8 +4801,10 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             catch { return 5.0; }
         }
 
-        private async Task<string> SearchAndDownloadMedia(string keywords, int minWidth, string mediaType, CancellationToken ct, double minDurationSeconds = 0)
+        private async Task<string> SearchAndDownloadMedia(string keywords, int minWidth, string mediaType, CancellationToken ct, double minDurationSeconds = 0, bool strictSeasonFilter = true)
         {
+            // ZERO-FALLBACK guard: null keywords → odmah null (caller će GenerateBlackFrame)
+            if (string.IsNullOrWhiteSpace(keywords)) return null;
             LogToMainWindow($"🔍 SearchAndDownloadMedia: '{keywords.Substring(0, Math.Min(60, keywords.Length))}...', type={mediaType}");
 
             string apiKey = null;
@@ -4526,7 +4877,21 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                     try
                     {
                         ct.ThrowIfCancellationRequested();
-                        string searchQ = attempt == 0 ? keywords : _universalKeywords[new Random().Next(_universalKeywords.Count)];
+                        // FALLBACK FIX: attempt==1 ostaje semantički vezan za query
+                        // (ne vuče random iz _universalKeywords koji nema veze sa stihom)
+                        string searchQ;
+                        if (attempt == 0)
+                        {
+                            searchQ = keywords;
+                        }
+                        else
+                        {
+                            // Uzmi prvu smislenu riječ iz query-a + "children outdoor"
+                            var firstWord = keywords
+                                .Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries)
+                                .FirstOrDefault(t => t.Length > 3) ?? keywords.Split(' ')[0];
+                            searchQ = firstWord + " children outdoor";
+                        }
 
                         string url = mediaType == "video"
                             ? (minDurationSeconds > 20
@@ -4786,11 +5151,15 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                                         continue;
                                     }
 
-                                    bool motionOk = MotionResult.IsCompatible(_lastClipMotion, clipMotion);
+                                    // FIX-MOTION: Koristimo EndDirection prethodnog klipa (ne Direction)
+                                    // _lastClipEndMotion sadrži kretanje pri KRAJU prethodnog klipa
+                                    // Ovo rešava jump-cut: kraj-početak mora biti kompatibilan, ne početak-početak
+                                    var prevForMatch = _lastClipEndMotion ?? _lastClipMotion;
+                                    bool motionOk = MotionResult.IsCompatible(prevForMatch, clipMotion);
 
                                     if (!motionOk && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow("   Motion mismatch (" + (_lastClipMotion?.Direction.ToString() ?? "null") + " -> " + clipMotion.Direction + ") -- trazim bolji...");
+                                        LogToMainWindow("   Motion mismatch (end:" + (prevForMatch?.EndDirection.ToString() ?? "null") + " -> start:" + clipMotion.Direction + ") -- trazim bolji...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         break;
@@ -4842,21 +5211,54 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                                     }
 
                                     // ── Temporal Seasonal Grouping ────────────────────────────────
-                                    // Detektujemo sezonu klipa na osnovu tagova
+                                    // ── STRICT SEASONAL MATCHING ──────────────────────────────────
+                                    // Detektujemo sezonu klipa na osnovu tagova (prošireni set za bolju detekciju)
                                     string clipSeasonTag = "none";
-                                    if (hitTagsForShot.Contains("snow") || hitTagsForShot.Contains("winter") || hitTagsForShot.Contains("frost"))
+                                    if (hitTagsForShot.Contains("snow") || hitTagsForShot.Contains("winter") ||
+                                        hitTagsForShot.Contains("frost") || hitTagsForShot.Contains("ice") ||
+                                        hitTagsForShot.Contains("frozen") || hitTagsForShot.Contains("cold") ||
+                                        hitTagsForShot.Contains("blizzard") || hitTagsForShot.Contains("snowflake"))
                                         clipSeasonTag = "winter";
-                                    else if (hitTagsForShot.Contains("autumn") || hitTagsForShot.Contains("fall") || hitTagsForShot.Contains("leaves"))
+                                    else if (hitTagsForShot.Contains("autumn") || hitTagsForShot.Contains("fall") ||
+                                             hitTagsForShot.Contains("leaves") || hitTagsForShot.Contains("foliage") ||
+                                             hitTagsForShot.Contains("orange leaves") || hitTagsForShot.Contains("maple"))
                                         clipSeasonTag = "autumn";
-                                    else if (hitTagsForShot.Contains("spring") || hitTagsForShot.Contains("blossom") || hitTagsForShot.Contains("bloom"))
+                                    else if (hitTagsForShot.Contains("spring") || hitTagsForShot.Contains("blossom") ||
+                                             hitTagsForShot.Contains("bloom") || hitTagsForShot.Contains("cherry blossom") ||
+                                             hitTagsForShot.Contains("tulip") || hitTagsForShot.Contains("daffodil"))
                                         clipSeasonTag = "spring";
-                                    else if (hitTagsForShot.Contains("summer") || hitTagsForShot.Contains("beach") || hitTagsForShot.Contains("sunny"))
+                                    else if (hitTagsForShot.Contains("summer") || hitTagsForShot.Contains("beach") ||
+                                             hitTagsForShot.Contains("tropical") || hitTagsForShot.Contains("heat") ||
+                                             hitTagsForShot.Contains("swimming pool") || hitTagsForShot.Contains("sunbath"))
                                         clipSeasonTag = "summer";
 
-                                    // Zabranjujemo nagle skokove između suprotnih sezona
-                                    // (npr. snijeg → plaža → snijeg) — dopuštamo samo susjedne sezone
+                                    // STRICT FILTER: odbaci klip koji nije "none" i nije ciljana sezona pesme
+                                    // Npr. pesma je "spring" → prihvati "spring" i "none", odbaci "summer/autumn/winter"
+                                    // Ovo rješava Geminijev prigovor o nekonzistentnosti kadrova
+                                    // IZNIMKA: B-roll klipovi (strictSeasonFilter=false) — ne filtriramo jer
+                                    // B-roll pokriva više sezona u pesmi (npr. "Šetnja" ima sva 4 godišnja doba)
+                                    bool strictSeasonReject = false;
+                                    if (strictSeasonFilter &&
+                                        !string.IsNullOrEmpty(_currentSeason) && _currentSeason != "none" &&
+                                        clipSeasonTag != "none" && clipSeasonTag != _currentSeason &&
+                                        hitOffset < sortedHits.Count - 2)
+                                    {
+                                        strictSeasonReject = true;
+                                    }
+
+                                    if (strictSeasonReject)
+                                    {
+                                        LogToMainWindow($"   🗓 StrictSeason: klip={clipSeasonTag}, pesma={_currentSeason} — nije kompatibilno, tražim konzistentniji klip...");
+                                        try { File.Delete(fullPath); } catch { }
+                                        _usedMediaUrls.Remove(dlUrl);
+                                        continue;
+                                    }
+
+                                    // Sekundarni guard: zabrani i nagle oscilacije (winter→summer na istoj sceni)
+                                    // Ovo ostaje kao fallback za pesme bez definirane sezone ("none")
                                     bool seasonClash = false;
-                                    if (_lastSeasonTag != "none" && clipSeasonTag != "none" && clipSeasonTag != _lastSeasonTag)
+                                    if (!strictSeasonReject && _lastSeasonTag != "none" &&
+                                        clipSeasonTag != "none" && clipSeasonTag != _lastSeasonTag)
                                     {
                                         var opposites = new Dictionary<string, string>
                                         {
@@ -5004,15 +5406,40 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                                     }
 
                                     _lastClipMotion = clipMotion;
+
+                                    // FIX-MOTION: Analiza KRAJA klipa za precizni jump-cut matching
+                                    // Asinhrono — ne blokira, fallback na clipMotion ako ne uspe
+                                    try
+                                    {
+                                        double clipDurEst = 3.0; // konzervativna procena; precizno vreme nije bitno za ovu analizu
+                                        _lastClipEndMotion = await MotionAnalyzer.AnalyzeEndAsync(
+                                            fullPath, ffmpegForVision, clipDurEst, 1.5, ct);
+                                    }
+                                    catch { _lastClipEndMotion = clipMotion; }
                                     _lastShotType   = shotType;
                                     _lastSeasonTag  = clipSeasonTag != "none" ? clipSeasonTag : _lastSeasonTag;
                                     _lastClipWarm   = clipIsWarm || (!clipIsCold);
-                                    _lastClipWasOutdoor = vision.IsOutdoor || !thisClipIsIndoor; // PATCH 10: prati outdoor state
-                                    string visionTag = vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : "FFmpeg";
-                                    LogToMainWindow($"   ✅ Score {vision.Score:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Shot:{shotType} | Season:{clipSeasonTag} | " +
-                                        $"Children:{vision.HasChildren} Outdoor:{vision.IsOutdoor}");
+                                    _lastClipWasOutdoor = vision.IsOutdoor || !thisClipIsIndoor;
 
-                                    _lastDownloadedVisionScore = vision.Score;
+                                    // FIX-SMILE: Bonus score za osmeh kada je stih pozitivan
+                                    // Gemini preporuka: "ako je muzika vesela, dozvoljeni su samo kadrovi gdje se vide osmesi"
+                                    // Implementacija: bonus na score (ne odbacivanje), da sistem preferira smiješne kadrove
+                                    double finalScore = vision.Score;
+                                    if (vision.HasSmile)
+                                    {
+                                        var currentSentiment = StrictQueryEngine.ClassifySentiment(_currentLyric ?? "");
+                                        if (currentSentiment == SentimentPolarity.Positive)
+                                        {
+                                            finalScore = Math.Min(10.0, vision.Score + 1.5);
+                                            LogToMainWindow($"   😊 Smile bonus +1.5 (sentiment=Positive): {vision.Score:F1} → {finalScore:F1}");
+                                        }
+                                    }
+
+                                    string visionTag = vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : "FFmpeg";
+                                    LogToMainWindow($"   ✅ Score {finalScore:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Shot:{shotType} | Season:{clipSeasonTag} | " +
+                                        $"Children:{vision.HasChildren} Outdoor:{vision.IsOutdoor} Smile:{vision.HasSmile}");
+
+                                    _lastDownloadedVisionScore = finalScore;
                                     _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
                                                               || clipMotion.Direction == MotionDirection.Static;
                                     return fullPath;
@@ -5114,7 +5541,16 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             }
 
             string songTitle = string.IsNullOrEmpty(txtIntroText.Text) ? "🎵 Nova pjesmica" : txtIntroText.Text;
-            double introDuration = 4;
+            // DEAD-ZONE FIX: Naslov traje koliko instrumentalni uvod (max 4s).
+            // Ako muzika kreće odmah → samo 0.5s da ne "visi" dok audio svira.
+            double introDuration;
+            if (_beatInfo != null && _beatInfo.AudioStartSeconds > 0.5)
+                introDuration = Math.Min(4.0, Math.Round(_beatInfo.AudioStartSeconds, 1));
+            else if (_beatInfo != null && _beatInfo.AudioStartSeconds >= 0.0 && _beatInfo.AudioStartSeconds <= 0.5)
+                introDuration = 0.5;
+            else
+                introDuration = 4.0;
+            LogToMainWindow($"🎬 Intro trajanje: {introDuration:F1}s (AudioStart={_beatInfo?.AudioStartSeconds:F2}s)");
             string introImagePath = await CreateTextImage(songTitle, introDuration, true);
             var introItem = new TimelineItem
             {
@@ -5341,7 +5777,9 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
                 }
                 else
                 {
-                    AddCrossfadeWithEnergy(currentItem, nextItem, fadeDuration, transEnergy);
+                    // Bira tip tranzicije po energiji i sezoni — deterministic ali raznovrstan
+                    var transType = TransitionEffect.PickForEnergy(transEnergy, _detectedSeason, i);
+                    AddCrossfadeWithEnergy(currentItem, nextItem, fadeDuration, transEnergy, transType);
 
                     if (addTransitionSound)
                     {
@@ -5391,8 +5829,19 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             item.Keyframes.Add(new AnimationKeyframe { Time = duration, Opacity = 1 });
         }
 
-        private void AddCrossfadeWithEnergy(TimelineItem currentItem, TimelineItem nextItem, double duration, int nextEnergy)
+        private void AddCrossfadeWithEnergy(TimelineItem currentItem, TimelineItem nextItem,
+            double duration, int nextEnergy,
+            TransitionType transType = TransitionType.Fade)
         {
+            // Spremi odabrani tip tranzicije na item kako bi ga RenderEngine mogao pokupit
+            // kroz AudioDescription field (koji se već koristi za prijenos metapodataka)
+            // Format: postojeći string + "|xfade=<type>"
+            string xfadeTag = $"|xfade={TransitionTypeToFFmpeg(transType)}";
+            if (!string.IsNullOrEmpty(currentItem.AudioDescription))
+                currentItem.AudioDescription += xfadeTag;
+            else
+                currentItem.AudioDescription = xfadeTag.TrimStart('|');
+
             double startFade = Math.Max(0, currentItem.Duration - duration);
             currentItem.Keyframes.Add(new AnimationKeyframe { Time = startFade, Opacity = 1 });
             currentItem.Keyframes.Add(new AnimationKeyframe { Time = currentItem.Duration, Opacity = 0 });
@@ -5401,6 +5850,20 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             nextItem.Keyframes.Add(new AnimationKeyframe { Time = 0, Opacity = 0 });
             nextItem.Keyframes.Add(new AnimationKeyframe { Time = fadeInDuration, Opacity = 1 });
         }
+
+        private static string TransitionTypeToFFmpeg(TransitionType t) => t switch
+        {
+            TransitionType.SlideLeft  => "slideleft",
+            TransitionType.SlideRight => "slideright",
+            TransitionType.SlideUp    => "slideup",
+            TransitionType.SlideDown  => "slidedown",
+            TransitionType.WipeLeft   => "wipeleft",
+            TransitionType.WipeRight  => "wiperight",
+            TransitionType.ZoomIn     => "zoom",
+            TransitionType.Crossfade  => "fade",
+            TransitionType.Fade       => "fade",
+            _ => "fade"
+        };
 
         private async Task<string> CreateTextImage(string text, double duration, bool isIntro = false)
         {
@@ -5553,6 +6016,41 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             var _bgSo = proc.StandardOutput.ReadToEndAsync();
             var _bgSe = proc.StandardError.ReadToEndAsync();
             await Task.WhenAll(_bgSo, _bgSe);
+            await proc.WaitForExitAsync();
+
+            return (proc.ExitCode == 0 && File.Exists(outputPath)) ? outputPath : null;
+        }
+
+        /// <summary>
+        /// ZERO-FALLBACK: Generiše crni ekran umjesto pogrešnog kadra.
+        /// Svaki crni ekran u finalnom videu = jasna debug poruka:
+        /// "dodaj ovu mapu u StrictQueryEngine".
+        /// </summary>
+        private async Task<string> GenerateBlackFrame(double duration, string tempDir)
+        {
+            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            if (!File.Exists(ffmpegPath)) return null;
+
+            string outputPath = Path.Combine(tempDir, $"black_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4");
+            string dStr = duration.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            string args = $"-f lavfi -i \"color=c=black:s={_targetWidth}x{_targetHeight}:d={dStr},format=yuv420p\" " +
+                          $"-c:v libx264 -preset veryfast -crf 23 -profile:v high -level 4.1 -pix_fmt yuv420p -an -y \"{outputPath}\"";
+
+            var proc = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffmpegPath,
+                    Arguments = args,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                }
+            };
+            proc.Start();
+            await Task.WhenAll(proc.StandardOutput.ReadToEndAsync(), proc.StandardError.ReadToEndAsync());
             await proc.WaitForExitAsync();
 
             return (proc.ExitCode == 0 && File.Exists(outputPath)) ? outputPath : null;
@@ -5846,6 +6344,8 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             string keywords, string fallbackKeywords, string mediaType,
             double targetDuration, string tempDir, CancellationToken ct)
         {
+            // ZERO-FALLBACK guard: null keywords → odmah null
+            if (string.IsNullOrWhiteSpace(keywords)) return null;
             int clipCount = Math.Max(2, (int)Math.Ceiling(targetDuration / 5.0));
             clipCount = Math.Min(clipCount, 4);
 
@@ -6016,6 +6516,55 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
             if (_isRunning) { _cts?.Cancel(); AnnounceToUser(L("cancelling_msg")); btnCancel.Content = L("cancelling_button"); btnCancel.IsEnabled = false; }
             else { DialogResult = false; Close(); }
         }
+
+        /// <summary>
+        /// Postavlja Whisper word-level timestamps koji se koriste za preciznu sinhronizaciju
+        /// teksta i videa na nivou pojedinačnih reči.
+        /// </summary>
+        public void SetWordTimings(List<AITranscription.WordTiming> wordTimings)
+        {
+            if (wordTimings == null) return;
+            _wordTimings = wordTimings;
+            LogToMainWindow($"🔤 Word timings postavljeni: {_wordTimings.Count} reči");
+        }
+
+        /// <summary>
+        /// Čuva API ključ za zadatog media provajdera (šifrovano na disku).
+        /// </summary>
+        public void SaveMediaProviderKey(string providerName, string key)
+        {
+            if (string.IsNullOrWhiteSpace(providerName) || string.IsNullOrWhiteSpace(key)) return;
+            try
+            {
+                MediaProviderSettings.SaveKey(providerName, key);
+                if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
+                    _pixabayApiKey = key;
+                LogToMainWindow($"✅ API ključ za {providerName} sačuvan.");
+            }
+            catch (Exception ex)
+            {
+                LogToMainWindow($"❌ Greška pri čuvanju ključa za {providerName}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Briše API ključ za zadatog media provajdera.
+        /// </summary>
+        public void DeleteMediaProviderKey(string providerName)
+        {
+            if (string.IsNullOrWhiteSpace(providerName)) return;
+            try
+            {
+                MediaProviderSettings.DeleteKey(providerName);
+                if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
+                    _pixabayApiKey = null;
+                LogToMainWindow($"🗑 API ključ za {providerName} obrisan.");
+            }
+            catch (Exception ex)
+            {
+                LogToMainWindow($"❌ Greška pri brisanju ključa za {providerName}: {ex.Message}");
+            }
+        }
     }
 
     #region Helper Classes
@@ -6024,6 +6573,8 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
     {
         public int SceneNumber { get; set; }
         public string Description { get; set; }
+        /// <summary>Originalni, neskraćeni tekst stiha — koristi se za StrictQueryEngine matching.</summary>
+        public string FullLyric { get; set; }
         public string Emotion { get; set; }
         public int Energy { get; set; }
         public string Characters { get; set; }
@@ -6043,6 +6594,12 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
         /// Određuje da li scena koristi fotografiju (ZoomPan) ili video.
         /// </summary>
         public string ContentTag { get; set; }
+
+        /// <summary>Wide / Medium / Close — tip kadra, utiče na pacing i crossfade dužinu.</summary>
+        public string ShotType { get; set; } = "medium";
+
+        /// <summary>Fast(1.5-2s) / Standard(2.8-3.2s) / Slow(5-6s) — Rhythmic Variation kategorija.</summary>
+        public string PacingCategory { get; set; } = "standard";
     }
 
     public class StoryBoard
@@ -6070,6 +6627,8 @@ Odgovori ISKLJUČIVO JSON (nema teksta izvan JSON-a):
         /// Hybrid Content Selector tag propagiran iz StoryScene.
         /// </summary>
         public string ContentTag { get; set; }
+        /// <summary>Per-stih sentiment polaritet — Positive/Negative/Neutral.</summary>
+        public string Sentiment { get; set; } = "Neutral";
     }
 
     public class SongAnalysis

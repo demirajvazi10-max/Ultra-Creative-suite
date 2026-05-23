@@ -185,8 +185,29 @@
                        AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
 
+        <!-- Auto-Render sekcija -->
+        <Border Grid.Row="14" Background="#1A3A1A" CornerRadius="4" Padding="8" Margin="0,0,0,6"
+                BorderBrush="#2E7D32" BorderThickness="1">
+            <StackPanel>
+                <CheckBox x:Name="chkAutoRender" Content="Auto-Render posle generisanja (pokreni i idi spavati)"
+                          Foreground="#90EE90" FontWeight="Bold" IsChecked="False"
+                          Checked="chkAutoRender_Checked" Unchecked="chkAutoRender_Checked"/>
+                <StackPanel x:Name="pnlAutoRenderPath" Orientation="Horizontal" Margin="0,6,0,0"
+                            Visibility="Collapsed">
+                    <TextBox x:Name="txtAutoRenderPath" Width="320" Height="25"
+                             Background="#2D2D2D" Foreground="White" Padding="3"
+                             VerticalContentAlignment="Center"
+                             Text="C:\Videos\iskra_video.mp4"
+                             ToolTip="Puna putanja gdje se čuva finalni video"/>
+                    <Button Content="📁" Width="28" Height="25" Margin="4,0,0,0"
+                            Background="#333" Foreground="White"
+                            Click="btnAutoRenderBrowse_Click" ToolTip="Odaberi folder"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Dugmad -->
-        <StackPanel Grid.Row="14" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+        <StackPanel Grid.Row="15" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
             <Button x:Name="btnGenerate" Content="🎬 KREIRAJ VIDEO" Click="btnGenerate_Click"
                     Width="150" Height="40" Background="#2E7D32" Foreground="White"
                     FontSize="13" FontWeight="Bold" Margin="0,0,10,0"

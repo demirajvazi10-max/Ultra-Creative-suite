@@ -1,4 +1,4 @@
-﻿#nullable disable
+#nullable disable
 using SkiaSharp;
 using Timer = System.Windows.Forms.Timer;
 using LibVLCSharp.Shared;
@@ -1058,6 +1058,18 @@ namespace UltraVideoEditor
             }
         }
 
+        private void MnuMediaProviders_Click(object sender, RoutedEventArgs e)
+        {
+            // Pronadji otvoreni AIVideoCreator prozor
+            var creator = System.Windows.Application.Current.Windows
+                .OfType<AIVideoCreator>()
+                .FirstOrDefault();
+
+            var dlg = new MediaProvidersDialog(creator);
+            dlg.Owner = this;
+            dlg.ShowDialog();
+        }
+
         private void ShowPreferences_Click(object sender, RoutedEventArgs e)
         {
             WpfMessageBox.Show(L("settings_wip"), L("settings_title"), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2107,18 +2119,81 @@ namespace UltraVideoEditor
                 var lyrics = lines.Where(l => !string.IsNullOrWhiteSpace(l.Trim())).ToList();
                 if (lyrics.Count == 0) { LogMessage("Nema ispravnih stihova", true); return; }
                 double duration = GetAudioDuration(selectedAudioPath);
-                await Task.Delay(500);
                 syncedSubtitles.Clear();
-                double timePerLine = duration / lyrics.Count;
-                for (int i = 0; i < lyrics.Count; i++)
+
+                // SYNC FIX: Pokušavamo Whisper transkripciju za tačne audio timestamps.
+                // Whisper vraća START/END svake linije direktno iz talasnog oblika zvuka,
+                // što eliminiše "theoretical timing" drift.
+                // Fallback: ravnomerna podela ako Whisper nije dostupan ili ne pronađe tekst.
+                bool usedAlignment = false;
+                if (AITranscription.IsWhisperAvailable())
                 {
-                    syncedSubtitles.Add(new AISubtitle { Text = lyrics[i], Start = i * timePerLine, End = (i + 1) * timePerLine });
+                    try
+                    {
+                        // FORCED ALIGNMENT: korisnik je već dao tekst, Whisper samo mjeri
+                        // gdje se svaka linija nalazi u audio-u. Bez transkripcije, bez pogađanja.
+                        // Rezultat: milisekunda-tačni timestamps koji prate stvarni glas.
+                        txtSyncStatus.Text = "Whisper sluša glas i poravnava tekst...";
+                        LogMessage("🎵 Forced alignment: Whisper sluša gdje počinje svaka linija...", true);
+                        string ffmpegPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+
+                        var alignResult = await AITranscription.ForcedAlignAsync(
+                            audioPath:   selectedAudioPath,
+                            userLines:   lyrics,
+                            language:    _currentLanguage ?? "sr",
+                            ffmpegPath:  ffmpegPath,
+                            modelSize:   "small",
+                            progress:    new Progress<string>(msg => Dispatcher.Invoke(() => txtSyncStatus.Text = msg)));
+
+                        if (alignResult.Success && alignResult.Lines.Count > 0)
+                        {
+                            foreach (var line in alignResult.Lines)
+                                syncedSubtitles.Add(new AISubtitle
+                                {
+                                    Text  = line.Text,
+                                    Start = line.StartSeconds,
+                                    End   = line.EndSeconds
+                                });
+                            usedAlignment = true;
+                            LogMessage($"✅ Forced alignment: {alignResult.Lines.Count} linija poravnano sa glasom", true);
+
+                            // Proslijedi word-level timestamps AIVideoCreatoru
+                            if (alignResult.WordTimings?.Count > 0)
+                            {
+                                var creator = FindAIVideoCreator();
+                                if (creator != null)
+                                {
+                                    creator.SetWordTimings(alignResult.WordTimings);
+                                    LogMessage($"🔤 Word-level sync: {alignResult.WordTimings.Count} riječi", true);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            LogMessage($"⚠ Alignment nije uspio ({alignResult.ErrorMessage}) — koristim ravnomjernu podjelu", true);
+                        }
+                    }
+                    catch (Exception alignEx)
+                    {
+                        LogMessage($"⚠ Alignment greška: {alignEx.Message} — fallback na ravnomjernu podjelu", true);
+                    }
                 }
+
+                if (!usedAlignment)
+                {
+                    // Fallback: ravnomjerna podjela
+                    double timePerLine = duration / Math.Max(1, lyrics.Count);
+                    for (int i = 0; i < lyrics.Count; i++)
+                        syncedSubtitles.Add(new AISubtitle { Text = lyrics[i], Start = i * timePerLine, End = (i + 1) * timePerLine });
+                    LogMessage("Sinhronizacija: ravnomjerna podjela (instalirajte Whisper za audio-precise sync)", true);
+                }
+
                 lstAutoSubtitles.Items.Clear();
                 foreach (var sub in syncedSubtitles)
                     lstAutoSubtitles.Items.Add($"[{FormatTime(sub.Start)} -> {FormatTime(sub.End)}] {sub.Text}");
-                txtSyncStatus.Text = string.Format(L("subtitles_done"), syncedSubtitles.Count);
-                LogMessage(string.Format(L("subtitles_done"), syncedSubtitles.Count), true);
+                string method = usedAlignment ? " (forced alignment ✅)" : " (ravnomjerna podjela)";
+                txtSyncStatus.Text = string.Format(L("subtitles_done"), syncedSubtitles.Count) + method;
+                LogMessage(string.Format(L("subtitles_done"), syncedSubtitles.Count) + method, true);
                 PlayBeep();
             }
             catch (Exception ex) { LogMessage(string.Format(L("generic_error"), ex.Message), true); }
@@ -2236,6 +2311,132 @@ namespace UltraVideoEditor
                 PlayBeep();
             }
         }
+        // ══════════════════════════════════════════════════════════════════════
+        //  StartRenderToPath — render bez dijaloga, za AutoRender iz AIVideoCreator
+        //  Koristi isti RenderSimpleAsync poziv kao FinalRender_Click
+        // ══════════════════════════════════════════════════════════════════════
+        public async Task StartRenderToPath(string outputPath)
+        {
+            if (timelineItems.Count == 0)
+            {
+                LogMessage("Auto-Render: Nema klipova za render", true);
+                return;
+            }
+
+            string format = Path.GetExtension(outputPath).ToLower().TrimStart('.');
+            if (format != "mp4" && format != "webm" && format != "avi")
+                format = "mp4";
+
+            // Osiguraj da folder postoji
+            string folder = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
+                Directory.CreateDirectory(folder);
+
+            _renderCancellation = new CancellationTokenSource();
+            prgRender.Visibility = Visibility.Visible;
+            prgRender.Value = 0;
+            btnRenderTool.IsEnabled = false;
+            txtRenderStatus.Text = "Auto-Render u toku...";
+
+            LogMessage($"🚀 Auto-Render: {timelineItems.Count} klipova → {outputPath}", true);
+
+            try
+            {
+                var renderProgress = new Progress<int>(percent =>
+                    Dispatcher.Invoke(() => { prgRender.Value = percent; }));
+
+                var renderSubtitles = subtitles.ToList();
+                bool enableSubtitles = chkEnableSubtitles?.IsChecked == true;
+
+                BeatInfo renderBeatInfo = null;
+                try
+                {
+                    var aiCreator = FindAIVideoCreator();
+                    if (aiCreator != null) renderBeatInfo = aiCreator.GetBeatInfo();
+                }
+                catch { }
+
+                await _renderEngine.RenderSimpleAsync(
+                    timelineItems,
+                    outputPath,
+                    format,
+                    renderProgress,
+                    renderSubtitles,
+                    currentExportSettings,
+                    _renderCancellation.Token,
+                    useGPUAcceleration,
+                    _selectedResolution ?? "1920x1080",
+                    AIVideoCreator.FastRenderMode,
+                    enableSubtitles,
+                    renderBeatInfo);
+
+                if (File.Exists(outputPath))
+                {
+                    long fileSize = new FileInfo(outputPath).Length;
+                    LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
+                    txtRenderStatus.Text = "Auto-Render završen!";
+                    PlayBeep();
+
+                    // Auto-close prozor posle 8 sekundi — ne treba klik
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500); // malo kašnjenje da render engine završi cleanup
+                        Dispatcher.Invoke(() =>
+                        {
+                            var toast = new System.Windows.Window
+                            {
+                                Title = "Auto-Render završen",
+                                Width = 420, Height = 130,
+                                WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
+                                Left = SystemParameters.WorkArea.Right - 440,
+                                Top  = SystemParameters.WorkArea.Bottom - 150,
+                                Topmost = true,
+                                ResizeMode = System.Windows.ResizeMode.NoResize,
+                                WindowStyle = System.Windows.WindowStyle.ToolWindow,
+                                Background = new System.Windows.Media.SolidColorBrush(
+                                    System.Windows.Media.Color.FromRgb(30, 70, 30))
+                            };
+                            var txt = new System.Windows.Controls.TextBlock
+                            {
+                                Text = "Video sacuvan!" + Environment.NewLine +
+                                       System.IO.Path.GetFileName(outputPath) + Environment.NewLine +
+                                       "(" + (fileSize / 1024 / 1024) + " MB)" + Environment.NewLine +
+                                       "Prozor se zatvara za 8 sekundi...",
+                                Foreground = System.Windows.Media.Brushes.LightGreen,
+                                FontSize = 13, TextAlignment = System.Windows.TextAlignment.Center,
+                                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                                Margin = new System.Windows.Thickness(10)
+                            };
+                            toast.Content = txt;
+                            toast.Show();
+
+                            // Auto-close posle 8 sekundi
+                            var timer = new System.Windows.Threading.DispatcherTimer
+                                { Interval = TimeSpan.FromSeconds(8) };
+                            timer.Tick += (s, e) => { timer.Stop(); toast.Close(); };
+                            timer.Start();
+                        });
+                    });
+                }
+                else
+                {
+                    LogMessage($"Auto-Render: fajl nije kreiran: {outputPath}", true);
+                    txtRenderStatus.Text = "Auto-Render nije uspio";
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Auto-Render greška: {ex.Message}", true);
+                txtRenderStatus.Text = "Auto-Render greška";
+            }
+            finally
+            {
+                btnRenderTool.IsEnabled = true;
+                prgRender.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private async void FinalRender_Click(object sender, RoutedEventArgs e)
         {
             if (timelineItems.Count == 0)
@@ -2335,6 +2536,17 @@ namespace UltraVideoEditor
                 });
 
                 var renderSubtitles = subtitles.ToList();
+                bool enableSubtitles = chkEnableSubtitles?.IsChecked == true;
+
+                // BEAT-SYNC: proslijedi BeatInfo ako je AIVideoCreator generisao analizu
+                BeatInfo renderBeatInfo = null;
+                try
+                {
+                    var aiCreator = FindAIVideoCreator();
+                    if (aiCreator != null)
+                        renderBeatInfo = aiCreator.GetBeatInfo();
+                }
+                catch { }
 
                 await _renderEngine.RenderSimpleAsync(
                     timelineItems,
@@ -2346,7 +2558,9 @@ namespace UltraVideoEditor
                     _renderCancellation.Token,
                     useGPUAcceleration,
                     selectedResolution,  // PROSLIJEĐENA REZOLUCIJA
-                    AIVideoCreator.FastRenderMode);  // BRZI RENDER (bez Ken Burns)
+                    AIVideoCreator.FastRenderMode,  // BRZI RENDER (bez Ken Burns)
+                    enableSubtitles,    // HARD-ANCHOR subtitle toggle
+                    renderBeatInfo);    // BEAT-SYNC: DownBeat snap za rezove
 
                 if (File.Exists(outputPath))
                 {
@@ -2812,9 +3026,15 @@ namespace UltraVideoEditor
 
             LogMessage(L("ai_generating_scenario"), true);
 
-            string prompt = $@"Kreiraj scenario za animaciju na osnovu sljedećeg zahtjeva: '{txtAnimationPrompt.Text}'
-Dostupne slike: {string.Join(", ", availableImages)}
-Rezultat vrati isključivo u JSON formatu bez dodatnog teksta. JSON treba da bude niz scena. Svaka scena treba da ima: 'imageName' (ime slike iz liste dostupnih slika), 'duration' (broj u sekundama, između 3 i 10), 'effect' (jedan od: Fade In, Fade Out, Zoom In, Zoom Out, Slide Left, Slide Right, None), 'description' (kratak opis na srpskom šta se dešava u sceni). Napravi između 3 i 6 scena. Vrati SAMO JSON niz, bez ikakvog dodatnog teksta.";
+            string prompt =
+                "Kreiraj scenario za animaciju na osnovu sljedeceg zahtjeva: " + txtAnimationPrompt.Text + "\n" +
+                "Dostupne slike: " + string.Join(", ", availableImages) + "\n" +
+                "Rezultat vrati iskljucivo u JSON formatu bez dodatnog teksta. " +
+                "JSON treba da bude niz scena. Svaka scena treba da ima: " +
+                "imageName (ime slike), duration (sekunde 3-10), " +
+                "effect (Fade In/Out, Zoom In/Out, Slide Left/Right, None), " +
+                "description (kratak opis na srpskom). " +
+                "Napravi izmedju 3 i 6 scena. Vrati SAMO JSON niz.";
 
             try
             {
@@ -2913,11 +3133,16 @@ Rezultat vrati isključivo u JSON formatu bez dodatnog teksta. JSON treba da bud
 
             var animacijeInfo = string.Join(", ", animacije.Select((a, i) => $"animacija{i + 1}: {a.Duration}s"));
 
-            string prompt = $@"Imam audio zapis dužine {audioDuration} sekundi. 
-Imam {animacije.Count} animacija: {animacijeInfo}.
-Predloži mi optimalan redoslijed i početne pozicije ovih animacija na timeline-u tako da pokriju cijeli audio.
-Rezultat vrati isključivo u JSON formatu bez dodatnog teksta.
-JSON treba da sadrži listu 'raspored' gdje svaki element ima: 'animacija_index' (broj od 1 do {animacije.Count}), 'pocetak' (broj u sekundama), 'kraj' (broj u sekundama), 'razlog' (kratak opis na srpskom).";
+            string prompt =
+                "Imam audio zapis duzine " + audioDuration + " sekundi. " +
+                "Imam " + animacije.Count + " animacija: " + animacijeInfo + ". " +
+                "Predlozi mi optimalan redoslijed i pocetne pozicije ovih animacija na timeline-u " +
+                "tako da pokriju cijeli audio. " +
+                "Rezultat vrati iskljucivo u JSON formatu bez dodatnog teksta. " +
+                "JSON treba da sadrzi listu raspored gdje svaki element ima: " +
+                "animacija_index (broj od 1 do " + animacije.Count + "), " +
+                "pocetak (broj u sekundama), kraj (broj u sekundama), " +
+                "razlog (kratak opis na srpskom).";
 
             LogMessage(L("ai_analyzing_audio"), true);
 
@@ -4813,6 +5038,29 @@ JSON treba da sadrži listu 'raspored' gdje svaki element ima: 'animacija_index'
         public class AILayoutResponse
         {
             public List<AILayoutItem> raspored { get; set; }
+        }
+
+        /// <summary>
+        /// Pronađi AIVideoCreator instancu u vizuelnom stablu prozora.
+        /// Koristi se za proslijeđivanje word-level timestamps nakon alignment-a.
+        /// </summary>
+        private AIVideoCreator FindAIVideoCreator()
+        {
+            return FindVisualChild<AIVideoCreator>(this);
+        }
+
+        private static T FindVisualChild<T>(System.Windows.DependencyObject parent) where T : System.Windows.DependencyObject
+        {
+            if (parent == null) return null;
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T target) return target;
+                var result = FindVisualChild<T>(child);
+                if (result != null) return result;
+            }
+            return null;
         }
 
         public class AILayoutItem

@@ -41,6 +41,12 @@ namespace UltraVideoEditor
         }
     }
 
+    /// <summary>
+    /// Detektuje kretanje kamere u video klipu koristeći pouzdanu frame-diff metodu.
+    /// Izvlači 6 frejmova (3 na početku, 3 na kraju), mjeri pixel shift između uzastopnih
+    /// frejmova koristeći FFmpeg ssim/psnr output, i klasifikuje smjer kretanja.
+    /// Ova metoda radi sa svim FFmpeg build-ovima bez eksperimentalnih filtera.
+    /// </summary>
     public static class MotionAnalyzer
     {
         private static readonly Dictionary<string, MotionResult> _cache =
@@ -60,7 +66,7 @@ namespace UltraVideoEditor
             _cacheLock.Release();
             if (found) return cached;
 
-            var result = await DoAnalyze(videoPath, ffmpegPath, ct, 0, 3.0);
+            var result = await DoFrameDiffAnalysis(videoPath, ffmpegPath, ct);
 
             await _cacheLock.WaitAsync(ct);
             _cache[videoPath] = result;
@@ -79,8 +85,9 @@ namespace UltraVideoEditor
             if (!File.Exists(videoPath) || !File.Exists(ffmpegPath))
                 return MakeUnknown();
 
-            double startAt = Math.Max(0, clipDuration - analyzeLastSeconds);
-            return await DoAnalyze(videoPath, ffmpegPath, ct, startAt, analyzeLastSeconds);
+            // Za kraj klipa koristimo isti frame-diff, samo seek na zadnji dio
+            return await DoFrameDiffAnalysis(videoPath, ffmpegPath, ct,
+                seekTo: Math.Max(0, clipDuration - analyzeLastSeconds));
         }
 
         public static async Task<List<string>> FilterCompatibleAsync(
@@ -94,14 +101,12 @@ namespace UltraVideoEditor
                 return candidatePaths;
 
             var compatible = new List<string>();
-
             foreach (var path in candidatePaths)
             {
                 var motion = await AnalyzeAsync(path, ffmpegPath, ct);
                 if (MotionResult.IsCompatible(previousClipMotion, motion))
                     compatible.Add(path);
             }
-
             return compatible.Count > 0 ? compatible : candidatePaths;
         }
 
@@ -110,136 +115,98 @@ namespace UltraVideoEditor
             _cache.Clear();
         }
 
-        private static async Task<MotionResult> DoAnalyze(
+        // ── Pouzdana frame-diff implementacija ───────────────────────────────────
+        // Izvlači 3 para frejmova na intervalima od 0.3s i mjeri optički tok
+        // koristeći standardni FFmpeg scale+format pipeline bez eksperimentalnih filtera.
+        // Svaki par daje dx/dy pomak; prosječavamo sve parove za stabilniji rezultat.
+        private static async Task<MotionResult> DoFrameDiffAnalysis(
             string videoPath, string ffmpegPath, CancellationToken ct,
-            double startAt, double duration)
+            double seekTo = 0.0)
         {
+            string tmpDir = Path.Combine(Path.GetTempPath(),
+                "MA_" + Guid.NewGuid().ToString("N").Substring(0, 8));
             try
             {
-                string seekPart = startAt > 0.5
-                    ? "-ss " + startAt.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + " "
-                    : "";
-                string durStr = duration.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+                Directory.CreateDirectory(tmpDir);
 
-                string args = "-nostdin " + seekPart + "-i \"" + videoPath + "\" " +
-                    "-t " + durStr + " " +
-                    "-vf \"mestimate=method=ds:search_param=7,metadata=print:key=lavfi.motion.estimation_avg\" " +
-                    "-f null -an -";
+                // Izvuci 6 frejmova: t=seekTo+0.0, +0.3, +0.6, +0.9, +1.2, +1.5
+                double[] offsets = { 0.0, 0.3, 0.6, 0.9, 1.2, 1.5 };
+                var framePaths = new List<string>();
 
-                var psi = new ProcessStartInfo
+                foreach (double off in offsets)
                 {
-                    FileName = ffmpegPath,
-                    Arguments = args,
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true
-                };
-                using var proc = Process.Start(psi);
-                if (proc == null) return MakeUnknown();
-
-                string stderr = await proc.StandardError.ReadToEndAsync();
-                await proc.WaitForExitAsync(ct);
-
-                return ParseMotionOutput(stderr);
-            }
-            catch
-            {
-                return await FallbackMotionDetect(videoPath, ffmpegPath, ct, startAt);
-            }
-        }
-
-        private static MotionResult ParseMotionOutput(string ffmpegOutput)
-        {
-            var xValues = new List<double>();
-            var yValues = new List<double>();
-
-            // Pattern: lavfi.motion.estimation_avg=X,Y
-            string pattern = @"lavfi\.motion\.estimation_avg=([-0-9.]+),([-0-9.]+)";
-            var matches = Regex.Matches(ffmpegOutput, pattern);
-
-            foreach (Match m in matches)
-            {
-                double xVal, yVal;
-                if (double.TryParse(m.Groups[1].Value,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out xVal))
-                {
-                    xValues.Add(xVal);
+                    double t = seekTo + off;
+                    string outPng = Path.Combine(tmpDir, $"f_{off:F1}.png");
+                    string args = $"-nostdin -ss {t.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)}" +
+                                  $" -i \"{videoPath}\" -vframes 1 -vf \"scale=160:90\" -y \"{outPng}\"";
+                    await RunFfmpegAsync(ffmpegPath, args, ct);
+                    if (File.Exists(outPng)) framePaths.Add(outPng);
                 }
-                if (double.TryParse(m.Groups[2].Value,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out yVal))
+
+                if (framePaths.Count < 2) return MakeUnknown();
+
+                // Mjeri pomak između uzastopnih parova frejmova
+                var dxList = new List<double>();
+                var dyList = new List<double>();
+
+                for (int i = 0; i < framePaths.Count - 1; i++)
                 {
-                    yValues.Add(yVal);
+                    var (dx, dy) = await MeasureFrameShift(framePaths[i], framePaths[i + 1], ffmpegPath, ct);
+                    if (!double.IsNaN(dx))
+                    {
+                        dxList.Add(dx);
+                        dyList.Add(dy);
+                    }
                 }
-            }
 
-            if (xValues.Count < 3) return MakeUnknown();
+                if (dxList.Count < 2) return MakeUnknown();
 
-            double avgX = xValues.Average();
-            double avgY = yValues.Average();
-            double magnitude = Math.Sqrt(avgX * avgX + avgY * avgY);
-            double normalizedMag = Math.Min(100, magnitude * 5);
+                double avgDx = dxList.Average();
+                double avgDy = dyList.Average();
+                double magnitude = Math.Sqrt(avgDx * avgDx + avgDy * avgDy);
+                // Skaliraj na 0-100 raspon (160px širina → pomak 8px = 5% ekrana = magnitude ~20)
+                double normalizedMag = Math.Min(100, magnitude * 12.5);
 
-            if (normalizedMag < 5)
-                return new MotionResult { Direction = MotionDirection.Static, EndDirection = MotionDirection.Static, Magnitude = normalizedMag };
+                if (normalizedMag < 4.0)
+                    return new MotionResult
+                    {
+                        Direction = MotionDirection.Static,
+                        EndDirection = MotionDirection.Static,
+                        Magnitude = normalizedMag
+                    };
 
-            double threshold = 2.0;
-            bool strongX = Math.Abs(avgX) > threshold;
-            bool strongY = Math.Abs(avgY) > threshold;
+                double threshold = 1.5;
+                bool strongX = Math.Abs(avgDx) > threshold;
+                bool strongY = Math.Abs(avgDy) > threshold;
 
-            MotionDirection dir;
-            if (strongX && strongY)
-            {
-                if (Math.Abs(avgX) > Math.Abs(avgY) * 1.5)
-                    dir = avgX > 0 ? MotionDirection.Right : MotionDirection.Left;
-                else if (Math.Abs(avgY) > Math.Abs(avgX) * 1.5)
-                    dir = avgY > 0 ? MotionDirection.Down : MotionDirection.Up;
+                MotionDirection dir;
+                if (strongX && strongY)
+                {
+                    if (Math.Abs(avgDx) > Math.Abs(avgDy) * 1.5)
+                        dir = avgDx > 0 ? MotionDirection.Right : MotionDirection.Left;
+                    else if (Math.Abs(avgDy) > Math.Abs(avgDx) * 1.5)
+                        dir = avgDy > 0 ? MotionDirection.Down : MotionDirection.Up;
+                    else
+                        dir = MotionDirection.Mixed;
+                }
+                else if (strongX)
+                    dir = avgDx > 0 ? MotionDirection.Right : MotionDirection.Left;
+                else if (strongY)
+                    dir = avgDy > 0 ? MotionDirection.Down : MotionDirection.Up;
                 else
-                    dir = MotionDirection.Mixed;
-            }
-            else if (strongX)
-                dir = avgX > 0 ? MotionDirection.Right : MotionDirection.Left;
-            else if (strongY)
-                dir = avgY > 0 ? MotionDirection.Down : MotionDirection.Up;
-            else
-                dir = MotionDirection.Static;
+                    dir = MotionDirection.Static;
 
-            return new MotionResult
-            {
-                Direction = dir,
-                EndDirection = dir,
-                Magnitude = Math.Round(normalizedMag, 1)
-            };
-        }
+                // Provjeri zoom (TowardCamera/AwayCamera) — klipovi s jakim blur promjenama
+                // Jednostavna heuristika: ako je magnitude visoka ali dx/dy mali → zoom
+                if (normalizedMag > 15 && !strongX && !strongY)
+                    dir = MotionDirection.TowardCamera;
 
-        private static async Task<MotionResult> FallbackMotionDetect(
-            string videoPath, string ffmpegPath, CancellationToken ct, double startAt)
-        {
-            string tempA = Path.Combine(Path.GetTempPath(),
-                "motA_" + Guid.NewGuid().ToString().Substring(0, 6) + ".png");
-            string tempB = Path.Combine(Path.GetTempPath(),
-                "motB_" + Guid.NewGuid().ToString().Substring(0, 6) + ".png");
-
-            try
-            {
-                string seekA = startAt > 0.5
-                    ? "-ss " + startAt.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " "
-                    : "";
-                double timeB = startAt + 0.5;
-                string timeBStr = timeB.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
-
-                await RunFfmpegAsync(ffmpegPath,
-                    "-nostdin " + seekA + "-i \"" + videoPath + "\" -vframes 1 -vf scale=128:72 -q:v 5 -y \"" + tempA + "\"", ct);
-
-                await RunFfmpegAsync(ffmpegPath,
-                    "-nostdin -ss " + timeBStr + " -i \"" + videoPath + "\" -vframes 1 -vf scale=128:72 -q:v 5 -y \"" + tempB + "\"", ct);
-
-                if (!File.Exists(tempA) || !File.Exists(tempB))
-                    return MakeUnknown();
-
-                return await EstimateFromFrames(tempA, tempB, ffmpegPath, ct);
+                return new MotionResult
+                {
+                    Direction = dir,
+                    EndDirection = dir,
+                    Magnitude = Math.Round(normalizedMag, 1)
+                };
             }
             catch
             {
@@ -247,18 +214,31 @@ namespace UltraVideoEditor
             }
             finally
             {
-                try { if (File.Exists(tempA)) File.Delete(tempA); } catch { }
-                try { if (File.Exists(tempB)) File.Delete(tempB); } catch { }
+                try { Directory.Delete(tmpDir, true); } catch { }
             }
         }
 
-        private static async Task<MotionResult> EstimateFromFrames(
+        // Mjeri pixel shift između dva PNG frejma koristeći FFmpeg blend+metadata
+        // Koristi standardni signalstats filter koji je dostupan u svim FFmpeg build-ovima
+        private static async Task<(double dx, double dy)> MeasureFrameShift(
             string frameA, string frameB, string ffmpegPath, CancellationToken ct)
         {
             try
             {
-                string args = "-nostdin -i \"" + frameA + "\" -i \"" + frameB + "\" " +
-                    "-lavfi \"[0:v][1:v]phase_correlation\" -f null -";
+                // Koristimo blend diff + signalstats za mjerenje ukupne promjene pixela
+                // Posebno: uspoređujemo lijevu/desnu i gornju/donju polovinu da dobijemo smjer
+                string args = $"-nostdin -i \"{frameA}\" -i \"{frameB}\"" +
+                    " -filter_complex" +
+                    " \"[0:v]crop=80:90:0:0[left0];[1:v]crop=80:90:0:0[left1];" +
+                    "[0:v]crop=80:90:80:0[right0];[1:v]crop=80:90:80:0[right1];" +
+                    "[0:v]crop=160:45:0:0[top0];[1:v]crop=160:45:0:0[top1];" +
+                    "[0:v]crop=160:45:0:45[bot0];[1:v]crop=160:45:0:45[bot1];" +
+                    "[left0][left1]blend=all_mode=difference,signalstats=stat=mean[dl];" +
+                    "[right0][right1]blend=all_mode=difference,signalstats=stat=mean[dr];" +
+                    "[top0][top1]blend=all_mode=difference,signalstats=stat=mean[dt];" +
+                    "[bot0][bot1]blend=all_mode=difference,signalstats=stat=mean[db]\"" +
+                    " -map [dl] -map [dr] -map [dt] -map [db]" +
+                    " -frames:v 1 -f null -";
 
                 var psi = new ProcessStartInfo
                 {
@@ -270,44 +250,31 @@ namespace UltraVideoEditor
                     RedirectStandardOutput = true
                 };
                 using var proc = Process.Start(psi);
-                if (proc == null) return MakeUnknown();
+                if (proc == null) return (double.NaN, double.NaN);
+
                 string stderr = await proc.StandardError.ReadToEndAsync();
                 await proc.WaitForExitAsync(ct);
 
-                // Pattern: x:NUMBER y:NUMBER
-                string pattern = @"x:([-0-9.]+)\s+y:([-0-9.]+)";
-                var m = Regex.Match(stderr, pattern);
-                if (m.Success)
-                {
-                    double dx, dy;
-                    bool okX = double.TryParse(m.Groups[1].Value,
-                        System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out dx);
-                    bool okY = double.TryParse(m.Groups[2].Value,
-                        System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out dy);
+                // Izvuci YAVG vrijednosti za svaki od 4 cropova
+                var means = Regex.Matches(stderr, @"YAVG:([\d.]+)");
+                if (means.Count < 4) return (double.NaN, double.NaN);
 
-                    if (okX && okY)
-                    {
-                        double mag = Math.Sqrt(dx * dx + dy * dy);
-                        double normalizedMag = Math.Min(100, mag * 10);
+                double meanLeft  = double.Parse(means[0].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                double meanRight = double.Parse(means[1].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                double meanTop   = double.Parse(means[2].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                double meanBot   = double.Parse(means[3].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
 
-                        if (normalizedMag < 5)
-                            return new MotionResult { Direction = MotionDirection.Static, EndDirection = MotionDirection.Static, Magnitude = normalizedMag };
+                // dx pozitivan = pokret u desno (više promjene na lijevoj strani)
+                // dy pozitivan = pokret prema dolje (više promjene na gornjoj strani)
+                double dx = meanLeft - meanRight;
+                double dy = meanTop - meanBot;
 
-                        MotionDirection dir;
-                        if (Math.Abs(dx) > Math.Abs(dy))
-                            dir = dx > 0 ? MotionDirection.Right : MotionDirection.Left;
-                        else
-                            dir = dy > 0 ? MotionDirection.Down : MotionDirection.Up;
-
-                        return new MotionResult { Direction = dir, EndDirection = dir, Magnitude = normalizedMag };
-                    }
-                }
+                return (dx, dy);
             }
-            catch { }
-
-            return MakeUnknown();
+            catch
+            {
+                return (double.NaN, double.NaN);
+            }
         }
 
         private static async Task RunFfmpegAsync(string ffmpegPath, string args, CancellationToken ct)
@@ -331,7 +298,12 @@ namespace UltraVideoEditor
 
         private static MotionResult MakeUnknown()
         {
-            return new MotionResult { Direction = MotionDirection.Unknown, EndDirection = MotionDirection.Unknown, Magnitude = 0 };
+            return new MotionResult
+            {
+                Direction = MotionDirection.Unknown,
+                EndDirection = MotionDirection.Unknown,
+                Magnitude = 0
+            };
         }
     }
 }

@@ -15,6 +15,13 @@ namespace UltraVideoEditor
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
+        // ── Model konstante ────────────────────────────────────────────────────
+        // QueryModel: Qwen 2.5 14B — analiza pesme i generisanje vizuelnih querija
+        // VisionModel: Qwen 2-VL — vizuelna analiza klipova (Qwen multimodal)
+        // Promena modela: samo ovde, ne po celom kodu
+        public const string QueryModel  = "qwen2.5:14b";
+        public const string VisionModel = "qwen2.5vl";  // naziv koji Ollama prijavljuje (ollama list)
+
         private readonly HttpClient _httpClient;
         private readonly string _ollamaUrl = "http://localhost:11434/api/generate";
 
@@ -28,10 +35,10 @@ namespace UltraVideoEditor
         public OllamaClient()
         {
             _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(300); // 5 minuta — Qwen2.5-VL na CPU moze biti spor
+            _httpClient.Timeout = TimeSpan.FromSeconds(600); // 10 minuta — Qwen2.5:14B prvi load može biti spor
         }
 
-        public async Task<string> GenerateAsync(string prompt, string model = "llama3.2", CancellationToken ct = default)
+        public async Task<string> GenerateAsync(string prompt, string model = QueryModel, CancellationToken ct = default)
         {
             try
             {
@@ -114,7 +121,7 @@ namespace UltraVideoEditor
         public async Task<(string response, string error)> VisionAsyncEx(
             string imagePath,
             string prompt,
-            string model = "qwen2-vl",
+            string model = VisionModel,
             CancellationToken ct = default)
         {
             // imagePath == null → tekstualni warm-up ping (bez slike), samo ucitava model
@@ -222,7 +229,7 @@ namespace UltraVideoEditor
         public async Task<string> VisionAsync(
             string imagePath,
             string prompt,
-            string model = "qwen2-vl",
+            string model = VisionModel,
             CancellationToken ct = default)
         {
             var (response, _) = await VisionAsyncEx(imagePath, prompt, model, ct);
