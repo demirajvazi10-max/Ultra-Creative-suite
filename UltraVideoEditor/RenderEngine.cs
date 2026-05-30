@@ -478,10 +478,15 @@ namespace UltraVideoEditor
                         // Vrednosti su konzervativne — za dečiji video veće vrednosti izgledaju artificijelno
                         const string DENOISE_FILTER = ",hqdn3d=1.5:1.5:6:6,unsharp=3:3:0.4:3:3:0.0";
 
+                        // PATCH-HASCHILDREN: Contrast boost za playground scene sa djecom
+                        // Gemini preporuka: eq=contrast=1.08 bolje izdvaja djecu od pozadine
+                        bool hasChildrenClip = audioDesc2.Contains("haschildren=1");
+                        string childrenContrastFilter = hasChildrenClip ? ",eq=contrast=1.08" : "";
+
                         baseNormalize = $"{baseNormalize},{warmthBoost}";
                         videoVf = string.IsNullOrEmpty(moodFilter)
-                            ? $"{scaleFilter},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}"
-                            : $"{scaleFilter},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}";
+                            ? $"{scaleFilter},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
+                            : $"{scaleFilter},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
 
                         if (!fastRender)
                         {
@@ -514,8 +519,8 @@ namespace UltraVideoEditor
                                                       $"crop={targetWidth}:{targetHeight}:{sxExpr}:{syExpr}";
                                     // Ken Burns + color grading + fps normalizacija
                                     videoVf = string.IsNullOrEmpty(moodFilter)
-                                        ? $"{staticKB},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}"
-                                        : $"{staticKB},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}";
+                                        ? $"{staticKB},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
+                                        : $"{staticKB},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
                                 }
 
                                 if (item.Duration >= 2.0 && !isStaticClip)
@@ -568,8 +573,8 @@ namespace UltraVideoEditor
 
                                     // Ken Burns + color grading + fps normalizacija
                                     videoVf = string.IsNullOrEmpty(moodFilter)
-                                        ? $"{kenBurnsGpu},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}"
-                                        : $"{kenBurnsGpu},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{fpsNormalize}{DENOISE_FILTER}";
+                                        ? $"{kenBurnsGpu},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
+                                        : $"{kenBurnsGpu},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
                                 }
                             }
                             catch { }
@@ -592,9 +597,16 @@ namespace UltraVideoEditor
                             // round=near: zaokrugljava PTS umjesto da preskače frejmove —
                             // eliminišo zelene/crne međufrejmove na spojevima klipova.
                             string loopFadeIn = $",fade=t=in:st=0:d=0.3";
+                            // OUTRO-FIX: Dodaj fade=t=out za zadnje kadrove outro sekcije
+                            // Tag fadeout=1 se upisuje u Description od AIVideoCreator za zadnja 3 kadra.
+                            bool hasFadeOutTag = (item.AudioDescription ?? "").Contains("fadeout=1") ||
+                                                 (item.Name ?? "").Contains("fadeout=1");
+                            string loopFadeOut = hasFadeOutTag
+                                ? $",fade=t=out:st={Math.Max(0.3, effectiveDuration - 1.5):F2}:d=1.5"
+                                : "";
                             // Pravilo 2: scale+fps normalizacija u jednom filtru
                             string normVf = $"scale={targetWidth}:{targetHeight}:flags=lanczos,fps=fps={TARGET_FPS}:round=near,format=yuv420p";
-                            argsVid = $"-nostdin -stream_loop -1 -t {durationStr} -i \"{item.Path}\" -vf \"{normVf},{videoVf}{loopFadeIn}\" {vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{tempVideo}\"";
+                            argsVid = $"-nostdin -stream_loop -1 -t {durationStr} -i \"{item.Path}\" -vf \"{normVf},{videoVf}{loopFadeIn}{loopFadeOut}\" {vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{tempVideo}\"";
                         }
 
                         success = await RunFFmpegAsync(argsVid, cancellationToken);
@@ -675,13 +687,41 @@ namespace UltraVideoEditor
                 // IskraSync mora to uzeti u obzir — inače produžava premalo i video ostaje kraći od audija.
                 // Formula: effectiveVideoDur = sum(clipDurs) - crossfadeOverlap
                 // gdje crossfadeOverlap = (N-1) * avgFade (N = broj video klipova)
+                // ══════════════════════════════════════════════════════════════════════════
+                // ISKRASYNC v3 — Kompletan rewrite svih poznatih bugova
+                //
+                // Fix 1: timelineSpan kao primarna mjera (ne videoSum)
+                //         videoSum ne uzima u obzir rupe između stihova (lyric-sync raspored).
+                //         timelineSpan = max(End) - cursorOffset = stvarni vremenski raspon videa.
+                //
+                // Fix 2: Beat-Lock offset se oduzima od audioDurForSync
+                //         -ss AudioStartSeconds skraćuje efektivni audio stream za tu vrijednost.
+                //         Video treba trajati rawAudioDur - ssOffset, ne rawAudioDur.
+                //
+                // Fix 3: Cap na ponavljanje u SmartOutroPool
+                //         Ako deficit > poolUkupno, pool bi kružio beskonačno.
+                //         Ograničavamo na max 1 krug (svaki klip iz poola max 1x).
+                //         Ako ni to ne pokriva deficit, SmartOutroPool završava — -shortest presjeca višak.
+                //
+                // Fix 4: outroSegPath naming koristi dedicirani brojač, ne videoFiles.Count
+                //         videoFiles.Count se mijenja unutar petlje — mogući imenski konflikti.
+                //
+                // Fix 5: Buffer smanjen sa +1.0s na +0.5s (preciznije poklapanje s crossfade-om)
+                //
+                // Fix 6: Log upozorenje kad timelineSpan > audioDur (outro segmenti biće odrezani)
+                //
+                // Fix 7: Outro crossfade overlap se dodaje u efectiveVideoDur za preciznost
+                // ══════════════════════════════════════════════════════════════════════════
+                double audioDurForSync = 0; // Outer scope — dostupno i u mux bloku ispod
                 if (audio != null && File.Exists(audio.Path))
                 {
-                    double audioDurForSync = await GetVideoDuration(audio.Path, cancellationToken);
-                    // BUG-3 FIX: Oduzmi AudioStartSeconds jer -ss na audio skraćuje efektivno trajanje audija
+                    double rawAudioDur = await GetVideoDuration(audio.Path, cancellationToken);
+
+                    // FIX 2: Beat-Lock offset (-ss) skraćuje efektivni audio stream.
+                    // audioDurForSync = rawAudioDur - ssOffset = koliko sekundi audio zaista svira.
                     double audioSsOffset = (beatInfo != null && beatInfo.AudioStartSeconds > 0.05)
                         ? beatInfo.AudioStartSeconds : 0.0;
-                    audioDurForSync = Math.Max(0, audioDurForSync - audioSsOffset);
+                    audioDurForSync = Math.Max(0, rawAudioDur - audioSsOffset);
 
                     if (audioDurForSync > 0)
                     {
@@ -694,82 +734,128 @@ namespace UltraVideoEditor
                             totalVidDur += vd;
                         }
 
-                        // BUG-3 FIX: Izračunaj crossfade overlap koji će se oduzeti od ukupnog trajanja
+                        // Crossfade overlap — koristi se i za effectiveVideoDur i za dijagnostiku
                         double avgFadeForSync = fadeDurations.Count > 0
                             ? fadeDurations.Average() : 0.35;
                         int nClips = videoFiles.Count;
                         double crossfadeOverlap = nClips > 1 ? (nClips - 1) * avgFadeForSync : 0.0;
-                        double effectiveVideoDur = totalVidDur - crossfadeOverlap;
+
+                        // FIX 1: effectiveVideoDur = timelineSpan (ne videoSum).
+                        // timelineSpan = max(End) - cursorOffset odražava stvarni vremenski raspon
+                        // uključujući rupe između stihova u lyric-sync rasporedu.
+                        // cursorOffset = min(Start) svih timeline stavki = Naslov + Logo trajanje.
+                        // Ako itemToFile nije dostupan, fallback na videoSum - crossfadeOverlap.
+                        double effectiveVideoDur;
+                        double timelineSpan = 0;
+                        if (itemToFile.Count > 0)
+                        {
+                            double timelineEnd    = itemToFile.Keys.Max(it => it.End);
+                            double timelineStart  = itemToFile.Keys.Min(it => it.Start);
+                            timelineSpan          = timelineEnd - timelineStart;
+                            // Koristimo timelineSpan kao primarnu mjeru ako je veća od videoSum-crossfade.
+                            // Ako je videoSum-crossfade veća (sekvencijalni video bez rupa), koristimo nju.
+                            effectiveVideoDur = Math.Max(timelineSpan, Math.Max(totalVidDur - crossfadeOverlap, 0));
+                        }
+                        else
+                        {
+                            effectiveVideoDur = Math.Max(totalVidDur - crossfadeOverlap, 0);
+                        }
 
                         double deficit = audioDurForSync - effectiveVideoDur;
-                        LogToMainWindow($"[IskraSync] Audio={audioDurForSync:F3}s (ss={audioSsOffset:F2}s) | VideoSum={totalVidDur:F3}s | XfadeOverlap={crossfadeOverlap:F2}s | EffectiveVideo={effectiveVideoDur:F3}s | Deficit={deficit:F3}s");
+                        LogToMainWindow($"[IskraSync] Audio={audioDurForSync:F3}s (ss={audioSsOffset:F2}s) | VideoSum={totalVidDur:F3}s | TimelineSpan={timelineSpan:F2}s | XfadeOverlap={crossfadeOverlap:F2}s | EffectiveVideo={effectiveVideoDur:F3}s | Deficit={deficit:F3}s");
+
+                        // FIX 6: Upozorenje kad timeline prelazi audio trajanje
+                        if (timelineSpan > audioDurForSync + 2.0)
+                            LogToMainWindow($"[IskraSync] ⚠ Timeline ({timelineSpan:F1}s) prelazi audio ({audioDurForSync:F1}s) za {timelineSpan - audioDurForSync:F1}s — outro segmenti biće odrezani od -shortest");
 
                         if (deficit > 0.15 && videoFiles.Count > 0)
                         {
-                            // ── BUG-2 FIX: Robusna kompenzacija deficita ──────────────────────
-                            // Stari kod: loop filter ponekad ne radi ako je klip kratak (<1s)
-                            //            ili ima nekompatibilan pixel format.
-                            // Novo:  1) Pokusaj stream_loop (brzi, bez re-enkodiranja)
-                            //        2) Fallback: loop video filter (sa re-enkodiranjem)
-                            //        3) Fallback: dodaj kopiju zadnjeg klipa segmentima
-                            // Sve tri metode garantuju popunjavanje deficita.
-                            // ─────────────────────────────────────────────────────────────────
-                            string lastClipPath = videoFiles[videoFiles.Count - 1];
-                            double lastDur = clipDurations[clipDurations.Count - 1];
-                            // +1.0s buffer — fade-out trosi 2.5s, vise bolje nego manje
-                            double newDur = lastDur + deficit + 1.0;
-                            string newDurStr = newDur.ToString("F3", CultureInfo.InvariantCulture);
-                            string loopedPath = Path.Combine(tempDir, $"looped_last_{Guid.NewGuid().ToString().Substring(0, 6)}.mp4");
+                            // ── ISKRASYNC v3 — SmartOutroPool ────────────────────────────────────────
+                            // Puni deficit klipovima iz druge polovine videa (vizuelno raznovrsno).
+                            // FIX 3: Svaki klip iz poola se koristi max 1x (nema kruženja).
+                            // FIX 4: outroSegIdx je dedicirani brojač, neovisan o videoFiles.Count.
+                            // ─────────────────────────────────────────────────────────────────────────
 
-                            LogToMainWindow($"[IskraSync] Produzujem zadnji klip: {lastDur:F2}s → {newDur:F2}s (deficit={deficit:F2}s)");
+                            // Pool: klipovi iz druge polovine videoFiles (ne intro/početak)
+                            int halfPoint = videoFiles.Count / 2;
+                            int poolSize  = Math.Min(12, videoFiles.Count - halfPoint);
+                            if (poolSize < 3) poolSize = Math.Min(12, videoFiles.Count);
+                            int poolStart = Math.Max(halfPoint, videoFiles.Count - poolSize);
+                            var outroPool     = videoFiles   .Skip(poolStart).Take(poolSize).ToList();
+                            var outroPoolDurs = clipDurations.Skip(poolStart).Take(poolSize).ToList();
 
-                            // Metoda 1: stream_loop — brz, bez re-enkoda, radi na vecini klipova
-                            string streamLoopArgs = $"-nostdin -stream_loop -1 -t {newDurStr} -i \"{lastClipPath}\" " +
-                                                   $"-vf \"fps=fps={TARGET_FPS}:round=near,format=yuv420p\" " +
-                                                   $"{vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{loopedPath}\"";
-                            bool loopOk = await RunFFmpegAsync(streamLoopArgs, cancellationToken);
+                            // FIX 3: Ukupni kapacitet poola bez ponavljanja
+                            double poolTotalCapacity = outroPoolDurs.Sum();
+                            LogToMainWindow($"[IskraSync] SmartOutroPool: {outroPool.Count} klipova, kapacitet={poolTotalCapacity:F1}s, deficit={deficit:F2}s");
 
-                            // Metoda 2: video filter loop (ako stream_loop ne uspije)
-                            if (!loopOk || !File.Exists(loopedPath) || new FileInfo(loopedPath).Length < 1000)
+                            // FIX 5: Buffer +0.5s (umjesto +1.0s) — preciznije poklapanje s xfade-om
+                            double remaining    = deficit + 0.5;
+                            int    outroSegIdx  = 0;  // FIX 4: dedicirani brojač za naming
+                            int    poolIdx      = 0;
+                            int    maxIter      = outroPool.Count + 2; // FIX 3: max 1 prolaz kroz pool
+                            bool   anySegOk     = false;
+
+                            while (remaining > 0.1 && poolIdx < outroPool.Count && maxIter-- > 0)
                             {
-                                LogToMainWindow($"[IskraSync] stream_loop nije uspio — koristim loop filter...");
-                                int loopCount = (int)Math.Ceiling(newDur / Math.Max(0.1, lastDur)) + 2;
-                                string loopVf = $"loop=loop={loopCount}:size=32767:start=0," +
-                                                $"fps=fps={TARGET_FPS}:round=near,format=yuv420p";
-                                string loopFilterArgs = $"-nostdin -i \"{lastClipPath}\" " +
-                                                        $"-vf \"{loopVf}\" -t {newDurStr} " +
-                                                        $"{vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{loopedPath}\"";
-                                loopOk = await RunFFmpegAsync(loopFilterArgs, cancellationToken);
-                            }
+                                string srcClip = outroPool[poolIdx];
+                                double srcDur  = outroPoolDurs[poolIdx];
+                                poolIdx++;
+                                outroSegIdx++;
 
-                            if (loopOk && File.Exists(loopedPath) && new FileInfo(loopedPath).Length > 1000)
-                            {
-                                double actualLooped = await GetVideoDuration(loopedPath, cancellationToken);
-                                videoFiles[videoFiles.Count - 1] = loopedPath;
-                                LogToMainWindow($"[IskraSync] ✅ Zadnji klip produžen: {lastDur:F2}s → {actualLooped:F2}s (potrebno {newDur:F2}s)");
-                            }
-                            else
-                            {
-                                // Metoda 3: segmentna duplikacija — garancija za edge case-ove
-                                LogToMainWindow($"[IskraSync] ⚠ Loop nije uspio — segmentna duplikacija ({deficit:F2}s)");
-                                double remaining = deficit + 1.0;
-                                int maxIter = 50; // sigurnosni limit
-                                while (remaining > 0.1 && maxIter-- > 0)
+                                // Segment traje min(srcDur, remaining) — ne loopujemo dulje od originala
+                                double segDur    = Math.Min(remaining, Math.Max(srcDur, 2.5));
+                                string segDurStr = segDur.ToString("F3", CultureInfo.InvariantCulture);
+
+                                // FIX 4: Naziv koristi outroSegIdx, ne videoFiles.Count
+                                string outroSegPath = Path.Combine(tempDir, $"outro_seg_{outroSegIdx:D3}.mp4");
+
+                                bool isLastSeg    = (remaining - segDur) <= 0.15 || poolIdx >= outroPool.Count;
+                                string fadeOutFilter = isLastSeg
+                                    ? $",fade=t=out:st={Math.Max(0.3, segDur - 2.0):F2}:d=2.0"
+                                    : "";
+
+                                string outroVf = $"fps=fps={TARGET_FPS}:round=near,format=yuv420p,fade=t=in:st=0:d=0.4{fadeOutFilter}";
+                                string outroSegArgs = $"-nostdin -stream_loop -1 -t {segDurStr} -i \"{srcClip}\" " +
+                                                     $"-vf \"{outroVf}\" " +
+                                                     $"{vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{outroSegPath}\"";
+                                bool segOk = await RunFFmpegAsync(outroSegArgs, cancellationToken);
+
+                                if (segOk && File.Exists(outroSegPath) && new FileInfo(outroSegPath).Length > 100)
                                 {
-                                    double segDur = Math.Min(remaining, Math.Max(1.0, lastDur));
-                                    string segDurStr = segDur.ToString("F3", CultureInfo.InvariantCulture);
-                                    string dupPath = Path.Combine(tempDir, $"dup_{videoFiles.Count:D3}.mp4");
-                                    // -c:v copy je brz ali moze imati PTS problem; koristimo normalizaciju
-                                    string dupArgs = $"-nostdin -i \"{lastClipPath}\" -t {segDurStr} " +
-                                                    $"-vf \"fps=fps={TARGET_FPS}:round=near,format=yuv420p\" " +
-                                                    $"{vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{dupPath}\"";
-                                    bool dupOk = await RunFFmpegAsync(dupArgs, cancellationToken);
-                                    if (dupOk && File.Exists(dupPath) && new FileInfo(dupPath).Length > 100)
-                                        videoFiles.Add(dupPath);
-                                    remaining -= segDur;
+                                    videoFiles.Add(outroSegPath);
+                                    fadeDurations.Add(0.50);
+                                    transitionTypes.Add("dissolve");
+                                    double actualSeg = await GetVideoDuration(outroSegPath, cancellationToken);
+                                    remaining -= actualSeg;
+                                    anySegOk = true;
+                                    LogToMainWindow($"[IskraSync] ✅ Outro seg {outroSegIdx}: {actualSeg:F2}s (pool[{poolIdx - 1}]), ostalo={remaining:F2}s");
                                 }
-                                LogToMainWindow($"[IskraSync] ✅ Segmentna duplikacija završena: {videoFiles.Count} klipova ukupno");
+                                else
+                                {
+                                    // Fallback: kopija bez filtera
+                                    string fbPath = Path.Combine(tempDir, $"outro_fb_{outroSegIdx:D3}.mp4");
+                                    string fbArgs = $"-nostdin -i \"{srcClip}\" -t {segDurStr} " +
+                                                   $"-vf \"fps=fps={TARGET_FPS}:round=near,format=yuv420p\" " +
+                                                   $"{vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{fbPath}\"";
+                                    bool fbOk = await RunFFmpegAsync(fbArgs, cancellationToken);
+                                    if (fbOk && File.Exists(fbPath) && new FileInfo(fbPath).Length > 100)
+                                    {
+                                        videoFiles.Add(fbPath);
+                                        fadeDurations.Add(0.50);
+                                        transitionTypes.Add("dissolve");
+                                        remaining -= segDur;
+                                        anySegOk = true;
+                                    }
+                                }
                             }
+
+                            if (anySegOk)
+                                LogToMainWindow($"[IskraSync] ✅ SmartOutroPool završen: {videoFiles.Count} klipova ukupno, preostalo={remaining:F2}s");
+                            else
+                                LogToMainWindow($"[IskraSync] ⚠ SmartOutroPool nije uspio — video može biti kraći od audija");
+
+                            if (remaining > 1.0)
+                                LogToMainWindow($"[IskraSync] ℹ Pool iscrpljen ({outroPool.Count} klipova), {remaining:F1}s deficit ostaje — -shortest će pokriti");
                         }
                         else if (deficit <= 0)
                         {
@@ -877,10 +963,29 @@ namespace UltraVideoEditor
                         LogToMainWindow($"🥁 Beat-Lock AudioStart: audio -ss {ssVal}s → video i audio sada kreću zajedno");
                     }
 
+                    // DURATION FIX: Koristimo -shortest ali SAMO ako je video dovoljno dug.
+                    // Ako video nije popunjen (SmartOutroPool nije pokrio deficit), dodajemo
+                    // eksplicitni -t na audio stream da sprečimo prerano rezanje.
+                    // Primarno rješenje ostaje SmartOutroPool — -t je backup.
+                    string shortestArg = "-shortest ";
+
                     if (crossfadedVideo != null && File.Exists(crossfadedVideo))
-                        argsFinal = $"-nostdin -i \"{crossfadedVideo}\" {audioSsArg}-i \"{tempAudioPath}\" -c:v copy -c:a aac -map 0:v -map 1:a -shortest -y \"{finalOutput}\"";
+                    {
+                        double crossfadedDur = await GetVideoDuration(crossfadedVideo, cancellationToken);
+                        if (crossfadedDur < audioDurForSync - 2.0)
+                        {
+                            // Video je i dalje kraći od audija — ograniči audio na video trajanje
+                            // da izbjegnemo tišinu na kraju
+                            string tVal = crossfadedDur.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+                            shortestArg = $"-t {tVal} ";
+                            LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → -t {tVal} (SmartOutroPool nije potpuno popunio deficit)");
+                        }
+                        argsFinal = $"-nostdin -i \"{crossfadedVideo}\" {audioSsArg}-i \"{tempAudioPath}\" -c:v copy -c:a aac -map 0:v -map 1:a {shortestArg}-y \"{finalOutput}\"";
+                    }
                     else
-                        argsFinal = $"-nostdin -f concat -safe 0 -i \"{concatFile}\" {audioSsArg}-i \"{tempAudioPath}\" -c:v copy -c:a aac -map 0:v -map 1:a -shortest -y \"{finalOutput}\"";
+                    {
+                        argsFinal = $"-nostdin -f concat -safe 0 -i \"{concatFile}\" {audioSsArg}-i \"{tempAudioPath}\" -c:v copy -c:a aac -map 0:v -map 1:a {shortestArg}-y \"{finalOutput}\"";
+                    }
                 }
                 else
                 {
@@ -1060,10 +1165,14 @@ namespace UltraVideoEditor
             string outputPath,
             CancellationToken ct)
         {
+            // CLEANUP FIX: Koristimo dedicirani temp folder umjesto Path.GetDirectoryName(outputPath).
+            // Stari kod je pisao mix_batch_*.aac direktno u output folder (D:\Iskra kompozicije\)
+            // i nikad ih nije brisao — uzrokovalo gigabajte smeća uz svaki render.
+            string mixTempDir = Path.Combine(Path.GetTempPath(), $"UVE_MixAudio_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
+            Directory.CreateDirectory(mixTempDir);
             try
             {
                 string currentAudio = mainAudioPath;
-                string tempDir = Path.GetDirectoryName(outputPath);
                 const int batchSize = 8;
                 int batchNum = 0;
 
@@ -1077,9 +1186,10 @@ namespace UltraVideoEditor
                 {
                     batchNum++;
                     bool isLast = batchNum == batches.Count;
+                    // CLEANUP FIX: Sve međufaze idu u mixTempDir (temp), finalnt output u outputPath
                     string batchOutput = isLast
                         ? outputPath
-                        : Path.Combine(tempDir, $"mix_batch_{batchNum}_{Guid.NewGuid().ToString().Substring(0, 6)}.aac");
+                        : Path.Combine(mixTempDir, $"mix_batch_{batchNum}_{Guid.NewGuid().ToString().Substring(0, 6)}.aac");
 
                     var inputs = new StringBuilder();
                     inputs.Append($"-i \"{currentAudio}\" ");
@@ -1135,6 +1245,11 @@ namespace UltraVideoEditor
             {
                 LogToMainWindow(LF("re_mix_error", ex.Message));
                 return null;
+            }
+            finally
+            {
+                // CLEANUP FIX: Briši temp folder sa batch fajlovima
+                try { if (Directory.Exists(mixTempDir)) Directory.Delete(mixTempDir, true); } catch { }
             }
         }
 

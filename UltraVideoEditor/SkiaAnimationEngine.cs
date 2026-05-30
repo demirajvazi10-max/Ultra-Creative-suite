@@ -242,7 +242,9 @@ namespace UltraVideoEditor
                 Color       = color,
                 TextSize    = size,
                 IsAntialias = true,
-                Typeface    = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold),
+                Typeface    = SKTypeface.FromFamilyName("Segoe Script", SKFontStyle.Bold)
+                           ?? SKTypeface.FromFamilyName("Lucida Handwriting", SKFontStyle.Bold)
+                           ?? SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold),
                 TextAlign   = SKTextAlign.Center
             };
         }

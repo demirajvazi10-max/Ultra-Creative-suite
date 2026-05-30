@@ -62,6 +62,7 @@ namespace UltraVideoEditor
         private MotionResult _lastClipEndMotion;   // EndDirection prethodnog klipa za precizni jump-cut matching
         private double _lastDownloadedVisionScore = 6.0;
         private bool _lastDownloadedIsStatic = false;
+        private bool _lastDownloadedHasChildren = false;
         private string _detectedMood = "neutral";
         private string _detectedContext = "";
         private SongContext _songContext = new SongContext(); // Iskra AI-First: kontekst za StrictQueryEngine
@@ -3273,17 +3274,20 @@ namespace UltraVideoEditor
                         ? Math.Clamp(duration * 0.30, 0.5, 1.5)
                         : Math.Clamp(duration * 0.20, 0.3, 1.0);
 
-                    // ISPRAVKA: atrim MORA biti prije adelay
-                    // adelay pomjera zvuk na timeline poziciju, atrim reže originalni fajl
+                    // AFADE FIX: afade mjeri poziciju u uzorcima od POČETKA STREAMA, ne na timeline-u.
+                    // Nakon asetpts=PTS-STARTPTS, stream počinje od t=0.
+                    // Stari kod koristio st=startTime (npr. 86.7s) unutar streama koji traje 1.6s —
+                    // FFmpeg je ubrzavao audio da "dohvati" tu poziciju → ptice zvučale kao miševi.
+                    // Fix: st=0 za fade-in (odmah), st=(duration-fadeOut) za fade-out (relativno).
                     filterParts.Add(
                         $"[{ambientIndex}:a]" +
                         $"aloop=loop=-1:size=2e+09," +
                         $"atrim=duration={duration.ToString("F3", CultureInfo.InvariantCulture)}," +
                         $"asetpts=PTS-STARTPTS," +
-                        $"adelay={startMs}|{startMs}," +
-                        $"afade=t=in:st={startTime.ToString("F3", CultureInfo.InvariantCulture)}:d={fadeInDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
-                        $"afade=t=out:st={(endTime - fadeOutDuration).ToString("F3", CultureInfo.InvariantCulture)}:d={fadeOutDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
-                        $"volume={ambientVolume.ToString("F2", CultureInfo.InvariantCulture)}[a{ambientIndex}]");
+                        $"afade=t=in:st=0:d={fadeInDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
+                        $"afade=t=out:st={(Math.Max(0, duration - fadeOutDuration)).ToString("F3", CultureInfo.InvariantCulture)}:d={fadeOutDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
+                        $"volume={ambientVolume.ToString("F2", CultureInfo.InvariantCulture)}," +
+                        $"adelay={startMs}|{startMs}[a{ambientIndex}]");
 
                     ambientIndex++;
                     LogToMainWindow($"🔊 Scena {i + 1}: ambient start={startTime:F1}s dur={duration:F1}s");
@@ -3584,6 +3588,19 @@ namespace UltraVideoEditor
                 LogToMainWindow($"🔇 Audio start offset: {_audioStartSeconds:F2}s tišine na početku → video kreće tačno kad muzika");
             LogToMainWindow($"✂️ Cut-advance: {_cutAdvanceMs:F0}ms look-ahead (BPM={_beatInfo.BPM:F0}) — rez ide ispred beata");
 
+            // DURATION FIX: totalDuration mora biti efektivno trajanje audio streama,
+            // ne raw trajanje fajla. RenderEngine koristi -ss AudioStartSeconds na audio inputu
+            // što skraćuje audio stream za tačno tu vrijednost. Ako segmenti pokrivaju 177s
+            // ali audio svira samo 169s (177-8), -shortest reže output na 169s = 2:49.
+            // Fix: planiramo segmente na effectiveDuration = rawDuration - AudioStartSeconds.
+            if (_audioStartSeconds > 0.05)
+            {
+                double rawTotalDuration = totalDuration;
+                totalDuration = Math.Max(10.0, totalDuration - _audioStartSeconds);
+                _totalDuration = totalDuration;
+                LogToMainWindow($"⏱ Duration korekcija: {rawTotalDuration:F1}s → {totalDuration:F1}s (oduzeto {_audioStartSeconds:F2}s Beat-Lock offset)");
+            }
+
             _lyricQueryCache.Clear();  // reset refrain cache za svaki novi video
 
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
@@ -3606,6 +3623,30 @@ namespace UltraVideoEditor
 
             _tempVideoFolder = Path.Combine(Path.GetTempPath(), $"UVE_Story_{Guid.NewGuid()}");
             Directory.CreateDirectory(_tempVideoFolder);
+
+            // CLEANUP: Tiho briši stare UVE_* temp foldere starije od 12h (prethodne sesije).
+            string _activeTempFolder = _tempVideoFolder;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    string tempRoot = Path.GetTempPath();
+                    foreach (var prefix in new[] { "UVE_Story_", "UVE_MixAudio_", "UVE_Render_" })
+                    {
+                        foreach (var dir in Directory.GetDirectories(tempRoot, prefix + "*"))
+                        {
+                            try
+                            {
+                                if (dir.Equals(_activeTempFolder, StringComparison.OrdinalIgnoreCase)) continue;
+                                if ((DateTime.Now - new DirectoryInfo(dir).LastWriteTime).TotalHours > 12)
+                                    Directory.Delete(dir, true);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
+            });
 
             _segments = new List<TimelineSegment>();
 
@@ -3661,6 +3702,51 @@ namespace UltraVideoEditor
                     // da oko doživi promjenu slike u istoj milisekundi kad uho čuje vokal
                     double cutAdvanceSec = _cutAdvanceMs / 1000.0;
                     sc.StartTime = Math.Max(0, _lyricTimestamps[si] - cutAdvanceSec);
+
+                    // WORD-SYNC: ako imamo word-level timestamps iz Whispera,
+                    // pokušaj da nađeš ključnu riječ scene i snapuj StartTime na nju.
+                    // Na taj način npr. "sladoled" → klip kreće tačno kad se ta riječ izgovori.
+                    // Radi u prozoru ±2s oko stih-level timestamps da izbjegnemo pogrešna poklapanja.
+                    if (_wordTimings != null && _wordTimings.Count > 0)
+                    {
+                        // Skupi kandidatske ključne riječi: Keywords, Action, prve riječi Description
+                        var candidateWords = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(sc.Keywords))
+                            candidateWords.AddRange(sc.Keywords.Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
+                        if (!string.IsNullOrWhiteSpace(sc.Action))
+                            candidateWords.AddRange(sc.Action.Split(new[] { ' ', '_' }, StringSplitOptions.RemoveEmptyEntries));
+                        if (!string.IsNullOrWhiteSpace(sc.FullLyric))
+                            candidateWords.AddRange(sc.FullLyric.Split(' ').Take(4)); // prve 4 rijeci stiha
+
+                        // Prozor pretrage: od stih-start do stih-start + MAX_LYRIC_SCENE_DURATION
+                        double windowStart = _lyricTimestamps[si] - 0.5;
+                        double windowEnd   = _lyricTimestamps.ContainsKey(si + 1)
+                            ? _lyricTimestamps[si + 1]
+                            : _lyricTimestamps[si] + MAX_LYRIC_SCENE_DURATION;
+
+                        AITranscription.WordTiming bestMatch = null;
+                        foreach (var cw in candidateWords)
+                        {
+                            string cwNorm = cw.ToLowerInvariant().Trim('.', ',', '!', '?', ';', ':');
+                            if (cwNorm.Length < 3) continue; // ignoriši kratke riječi (i, je, na...)
+                            var match = _wordTimings.FirstOrDefault(wt =>
+                                wt.StartSecond >= windowStart &&
+                                wt.StartSecond <= windowEnd &&
+                                wt.Word.ToLowerInvariant().Trim('.', ',', '!', '?') == cwNorm);
+                            if (match != null)
+                            {
+                                bestMatch = match;
+                                break;
+                            }
+                        }
+
+                        if (bestMatch != null)
+                        {
+                            double wordSync = Math.Max(0, bestMatch.StartSecond - cutAdvanceSec);
+                            LogToMainWindow($"   🔤 WordSync scena {si + 1}: '{bestMatch.Word}' @ {bestMatch.StartSecond:F2}s → StartTime {sc.StartTime:F2}s → {wordSync:F2}s");
+                            sc.StartTime = wordSync;
+                        }
+                    }
 
                     double nxt = _lyricTimestamps.ContainsKey(si + 1)
                         ? _lyricTimestamps[si + 1]
@@ -3886,25 +3972,27 @@ namespace UltraVideoEditor
                         }
                         if (bRollKeywords.Count == 0)
                             // FIX-BROLL: Proširena lista querija za default/fun context
-                            // Stara lista imala 8 querija za 26 outro klipova → pool se iscrpljivao
-                            // Nova lista ima 16 + season-aware varijante za duže outre
+                            // Prioritet: djeca i emocije prvo, priroda kao fill-in
+                            // SmartOutroPool rotira posljednjih 8 klipova → raznovrsniji outro
                             bRollKeywords.AddRange(new[] {
-                                "children playing park nature sunny day cinematic",
-                                "child running meadow happy slow motion",
-                                "kids jumping playing outdoor joyful bright",
+                                // Djeca i emocije — glavna vizuelna tema outra
                                 "child closeup smiling face happy warm light",
-                                "family walking park holding hands warm golden",
                                 "children laughing together outdoor playground",
+                                "children friends playing together sunny park",
+                                "child closeup eyes wonder curious nature",
+                                "family walking park holding hands warm golden",
+                                "parent child hands holding walking outdoor",
+                                "family outdoor together golden hour warm light",
+                                "child running meadow happy slow motion",
+                                // Priroda kao vizuelni oddah između dječijih kadrova
+                                "children playing park nature sunny day cinematic",
+                                "kids jumping playing outdoor joyful bright",
                                 "nature path sunlight dappled morning forest",
                                 "child exploring curiosity outdoor nature bokeh",
-                                "parent child hands holding walking outdoor",
-                                "children friends playing together sunny park",
                                 "birds chirping morning trees nature peaceful",
                                 "flowers garden colorful bokeh soft light nature",
-                                "stream brook water peaceful outdoor nature sounds",
                                 "nature landscape beautiful sky cinematic aerial",
-                                "child closeup eyes wonder curious nature",
-                                "family outdoor together golden hour warm light",
+                                "stream brook water peaceful outdoor nature sounds",
                             });
                         break;
                 }
@@ -3952,6 +4040,13 @@ namespace UltraVideoEditor
                         bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                     }
 
+                    // Treći pokušaj: ultra-safe generički upit
+                    if (string.IsNullOrEmpty(bMediaPath))
+                    {
+                        var introSafe = new[] { "children playing outdoor", "nature landscape sunny", "kids park happy", "flowers garden nature" };
+                        bMediaPath = await SearchAndDownloadMedia(introSafe[i % introSafe.Length], _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
+                    }
+
                     if (!string.IsNullOrEmpty(bMediaPath) && bRollMediaType == "video")
                     {
                         double bVidDur = await GetVideoDuration(bMediaPath);
@@ -3988,9 +4083,64 @@ namespace UltraVideoEditor
                 double outroPortion = remainingDuration - introPortion;
                 if (outroPortion > 0.5)
                 {
-                    int outroClips = Math.Max(1, (int)Math.Ceiling(outroPortion / actualDurationPerClip));
+                    // OUTRO-FIX: Koristimo fiksni max 3.5s po kadru (ne actualDurationPerClip koji
+                    // može biti ~64s kad search feli za sve kadrove osim prvog).
+                    // Gemini analiza: zadnjih 74s video se "zaključao" na isti kadar potoka.
+                    // Uzrok: kad SearchAndDownloadMedia vrati "" za 16+ kadrova, svi se preskače
+                    // u sortedSegments petlji (File.Exists("") = false → continue).
+                    // Fix: (1) max 3.5s/kadru, (2) recycle pool od uspješnih intro kadrova,
+                    //      (3) fade-out tag na zadnjim 3 kadra outro sekcije.
+                    const double OUTRO_MAX_CLIP_DURATION = 3.5;
+                    double outroEffectiveDurPerClip = Math.Min(actualDurationPerClip, OUTRO_MAX_CLIP_DURATION);
+                    int outroClips = Math.Max(1, (int)Math.Ceiling(outroPortion / outroEffectiveDurPerClip));
                     double outroClipDuration = outroPortion / outroClips;
                     double outroStartTime = totalDuration - outroPortion;
+
+                    // REPETITION FIX: Recycle pool koristi SAMO lyrics segment putanje (sredina videa),
+                    // NE intro klipove — to je uzrokovalo da se isti kadrovi pojavljuju u prvoj I drugoj polovini.
+                    // Intro putanje se svjesno izostavljaju da izbjegnemo vizuelno ponavljanje.
+                    var introPathSet = new HashSet<string>(
+                        introSegments
+                            .Where(s => !string.IsNullOrEmpty(s.Path))
+                            .Select(s => s.Path),
+                        StringComparer.OrdinalIgnoreCase);
+
+                    var outroRecyclePool = _segments
+                        .Where(s => !string.IsNullOrEmpty(s.Path) && File.Exists(s.Path)
+                                    && !introPathSet.Contains(s.Path))
+                        .Select(s => s.Path)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    // Ako lyrics pool prazan (nema dovoljno scena), dodaj zadnjih 50% intro segmenata
+                    // (ne cijeli — samo drugu polovinu, vizuelno udaljenije od početka)
+                    if (outroRecyclePool.Count < 3)
+                    {
+                        var introFallback = introSegments
+                            .Where(s => !string.IsNullOrEmpty(s.Path) && File.Exists(s.Path))
+                            .Select(s => s.Path)
+                            .Skip(introSegments.Count / 2)  // samo druga polovina intro segmenata
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        foreach (var p in introFallback)
+                            if (!outroRecyclePool.Contains(p))
+                                outroRecyclePool.Add(p);
+                    }
+
+                    int recycleIdx = 0;
+
+                    // Garantovani ultra-safe fallback upiti koji uvijek pronađu rezultate na Pixabay
+                    var ultraSafeFallbacks = new[]
+                    {
+                        "children playing outdoor sunny day",
+                        "nature landscape beautiful sky",
+                        "kids running park happy",
+                        "green meadow flowers sunshine",
+                        "children laughing together",
+                        "outdoor park trees sunlight",
+                        "happy family outdoor",
+                        "nature forest peaceful morning"
+                    };
 
                     for (int i = 0; i < outroClips; i++)
                     {
@@ -4017,6 +4167,24 @@ namespace UltraVideoEditor
                             bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                         }
 
+                        // Treći pokušaj: ultra-safe generički upit koji uvijek pronađe nešto
+                        if (string.IsNullOrEmpty(bMediaPath))
+                        {
+                            string safeQuery = ultraSafeFallbacks[i % ultraSafeFallbacks.Length];
+                            bMediaPath = await SearchAndDownloadMedia(safeQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
+                            if (!string.IsNullOrEmpty(bMediaPath))
+                                LogToMainWindow($"   ✅ Outro {i + 1}: ultra-safe fallback uspješan ('{safeQuery}')");
+                        }
+
+                        // OUTRO-FIX: Ako svi pokušaji failuju, recikliraj klip iz pool-a
+                        // umjesto da ostavimo prazan Path koji uzrokuje rupe u trajanju videa.
+                        if (string.IsNullOrEmpty(bMediaPath) && outroRecyclePool.Count > 0)
+                        {
+                            bMediaPath = outroRecyclePool[recycleIdx % outroRecyclePool.Count];
+                            recycleIdx++;
+                            LogToMainWindow($"   ♻️ Outro {i + 1}: reciklirani kadar (pool={outroRecyclePool.Count})");
+                        }
+
                         if (!string.IsNullOrEmpty(bMediaPath) && bRollMediaType == "video")
                         {
                             double bVidDur = await GetVideoDuration(bMediaPath);
@@ -4024,18 +4192,24 @@ namespace UltraVideoEditor
                                 bMediaPath = await TrimVideoToDuration(bMediaPath, outroClipDuration, _tempVideoFolder);
                         }
 
+                        // Zadnja 3 kadra dobivaju fade-out tag za postepen završetak
+                        bool isFadeOutClip = (i >= outroClips - 3);
+                        string outroDesc = isFadeOutClip
+                            ? (i == outroClips - 1 ? "🎵 Outro - kraj|fadeout=1" : "🎵 Outro - fadeout|fadeout=1")
+                            : "🎵 Outro - instrumental";
+
                         _segments.Add(new TimelineSegment
                         {
                             Path = bMediaPath ?? "",
                             Duration = outroClipDuration,
                             StartTime = outroStartTime + (i * outroClipDuration),
-                            Description = i == outroClips - 1 ? "🎵 Outro - kraj" : "🎵 Outro - instrumental",
+                            Description = outroDesc,
                             LyricText = "",
                             AmbientSoundPath = null,
                             Energy = 2,
                             Emotion = _detectedContext == "lullaby" ? "calm" : "happy"
                         });
-                        LogToMainWindow($"   B-roll outro {i + 1}: {outroClipDuration:F1}s - '{kw}' → {(string.IsNullOrEmpty(bMediaPath) ? "❌ nema medija" : "✅ OK")}");
+                        LogToMainWindow($"   B-roll outro {i + 1}/{outroClips}: {outroClipDuration:F1}s - '{kw}' → {(string.IsNullOrEmpty(bMediaPath) ? "❌ nema medija" : "✅ OK")}{(isFadeOutClip ? " [fade-out]" : "")}");
                     }
                 }
 
@@ -4346,6 +4520,7 @@ namespace UltraVideoEditor
 
                         scene.VisionScore = _lastDownloadedVisionScore;
                         scene.IsStaticClip = _lastDownloadedIsStatic;
+                        scene.HasChildren = _lastDownloadedHasChildren;
 
                         if (scene.IsStaticClip)
                             LogToMainWindow($"   🎬 Statičan klip — Ken Burns će se primijeniti u renderu");
@@ -4363,6 +4538,7 @@ namespace UltraVideoEditor
                             MoodTag = $"mood:{scene.Emotion ?? _detectedMood}|context:{_detectedContext}|pacing:{scene.PacingCategory}|shottype:{scene.ShotType}|season:{_currentSeason ?? _detectedSeason ?? _songContext.Season ?? "none"}",
                             VisionScore = scene.VisionScore,
                             IsStaticClip = scene.IsStaticClip,
+                            HasChildren = scene.HasChildren,
                             ContentTag = scene.ContentTag,        // Hybrid Content Selector
                             Sentiment = StrictQueryEngine.ClassifySentiment(
                                 i < _lyricLines?.Count ? _lyricLines[i] : "").ToString()
@@ -4457,7 +4633,46 @@ namespace UltraVideoEditor
                 }
             }
             catch (Exception ex) { WpfMessageBox.Show(LF("generic_error", ex.Message), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error); }
-            finally { btnGenerate.IsEnabled = true; btnGenerate.Content = "🎬 KREIRAJ VIDEO"; }
+            finally
+            {
+                btnGenerate.IsEnabled = true;
+                btnGenerate.Content = "🎬 KREIRAJ VIDEO";
+
+                // CLEANUP: Briši _tempVideoFolder sa svim preuzetim i procesiranim klipovima.
+                // Čekamo kratko da RenderEngine završi pisanje fajlova, pa provjeri da output postoji.
+                string folderToClean = _tempVideoFolder;
+                string outputForCheck = AutoRenderOutputPath;
+                if (!string.IsNullOrEmpty(folderToClean) && Directory.Exists(folderToClean))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Sačekaj 3s da RenderEngine završi flush na disk
+                            await Task.Delay(3000);
+
+                            // Briši samo ako render output postoji i nije prazan (> 5 MB)
+                            bool outputOk = !string.IsNullOrEmpty(outputForCheck)
+                                && File.Exists(outputForCheck)
+                                && new FileInfo(outputForCheck).Length > 5_000_000;
+
+                            if (outputOk)
+                            {
+                                Directory.Delete(folderToClean, true);
+                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Obrisan temp folder: {folderToClean}");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Preskačem brisanje — output nije potvrđen: {outputForCheck}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[Cleanup] Greška pri brisanju {folderToClean}: {ex.Message}");
+                        }
+                    });
+                }
+            }
         }
 
         #endregion
@@ -5442,6 +5657,7 @@ namespace UltraVideoEditor
                                     _lastDownloadedVisionScore = finalScore;
                                     _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
                                                               || clipMotion.Direction == MotionDirection.Static;
+                                    _lastDownloadedHasChildren = vision.HasChildren;
                                     return fullPath;
                                 }
                             }
@@ -5617,12 +5833,18 @@ namespace UltraVideoEditor
                     AudioDescription = !string.IsNullOrEmpty(segment.MoodTag)
                         ? $"{segment.MoodTag}|energy={segment.Energy}" +
                           (segment.IsStaticClip ? "|static=1" : "") +
+                          (segment.HasChildren ? "|haschildren=1" : "") +
                           (anchorBrightnessValue > 0 ? $"|anchor_brightness={anchorBrightnessValue.ToString("F3", CultureInfo.InvariantCulture)}" : "") +
                           // Warm White Balance tag — signal za RenderEngine da primijeni topliji balans bijele
-                          "|wwb=1|wwb_filter=" + GetMoodColorFilter(segment.Emotion, null) + "," + WARM_WHITE_BALANCE_FILTER
+                          "|wwb=1|wwb_filter=" + GetMoodColorFilter(segment.Emotion, null) + "," + WARM_WHITE_BALANCE_FILTER +
+                          // OUTRO-FIX: propagiraj fadeout tag u AudioDescription
+                          ((segment.Description ?? "").Contains("fadeout=1") ? "|fadeout=1" : "")
                         : $"{segment.Description}|energy={segment.Energy}" +
                           (segment.IsStaticClip ? "|static=1" : "") +
-                          "|wwb=1|wwb_filter=" + WARM_WHITE_BALANCE_FILTER
+                          (segment.HasChildren ? "|haschildren=1" : "") +
+                          "|wwb=1|wwb_filter=" + WARM_WHITE_BALANCE_FILTER +
+                          // OUTRO-FIX: propagiraj fadeout tag u AudioDescription
+                          ((segment.Description ?? "").Contains("fadeout=1") ? "|fadeout=1" : "")
                 };
                 await Dispatcher.InvokeAsync(() => mainWindow.timelineItems.Add(newItem));
 
@@ -5884,7 +6106,9 @@ namespace UltraVideoEditor
                         paint.TextAlign = SKTextAlign.Center;
 
                         if (isIntro)
-                            paint.Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+                            paint.Typeface = SKTypeface.FromFamilyName("Segoe Script", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+                                          ?? SKTypeface.FromFamilyName("Lucida Handwriting", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+                                          ?? SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
 
                         var words = text.Split(' ');
                         var lines = new List<string>();
@@ -6589,8 +6813,8 @@ namespace UltraVideoEditor
         public string AmbientPath { get; set; }
         public double VisionScore { get; set; } = 6.0;
         public bool IsStaticClip { get; set; } = false;
+        public bool HasChildren { get; set; } = false;
         /// <summary>
-        /// Hybrid Content Selector tag: "Emotional", "Portrait", "Action", "Nature"
         /// Određuje da li scena koristi fotografiju (ZoomPan) ili video.
         /// </summary>
         public string ContentTag { get; set; }
@@ -6623,6 +6847,7 @@ namespace UltraVideoEditor
         public string MoodTag { get; set; }
         public double VisionScore { get; set; } = 6.0;
         public bool IsStaticClip { get; set; } = false;
+        public bool HasChildren { get; set; } = false;
         /// <summary>
         /// Hybrid Content Selector tag propagiran iz StoryScene.
         /// </summary>
