@@ -15,12 +15,71 @@ namespace UltraVideoEditor
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
-        // ── Model konstante ────────────────────────────────────────────────────
-        // QueryModel: Qwen 2.5 14B — analiza pesme i generisanje vizuelnih querija
-        // VisionModel: Qwen 2-VL — vizuelna analiza klipova (Qwen multimodal)
-        // Promena modela: samo ovde, ne po celom kodu
-        public const string QueryModel  = "qwen2.5:14b";
-        public const string VisionModel = "qwen2.5vl";  // naziv koji Ollama prijavljuje (ollama list)
+        // ── Model selekcija ────────────────────────────────────────────────────
+        // Modeli se biraju dinamicki na osnovu installer_config.json koji kreira
+        // UltraInstaller.ps1 tokom instalacije (detektuje GPU i VRAM).
+        //
+        // Fallback vrijednosti ako config ne postoji (rucna instalacija / dev):
+        //   QueryModel  → "qwen2.5:14b"
+        //   VisionModel → "qwen2.5vl"
+        //
+        // Promena modela: ili kroz installer (automatski), ili rucno u config fajlu.
+        // Putanja: [AppDir]\installer_config.json
+
+        private static InstallerConfig _cachedConfig = null;
+        private static readonly object _configLock   = new object();
+
+        private static InstallerConfig GetInstallerConfig()
+        {
+            if (_cachedConfig != null) return _cachedConfig;
+
+            lock (_configLock)
+            {
+                if (_cachedConfig != null) return _cachedConfig;
+
+                try
+                {
+                    string configPath = Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory,
+                        "installer_config.json");
+
+                    if (File.Exists(configPath))
+                    {
+                        string json = File.ReadAllText(configPath);
+                        _cachedConfig = JsonConvert.DeserializeObject<InstallerConfig>(json)
+                                        ?? new InstallerConfig();
+                    }
+                    else
+                    {
+                        // Config ne postoji — dev/rucna instalacija, koristimo defaults
+                        _cachedConfig = new InstallerConfig();
+                    }
+                }
+                catch
+                {
+                    _cachedConfig = new InstallerConfig();
+                }
+
+                return _cachedConfig;
+            }
+        }
+
+        /// <summary>
+        /// Query model izabran na osnovu GPU-a korisnika (ili default ako nema config-a).
+        /// Primjeri: "qwen2.5:14b" (NVIDIA 8GB+), "qwen2.5:7b" (4-8GB), "qwen2.5:3b" (CPU/slabiji)
+        /// </summary>
+        public static string QueryModel  => GetInstallerConfig().OllamaQueryModel;
+
+        /// <summary>
+        /// Vision model izabran na osnovu GPU-a korisnika.
+        /// Primjeri: "qwen2.5vl:7b" (NVIDIA 6GB+), "moondream" (CPU/slabiji GPU)
+        /// </summary>
+        public static string VisionModel => GetInstallerConfig().OllamaVisionModel;
+
+        /// <summary>
+        /// Resetuje keš konfiguracije — pozovi ako se installer_config.json promijeni u toku rada.
+        /// </summary>
+        public static void ResetConfigCache() { lock (_configLock) { _cachedConfig = null; } }
 
         private readonly HttpClient _httpClient;
         private readonly string _ollamaUrl = "http://localhost:11434/api/generate";
@@ -275,5 +334,30 @@ namespace UltraVideoEditor
         public string[] images  { get; set; }
         public bool     stream  { get; set; } = false;
         public object   options { get; set; }
+    }
+
+    // ── InstallerConfig ────────────────────────────────────────────────────────
+    // Deserijalizacija installer_config.json koji kreira UltraInstaller.ps1
+    // Format: { "ollama_query_model": "qwen2.5:14b", "ollama_vision_model": "qwen2.5vl:7b", ... }
+    public class InstallerConfig
+    {
+        // JSON property names moraju da odgovaraju onome sto installer pise
+        [JsonProperty("ollama_query_model")]
+        public string OllamaQueryModel  { get; set; } = "qwen2.5:14b";
+
+        [JsonProperty("ollama_vision_model")]
+        public string OllamaVisionModel { get; set; } = "qwen2.5vl";
+
+        [JsonProperty("gpu_type")]
+        public string GpuType           { get; set; } = "unknown";
+
+        [JsonProperty("gpu_name")]
+        public string GpuName           { get; set; } = "";
+
+        [JsonProperty("vram_gb")]
+        public double VramGB            { get; set; } = 0;
+
+        [JsonProperty("install_date")]
+        public string InstallDate       { get; set; } = "";
     }
 }

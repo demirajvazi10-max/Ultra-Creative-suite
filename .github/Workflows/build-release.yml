@@ -1,0 +1,103 @@
+name: Build and Release Ultra Creative Suite
+
+on:
+  push:
+    tags:
+      - 'v*'          # Pokretanje na svaki tag koji pocinje sa 'v' (v0.2, v1.0, itd.)
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout koda
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet paketa
+        run: dotnet restore UltraVideoEditor\UltraVideoEditor.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraVideoEditor\UltraVideoEditor.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Kopiraj installer u publish folder
+        run: |
+          copy install.bat .\publish\install.bat
+          copy UltraInstaller.ps1 .\publish\UltraInstaller.ps1
+
+      - name: Napravi README za instalaciju
+        run: |
+          $readmeContent = @"
+          # Ultra Creative Suite - ${{ github.ref_name }}
+
+          ## Kako instalirati
+
+          1. Raspakuj ovaj ZIP na zeljenu lokaciju
+          2. Desni klik na install.bat -> Pokreni kao administrator
+          3. Installer ce automatski preuzeti sve potrebno (FFmpeg, Ollama, Whisper)
+          4. Pokrenuti UltraVideoEditor.exe
+
+          ## Sistemski zahtjevi
+
+          - Windows 10 ili 11 (64-bit)
+          - 8GB RAM (preporuceno 16GB+)
+          - NVIDIA GPU za 4K rendering (opciono - CPU fallback automatski)
+          - Internetska veza za prvu instalaciju
+
+          ## Screen reader podrska
+
+          Testirano sa JAWS for Windows i NVDA.
+          Sve funkcije dostupne iskljucivo tastaturom.
+
+          Vise informacija: https://github.com/demirajvazi10-max/Ultra-Creative-suite
+          "@
+          $readmeContent | Out-File -FilePath .\publish\KAKO_INSTALIRATI.txt -Encoding UTF8
+
+      - name: Zipuj publish folder
+        run: |
+          Compress-Archive `
+            -Path .\publish\* `
+            -DestinationPath UltraCreativeSuite-${{ github.ref_name }}-win-x64.zip
+
+      - name: Kreiraj GitHub Release i uploaduj
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Creative Suite ${{ github.ref_name }}"
+          body: |
+            ## Ultra Creative Suite ${{ github.ref_name }}
+
+            **Preuzmi ZIP ispod, raspakuj i pokreni `install.bat` kao administrator.**
+
+            Installer automatski preuzima i instalira:
+            - FFmpeg (video processing)
+            - Ollama + AI modeli (optimizovani za tvoj hardver)
+            - Faster-Whisper (transkripcija)
+            - VLC (video preview)
+
+            ### Accessibility
+            Potpuno funkcionalno sa JAWS i NVDA screen readerima.
+            Sve funkcije dostupne iskljucivo tastaturom.
+
+            ### Sistemski zahtjevi
+            - Windows 10/11 (64-bit)
+            - 8GB RAM minimum, 16GB+ preporuceno
+            - NVIDIA GPU za NVENC (opciono)
+
+            ---
+            *Built with GitHub Actions | [Dokumentacija](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: UltraCreativeSuite-${{ github.ref_name }}-win-x64.zip
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

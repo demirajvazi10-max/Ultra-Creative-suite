@@ -1,0 +1,29 @@
+{
+  "name": "NazivServisa",
+  "description": "Kratki opis: sta nudi, koliko zahtjeva/sat, da li je besplatan",
+  "apiKeyUrl": "https://www.servis.com/api/registracija",
+
+  "searchVideoUrl": "https://api.servis.com/v1/videos/search",
+  "searchImageUrl": "https://api.servis.com/v1/images/search",
+
+  "authType": "queryParam",
+  "authParamName": "api_key",
+
+  "queryParam": "q",
+
+  "extraParams": {
+    "safesearch": "true",
+    "per_page": "30"
+  },
+
+  "responseMap": {
+    "hitsArray": "hits",
+    "downloadUrl": "video_url",
+    "tags": "tags",
+    "duration": "duration",
+    "width": "width",
+    "height": "height",
+    "pageUrl": "page_url",
+    "author": "author_name"
+  }
+}

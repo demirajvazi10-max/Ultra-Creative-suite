@@ -664,9 +664,11 @@ namespace UltraVideoEditor
                             }
 
                             double brightnessDelta = Math.Abs(clipBrightness - prevBrightness);
-                            // Jako različita svjetlina (>0.20) → dissolve (blago, ne reže oštro)
-                            // Slična svjetlina ili oba tamna → fade (standardni)
-                            xfadeType = brightnessDelta > 0.20 ? "dissolve" : "fade";
+                            // FIX-DISSOLVE: dissolve čini "provlačenje" (ghosting) elemenata prethodne scene.
+                            // Gemini @ 01:06: siluete plaže vidljive iznad trave = dissolve na sličnoj svjetlini.
+                            // Threshold spušten na 0.03 — praktično samo identični kadrovi (npr. isti ambijent).
+                            // Sve ostalo ide kao čist fade bez ghostinga.
+                            xfadeType = brightnessDelta < 0.03 ? "dissolve" : "fade";
                         }
 
                         transitionTypes.Add(xfadeType);
@@ -774,7 +776,7 @@ namespace UltraVideoEditor
                             // Puni deficit klipovima iz druge polovine videa (vizuelno raznovrsno).
                             // FIX 3: Svaki klip iz poola se koristi max 1x (nema kruženja).
                             // FIX 4: outroSegIdx je dedicirani brojač, neovisan o videoFiles.Count.
-                            // ─────────────────────────────────────────────────────────────────────────
+                            // ─────────────────────────────────────────────────────────────────────────    
 
                             // Pool: klipovi iz druge polovine videoFiles (ne intro/početak)
                             int halfPoint = videoFiles.Count / 2;
@@ -824,7 +826,7 @@ namespace UltraVideoEditor
                                 {
                                     videoFiles.Add(outroSegPath);
                                     fadeDurations.Add(0.50);
-                                    transitionTypes.Add("dissolve");
+                                    transitionTypes.Add("fade"); // FIX-DISSOLVE: outro segmenti koriste fade
                                     double actualSeg = await GetVideoDuration(outroSegPath, cancellationToken);
                                     remaining -= actualSeg;
                                     anySegOk = true;
@@ -842,7 +844,7 @@ namespace UltraVideoEditor
                                     {
                                         videoFiles.Add(fbPath);
                                         fadeDurations.Add(0.50);
-                                        transitionTypes.Add("dissolve");
+                                        transitionTypes.Add("fade"); // FIX-DISSOLVE: outro fallback koristi fade
                                         remaining -= segDur;
                                         anySegOk = true;
                                     }
@@ -875,7 +877,7 @@ namespace UltraVideoEditor
                 // ── CROSS-DISSOLVE: single-pass FFmpeg xfade ─────────────────────────
                 // Pacing-aware: fast klipovi 0.15s, slow 0.60s, standard 0.35s fade.
                 // ─────────────────────────────────────────────────────────────────────
-                const double CROSSFADE_DURATION = 0.35;
+                const double CROSSFADE_DURATION = 0.45; // FIX-FADE: povećano 0.35→0.45 za glatkiji blend
                 double avgFade = fadeDurations.Count > 0
                     ? Math.Round(fadeDurations.Average(), 3) : CROSSFADE_DURATION;
                 string crossfadedVideo = null;

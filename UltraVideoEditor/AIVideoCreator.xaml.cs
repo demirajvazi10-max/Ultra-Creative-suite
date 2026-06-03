@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -63,6 +63,7 @@ namespace UltraVideoEditor
         private double _lastDownloadedVisionScore = 6.0;
         private bool _lastDownloadedIsStatic = false;
         private bool _lastDownloadedHasChildren = false;
+        private bool _lastDownloadedIsOutdoor = false;
         private string _detectedMood = "neutral";
         private string _detectedContext = "";
         private SongContext _songContext = new SongContext(); // Iskra AI-First: kontekst za StrictQueryEngine
@@ -70,7 +71,7 @@ namespace UltraVideoEditor
         // ── Auto-Render: pokreni render automatski posle generisanja ─────────
         // Korisnik postavi putanju, čekirа checkbox, krene spavati :)
         public string AutoRenderOutputPath { get; set; } = "";
-        public bool   AutoRenderEnabled    { get; set; } = false;
+        public bool AutoRenderEnabled { get; set; } = false;
         // Setuju se iz scene loopa da bi bili dostupni unutar SearchAndDownloadMedia
         private string _currentLyric = null;
         private string _currentSeason = null;
@@ -150,7 +151,10 @@ namespace UltraVideoEditor
         private int _currentSceneIndex = 0;
         private const int QUERY_COOLDOWN_SCENES = 4; // Ne ponavljaj istu temu unutar 4 scene (~12-16s)
         private readonly HashSet<string> _seenPixabayIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _seenPexelsIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _queryUseCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // Page rotation — kad se iscrpi prva stranica (30 rezultata), uzimamo sljedeću
+        private readonly Dictionary<string, int> _queryPageMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         private List<string> _universalKeywords = new List<string>
         {
@@ -1256,9 +1260,9 @@ namespace UltraVideoEditor
                 return mood switch
                 {
                     "happy" or "joyful" or "playful" => "child laughing arms open sunlight freedom joy candid",
-                    "calm" or "peaceful"              => "child peaceful meadow soft light serene candid",
-                    "excited" or "energetic"          => "child jumping spinning outdoor sunny candid",
-                    _                                 => "child smiling golden hour park warm candid"
+                    "calm" or "peaceful" => "child peaceful meadow soft light serene candid",
+                    "excited" or "energetic" => "child jumping spinning outdoor sunny candid",
+                    _ => "child smiling golden hour park warm candid"
                 };
             }
 
@@ -2254,18 +2258,18 @@ namespace UltraVideoEditor
         {
             var analysis = await AnalyseSongWithAI(lyrics, ct);
             _detectedContext = string.IsNullOrWhiteSpace(analysis.Context) ? "fun" : analysis.Context;
-            _detectedMood    = string.IsNullOrWhiteSpace(analysis.Mood)    ? "happy" : analysis.Mood;
-            _detectedSeason  = string.IsNullOrWhiteSpace(analysis.Season)  ? ""      : analysis.Season;
+            _detectedMood = string.IsNullOrWhiteSpace(analysis.Mood) ? "happy" : analysis.Mood;
+            _detectedSeason = string.IsNullOrWhiteSpace(analysis.Season) ? "" : analysis.Season;
 
             // Iskra AI-First: build SongContext za Ollama + StrictQueryEngine
             _songContext = new SongContext
             {
-                AgeGroup    = StrictQueryEngine.DetectAgeGroup(string.Join(" ", lyrics), _detectedContext),
-                Context     = _detectedContext,
-                Mood        = _detectedMood,
-                Season      = _detectedSeason,
-                Setting     = analysis.Setting ?? "outdoor",
-                Theme       = analysis.Theme ?? _detectedContext,
+                AgeGroup = StrictQueryEngine.DetectAgeGroup(string.Join(" ", lyrics), _detectedContext),
+                Context = _detectedContext,
+                Mood = _detectedMood,
+                Season = _detectedSeason,
+                Setting = analysis.Setting ?? "outdoor",
+                Theme = analysis.Theme ?? _detectedContext,
                 VisualStyle = analysis.VisualStyle ?? "bright colorful outdoor children"
             };
             LogToMainWindow($"🎯 SongContext: uzrast={_songContext.AgeGroup}, kontekst={_songContext.Context}, sezona={_songContext.Season}");
@@ -2289,7 +2293,7 @@ namespace UltraVideoEditor
                 {
                     SceneNumber = i + 1,
                     Description = lyrics[i].Length > 60 ? lyrics[i].Substring(0, 57) + "..." : lyrics[i],
-                    FullLyric   = lyrics[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
+                    FullLyric = lyrics[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
                     Emotion = analysis.Mood ?? "happy",
                     Energy = energy,
                     Characters = analysis.MainSubject ?? "children",
@@ -2594,7 +2598,7 @@ namespace UltraVideoEditor
                 {
                     SceneNumber = i + 1,
                     Description = _lyricLines[i].Length > 50 ? _lyricLines[i].Substring(0, 47) + "..." : _lyricLines[i],
-                    FullLyric   = _lyricLines[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
+                    FullLyric = _lyricLines[i],  // ZERO-FALLBACK: originalni stih za StrictQueryEngine
                     Emotion = emotions[i % emotions.Length],
                     Energy = energy,
                     Characters = mainCharacter,
@@ -3546,6 +3550,8 @@ namespace UltraVideoEditor
         private async Task ProcessVideoCreation(string audioPath, double totalDuration)
         {
             _seenPixabayIds.Clear();
+            _seenPexelsIds.Clear();
+            _queryPageMap.Clear();
             _usedMediaUrls.Clear();
             _audioPath = audioPath;
             _totalDuration = totalDuration;
@@ -3616,8 +3622,8 @@ namespace UltraVideoEditor
             _lastClipEndMotion = null;
             _queryThemeCooldown.Clear();
             _currentSceneIndex = 0;
-            _lastSeasonTag  = "none";
-            _lastClipWarm   = true;
+            _lastSeasonTag = "none";
+            _lastClipWarm = true;
             _lastClipWasOutdoor = true; // PATCH 10: reset
             _recentLuminance.Clear(); // PATCH 10: reset rolling luminance history
 
@@ -3652,6 +3658,7 @@ namespace UltraVideoEditor
 
             _usedMediaUrls.Clear();
             _queryUseCount.Clear();
+            _queryPageMap.Clear();
 
             int sceneCount = storyBoard.Scenes.Count;
             double estimatedSegDur = sceneCount > 0
@@ -3665,10 +3672,10 @@ namespace UltraVideoEditor
             // Lullaby uvek → 8 udaraca (maksimalno spoро)
             int beatsPerCut = _detectedContext switch
             {
-                "lullaby"   => 8,
-                "sad"       => 6,
+                "lullaby" => 8,
+                "sad" => 6,
                 "adventure" or "dance" => 2,
-                _           => 4  // YouTube Kids default
+                _ => 4  // YouTube Kids default
             };
 
             double MAX_LYRIC_SCENE_DURATION;
@@ -3685,10 +3692,10 @@ namespace UltraVideoEditor
                 // Nema BeatInfo → context-based default
                 MAX_LYRIC_SCENE_DURATION = _detectedContext switch
                 {
-                    "lullaby"   => 6.0,
-                    "sad"       => 5.0,
+                    "lullaby" => 6.0,
+                    "sad" => 5.0,
                     "adventure" or "dance" => 2.5,
-                    _           => 3.5   // YouTube Kids default bez BPM-a
+                    _ => 3.5   // YouTube Kids default bez BPM-a
                 };
                 LogToMainWindow($"🎬 Nema BPM, context '{_detectedContext}' → max {MAX_LYRIC_SCENE_DURATION}s po kadru");
             }
@@ -3720,7 +3727,7 @@ namespace UltraVideoEditor
 
                         // Prozor pretrage: od stih-start do stih-start + MAX_LYRIC_SCENE_DURATION
                         double windowStart = _lyricTimestamps[si] - 0.5;
-                        double windowEnd   = _lyricTimestamps.ContainsKey(si + 1)
+                        double windowEnd = _lyricTimestamps.ContainsKey(si + 1)
                             ? _lyricTimestamps[si + 1]
                             : _lyricTimestamps[si] + MAX_LYRIC_SCENE_DURATION;
 
@@ -4230,16 +4237,16 @@ namespace UltraVideoEditor
                     // "candid natural authentic" se dodaje svuda — suprotno od stock-commercial look
                     string styleConsistency = _detectedContext switch
                     {
-                        "lullaby"   => "candid natural soft light cozy warm peaceful night children",
-                        "party"     => "candid natural colorful bright happy festive vibrant children",
-                        "love"      => "candid natural warm golden soft glow family children",
-                        "sad"       => "candid natural grey moody soft desaturated melancholy",
+                        "lullaby" => "candid natural soft light cozy warm peaceful night children",
+                        "party" => "candid natural colorful bright happy festive vibrant children",
+                        "love" => "candid natural warm golden soft glow family children",
+                        "sad" => "candid natural grey moody soft desaturated melancholy",
                         "adventure" => "candid natural outdoor bright energetic children lifestyle",
-                        "dance"     => "candid natural colorful joyful movement bright children",
+                        "dance" => "candid natural colorful joyful movement bright children",
                         "christmas" => "candid natural warm holiday lights cozy festive children",
-                        "animal"    => "candid natural cute nature soft light warm children",
-                        "school"    => "candid natural bright colorful educational warm children",
-                        "nature"    => "candid natural sunlight green peaceful children lifestyle",
+                        "animal" => "candid natural cute nature soft light warm children",
+                        "school" => "candid natural bright colorful educational warm children",
+                        "nature" => "candid natural sunlight green peaceful children lifestyle",
                         "music" => "children joyful colorful bright fun",
                         "outdoor" => "children park playground sunny green happy",
                         "health" => "children running active park outdoor healthy sunny",
@@ -4279,18 +4286,36 @@ namespace UltraVideoEditor
                         {
                             _songContext = new SongContext
                             {
-                                AgeGroup    = _songContext.AgeGroup,
-                                Context     = _songContext.Context,
-                                Mood        = _songContext.Mood,
-                                Season      = lyricSeason,
-                                Setting     = _songContext.Setting,
-                                Theme       = _songContext.Theme,
+                                AgeGroup = _songContext.AgeGroup,
+                                Context = _songContext.Context,
+                                Mood = _songContext.Mood,
+                                Season = lyricSeason,
+                                Setting = _songContext.Setting,
+                                Theme = _songContext.Theme,
                                 VisualStyle = _songContext.VisualStyle
                             };
                             LogToMainWindow($"   🗓 ✅ Sezona promijenjena na: {lyricSeason}");
                         }
                     }
                     // Ako lyricSeason == null → _currentSeason ostaje isti kao prethodni stih (ispravno)
+
+                    // LITERAL SYNC FIX — SLOJ 0: ActionMap direktni match (prije Ollame)
+                    // Problem: Ollama overriduje actionMap pa "sladoled" → generic child query
+                    // umjesto točnog "child eating ice cream".
+                    // Rješenje: ako actionMap ima direktan lexical hit na konkretnu imenicu u stihu,
+                    // taj query ide kao PRIORITET i Ollama ga može samo proširiti, ne zamijeniti.
+                    string actionMapDirectHit = null;
+                    {
+                        string directQuery = StrictQueryEngine.GetHardCodedQuery(lyricForQuery);
+                        if (!string.IsNullOrEmpty(directQuery))
+                        {
+                            // Provjeri da li je match na konkretnu imenicu (objekt/akcija, ne generički kontekst)
+                            // GetHardCodedQuery vraća samo ako postoji direktan keyword match u stihu
+                            actionMapDirectHit = StrictQueryEngine.ValidateAndFilter(directQuery, _songContext);
+                            if (!string.IsNullOrEmpty(actionMapDirectHit))
+                                LogToMainWindow($"   🎯 ActionMap direktni hit (prioritet): '{actionMapDirectHit}'");
+                        }
+                    }
 
                     // SLOJ 1: Ollama — sa semantičkom klasifikacijom stiha (FIX Tag-Semantic Gap)
                     if (_ollamaRunning)
@@ -4328,7 +4353,23 @@ namespace UltraVideoEditor
                                     LogToMainWindow($"   ⚠️ Ollama query odbijen filterom: '{ollamaFiltered}'");
                             }
                             else
-                                LogToMainWindow($"   ⚠️ Ollama nije dala upotrebljiv query");
+                            {
+                                // FIX-OLLAMA-DEBUG: Loguj raw output da vidimo zašto se odbacuje
+                                string rawPreview = string.IsNullOrWhiteSpace(ollamaRaw)
+                                    ? "(prazan odgovor)"
+                                    : ollamaRaw.Substring(0, Math.Min(80, ollamaRaw.Length)).Replace("\n", "↵").Replace("\r", "");
+                                LogToMainWindow($"   ⚠️ Ollama nije dala upotrebljiv query | Raw: '{rawPreview}'");
+                            }
+
+                            // LITERAL SYNC FIX: ActionMap direktni hit pobjeđuje Ollamu
+                            // "sladoled" → actionMap = "child eating ice cream" (konkretan)
+                            // Ollama = "child running park joy" (generički) → mora izgubiti
+                            if (!string.IsNullOrEmpty(actionMapDirectHit))
+                            {
+                                if (primaryQuery != actionMapDirectHit)
+                                    LogToMainWindow($"   🎯 ActionMap override: '{primaryQuery}' → '{actionMapDirectHit}' (literal sync)");
+                                primaryQuery = actionMapDirectHit;
+                            }
                         }
                         catch (Exception ollamaEx)
                         {
@@ -4395,7 +4436,7 @@ namespace UltraVideoEditor
                     var multiMatches = StrictQueryEngine.GetAllHardCodedMatches(lyricForQuery);
 
                     // Setujemo instance fields da budu dostupni unutar SearchAndDownloadMedia
-                    _currentLyric  = scene.Description;
+                    _currentLyric = scene.Description;
                     _currentSeason = _detectedSeason;
 
                     LogToMainWindow($"🎬 Scena {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
@@ -4479,9 +4520,19 @@ namespace UltraVideoEditor
                                               attempt == 1 ? "Pokušaj 2 (SmartFallback)" :
                                                             "Pokušaj 3 (safe)";
                         LogToMainWindow($"   🔍 {attemptLabel}: '{attemptQuery}'");
+
+                        // FIX-SEASON-OBJECT: Neki objekti postoje u svim sezonama (sladoled, čaj, igranje)
+                        // ali Pixabay klipovi za njih mogu imati winter/summer tag koji se mimoilazi.
+                        // Za object querije → isključi strictSeason filter da ne odbacuje validne klipove.
+                        bool seasonNeutralQuery = new[] {
+                            "ice cream", "eating", "drinking", "tea", "hot chocolate",
+                            "playing indoor", "birthday", "cake", "food"
+                        }.Any(k => attemptQuery.ToLower().Contains(k));
+
                         mediaPath = await SearchAndDownloadMedia(
                             attemptQuery, _pixabayMinHeight, effectiveMediaType,
-                            _cts?.Token ?? CancellationToken.None, scene.Duration);
+                            _cts?.Token ?? CancellationToken.None, scene.Duration,
+                            strictSeasonFilter: !seasonNeutralQuery);
                         if (!string.IsNullOrEmpty(mediaPath))
                             LogToMainWindow($"   ✅ {attemptLabel} uspješan");
                         else
@@ -4521,6 +4572,7 @@ namespace UltraVideoEditor
                         scene.VisionScore = _lastDownloadedVisionScore;
                         scene.IsStaticClip = _lastDownloadedIsStatic;
                         scene.HasChildren = _lastDownloadedHasChildren;
+                        scene.IsOutdoor = _lastDownloadedIsOutdoor;
 
                         if (scene.IsStaticClip)
                             LogToMainWindow($"   🎬 Statičan klip — Ken Burns će se primijeniti u renderu");
@@ -4539,6 +4591,7 @@ namespace UltraVideoEditor
                             VisionScore = scene.VisionScore,
                             IsStaticClip = scene.IsStaticClip,
                             HasChildren = scene.HasChildren,
+                            IsOutdoor = scene.IsOutdoor,
                             ContentTag = scene.ContentTag,        // Hybrid Content Selector
                             Sentiment = StrictQueryEngine.ClassifySentiment(
                                 i < _lyricLines?.Count ? _lyricLines[i] : "").ToString()
@@ -4708,7 +4761,7 @@ namespace UltraVideoEditor
             if (dlg.ShowDialog() == true)
             {
                 txtAutoRenderPath.Text = dlg.FileName;
-                AutoRenderOutputPath   = dlg.FileName;
+                AutoRenderOutputPath = dlg.FileName;
             }
         }
 
@@ -4752,15 +4805,11 @@ namespace UltraVideoEditor
             int totalSegs = segs.Count;
             double avgScore = segs.Average(s => s.VisionScore);
             int staticCount = segs.Count(s => s.IsStaticClip);
-            int outdoorCount = segs.Count(s => s.Description != null && (
-                s.Description.Contains("park") || s.Description.Contains("outdoor") ||
-                s.Description.Contains("nature") || s.Description.Contains("street") ||
-                s.Description.Contains("playground") || s.Description.Contains("garden")));
-            int childrenCount = segs.Count(s => s.Description != null && (
-                s.Description.Contains("child") || s.Description.Contains("kid") ||
-                s.Description.Contains("family") || s.Description.Contains("deca") ||
-                s.Description.Contains("djeca") || s.Description.Contains("dete") ||
-                s.Description.Contains("baby")));
+            // FIX-VALIDATION: Koristi IsOutdoor flag koji se setuje pri downloadu (TagBoost + ONNX)
+            int outdoorCount = segs.Count(s => s.IsOutdoor);
+            // FIX-VALIDATION: Koristi HasChildren flag koji se setuje pri downloadu (TagBoost + ONNX)
+            // Prethodni kod je čitao s.Description (tekst stiha) — to uvijek vraća ~0%
+            int childrenCount = segs.Count(s => s.HasChildren);
             // BUG-4 FIX: Oduzmi crossfade overlap da prikaz bude tačan
             // Crossfade oduzima (N-1) * avgFade od ukupnog trajanja
             double avgFadeEst = 0.346; // prosječni fade iz pacing logike
@@ -4808,10 +4857,10 @@ namespace UltraVideoEditor
                 $"{outdoorCount} outdoor, {childrenCount} dječijih kadrova.", 0);
         }
 
-        private string _lastShotType  = "";
+        private string _lastShotType = "";
         private string _lastSeasonTag = "none"; // prati sezonu prethodnog klipa za grupisanje
-        private bool   _lastClipWarm  = true;   // prati temperaturu boja prethodnog klipa
-        private bool   _lastClipWasOutdoor = true; // PATCH 10: prati indoor/outdoor kontinuitet
+        private bool _lastClipWarm = true;   // prati temperaturu boja prethodnog klipa
+        private bool _lastClipWasOutdoor = true; // PATCH 10: prati indoor/outdoor kontinuitet
         private readonly System.Collections.Generic.Queue<double> _recentLuminance
             = new System.Collections.Generic.Queue<double>(4); // PATCH 10: rolling warm avg (3 klipa)
 
@@ -5103,18 +5152,23 @@ namespace UltraVideoEditor
                         {
                             // Uzmi prvu smislenu riječ iz query-a + "children outdoor"
                             var firstWord = keywords
-                                .Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries)
+                                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                 .FirstOrDefault(t => t.Length > 3) ?? keywords.Split(' ')[0];
                             searchQ = firstWord + " children outdoor";
                         }
 
+                        // Page rotation — kad svi rezultati budu viđeni, uzimamo sljedeću stranicu
+                        string pageKey = searchQ.ToLowerInvariant().Trim();
+                        if (!_queryPageMap.ContainsKey(pageKey)) _queryPageMap[pageKey] = 1;
+                        int currentPage = _queryPageMap[pageKey];
+
                         string url = mediaType == "video"
                             ? (minDurationSeconds > 20
-                                ? $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film&min_duration=20&max_duration=60"
+                                ? $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film&min_duration=20&max_duration=60&page={currentPage}"
                                 : minDurationSeconds > 4
-                                    ? $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film&min_duration=4&max_duration=60"
-                                    : $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film")
-                            : $"https://pixabay.com/api/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&image_type=photo&safesearch=true&per_page=30&min_width={minWidth}";
+                                    ? $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film&min_duration=4&max_duration=60&page={currentPage}"
+                                    : $"https://pixabay.com/api/videos/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&safesearch=true&per_page=30&video_type=film&page={currentPage}")
+                            : $"https://pixabay.com/api/?key={apiKey}&q={Uri.EscapeDataString(searchQ)}&image_type=photo&safesearch=true&per_page=30&min_width={minWidth}&page={currentPage}";
 
                         string response = await _httpClient.GetStringAsync(url, ct);
                         var json = JObject.Parse(response);
@@ -5129,17 +5183,36 @@ namespace UltraVideoEditor
     "playground","flowers","grass","blue sky",
     "boy","girl","toddler","baby","kids","siblings",
     "mother","father","parent","teacher" };
+
+                            // LITERAL SYNC FIX: Izvuci query riječi za direktno poređenje sa tagovima.
+                            // Ovo rješava problem gdje "sladoled" vraća generičke kadrove djece umjesto
+                            // specifičnih (dijete jede sladoled) — jer sorting nije gledao sam query.
+                            // queryMatchScore * 3 daje 3x veći prioritet direktnom podudaranju nego whitelist.
+                            var queryWords = searchQ.ToLowerInvariant()
+                                .Split(new[] { ' ', ',', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Where(w => w.Length > 2) // ignoriši kratke stop-words
+                                .ToArray();
+
                             var sortedHits = hits.Cast<JToken>().OrderByDescending(h => {
                                 string tags = h["tags"]?.ToString()?.ToLower() ?? "";
+                                string title = h["user"]?.ToString()?.ToLower() ?? "";
+
+                                // Query match score — svaka query riječ nađena u tagovima = +1
+                                int queryMatchScore = queryWords.Count(w => tags.Contains(w));
+
+                                // Whitelist score — generički bonus za dječiji sadržaj
                                 int whitelistScore = whitelistTags.Count(w => tags.Contains(w));
-                                // PATCH 7: Bonus za HD/4K snimke — veća rezolucija = veći score
-                                int width  = h["videos"]?["large"]?["width"]?.Value<int>()  ?? h["width"]?.Value<int>()  ?? 0;
+
+                                // PATCH 7: Bonus za HD/4K snimke
+                                int width = h["videos"]?["large"]?["width"]?.Value<int>() ?? h["width"]?.Value<int>() ?? 0;
                                 int height = h["videos"]?["large"]?["height"]?.Value<int>() ?? h["height"]?.Value<int>() ?? 0;
                                 int qualityBonus = (width >= 3840 || height >= 2160) ? 5   // 4K
                                                  : (width >= 1920 || height >= 1080) ? 3   // 1080p
-                                                 : (width >= 1280 || height >= 720)  ? 1   // 720p
+                                                 : (width >= 1280 || height >= 720) ? 1   // 720p
                                                  : 0;
-                                return whitelistScore + qualityBonus;
+
+                                // queryMatchScore nosi 3x težinu — specifičnost beat-uje popularnost
+                                return (queryMatchScore * 3) + whitelistScore + qualityBonus;
                             }).ToList();
 
                             string queryKey = searchQ.ToLowerInvariant().Trim();
@@ -5196,7 +5269,14 @@ namespace UltraVideoEditor
             "woman alone", "solo woman", "woman portrait", "woman closeup",
             "adult woman sitting", "model", "stock woman",
             "bull", "cow", "cattle", "livestock", "ox",
-            "dry branch", "bare branch", "dead tree", "twig closeup"
+            "dry branch", "bare branch", "dead tree", "twig closeup",
+            // FIX-BADTAGS: Vizuelno agresivni kadrovi (Gemini @ 01:25 tornado, @ 00:49 vatra)
+            "tornado", "twister", "hurricane", "cyclone", "typhoon",
+            "storm", "thunderstorm", "lightning strike", "dark storm",
+            "fire", "flame", "flames", "fireplace", "campfire",
+            "burning", "wildfire", "bonfire", "blaze", "inferno",
+            "explosion", "blast", "smoke dark", "disaster",
+            "flood", "tsunami", "earthquake", "volcano", "eruption"
         };
                                             break;
                                         case "health":
@@ -5332,9 +5412,42 @@ namespace UltraVideoEditor
                                     var vision = await VisionAnalyzer.AnalyzeClipAsync(
                                         fullPath, ffmpegForVision, ct,
                                         lyricLine: _currentLyric,
-                                        season:    _currentSeason,
-                                        mood:      _detectedMood,
-                                        context:   _detectedContext);
+                                        season: _currentSeason,
+                                        mood: _detectedMood,
+                                        context: _detectedContext);
+
+                                    // TAG BOOST: Ako ONNX nije prepoznao dijete ali Pixabay tagovi jasno govore
+                                    // da je kadar sa djecom — override HasChildren=true.
+                                    // ONNX MobileNetV2 ima loše labele za djecu; tagovi su pouzданiji signal.
+                                    if (!vision.HasChildren)
+                                    {
+                                        string[] childTagKeywords = {
+                                            "child", "children", "kid", "kids", "baby", "toddler",
+                                            "boy", "girl", "infant", "preschool", "kindergarten",
+                                            "playground", "nursery", "newborn"
+                                        };
+                                        bool tagsHaveChild = childTagKeywords.Any(k => hitTags.Contains(k));
+                                        if (tagsHaveChild)
+                                        {
+                                            vision.HasChildren = true;
+                                            LogToMainWindow($"   👶 TagBoost: Pixabay tagovi sadrže child keyword — HasChildren override=True");
+                                        }
+                                    }
+
+                                    // OUTDOOR TAG BOOST: Isti princip kao HasChildren
+                                    // ONNX rijetko detektuje outdoor — tagovi su pouzdaniji
+                                    if (!vision.IsOutdoor)
+                                    {
+                                        string[] outdoorTagKeywords = {
+                                            "outdoor", "outside", "nature", "park", "garden", "field",
+                                            "forest", "meadow", "grass", "sky", "sunshine", "sunlight",
+                                            "playground", "street", "beach", "mountain", "river", "lake",
+                                            "path", "trail", "yard", "backyard", "exterior"
+                                        };
+                                        bool tagsHaveOutdoor = outdoorTagKeywords.Any(k => hitTags.Contains(k));
+                                        if (tagsHaveOutdoor)
+                                            vision.IsOutdoor = true;
+                                    }
 
                                     if (vision.RetryNeeded && hitOffset < sortedHits.Count - 2)
                                     {
@@ -5361,6 +5474,29 @@ namespace UltraVideoEditor
                                     if (clipMotion.HasStrongMotion && hitOffset < sortedHits.Count - 2)
                                     {
                                         LogToMainWindow($"   🚫 KidsFilter: Preagresivan pokret kamere (mag:{clipMotion.Magnitude:F0}) — odbacujem za dečiji video...");
+                                        try { File.Delete(fullPath); } catch { }
+                                        _usedMediaUrls.Remove(dlUrl);
+                                        continue;
+                                    }
+
+                                    // FIX-FROZEN: Filter za "zamrznute" životinjske kadrove
+                                    // AI stock klipovi ptica, flaminga i sl. često imaju Magnitude≈0 (statična scena)
+                                    // Iskusno oko to odmah primijeti (Gemini: 00:21 flamingo, 00:32 ptica).
+                                    // Ako je kadar životinje I gotovo statičan → tražimo dinamičniji klip.
+                                    bool isAnimalClip = hitTags.Contains("bird") || hitTags.Contains("flamingo") ||
+                                                        hitTags.Contains("animal") || hitTags.Contains("wildlife") ||
+                                                        hitTags.Contains("butterfly") || hitTags.Contains("cat") ||
+                                                        hitTags.Contains("dog") || hitTags.Contains("horse") ||
+                                                        hitTags.Contains("duck") || hitTags.Contains("rabbit") ||
+                                                        hitTags.Contains("fish") || hitTags.Contains("deer") ||
+                                                        (vision.Labels != null && vision.Labels.Any(l =>
+                                                            l.ToLower().Contains("bird") || l.ToLower().Contains("animal") ||
+                                                            l.ToLower().Contains("flamingo") || l.ToLower().Contains("wildlife")));
+                                    bool isFrozenClip = clipMotion.Direction == MotionDirection.Static &&
+                                                        clipMotion.Magnitude < 3.0;
+                                    if (isAnimalClip && isFrozenClip && hitOffset < sortedHits.Count - 3)
+                                    {
+                                        LogToMainWindow($"   🐦 FrozenAnimal: životinjski kadar bez pokreta (mag:{clipMotion.Magnitude:F1}) — tražim animiran klip...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5448,17 +5584,25 @@ namespace UltraVideoEditor
                                         clipSeasonTag = "summer";
 
                                     // STRICT FILTER: odbaci klip koji nije "none" i nije ciljana sezona pesme
-                                    // Npr. pesma je "spring" → prihvati "spring" i "none", odbaci "summer/autumn/winter"
-                                    // Ovo rješava Geminijev prigovor o nekonzistentnosti kadrova
-                                    // IZNIMKA: B-roll klipovi (strictSeasonFilter=false) — ne filtriramo jer
-                                    // B-roll pokriva više sezona u pesmi (npr. "Šetnja" ima sva 4 godišnja doba)
+                                    // IZNIMKA 1: B-roll klipovi (strictSeasonFilter=false) — ne filtriramo
+                                    // IZNIMKA 2: Ako scena ima eksplicitnu sezonu (po stihu), prihvati klipove te sezone
+                                    //            npr. stih "kad je zima" → _currentSeason može biti "winter" čak i ako je globalna sezona "spring"
                                     bool strictSeasonReject = false;
                                     if (strictSeasonFilter &&
                                         !string.IsNullOrEmpty(_currentSeason) && _currentSeason != "none" &&
                                         clipSeasonTag != "none" && clipSeasonTag != _currentSeason &&
                                         hitOffset < sortedHits.Count - 2)
                                     {
-                                        strictSeasonReject = true;
+                                        // Dodatna tolerancija: spring ↔ summer su kompatibilni (toplo doba)
+                                        // winter ↔ autumn su kompatibilni (hladno doba)
+                                        bool compatibleSeasons =
+                                            (_currentSeason == "spring" && clipSeasonTag == "summer") ||
+                                            (_currentSeason == "summer" && clipSeasonTag == "spring") ||
+                                            (_currentSeason == "winter" && clipSeasonTag == "autumn") ||
+                                            (_currentSeason == "autumn" && clipSeasonTag == "winter");
+
+                                        if (!compatibleSeasons)
+                                            strictSeasonReject = true;
                                     }
 
                                     if (strictSeasonReject)
@@ -5477,8 +5621,10 @@ namespace UltraVideoEditor
                                     {
                                         var opposites = new Dictionary<string, string>
                                         {
-                                            ["winter"] = "summer", ["summer"] = "winter",
-                                            ["spring"] = "autumn", ["autumn"] = "spring"
+                                            ["winter"] = "summer",
+                                            ["summer"] = "winter",
+                                            ["spring"] = "autumn",
+                                            ["autumn"] = "spring"
                                         };
                                         if (opposites.TryGetValue(_lastSeasonTag, out string opposite) && opposite == clipSeasonTag)
                                             seasonClash = true;
@@ -5631,9 +5777,9 @@ namespace UltraVideoEditor
                                             fullPath, ffmpegForVision, clipDurEst, 1.5, ct);
                                     }
                                     catch { _lastClipEndMotion = clipMotion; }
-                                    _lastShotType   = shotType;
-                                    _lastSeasonTag  = clipSeasonTag != "none" ? clipSeasonTag : _lastSeasonTag;
-                                    _lastClipWarm   = clipIsWarm || (!clipIsCold);
+                                    _lastShotType = shotType;
+                                    _lastSeasonTag = clipSeasonTag != "none" ? clipSeasonTag : _lastSeasonTag;
+                                    _lastClipWarm = clipIsWarm || (!clipIsCold);
                                     _lastClipWasOutdoor = vision.IsOutdoor || !thisClipIsIndoor;
 
                                     // FIX-SMILE: Bonus score za osmeh kada je stih pozitivan
@@ -5658,11 +5804,15 @@ namespace UltraVideoEditor
                                     _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
                                                               || clipMotion.Direction == MotionDirection.Static;
                                     _lastDownloadedHasChildren = vision.HasChildren;
+                                    _lastDownloadedIsOutdoor = vision.IsOutdoor;
                                     return fullPath;
                                 }
                             }
 
                             LogToMainWindow($"   ⚠ Svi {sortedHits.Count} video rezultati za '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' su već korišćeni");
+                            // Page rotation — povećaj stranicu za sljedeći poziv istog query-a
+                            if (_queryPageMap.ContainsKey(pageKey) && _queryPageMap[pageKey] < 5)
+                                _queryPageMap[pageKey]++;
                         }
                         else
                         {
@@ -5713,6 +5863,220 @@ namespace UltraVideoEditor
                     LogToMainWindow($"❌ Greška u attempt {attempt + 1}: {ex.Message}");
                 }
             }
+
+            // ══════════════════════════════════════════════════════════════════
+            // PEXELS FALLBACK — aktivira se kad Pixabay ne pronađe ništa
+            // Koristi MediaProviderRegistry waterfall (Pexels → Coverr → ...)
+            // Pexels: 200 req/sat, visoka HD kvaliteta, lifestyle/children sadržaj
+            // ══════════════════════════════════════════════════════════════════
+            if (mediaType == "video")
+            {
+                try
+                {
+                    LogToMainWindow($"   🔄 Pixabay iscrpljen — pokušavam Pexels fallback za '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+
+                    var registry = MediaProviderRegistry.Instance;
+                    var fallbackProviders = registry.Configured
+                        .Where(p => !string.Equals(p.Name, "Pixabay", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (fallbackProviders.Count == 0)
+                    {
+                        LogToMainWindow("   ℹ Nema konfigurisanih fallback provajdera (Pexels/Coverr). Dodaj API ključ u Postavkama → Provajderi.");
+                    }
+
+                    foreach (var provider in fallbackProviders)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        try
+                        {
+                            LogToMainWindow($"   🌐 [{provider.Name}] Pretražujem: '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+
+                            double minDur = minDurationSeconds > 0 ? minDurationSeconds : 4.0;
+                            var results = await provider.SearchAsync(
+                                keywords, true, minWidth,
+                                minDur, 60.0, 30, ct);
+
+                            // Kids-safe filter
+                            var safeResults = results
+                                .Where(r => IskraKidsSafeQuery.IsHitSafe(r.Tags?.ToLower() ?? ""))
+                                .Where(r => !_usedMediaUrls.Contains(r.DownloadUrl))
+                                .ToList();
+
+                            if (safeResults.Count == 0)
+                            {
+                                LogToMainWindow($"   ⏭ [{provider.Name}] 0 kids-safe rezultata za ovaj query");
+                                continue;
+                            }
+
+                            // LITERAL SYNC FIX: Isti query-match scoring kao Pixabay —
+                            // specifične query riječi nose 3x veći bonus od generalnog children taga.
+                            var pexelsQueryWords = keywords.ToLowerInvariant()
+                                .Split(new[] { ' ', ',', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Where(w => w.Length > 2)
+                                .ToArray();
+
+                            // Sortiraj po query match (3x) + rezolucija + children tag bonus
+                            var sorted = safeResults.OrderByDescending(r =>
+                            {
+                                string tagsLower = r.Tags?.ToLower() ?? "";
+                                int queryMatchScore = pexelsQueryWords.Count(w => tagsLower.Contains(w));
+                                int qualityBonus = (r.Width >= 1920 || r.Height >= 1080) ? 10 : (r.Width >= 1280) ? 5 : 0;
+                                int childBonus = (tagsLower.Contains("child") || tagsLower.Contains("kid") ||
+                                                  tagsLower.Contains("family") || tagsLower.Contains("boy") ||
+                                                  tagsLower.Contains("girl") || tagsLower.Contains("baby")) ? 8 : 0;
+                                return (queryMatchScore * 3) + qualityBonus + childBonus;
+                            }).ToList();
+
+                            foreach (var result in sorted)
+                            {
+                                ct.ThrowIfCancellationRequested();
+                                if (_usedMediaUrls.Contains(result.DownloadUrl)) continue;
+
+                                // FIX-PEXELS-DEDUP: isti video može doći pod različitim URL-ovima (1080p vs 4K).
+                                // Ekstraktujemo numerički ID iz filename i čuvamo ga kao dodatni dedup ključ.
+                                string pexelsDlFile = result.DownloadUrl.Substring(result.DownloadUrl.LastIndexOf('/') + 1);
+                                string pexelsVideoIdMatch = System.Text.RegularExpressions.Regex.Match(pexelsDlFile, @"^(\d+)").Value;
+                                string pexelsDedupeKey = !string.IsNullOrEmpty(pexelsVideoIdMatch) ? $"pexels_{pexelsVideoIdMatch}" : null;
+                                if (pexelsDedupeKey != null && _usedMediaUrls.Contains(pexelsDedupeKey))
+                                {
+                                    LogToMainWindow($"   ⏭ [Pexels] Preskačem ID {pexelsVideoIdMatch} (već korišćen)");
+                                    continue;
+                                }
+
+                                // TagBoost za HasChildren (isti mehanizam kao Pixabay)
+                                string resultTagsLower = result.Tags?.ToLower() ?? "";
+                                bool pexelsHasChildTag = new[] {
+                                    "child","children","kid","kids","baby","toddler",
+                                    "boy","girl","infant","playground","preschool"
+                                }.Any(k => resultTagsLower.Contains(k));
+
+                                string fileName = $"AI_px_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4";
+                                string fullPath = Path.Combine(GetCurrentProjectFolder(), fileName);
+
+                                try
+                                {
+                                    LogToMainWindow($"   ⬇ [{provider.Name}] Preuzimam: {pexelsDlFile.Substring(0, Math.Min(40, pexelsDlFile.Length))}");
+                                    _usedMediaUrls.Add(result.DownloadUrl);
+                                    if (pexelsDedupeKey != null) _usedMediaUrls.Add(pexelsDedupeKey);
+
+                                    using var dlStream = await _dlHttpClient.GetStreamAsync(result.DownloadUrl, ct);
+                                    using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+                                    await dlStream.CopyToAsync(fileStream, ct);
+
+                                    if (!File.Exists(fullPath) || new FileInfo(fullPath).Length < 1000)
+                                    {
+                                        _usedMediaUrls.Remove(result.DownloadUrl);
+                                        if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                        try { File.Delete(fullPath); } catch { }
+                                        continue;
+                                    }
+
+                                    string ffmpegPath = System.IO.Path.Combine(
+                                        AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+
+                                    // Brightness check
+                                    var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegPath, ct);
+                                    if (!brightnessOk)
+                                    {
+                                        LogToMainWindow($"   ⏭ [{provider.Name}] Odbačen — brightness/tint problem");
+                                        _usedMediaUrls.Remove(result.DownloadUrl);
+                                        if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                        try { File.Delete(fullPath); } catch { }
+                                        continue;
+                                    }
+
+                                    // Vision analiza
+                                    var vision = await VisionAnalyzer.AnalyzeClipAsync(
+                                        fullPath, ffmpegPath, ct,
+                                        lyricLine: _currentLyric,
+                                        season: _currentSeason,
+                                        mood: _detectedMood,
+                                        context: _detectedContext);
+
+                                    // TagBoost za Pexels (isti princip - Pexels nema bogat tag sistem)
+                                    if (!vision.HasChildren && pexelsHasChildTag)
+                                    {
+                                        vision.HasChildren = true;
+                                        LogToMainWindow($"   👶 [{provider.Name}] TagBoost: HasChildren override=True");
+                                    }
+
+                                    if (vision.Score < 3.5)
+                                    {
+                                        LogToMainWindow($"   ⚠ [{provider.Name}] VisionScore {vision.Score:F1}/10 — tražim bolji...");
+                                        _usedMediaUrls.Remove(result.DownloadUrl);
+                                        if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                        try { File.Delete(fullPath); } catch { }
+                                        continue;
+                                    }
+
+                                    // Motion check
+                                    var clipMotion = await MotionAnalyzer.AnalyzeAsync(fullPath, ffmpegPath, ct);
+                                    if (clipMotion.HasStrongMotion)
+                                    {
+                                        LogToMainWindow($"   🚫 [{provider.Name}] Preagresivan pokret — odbacujem");
+                                        _usedMediaUrls.Remove(result.DownloadUrl);
+                                        if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                        try { File.Delete(fullPath); } catch { }
+                                        continue;
+                                    }
+
+                                    // Frozen animal filter
+                                    bool isAnimal = resultTagsLower.Contains("bird") || resultTagsLower.Contains("animal") ||
+                                                    resultTagsLower.Contains("wildlife") || resultTagsLower.Contains("flamingo");
+                                    if (isAnimal && clipMotion.Direction == MotionDirection.Static && clipMotion.Magnitude < 3.0)
+                                    {
+                                        LogToMainWindow($"   🐦 [{provider.Name}] Frozen animal — tražim animiran...");
+                                        _usedMediaUrls.Remove(result.DownloadUrl);
+                                        if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                        try { File.Delete(fullPath); } catch { }
+                                        continue;
+                                    }
+
+                                    double finalScore = vision.Score;
+                                    if (vision.HasSmile)
+                                    {
+                                        var sentiment = StrictQueryEngine.ClassifySentiment(_currentLyric ?? "");
+                                        if (sentiment == SentimentPolarity.Positive)
+                                            finalScore = Math.Min(10.0, vision.Score + 1.5);
+                                    }
+
+                                    string visionTag = vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : "FFmpeg";
+                                    LogToMainWindow($"   ✅ [{provider.Name}] Score {finalScore:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Children:{vision.HasChildren}");
+
+                                    _lastDownloadedVisionScore = finalScore;
+                                    _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
+                                                              || clipMotion.Direction == MotionDirection.Static;
+                                    _lastDownloadedHasChildren = vision.HasChildren;
+                                    return fullPath;
+                                }
+                                catch (OperationCanceledException) { throw; }
+                                catch (Exception ex)
+                                {
+                                    LogToMainWindow($"   ❌ [{provider.Name}] Greška pri preuzimanju: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
+                                    _usedMediaUrls.Remove(result.DownloadUrl);
+                                    if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
+                                    try { File.Delete(fullPath); } catch { }
+                                }
+                            }
+
+                            LogToMainWindow($"   ⚠ [{provider.Name}] Svi rezultati odbačeni ili iskorišćeni");
+                        }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception ex)
+                        {
+                            LogToMainWindow($"   ❌ [{provider.Name}] Search greška: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    LogToMainWindow($"   ❌ Pexels fallback greška: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                }
+            }
+            // ══════════════════════════════════════════════════════════════════
+
             return null;
         }
 
@@ -5946,7 +6310,23 @@ namespace UltraVideoEditor
 
                 int currentEnergy = i < _segments.Count ? _segments[i]?.Energy ?? 3 : 3;
                 int nextEnergy = i + 1 < _segments.Count ? _segments[i + 1]?.Energy ?? 3 : 3;
-                int transEnergy = (currentEnergy + nextEnergy) / 2;
+
+                // FIX-ENERGY-RAMP: Ako energija skoči/padne za više od 2 stepena,
+                // ograničimo transEnergy na ±2 od prethodnog — sprečava nagli tempo udarac
+                // koji narušava fluidnost toka (primijećeno @ 00:49-00:53 u Gemini analizi).
+                int energyDelta = Math.Abs(nextEnergy - currentEnergy);
+                int transEnergy;
+                if (energyDelta > 2)
+                {
+                    // Ramp: koristimo srednji korak umjesto punog skoka
+                    transEnergy = currentEnergy + Math.Sign(nextEnergy - currentEnergy) * 1;
+                    transEnergy = Math.Max(1, Math.Min(5, transEnergy));
+                    LogToMainWindow($"   ⚡ EnergyRamp: {currentEnergy}→{nextEnergy} (delta={energyDelta}) → ramp transEnergy={transEnergy}");
+                }
+                else
+                {
+                    transEnergy = (currentEnergy + nextEnergy) / 2;
+                }
 
                 // ── HYBRID CROSSFADE: 1000ms između različitih tipova medija ──────────
                 string currentContentTag = i < _segments.Count ? _segments[i]?.ContentTag : null;
@@ -6075,15 +6455,15 @@ namespace UltraVideoEditor
 
         private static string TransitionTypeToFFmpeg(TransitionType t) => t switch
         {
-            TransitionType.SlideLeft  => "slideleft",
+            TransitionType.SlideLeft => "slideleft",
             TransitionType.SlideRight => "slideright",
-            TransitionType.SlideUp    => "slideup",
-            TransitionType.SlideDown  => "slidedown",
-            TransitionType.WipeLeft   => "wipeleft",
-            TransitionType.WipeRight  => "wiperight",
-            TransitionType.ZoomIn     => "zoom",
-            TransitionType.Crossfade  => "fade",
-            TransitionType.Fade       => "fade",
+            TransitionType.SlideUp => "slideup",
+            TransitionType.SlideDown => "slidedown",
+            TransitionType.WipeLeft => "wipeleft",
+            TransitionType.WipeRight => "wiperight",
+            TransitionType.ZoomIn => "zoom",
+            TransitionType.Crossfade => "fade",
+            TransitionType.Fade => "fade",
             _ => "fade"
         };
 
@@ -6814,9 +7194,7 @@ namespace UltraVideoEditor
         public double VisionScore { get; set; } = 6.0;
         public bool IsStaticClip { get; set; } = false;
         public bool HasChildren { get; set; } = false;
-        /// <summary>
-        /// Određuje da li scena koristi fotografiju (ZoomPan) ili video.
-        /// </summary>
+        public bool IsOutdoor { get; set; } = false;
         public string ContentTag { get; set; }
 
         /// <summary>Wide / Medium / Close — tip kadra, utiče na pacing i crossfade dužinu.</summary>
@@ -6848,6 +7226,7 @@ namespace UltraVideoEditor
         public double VisionScore { get; set; } = 6.0;
         public bool IsStaticClip { get; set; } = false;
         public bool HasChildren { get; set; } = false;
+        public bool IsOutdoor { get; set; } = false;
         /// <summary>
         /// Hybrid Content Selector tag propagiran iz StoryScene.
         /// </summary>
