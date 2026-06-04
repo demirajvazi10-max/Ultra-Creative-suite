@@ -97,8 +97,9 @@ namespace UltraVideoEditor
             _httpClient.Timeout = TimeSpan.FromSeconds(600); // 10 minuta — Qwen2.5:14B prvi load može biti spor
         }
 
-        public async Task<string> GenerateAsync(string prompt, string model = QueryModel, CancellationToken ct = default)
+        public async Task<string> GenerateAsync(string prompt, string model = null, CancellationToken ct = default)
         {
+            model ??= QueryModel;
             try
             {
                 // Provjeri da li Ollama radi prije slanja zahtjeva
@@ -180,9 +181,10 @@ namespace UltraVideoEditor
         public async Task<(string response, string error)> VisionAsyncEx(
             string imagePath,
             string prompt,
-            string model = VisionModel,
+            string model = null,
             CancellationToken ct = default)
         {
+            model ??= VisionModel;
             // imagePath == null → tekstualni warm-up ping (bez slike), samo ucitava model
             string[] imageArray = null;
             if (imagePath != null)
@@ -288,7 +290,7 @@ namespace UltraVideoEditor
         public async Task<string> VisionAsync(
             string imagePath,
             string prompt,
-            string model = VisionModel,
+            string model = null,
             CancellationToken ct = default)
         {
             var (response, _) = await VisionAsyncEx(imagePath, prompt, model, ct);
