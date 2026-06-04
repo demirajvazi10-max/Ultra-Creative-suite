@@ -35,6 +35,7 @@ jobs:
         run: |
           copy install.bat .\publish\install.bat
           copy UltraInstaller.ps1 .\publish\UltraInstaller.ps1
+          copy README.md .\publish\README.md
 
       - name: Napravi README za instalaciju
         run: |

@@ -19,7 +19,8 @@ $ProgressPreference    = "SilentlyContinue"   # Ubrzava Invoke-WebRequest
 
 # ── Verzija i putanje ─────────────────────────────────────────────────────────
 $AppName    = "Ultra Creative Suite"
-$AppDir     = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RootDir    = Split-Path -Parent $MyInvocation.MyCommand.Path   # root repoa (gdje je install.bat)
+$AppDir     = Join-Path $RootDir "UltraVideoEditor"             # subfolder sa .exe
 $AppExe     = Join-Path $AppDir "UltraVideoEditor.exe"
 $FfmpegDir  = Join-Path $AppDir "Ffmpeg"
 $FfmpegExe  = Join-Path $FfmpegDir "ffmpeg.exe"
