@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
@@ -9,26 +9,57 @@ namespace UltraVideoEditor
 {
     public partial class ApiKeyDialog : Window
     {
-        // Language helper
         private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
+        // Pixabay key (originalni)
         public string ApiKey => txtApiKey.Text.Trim();
 
-        public ApiKeyDialog(string service, string message)
+        // Azure AI Foundry polja
+        public string AzureEndpoint   => txtAzureEndpoint.Text.Trim();
+        public string AzureApiKey     => txtAzureApiKey.Text.Trim();
+        public string AzureDeployment => string.IsNullOrWhiteSpace(txtAzureDeployment.Text)
+                                         ? "gpt-4o-mini"
+                                         : txtAzureDeployment.Text.Trim();
+
+        public ApiKeyDialog(string service, string message,
+            string existingPixabayKey    = null,
+            string existingAzureEndpoint = null,
+            string existingAzureKey      = null,
+            string existingAzureDeploy   = null)
         {
             InitializeComponent();
             Title = LF("akd_service_title", service);
-
             txtApiKey.ToolTip = message;
+
+            // Popuni postojece vrijednosti
+            if (!string.IsNullOrWhiteSpace(existingPixabayKey))
+                txtApiKey.Text = existingPixabayKey;
+
+            if (!string.IsNullOrWhiteSpace(existingAzureEndpoint))
+                txtAzureEndpoint.Text = existingAzureEndpoint;
+
+            if (!string.IsNullOrWhiteSpace(existingAzureKey))
+                txtAzureApiKey.Text = existingAzureKey;
+
+            if (!string.IsNullOrWhiteSpace(existingAzureDeploy))
+                txtAzureDeployment.Text = existingAzureDeploy;
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtApiKey.Text))
+            // Pixabay nije obavezan ako se samo Azure podesava i obrnuto
+            // Ali barem jedno mora biti popunjeno
+            bool hasPixabay = !string.IsNullOrWhiteSpace(txtApiKey.Text);
+            bool hasAzure   = !string.IsNullOrWhiteSpace(txtAzureEndpoint.Text) &&
+                              !string.IsNullOrWhiteSpace(txtAzureApiKey.Text);
+
+            if (!hasPixabay && !hasAzure)
             {
-                WpfMessageBox.Show(L("akd_enter_valid_key"), L("warning"),
+                WpfMessageBox.Show(
+                    "Unesi barem Pixabay API key ili Azure AI Foundry endpoint i key.",
+                    L("warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

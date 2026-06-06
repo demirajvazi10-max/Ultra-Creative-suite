@@ -463,6 +463,35 @@ namespace UltraVideoEditor
         private void SaveOpenAiApiKey(string key) => SaveApiKey("openai", key);
         private string GetPixabayApiKey() => GetApiKey("pixabay");
         private void SavePixabayApiKey(string key) => SaveApiKey("pixabay", key);
+
+        // ── Azure AI Foundry (Microsoft IQ layer) ─────────────────────────────
+        private string GetAzureFoundryEndpoint()    => GetApiKey("azure_foundry_endpoint");
+        private void SaveAzureFoundryEndpoint(string v) => SaveApiKey("azure_foundry_endpoint", v);
+        private string GetAzureFoundryApiKey()      => GetApiKey("azure_foundry_key");
+        private void SaveAzureFoundryApiKey(string v)   => SaveApiKey("azure_foundry_key", v);
+        private string GetAzureFoundryDeployment()  => GetApiKey("azure_foundry_deployment") ?? "gpt-4o-mini";
+        private void SaveAzureFoundryDeployment(string v) => SaveApiKey("azure_foundry_deployment", v);
+
+        private FoundryIQClient _foundryIQ;
+
+        private FoundryIQClient GetOrCreateFoundryIQ()
+        {
+            string endpoint   = GetAzureFoundryEndpoint();
+            string apiKey     = GetAzureFoundryApiKey();
+            string deployment = GetAzureFoundryDeployment();
+
+            if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
+                return null;
+
+            if (_foundryIQ == null ||
+                _foundryIQ.IsConfigured == false)
+            {
+                _foundryIQ = new FoundryIQClient(endpoint, apiKey, deployment);
+            }
+
+            return _foundryIQ;
+        }
+
         private void SetupSliderAnnouncements()
         {
             var sliders = new[] { sldBrightness, sldContrast, sldBlur, sldBass, sldTreble, sldReverb, sldZoom, sldRotation, sldX, sldY, sldOpacity, sldPreviewDuration, sldTransitionDuration };
@@ -1072,7 +1101,34 @@ namespace UltraVideoEditor
 
         private void ShowPreferences_Click(object sender, RoutedEventArgs e)
         {
-            WpfMessageBox.Show(L("settings_wip"), L("settings_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            var dialog = new ApiKeyDialog(
+                service:              "API Keys",
+                message:              "Pixabay API key za preuzimanje video klipova",
+                existingPixabayKey:   GetPixabayApiKey(),
+                existingAzureEndpoint: GetAzureFoundryEndpoint(),
+                existingAzureKey:     GetAzureFoundryApiKey(),
+                existingAzureDeploy:  GetAzureFoundryDeployment()
+            );
+
+            if (dialog.ShowDialog() == true)
+            {
+                // Snimi Pixabay key ako je popunjen
+                if (!string.IsNullOrWhiteSpace(dialog.ApiKey))
+                    SavePixabayApiKey(dialog.ApiKey);
+
+                // Snimi Azure polja ako su popunjena
+                if (!string.IsNullOrWhiteSpace(dialog.AzureEndpoint))
+                    SaveAzureFoundryEndpoint(dialog.AzureEndpoint);
+                if (!string.IsNullOrWhiteSpace(dialog.AzureApiKey))
+                    SaveAzureFoundryApiKey(dialog.AzureApiKey);
+                if (!string.IsNullOrWhiteSpace(dialog.AzureDeployment))
+                    SaveAzureFoundryDeployment(dialog.AzureDeployment);
+
+                // Resetuj FoundryIQ klijent da pokupi nove vrijednosti
+                _foundryIQ = null;
+
+                LogMessage("✓ API ključevi sačuvani.", true);
+            }
         }
 
         private void ShowUserManual_Click(object sender, RoutedEventArgs e)
