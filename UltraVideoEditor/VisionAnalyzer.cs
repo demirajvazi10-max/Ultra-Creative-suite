@@ -375,6 +375,43 @@ namespace UltraVideoEditor
             if (!File.Exists(videoPath))
                 return MakeResult(5.0, "Fajl ne postoji");
 
+            // Ako je videoPath već slika (jpg/png) — preskačemo ekstrakciju
+            string ext = Path.GetExtension(videoPath).ToLowerInvariant();
+            bool isImage = ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp";
+            if (isImage)
+            {
+                // Direktna analiza slike bez ekstrakcije
+                if (_qwenAvailable && _ollamaClient != null)
+                {
+                    var qwenResult = await QwenAnalyzeFrame(videoPath, ct, lyricLine, season, mood, context);
+                    if (qwenResult != null)
+                    {
+                        var ffMetrics = await FfmpegFrameAnalyze(videoPath, ffmpegPath, ct);
+                        if (qwenResult.Luminance  <= 0) qwenResult.Luminance  = ffMetrics.Luminance;
+                        if (qwenResult.Saturation <= 0) qwenResult.Saturation = ffMetrics.Saturation;
+                        if (qwenResult.Sharpness  <= 0) qwenResult.Sharpness  = ffMetrics.Sharpness;
+                        return qwenResult;
+                    }
+                }
+                if (_onnxAvailable && _onnxSession != null)
+                {
+                    var onnxResult = await OnnxAnalyzeFrame(videoPath, ct);
+                    if (onnxResult != null)
+                    {
+                        var ffResult = await FfmpegFrameAnalyze(videoPath, ffmpegPath, ct);
+                        onnxResult.Luminance  = ffResult.Luminance;
+                        onnxResult.Saturation = ffResult.Saturation;
+                        onnxResult.Sharpness  = ffResult.Sharpness;
+                        double sharpScore = Math.Min(10.0, onnxResult.Sharpness / 10.0);
+                        double lumScore   = CalcLumScore(onnxResult.Luminance);
+                        onnxResult.Score  = Math.Round(
+                            onnxResult.Score * 0.5 + sharpScore * 0.3 + lumScore * 0.2, 1);
+                        return onnxResult;
+                    }
+                }
+                return await FfmpegFrameAnalyze(videoPath, ffmpegPath, ct);
+            }
+
             string tempFrame = Path.Combine(
                 Path.GetTempPath(),
                 "vision_" + Guid.NewGuid().ToString().Substring(0, 8) + ".jpg");

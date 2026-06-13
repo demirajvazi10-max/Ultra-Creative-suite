@@ -184,7 +184,7 @@ namespace UltraVideoEditor
             };
 
             process.Start();
-            await process.WaitForExitAsync();
+               await process.WaitForExitAsync();
         }
 
         /// <summary>

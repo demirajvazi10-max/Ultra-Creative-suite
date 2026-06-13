@@ -102,6 +102,51 @@
                 <MenuItem x:Name="mnuTranscribe" Tag="mnu_transcribe" Click="TranscribeAudio_Click"/>
                 <MenuItem x:Name="mnuSyncLyrics" Tag="mnu_sync_lyrics" Click="SyncLyrics_Click"/>
                 <MenuItem x:Name="mnuAddSyncSubs" Tag="mnu_add_sync_subs" Click="AddSyncedSubtitles_Click"/>
+                <Separator/>
+                <MenuItem x:Name="mnuHighlightEngine"
+                          Header="🎬 AI Highlight Engine"
+                          InputGestureText="Ctrl+Shift+H"
+                          Click="OpenHighlightEngine_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Otvori AI Highlight Engine — automatski izvlači najzanimljivije momente i sinhronizuje rezove na beat"/>
+                <MenuItem x:Name="mnuPhase3"
+                          Header="🚀 AI Suite Faza 3"
+                          InputGestureText="Ctrl+Shift+3"
+                          Click="OpenPhase3_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Otvori Fazu 3 — Tranzicije, Audio Miks, Accessibility i Multi-format Export"/>
+                <Separator/>
+                <MenuItem x:Name="mnuSceneDetection"
+                          Header="🔍 Smart Scene Detection"
+                          InputGestureText="Ctrl+Shift+D"
+                          Click="OpenSceneDetection_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Otvori Smart Scene Detection — automatska detekcija scena iz videa"/>
+                <MenuItem x:Name="mnuTimelineAI"
+                          Header="🤖 Timeline AI Asistent"
+                          InputGestureText="Ctrl+Shift+T"
+                          Click="OpenTimelineAI_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Otvori Timeline AI Asistent — AI komande nad timeline-om"/>
+                <MenuItem x:Name="mnuColorGrading"
+                          Header="🎨 Color Grading Engine"
+                          InputGestureText="Ctrl+Shift+G"
+                          Click="OpenColorGrading_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Otvori Color Grading Engine — AI automatski color grade po sadržaju klipa"/>
+                <Separator/>
+                <MenuItem x:Name="mnuBatchExport"
+                          Header="📦 Batch Export"
+                          InputGestureText="Ctrl+Shift+B"
+                          Click="OpenBatchExport_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Batch Export — render više projekata odjednom"/>
+                <MenuItem x:Name="mnuProjectTemplates"
+                          Header="📋 Project Templates"
+                          InputGestureText="Ctrl+Shift+P"
+                          Click="OpenProjectTemplates_Click"
+                          FontWeight="Bold"
+                          AutomationProperties.Name="Project Templates — sačuvaj i učitaj podešavanja projekta"/>
             </MenuItem>
             <MenuItem x:Name="mnuEffects" Tag="mnu_effects_menu">
                 <MenuItem x:Name="mnuVideoEffects" Tag="mnu_video_effects" Click="ShowVideoEffectsTab_Click"/>

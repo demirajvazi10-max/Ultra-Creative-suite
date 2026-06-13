@@ -1,0 +1,201 @@
+<Window x:Class="UltraVideoEditor.ColorGradingDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Color Grading Engine — Faza 4C"
+        Width="900" Height="700"
+        MinWidth="640" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#1A1A2E"
+        AutomationProperties.Name="Color Grading Engine dijalog">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#F59E0B"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FBBF24"/>
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
+        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground"      Value="#1A1A2E"/>
+            <Setter Property="FontWeight"      Value="Bold"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="Padding"         Value="18,9"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+            <Setter Property="Background"  Value="#2D3748"/>
+            <Setter Property="Foreground"  Value="White"/>
+            <Setter Property="FontWeight"  Value="SemiBold"/>
+        </Style>
+        <Style x:Key="PresetBtn" TargetType="ToggleButton">
+            <Setter Property="Background"      Value="#1E293B"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="FontSize"        Value="11"/>
+            <Setter Property="Padding"         Value="10,6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Margin"          Value="0,0,6,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background"  Value="#F59E0B"/>
+                                <Setter Property="Foreground"  Value="#1A1A2E"/>
+                                <Setter Property="BorderBrush" Value="#F59E0B"/>
+                                <Setter Property="FontWeight"  Value="Bold"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#F59E0B"/>
+                                <Setter Property="Foreground"  Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Naslov -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="🎨  Color Grading Engine"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock Text="AI automatski grade po sadržaju klipa · 10 preseta · Preview thumbnailovi"
+                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+        </StackPanel>
+
+        <!-- Preset izbor -->
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+                CornerRadius="10" Padding="14,12" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="🎬  Izaberi preset"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="12" Margin="0,0,0,10"/>
+                <WrapPanel x:Name="PresetPanel"/>
+                <TextBlock x:Name="TxtPresetDesc"
+                           Text="Izaberi preset ili ostavi Auto da AI bira po sadržaju."
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="11" Margin="0,8,0,0" FontStyle="Italic"
+                           AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Progress -->
+        <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,5">
+                    <TextBlock x:Name="TxtProgressPct" Text="0%"
+                               DockPanel.Dock="Right"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontWeight="Bold" FontSize="13"/>
+                    <TextBlock x:Name="TxtProgressMsg" Text="Čekam…"
+                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </DockPanel>
+                <ProgressBar x:Name="ProgressBar" Height="6"
+                             Minimum="0" Maximum="100"
+                             Foreground="{StaticResource AccentBrush}"
+                             Background="{StaticResource BorderBrush}"
+                             BorderThickness="0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Klipoivi -->
+        <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                        CornerRadius="8,8,0,0" Padding="12,8">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,0,0">
+                            <Button x:Name="BtnSelectAll" Content="Sve"
+                                    Style="{StaticResource SecBtn}" FontSize="11"
+                                    Padding="10,4" Margin="0,0,6,0" IsEnabled="False"
+                                    Click="BtnSelectAll_Click"
+                                    AutomationProperties.Name="Selektuj sve klipoive"/>
+                            <Button x:Name="BtnDeselectAll" Content="Ništa"
+                                    Style="{StaticResource SecBtn}" FontSize="11"
+                                    Padding="10,4" IsEnabled="False"
+                                    Click="BtnDeselectAll_Click"
+                                    AutomationProperties.Name="Deselektuj sve klipoive"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtClipCount" Text="Nema klipoiva"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" VerticalAlignment="Center"
+                                   AutomationProperties.LiveSetting="Polite"/>
+                    </DockPanel>
+                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
+                    <WrapPanel x:Name="ClipsPanel" Orientation="Horizontal"
+                               AutomationProperties.Name="Lista klipoiva sa grade previewom"/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Dugmići -->
+        <DockPanel Grid.Row="4" LastChildFill="False">
+            <Button x:Name="BtnAnalyze" DockPanel.Dock="Left"
+                    Content="🎨 Analiziraj i grade-uj"
+                    Style="{StaticResource PrimaryBtn}"
+                    Padding="16,9" Click="BtnAnalyze_Click"
+                    AutomationProperties.Name="Pokreni analizu i color grading"/>
+            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Padding="16,9" Click="BtnClose_Click"
+                    AutomationProperties.Name="Zatvori dijalog"/>
+            <Button x:Name="BtnApply" DockPanel.Dock="Right"
+                    Content="✅ Primeni na timeline"
+                    Style="{StaticResource PrimaryBtn}"
+                    Padding="16,9" Margin="0,0,8,0"
+                    IsEnabled="False" Click="BtnApply_Click"
+                    AutomationProperties.Name="Primeni color grade na selektovane klipoive"/>
+        </DockPanel>
+    </Grid>
+</Window>

@@ -484,9 +484,20 @@ namespace UltraVideoEditor
                         string childrenContrastFilter = hasChildrenClip ? ",eq=contrast=1.08" : "";
 
                         baseNormalize = $"{baseNormalize},{warmthBoost}";
+
+                        // COLOR GRADING ENGINE (Faza 4C): čitaj [grade:...] tag iz ContentTag
+                        string gradeFilter = "";
+                        {
+                            string ctag = item.ContentTag ?? "";
+                            var gm = System.Text.RegularExpressions.Regex.Match(
+                                ctag, @"\[grade:([^\]]+)\]");
+                            if (gm.Success && !string.IsNullOrWhiteSpace(gm.Groups[1].Value))
+                                gradeFilter = "," + gm.Groups[1].Value;
+                        }
+
                         videoVf = string.IsNullOrEmpty(moodFilter)
-                            ? $"{scaleFilter},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
-                            : $"{scaleFilter},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
+                            ? $"{scaleFilter},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}"
+                            : $"{scaleFilter},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}";
 
                         if (!fastRender)
                         {
@@ -519,8 +530,8 @@ namespace UltraVideoEditor
                                                       $"crop={targetWidth}:{targetHeight}:{sxExpr}:{syExpr}";
                                     // Ken Burns + color grading + fps normalizacija
                                     videoVf = string.IsNullOrEmpty(moodFilter)
-                                        ? $"{staticKB},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
-                                        : $"{staticKB},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
+                                        ? $"{staticKB},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}"
+                                        : $"{staticKB},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}";
                                 }
 
                                 if (item.Duration >= 2.0 && !isStaticClip)
@@ -573,8 +584,8 @@ namespace UltraVideoEditor
 
                                     // Ken Burns + color grading + fps normalizacija
                                     videoVf = string.IsNullOrEmpty(moodFilter)
-                                        ? $"{kenBurnsGpu},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}"
-                                        : $"{kenBurnsGpu},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{fpsNormalize}{DENOISE_FILTER}";
+                                        ? $"{kenBurnsGpu},{baseNormalize}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}"
+                                        : $"{kenBurnsGpu},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}";
                                 }
                             }
                             catch { }

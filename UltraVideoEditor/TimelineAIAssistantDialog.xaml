@@ -1,0 +1,244 @@
+<Window x:Class="UltraVideoEditor.TimelineAIAssistantDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Timeline AI Asistent — Faza 4B"
+        Width="720" Height="580"
+        MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#1A1A2E"
+        AutomationProperties.Name="Timeline AI Asistent dijalog">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#8B5CF6"/>
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
+        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
+        <SolidColorBrush x:Key="GreenBrush"       Color="#10B981"/>
+        <SolidColorBrush x:Key="RedBrush"         Color="#EF4444"/>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="Padding"         Value="18,9"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+        <Style x:Key="InputBox" TargetType="TextBox">
+            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"         Value="10,8"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="CaretBrush"      Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Naslov -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="🤖  Timeline AI Asistent"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock x:Name="TxtSubtitle"
+                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"
+                       AutomationProperties.LiveSetting="Polite"/>
+        </StackPanel>
+
+        <!-- Primeri komandi -->
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+                CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="💡 Primeri komandi:"
+                           Foreground="{StaticResource TextMutedBrush}" FontSize="11"
+                           Margin="0,0,0,6"/>
+                <WrapPanel>
+                    <Button x:Name="BtnEx1" Content="ukloni kraće od 2s"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,6,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: ukloni klipoive kraće od 2 sekunde"/>
+                    <Button x:Name="BtnEx2" Content="zadrži samo lica"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,6,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: zadrži samo klipoive sa licima"/>
+                    <Button x:Name="BtnEx3" Content="sortiraj po skoru"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,6,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: sortiraj po skoru"/>
+                    <Button x:Name="BtnEx4" Content="zadrži prvih 10"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,6,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: zadrži prvih 10 klipoiva"/>
+                    <Button x:Name="BtnEx5" Content="ukloni statične"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,6,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: ukloni statične klipoive"/>
+                    <Button x:Name="BtnEx6" Content="sortiraj po trajanju"
+                            Style="{StaticResource SecBtn}" FontSize="10"
+                            Padding="8,4" Margin="0,0,0,4"
+                            Click="BtnExample_Click"
+                            AutomationProperties.Name="Primer: sortiraj po trajanju"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Input -->
+        <Border Grid.Row="2" Background="{StaticResource CardBrush}"
+                CornerRadius="8" Padding="12" Margin="0,0,0,10">
+            <DockPanel>
+                <Button x:Name="BtnExecute" DockPanel.Dock="Right"
+                        Content="▶ Izvrši" Style="{StaticResource PrimaryBtn}"
+                        Padding="16,9" Margin="8,0,0,0"
+                        Click="BtnExecute_Click"
+                        AutomationProperties.Name="Izvrši AI komandu"/>
+                <Button x:Name="BtnMic" DockPanel.Dock="Right"
+                        Content="🎙 Govori"
+                        Padding="14,9" Margin="8,0,0,0"
+                        FontSize="13" FontWeight="SemiBold"
+                        BorderThickness="0" Cursor="Hand"
+                        Click="BtnMic_Click"
+                        AutomationProperties.Name="Drži i govori komandu — Speech to Text">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="MicBorder"
+                                                Background="#16A34A"
+                                                CornerRadius="7"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="MicBorder" Property="Opacity" Value="0.85"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <TextBox x:Name="TxtCommand" Style="{StaticResource InputBox}"
+                         Text="" FontSize="14"
+                         KeyDown="TxtCommand_KeyDown"
+                         AutomationProperties.Name="Unesite AI komandu"
+                         AutomationProperties.HelpText="Pritisnite Enter, dugme Izvrši ili 🎙 Govori za glasovnu komandu"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Status / rezultat -->
+        <Border Grid.Row="3" x:Name="StatusPanel" Visibility="Collapsed"
+                CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock x:Name="TxtStatusMsg"
+                           Foreground="White" FontSize="13" FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Assertive"/>
+                <TextBlock x:Name="TxtCommandExplanation"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Istorija komandi -->
+        <Border Grid.Row="4" Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                        CornerRadius="8,8,0,0" Padding="12,8">
+                    <DockPanel>
+                        <Button x:Name="BtnUndoLast" DockPanel.Dock="Right"
+                                Content="↩ Poništi" Style="{StaticResource SecBtn}"
+                                FontSize="11" Padding="10,4"
+                                IsEnabled="False" Click="BtnUndoLast_Click"
+                                AutomationProperties.Name="Poništi poslednju komandu"/>
+                        <Button x:Name="BtnApplyAll" DockPanel.Dock="Right"
+                                Content="✅ Primeni na timeline" Style="{StaticResource PrimaryBtn}"
+                                FontSize="11" Padding="10,4" Margin="0,0,8,0"
+                                IsEnabled="False" Click="BtnApplyAll_Click"
+                                AutomationProperties.Name="Primeni promene na timeline"/>
+                        <TextBlock Text="📜  Istorija komandi"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" VerticalAlignment="Center"/>
+                    </DockPanel>
+                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
+                    <StackPanel x:Name="HistoryPanel"
+                                AutomationProperties.Name="Istorija izvršenih komandi"/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <DockPanel Grid.Row="5" LastChildFill="False">
+            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Padding="16,9" Click="BtnClose_Click"
+                    AutomationProperties.Name="Zatvori dijalog"/>
+        </DockPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,318 @@
+<Window x:Class="UltraVideoEditor.Phase3Dialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI Highlight Suite — Faza 3"
+        Width="780" Height="720"
+        MinWidth="580" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#1A1A2E"
+        AutomationProperties.Name="Faza 3 dijalog: Tranzicije, Audio Miks, Accessibility i Export">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#9D5FFF"/>
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
+        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
+        <SolidColorBrush x:Key="SuccessBrush"     Color="#10B981"/>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="Padding"         Value="18,9"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background"
+                                        Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button"
+               BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground"  Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="FontSize"    Value="13"/>
+            <Setter Property="FontWeight"  Value="SemiBold"/>
+            <Setter Property="Margin"      Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="FontSize"   Value="12"/>
+            <Setter Property="Margin"     Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
+            <Setter Property="CornerRadius"    Value="8"/>
+            <Setter Property="Padding"         Value="14"/>
+            <Setter Property="Margin"          Value="0,0,0,10"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Naslov -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="🎬  AI Highlight Suite — Faza 3"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock Text="Tranzicije · Smart Audio Miks · Accessibility · Multi-format Export"
+                       FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                       Margin="0,3,0,0"/>
+        </StackPanel>
+
+        <!-- Scroll sadržaj -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- A: Audio Miks -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="🔊  A — Smart Audio Miks"
+                                   Style="{StaticResource SectionHeader}"
+                                   AutomationProperties.HeadingLevel="Level2"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="Glasnoća muzike (%)"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <Slider x:Name="SliderMusicVol"
+                                        Minimum="0" Maximum="100" Value="85"
+                                        TickFrequency="5" IsSnapToTickEnabled="True"
+                                        Foreground="{StaticResource AccentBrush}"
+                                        AutomationProperties.Name="Glasnoća muzike"/>
+                                <TextBlock x:Name="TxtMusicVol" Text="85%"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11" Margin="0,2,0,8"/>
+
+                                <TextBlock Text="Glasnoća originalnog zvuka (%)"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <Slider x:Name="SliderClipVol"
+                                        Minimum="0" Maximum="100" Value="70"
+                                        TickFrequency="5" IsSnapToTickEnabled="True"
+                                        Foreground="{StaticResource AccentBrush}"
+                                        AutomationProperties.Name="Glasnoća originalnog zvuka"/>
+                                <TextBlock x:Name="TxtClipVol" Text="70%"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                <CheckBox x:Name="ChkDucking"
+                                          Content="Ducking (muzika se stišava na dijalogu)"
+                                          IsChecked="True"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          FontSize="12" Margin="0,0,0,8"
+                                          AutomationProperties.Name="Uključi audio ducking"/>
+                                <CheckBox x:Name="ChkNormalize"
+                                          Content="Normalizuj na -14 LUFS (YouTube)"
+                                          IsChecked="True"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          FontSize="12" Margin="0,0,0,8"
+                                          AutomationProperties.Name="Normalizuj glasnoću"/>
+                                <CheckBox x:Name="ChkMuteOriginal"
+                                          Content="Mute originalni zvuk (samo muzika)"
+                                          IsChecked="False"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          FontSize="12"
+                                          AutomationProperties.Name="Mute originalni zvuk klipova"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- B: Tranzicije -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="✂️  B — Transition Engine"
+                                   Style="{StaticResource SectionHeader}"
+                                   AutomationProperties.HeadingLevel="Level2"/>
+                        <CheckBox x:Name="ChkEnableTransitions"
+                                  Content="Automatski dodaj prelaze između segmenata (beat-synced)"
+                                  IsChecked="True"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  FontSize="12" Margin="0,0,0,8"
+                                  AutomationProperties.Name="Uključi automatske prelaze"/>
+                        <TextBlock Text="Tip prelaza se bira na osnovu sadržaja: action→flash, portrait→dissolve, arc→wipe…"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="11" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- C: Accessibility -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="♿  C — Accessibility Report"
+                                   Style="{StaticResource SectionHeader}"
+                                   AutomationProperties.HeadingLevel="Level2"/>
+                        <CheckBox x:Name="ChkGenReport"
+                                  Content="Generiši audio-description izveštaj (TXT)"
+                                  IsChecked="True"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  FontSize="12" Margin="0,0,0,8"
+                                  AutomationProperties.Name="Generiši accessibility report"/>
+                        <CheckBox x:Name="ChkTtsSummary"
+                                  Content="Uključi TTS-optimizovani sažetak"
+                                  IsChecked="True"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  FontSize="12" Margin="0,0,0,4"
+                                  AutomationProperties.Name="Uključi TTS sažetak"/>
+                        <CheckBox x:Name="ChkNavMarkers"
+                                  Content="Uključi navigacione markere (timestamp lista)"
+                                  IsChecked="True"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  FontSize="12"
+                                  AutomationProperties.Name="Uključi navigacione markere"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- D: Export formati -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="💾  D — Export Pipeline"
+                                   Style="{StaticResource SectionHeader}"
+                                   AutomationProperties.HeadingLevel="Level2"/>
+
+                        <TextBlock Text="Output folder:"
+                                   Style="{StaticResource FieldLabel}"/>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button x:Name="BtnPickFolder"
+                                    DockPanel.Dock="Right"
+                                    Content="…"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,7" Margin="6,0,0,0"
+                                    Click="BtnPickFolder_Click"
+                                    AutomationProperties.Name="Odaberi output folder"/>
+                            <TextBox x:Name="TxtOutputFolder"
+                                     Background="{StaticResource SurfaceBrush}"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"
+                                     BorderThickness="1" Padding="8,6"
+                                     FontSize="12"
+                                     AutomationProperties.Name="Output folder putanja"/>
+                        </DockPanel>
+
+                        <TextBlock Text="Formati za export:"
+                                   Style="{StaticResource FieldLabel}"/>
+                        <WrapPanel Margin="0,4,0,0">
+                            <CheckBox x:Name="ChkExportYoutube"
+                                      Content="🎬 YouTube FHD (1920×1080)"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      FontSize="12" Margin="0,0,16,6"
+                                      AutomationProperties.Name="Export za YouTube FHD"/>
+                            <CheckBox x:Name="ChkExportReels"
+                                      Content="📱 Reels / TikTok (1080×1920)"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      FontSize="12" Margin="0,0,16,6"
+                                      AutomationProperties.Name="Export za Instagram Reels i TikTok"/>
+                            <CheckBox x:Name="ChkExportMp3"
+                                      Content="🎵 MP3 Audio"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      FontSize="12" Margin="0,0,16,6"
+                                      AutomationProperties.Name="Export audio MP3"/>
+                            <CheckBox x:Name="ChkExportReport"
+                                      Content="♿ Accessibility TXT"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      FontSize="12" Margin="0,0,0,6"
+                                      AutomationProperties.Name="Export accessibility report"/>
+                        </WrapPanel>
+
+                        <CheckBox x:Name="ChkUseGPU"
+                                  Content="⚡ GPU encoding (NVENC)"
+                                  IsChecked="True"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  FontSize="12" Margin="0,8,0,0"
+                                  AutomationProperties.Name="Koristi GPU NVENC encoding"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Progress -->
+        <Border Grid.Row="2"
+                x:Name="ProgressPanel"
+                Visibility="Collapsed"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,5">
+                    <TextBlock x:Name="TxtProgressPct"
+                               Text="0%" DockPanel.Dock="Right"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontWeight="Bold" FontSize="13"/>
+                    <TextBlock x:Name="TxtProgressMsg"
+                               Text="Pokrećem…"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="13"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </DockPanel>
+                <ProgressBar x:Name="ProgressBar"
+                             Height="6" Minimum="0" Maximum="100"
+                             Foreground="{StaticResource AccentBrush}"
+                             Background="{StaticResource BorderBrush}"
+                             BorderThickness="0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Dugmići -->
+        <DockPanel Grid.Row="3" LastChildFill="False">
+            <Button x:Name="BtnClose"
+                    DockPanel.Dock="Right"
+                    Content="Zatvori"
+                    Style="{StaticResource SecondaryButton}"
+                    Padding="16,9"
+                    Click="BtnClose_Click"
+                    AutomationProperties.Name="Zatvori dijalog"/>
+            <Button x:Name="BtnRun"
+                    DockPanel.Dock="Left"
+                    Content="🚀 Pokreni Fazu 3"
+                    Style="{StaticResource PrimaryButton}"
+                    Padding="20,9"
+                    Click="BtnRun_Click"
+                    AutomationProperties.Name="Pokreni sve Faza 3 operacije"
+                    AutomationProperties.HelpText="Primenjuje tranzicije, audio miks, generiše accessibility report i exportuje u sve odabrane formate"/>
+        </DockPanel>
+    </Grid>
+</Window>

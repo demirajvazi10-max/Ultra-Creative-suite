@@ -47,6 +47,11 @@ namespace UltraVideoEditor
 {
     public partial class MainWindow : Window
     {
+        // Faza 3 — čuva poslednji highlight rezultat
+        private HighlightResult _lastHighlightResult     = null;
+        private string          _lastHighlightSourceVideo = null;
+        private string          _lastHighlightMusicPath   = null;
+
         // Language helper
         private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
@@ -463,35 +468,6 @@ namespace UltraVideoEditor
         private void SaveOpenAiApiKey(string key) => SaveApiKey("openai", key);
         private string GetPixabayApiKey() => GetApiKey("pixabay");
         private void SavePixabayApiKey(string key) => SaveApiKey("pixabay", key);
-
-        // ── Azure AI Foundry (Microsoft IQ layer) ─────────────────────────────
-        private string GetAzureFoundryEndpoint()    => GetApiKey("azure_foundry_endpoint");
-        private void SaveAzureFoundryEndpoint(string v) => SaveApiKey("azure_foundry_endpoint", v);
-        private string GetAzureFoundryApiKey()      => GetApiKey("azure_foundry_key");
-        private void SaveAzureFoundryApiKey(string v)   => SaveApiKey("azure_foundry_key", v);
-        private string GetAzureFoundryDeployment()  => GetApiKey("azure_foundry_deployment") ?? "gpt-4o-mini";
-        private void SaveAzureFoundryDeployment(string v) => SaveApiKey("azure_foundry_deployment", v);
-
-        private FoundryIQClient _foundryIQ;
-
-        private FoundryIQClient GetOrCreateFoundryIQ()
-        {
-            string endpoint   = GetAzureFoundryEndpoint();
-            string apiKey     = GetAzureFoundryApiKey();
-            string deployment = GetAzureFoundryDeployment();
-
-            if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
-                return null;
-
-            if (_foundryIQ == null ||
-                _foundryIQ.IsConfigured == false)
-            {
-                _foundryIQ = new FoundryIQClient(endpoint, apiKey, deployment);
-            }
-
-            return _foundryIQ;
-        }
-
         private void SetupSliderAnnouncements()
         {
             var sliders = new[] { sldBrightness, sldContrast, sldBlur, sldBass, sldTreble, sldReverb, sldZoom, sldRotation, sldX, sldY, sldOpacity, sldPreviewDuration, sldTransitionDuration };
@@ -1101,34 +1077,7 @@ namespace UltraVideoEditor
 
         private void ShowPreferences_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new ApiKeyDialog(
-                service:              "API Keys",
-                message:              "Pixabay API key za preuzimanje video klipova",
-                existingPixabayKey:   GetPixabayApiKey(),
-                existingAzureEndpoint: GetAzureFoundryEndpoint(),
-                existingAzureKey:     GetAzureFoundryApiKey(),
-                existingAzureDeploy:  GetAzureFoundryDeployment()
-            );
-
-            if (dialog.ShowDialog() == true)
-            {
-                // Snimi Pixabay key ako je popunjen
-                if (!string.IsNullOrWhiteSpace(dialog.ApiKey))
-                    SavePixabayApiKey(dialog.ApiKey);
-
-                // Snimi Azure polja ako su popunjena
-                if (!string.IsNullOrWhiteSpace(dialog.AzureEndpoint))
-                    SaveAzureFoundryEndpoint(dialog.AzureEndpoint);
-                if (!string.IsNullOrWhiteSpace(dialog.AzureApiKey))
-                    SaveAzureFoundryApiKey(dialog.AzureApiKey);
-                if (!string.IsNullOrWhiteSpace(dialog.AzureDeployment))
-                    SaveAzureFoundryDeployment(dialog.AzureDeployment);
-
-                // Resetuj FoundryIQ klijent da pokupi nove vrijednosti
-                _foundryIQ = null;
-
-                LogMessage("✓ API ključevi sačuvani.", true);
-            }
+            WpfMessageBox.Show(L("settings_wip"), L("settings_title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ShowUserManual_Click(object sender, RoutedEventArgs e)
@@ -2269,6 +2218,171 @@ namespace UltraVideoEditor
             PlayBeep();
         }
 
+        private void OpenPhase3_Click(object sender, RoutedEventArgs e)
+        {
+            // Phase3Dialog zahteva HighlightResult iz prethodne analize
+            // Ako je pokrenut kroz Highlight Engine, _lastHighlightResult je setovan
+            if (_lastHighlightResult == null || !_lastHighlightResult.Success)
+            {
+                System.Windows.MessageBox.Show(
+                    "Pokrenite AI Highlight Engine (Ctrl+Shift+H) i završite analizu pre Faze 3.",
+                    "Faza 3", System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+            var dlg = new Phase3Dialog(
+                _lastHighlightResult,
+                _lastHighlightSourceVideo ?? "",
+                _lastHighlightMusicPath   ?? "")
+            { Owner = this };
+            dlg.ShowDialog();
+        }
+
+        // ── Batch Export ─────────────────────────────────────────────
+        private void OpenBatchExport_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new BatchExportDialog { Owner = this };
+            dlg.ShowDialog();
+        }
+
+        // ── Project Templates ────────────────────────────────────────
+        private void OpenProjectTemplates_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new ProjectTemplateDialog { Owner = this };
+            dlg.OnApply = ApplyTemplate;
+            dlg.ShowDialog();
+        }
+
+        private void ApplyTemplate(ProjectTemplate t)
+        {
+            // Primijeni template podešavanja na MainWindow state
+            if (!string.IsNullOrEmpty(t.Language))
+            {
+                _currentLanguage = t.Language;
+                ApplyLanguage();
+            }
+
+            // Color grade na sve video klipoive
+            if (!string.IsNullOrEmpty(t.ColorGradePreset) && t.ColorGradePreset != "Auto")
+            {
+                if (System.Enum.TryParse<GradePreset>(t.ColorGradePreset, out var preset))
+                {
+                    string filter = ColorGradingEngine.GetFilterForPreset(preset);
+                    foreach (var item in timelineItems.Where(i => i.IsVideoTrack))
+                    {
+                        string existing = System.Text.RegularExpressions.Regex.Replace(
+                            item.ContentTag ?? "", @"\[grade:[^\]]*\]", "").Trim();
+                        item.ContentTag = string.IsNullOrEmpty(existing)
+                            ? $"[grade:{filter}]"
+                            : $"{existing} [grade:{filter}]";
+                    }
+                }
+            }
+            SaveState();
+            UpdateTimelineDisplay();
+            LogMessage($"Template \"{t.Name}\" primenjen.", true);
+        }
+
+        // ── Faza 4C: Color Grading Engine ───────────────────────────
+        private void OpenColorGrading_Click(object sender, RoutedEventArgs e)
+        {
+            var videoItems = timelineItems.Where(i => i.IsVideoTrack).ToList();
+            if (videoItems.Count == 0)
+            {
+                System.Windows.MessageBox.Show(
+                    "Nema video klipoiva na timeline-u.",
+                    "Color Grading", System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+            var dlg = new ColorGradingDialog(videoItems) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                SaveState();
+                UpdateTimelineDisplay();
+                LogMessage("Color Grading: grade primenjen na timeline klipoive.", true);
+            }
+        }
+
+        // ── Faza 4A: Smart Scene Detection ──────────────────────────
+        private void OpenSceneDetection_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new SceneDetectionDialog { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                var added = dlg.SelectedScenes;
+                if (added?.Count > 0)
+                {
+                    SaveState();
+                    UpdateTimelineDisplay();
+                    LogMessage($"Smart Scene Detection: dodato {added.Count} scena na timeline.", true);
+                }
+            }
+        }
+
+        // ── Faza 4B: Timeline AI Asistent ────────────────────────────
+        private void OpenTimelineAI_Click(object sender, RoutedEventArgs e)
+        {
+            if (timelineItems.Count == 0)
+            {
+                System.Windows.MessageBox.Show(
+                    "Timeline je prazan. Dodajte klipoive pre korišćenja AI Asistenta.",
+                    "Timeline AI Asistent",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+            var dlg = new TimelineAIAssistantDialog(new List<TimelineItem>(timelineItems)) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                SaveState();
+                timelineItems.Clear();
+                foreach (var item in dlg.ResultItems)
+                    timelineItems.Add(item);
+                UpdateTimelineDisplay();
+                LogMessage($"Timeline AI Asistent: primenjene promene. Klipoiva: {timelineItems.Count}", true);
+            }
+        }
+
+        private void OpenHighlightEngine_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new HighlightCreatorDialogV2 { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                // Segmenti su dostupni ako ih treba rucno obraditi
+                var segments = dlg.ResultSegments;
+                if (segments?.Count > 0)
+                {
+                    SaveState();
+                    double cursor = timelineItems.Sum(t => t.Duration);
+                    foreach (var seg in segments.OrderBy(s => s.Order))
+                    {
+                        var item = new TimelineItem
+                        {
+                            Path             = seg.SourcePath,
+                            Start            = seg.SourceStart,
+                            End              = seg.SourceEnd,
+                            Duration         = seg.Duration,
+                            Name             = $"Highlight {seg.Order:D2}",
+                            Type             = "Highlight",
+                            TrackIndex       = 0,
+                            FixedPosition    = cursor,
+                            UseFixedPosition = true,
+                        };
+                        timelineItems.Add(item);
+                        cursor += seg.Duration;
+                    }
+                    UpdateTimelineDisplay();
+                    LogMessage($"Dodato {segments.Count} highlight segmenata na timeline.", true);
+                    PlayBeep();
+                    // Sačuvaj za Fazu 3
+                    _lastHighlightResult      = dlg.PublicResult;
+                    _lastHighlightSourceVideo = dlg.ResultSegments.FirstOrDefault()?.SourcePath;
+                    _lastHighlightMusicPath   = "";  // setuje se u Phase3Dialog
+                }
+            }
+        }
+
         private void AddSubtitle_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage("Unesi tekst titla", true); return; }
@@ -2781,9 +2895,44 @@ namespace UltraVideoEditor
                     NextMarker_Click(null, null);
                     e.Handled = true;
                 }
+                else if (e.Key == Key.D && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenSceneDetection_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.G && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenColorGrading_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.B && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenBatchExport_Click(null, null);
+                    e.Handled = true;
+                }
                 else if (e.Key == Key.P && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
-                    PrevMarker_Click(null, null);
+                    OpenProjectTemplates_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.T && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenTimelineAI_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.H && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenHighlightEngine_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.D3 && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    OpenPhase3_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.OemComma && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    PrevMarker_Click(null, null);  // Ctrl+Shift+, za prethodni marker (bilo Key.P = konflikt)
                     e.Handled = true;
                 }
                 else if (e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control)
@@ -5090,12 +5239,6 @@ namespace UltraVideoEditor
             public string response { get; set; }
         }
 
-        // Dodaj ove klase ako nedostaju
-        public class AILayoutResponse
-        {
-            public List<AILayoutItem> raspored { get; set; }
-        }
-
         /// <summary>
         /// Pronađi AIVideoCreator instancu u vizuelnom stablu prozora.
         /// Koristi se za proslijeđivanje word-level timestamps nakon alignment-a.
@@ -5119,12 +5262,5 @@ namespace UltraVideoEditor
             return null;
         }
 
-        public class AILayoutItem
-        {
-            public int animacija_index { get; set; }
-            public double pocetak { get; set; }
-            public double kraj { get; set; }
-            public string razlog { get; set; }
-        }
     }
 }

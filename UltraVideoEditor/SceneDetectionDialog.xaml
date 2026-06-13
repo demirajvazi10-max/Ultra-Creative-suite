@@ -1,0 +1,241 @@
+<Window x:Class="UltraVideoEditor.SceneDetectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Smart Scene Detection — Faza 4A"
+        Width="860" Height="720"
+        MinWidth="620" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#1A1A2E"
+        AutomationProperties.Name="Smart Scene Detection dijalog">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#00BCD4"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#26C6DA"/>
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
+        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="Padding"         Value="18,9"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+        <Style x:Key="InputBox" TargetType="TextBox">
+            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"         Value="10,8"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="CaretBrush"      Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Naslov -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="🎬  Smart Scene Detection"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock Text="Automatska detekcija scena · FFmpeg analiza promena · Direktan export na timeline"
+                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+        </StackPanel>
+
+        <!-- Unos video fajla -->
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+                CornerRadius="10" Padding="16" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="📹  Video fajl"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="12" Margin="0,0,0,6"/>
+                <DockPanel>
+                    <Button x:Name="BtnPickVideo" DockPanel.Dock="Right"
+                            Content="Odaberi" Style="{StaticResource SecBtn}"
+                            Padding="14,8" Margin="8,0,0,0"
+                            Click="BtnPickVideo_Click"
+                            AutomationProperties.Name="Odaberi video fajl"/>
+                    <TextBox x:Name="TxtVideoPath" Style="{StaticResource InputBox}"
+                             IsReadOnly="True" Text="Nije odabran…"
+                             Foreground="{StaticResource TextMutedBrush}"
+                             AutomationProperties.Name="Putanja do video fajla"/>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Progress -->
+        <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,5">
+                    <TextBlock x:Name="TxtProgressPct" Text="0%"
+                               DockPanel.Dock="Right"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontWeight="Bold" FontSize="13"/>
+                    <TextBlock x:Name="TxtProgressMsg" Text="Čekam…"
+                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </DockPanel>
+                <ProgressBar x:Name="ProgressBar" Height="6"
+                             Minimum="0" Maximum="100"
+                             Foreground="{StaticResource AccentBrush}"
+                             Background="{StaticResource BorderBrush}"
+                             BorderThickness="0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- TabControl: scene + izveštaj -->
+        <TabControl Grid.Row="3" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    Margin="0,0,0,10">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
+                    <Setter Property="Foreground"      Value="{StaticResource TextMutedBrush}"/>
+                    <Setter Property="FontSize"        Value="13"/>
+                    <Setter Property="Padding"         Value="14,8"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- Tab 1: Scene -->
+            <TabItem Header="🎞  Scene" AutomationProperties.Name="Lista detektovanih scena">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
+                            <Button x:Name="BtnSelectAll" Content="Sve"
+                                    Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
+                                    Margin="0,0,6,0" IsEnabled="False"
+                                    Click="BtnSelectAll_Click"
+                                    AutomationProperties.Name="Uključi sve scene"/>
+                            <Button x:Name="BtnDeselectAll" Content="Ništa"
+                                    Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
+                                    IsEnabled="False" Click="BtnDeselectAll_Click"
+                                    AutomationProperties.Name="Isključi sve scene"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtSceneCount" Text="Nema scena"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" VerticalAlignment="Center" Margin="12,8"
+                                   AutomationProperties.LiveSetting="Polite"/>
+                    </DockPanel>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
+                        <StackPanel x:Name="ScenesPanel"
+                                    AutomationProperties.Name="Lista scena"/>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 2: Izveštaj -->
+            <TabItem Header="📋  Izveštaj" AutomationProperties.Name="Tekstualni izveštaj detekcije">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
+                            <Button x:Name="BtnCopyReport" Content="Kopiraj"
+                                    Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
+                                    Margin="0,0,6,0" Visibility="Collapsed"
+                                    Click="BtnCopyReport_Click"
+                                    AutomationProperties.Name="Kopiraj izveštaj"/>
+                        </StackPanel>
+                        <TextBlock Text="Izveštaj detekcije scena"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" Margin="12,8" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <TextBox x:Name="TxtReport" Grid.Row="1"
+                             Background="Transparent"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             BorderThickness="0" Padding="12"
+                             FontFamily="Consolas, Courier New" FontSize="12"
+                             IsReadOnly="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Text="Ovde će se pojaviti izveštaj nakon analize."
+                             AutomationProperties.Name="Tekstualni izveštaj"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Dugmici -->
+        <DockPanel Grid.Row="4" LastChildFill="False">
+            <Button x:Name="BtnDetect" DockPanel.Dock="Left"
+                    Content="🔍 Detektuj scene"
+                    Style="{StaticResource PrimaryBtn}"
+                    Padding="16,9" IsEnabled="False"
+                    Click="BtnDetect_Click"
+                    AutomationProperties.Name="Pokreni detekciju scena"/>
+            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Padding="16,9" Click="BtnClose_Click"
+                    AutomationProperties.Name="Zatvori dijalog"/>
+            <Button x:Name="BtnAddToTimeline" DockPanel.Dock="Right"
+                    Content="✅ Dodaj na timeline"
+                    Style="{StaticResource PrimaryBtn}"
+                    Padding="16,9" Margin="0,0,8,0" IsEnabled="False"
+                    Click="BtnAddToTimeline_Click"
+                    AutomationProperties.Name="Dodaj selektovane scene na timeline"/>
+        </DockPanel>
+    </Grid>
+</Window>
