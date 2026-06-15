@@ -151,7 +151,7 @@ else {
     Write-Info "FFmpeg nije pronadjen. Preuzimam..."
 
     $ffmpegZip = Join-Path $TempDir "ffmpeg.zip"
-    $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+    $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2024-12-01-12-55/ffmpeg-n7.1-6-g4134007eb5-win64-gpl-7.1.zip"
 
     try {
         Write-Info "Preuzimanje FFmpeg (ovo moze potrajati ~100MB)..."
@@ -253,8 +253,15 @@ else {
         Write-Info "Preuzimanje Ollama (~100MB)..."
         Invoke-WebRequest -Uri $ollamaUrl -OutFile $ollamaInstaller -UseBasicParsing
 
-        Write-Info "Instaliram Ollama..."
-        Start-Process -FilePath $ollamaInstaller -ArgumentList "/SILENT" -Wait
+        Write-Info "Instaliram Ollama (tiha instalacija)..."
+        Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
+
+        # Sacekaj da se instalacija upiše na disk
+        Start-Sleep -Seconds 3
+
+        # Refresh PATH u trenutnoj sesiji
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path","User")
 
         Write-OK "Ollama instalirana"
     }
@@ -278,10 +285,45 @@ try {
         $ollamaRunning = $true
     } catch {}
 
+    # Odredi punu putanju do ollama.exe
+    $ollamaExePath = $ollamaExe
+    if (-not (Test-Path $ollamaExePath)) {
+        # Pokusaj pronaci na PATH-u
+        $ollamaExePath = (Get-Command "ollama" -ErrorAction SilentlyContinue)?.Source
+    }
+
     if (-not $ollamaRunning) {
         Write-Info "Pokrecam Ollama server..."
-        Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden
-        Start-Sleep -Seconds 4
+        if ($ollamaExePath) {
+            Start-Process -FilePath $ollamaExePath -ArgumentList "serve" -WindowStyle Hidden
+        } else {
+            Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden
+        }
+
+        # Retry loop — cekaj do 30 sekundi da server odgovori
+        Write-Info "Cekam da Ollama server bude spreman..."
+        $retries = 0
+        $maxRetries = 10
+        $serverReady = $false
+        while ($retries -lt $maxRetries) {
+            Start-Sleep -Seconds 3
+            try {
+                $resp = Invoke-WebRequest -Uri "http://localhost:11434" -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue
+                $serverReady = $true
+                break
+            } catch {}
+            $retries++
+            Write-Info "  Pokusaj $retries/$maxRetries ..."
+        }
+
+        if (-not $serverReady) {
+            Write-Warn "Ollama server se nije pokrenuo na vrijeme."
+            Write-Info "Modeli ce biti preskoceni. Pokreni rucno:"
+            Write-Info "  ollama pull $ollamaQueryModel"
+            Write-Info "  ollama pull $ollamaVisionModel"
+            throw "Ollama server nije dostupan"
+        }
+        Write-OK "Ollama server spreman"
     }
 
     # Skini query model
