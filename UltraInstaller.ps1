@@ -26,6 +26,9 @@ $FfmpegDir  = Join-Path $AppDir "Ffmpeg"
 $FfmpegExe  = Join-Path $FfmpegDir "ffmpeg.exe"
 $TempDir    = Join-Path $env:TEMP "UltraInstaller"
 
+# Standardna putanja gdje Ollama instalira na Windowsu
+$ollamaExe  = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
+
 # ── Boje za konzolu ───────────────────────────────────────────────────────────
 function Write-Step   { param($msg) Write-Host "`n▶ $msg" -ForegroundColor Cyan }
 function Write-OK     { param($msg) Write-Host "  ✓ $msg" -ForegroundColor Green }
@@ -97,18 +100,31 @@ catch {
     Write-Warn "Nije moguce detektovati GPU — koristim CPU mod"
 }
 
-# ── Odabir Ollama modela na osnovu GPU-a i VRAM-a ────────────────────────────
+# ── Detektuj RAM ──────────────────────────────────────────────────────────────
+$ramGB = 0
+try {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $ramGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
+    Write-Info "RAM: $ramGB GB"
+} catch {
+    Write-Warn "Nije moguce detektovati RAM — pretpostavljam 8GB"
+    $ramGB = 8
+}
+
+# ── Odabir Ollama modela na osnovu GPU-a, VRAM-a i RAM-a ─────────────────────
 #
 #  Logika:
 #   NVIDIA >= 8GB VRAM  → qwen2.5:14b   (puni model, odlicni rezultati)
 #   NVIDIA 4-8GB VRAM   → qwen2.5:7b    (dobar balans)
 #   NVIDIA < 4GB VRAM   → qwen2.5:3b    (mali model)
 #   AMD / Intel GPU     → qwen2.5:7b    (konzervativno, GPU support varira)
-#   CPU only            → qwen2.5:3b    (kvantizovano, prihvatljiva brzina)
+#   CPU only, RAM>=16GB → qwen2.5:7b    (dovoljno RAM-a za veci model)
+#   CPU only, RAM 8-16GB→ qwen2.5:3b    (balans brzine i kvaliteta)
+#   CPU only, RAM <8GB  → tinyllama     (minimalan, radi svuda)
 #
-#  Vision model (za AI opis klipova):
+#  Vision model:
 #   >= 6GB VRAM         → qwen2.5vl:7b
-#   < 6GB ili CPU       → minovar/moondream (manji, brzi)
+#   < 6GB ili CPU       → moondream     (manji, brzi)
 #
 
 $ollamaQueryModel  = "qwen2.5:3b"    # default
@@ -122,10 +138,16 @@ switch ($gpuType) {
     }
     "amd"    { $ollamaQueryModel = "qwen2.5:7b";   $ollamaVisionModel = "qwen2.5vl:7b" }
     "intel"  { $ollamaQueryModel = "qwen2.5:7b";   $ollamaVisionModel = "moondream" }
-    default  { $ollamaQueryModel = "qwen2.5:3b";   $ollamaVisionModel = "moondream" }
+    default  {
+        # CPU only — biramo po RAM-u
+        if     ($ramGB -ge 16) { $ollamaQueryModel = "qwen2.5:7b";  $ollamaVisionModel = "moondream" }
+        elseif ($ramGB -ge 8)  { $ollamaQueryModel = "qwen2.5:3b";  $ollamaVisionModel = "moondream" }
+        else                   { $ollamaQueryModel = "tinyllama";    $ollamaVisionModel = "moondream" }
+    }
 }
 
 Write-OK "GPU: $gpuName ($gpuType, $vramGB GB VRAM)"
+Write-OK "RAM: $ramGB GB"
 Write-OK "Izabrani AI modeli: $ollamaQueryModel + $ollamaVisionModel"
 
 # Spremi GPU info za aplikaciju
@@ -326,9 +348,12 @@ try {
         Write-OK "Ollama server spreman"
     }
 
+    # Odredi putanju za pull (puna putanja ili PATH)
+    $ollamaPullExe = if (Test-Path $ollamaExe) { $ollamaExe } else { "ollama" }
+
     # Skini query model
     Write-Info "Preuzimam $ollamaQueryModel ..."
-    $pullResult = & ollama pull $ollamaQueryModel 2>&1
+    $pullResult = & $ollamaPullExe pull $ollamaQueryModel 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-OK "Model $ollamaQueryModel preuzet"
     } else {
@@ -337,7 +362,7 @@ try {
 
     # Skini vision model
     Write-Info "Preuzimam $ollamaVisionModel ..."
-    $pullResult = & ollama pull $ollamaVisionModel 2>&1
+    $pullResult = & $ollamaPullExe pull $ollamaVisionModel 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-OK "Model $ollamaVisionModel preuzet"
     } else {
