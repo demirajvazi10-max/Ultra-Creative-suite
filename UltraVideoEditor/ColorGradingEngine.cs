@@ -12,7 +12,7 @@ namespace UltraVideoEditor
     // ═══════════════════════════════════════════════════════════════
     // COLOR GRADING ENGINE — Faza 4C
     // AI-automatski color grade po ContentTag / VisionResult.
-    // Generiše FFmpeg vf filter string po klip osnovi.
+    // Generates FFmpeg vf filter string on a per-clip basis.
     // ═══════════════════════════════════════════════════════════════
 
     public enum GradePreset
@@ -24,7 +24,7 @@ namespace UltraVideoEditor
         Vintage,        // fade, grain, warm shadows
         Vivid,          // boost saturation + kontrast
         Noir,           // crno-belo, visok kontrast
-        Golden,         // zlatni čas — toplo, meko
+        Golden,         // golden hour — warm, soft
         Morning,        // hladno plavo, visok brightness
         Moody,          // tamno, crush blacks, desat
         Natural,        // samo normalizacija, nema grade-a
@@ -96,23 +96,23 @@ namespace UltraVideoEditor
         public static readonly Dictionary<GradePreset, string> PresetDescriptions =
             new Dictionary<GradePreset, string>
         {
-            [GradePreset.Auto]      = "AI automatski bira po sadržaju klipa",
+            [GradePreset.Auto]      = "AI automatically selects based on clip content",
             [GradePreset.Cinematic] = "Kinematografski — visok kontrast, teal-orange",
             [GradePreset.Warm]      = "Topao ton — orange/yellow boost",
             [GradePreset.Cool]      = "Hladan ton — blue/cyan boost",
             [GradePreset.Vintage]   = "Vintage — fade, grain, topli tonovi",
-            [GradePreset.Vivid]     = "Živopisan — boost boja i kontrasta",
+            [GradePreset.Vivid]     = "Vivid — color and contrast boost",
             [GradePreset.Noir]      = "Noir — crno-belo, visok kontrast",
-            [GradePreset.Golden]    = "Zlatni čas — toplo, meko svetlo",
+            [GradePreset.Golden]    = "Golden hour — warm, soft light",
             [GradePreset.Morning]   = "Jutro — hladno plavo, brightness",
-            [GradePreset.Moody]     = "Mračno — crush blacks, desaturate",
+            [GradePreset.Moody]     = "Moody — crush blacks, desaturate",
             [GradePreset.Natural]   = "Prirodno — samo normalizacija",
         };
 
         // ── Javni API ────────────────────────────────────────────────
 
         /// <summary>
-        /// Analizira klipoive i za svaki generiše color grade.
+        /// Analyzes clips and generates a color grade for each.
         /// Ako je preset == Auto, AI bira na osnovu VisionResult.
         /// </summary>
         public static async Task<List<ClipGradeResult>> AnalyzeAndGradeAsync(
@@ -182,7 +182,7 @@ namespace UltraVideoEditor
                 finally { sem.Release(); }
             });
 
-            progress?.Report((5, "Pokrećem analizu klipoiva…"));
+            progress?.Report((5, "Starting clip analysis…"));
             await Task.WhenAll(tasks);
             progress?.Report((98, "Sortiranje…"));
 
@@ -198,14 +198,14 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Primenjuje grade na klipoive — upisuje filter u AudioDescription tag
-        /// koji RenderEngine čita pri renderu.
+        /// which RenderEngine reads at render time.
         /// </summary>
         public static void ApplyGradesToItems(List<ClipGradeResult> grades)
         {
             foreach (var g in grades.Where(g => g.Selected && g.Grade.Success))
             {
-                // Čuvamo grade filter u ContentTag sa prefiksom "grade:"
-                // RenderEngine ga čita i ubacuje u vf pipeline
+                // We store the grade filter in ContentTag with prefix "grade:"
+                // RenderEngine reads it and inserts it into the vf pipeline
                 string existing = g.Item.ContentTag ?? "";
                 // Ukloni stari grade tag ako postoji
                 existing = System.Text.RegularExpressions.Regex.Replace(
@@ -217,7 +217,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća FFmpeg vf filter string za dati preset — koristi RenderEngine direktno.
+        /// Returns FFmpeg vf filter string for the given preset — used directly by RenderEngine.
         /// </summary>
         public static string GetFilterForPreset(GradePreset preset)
             => FilterMap.TryGetValue(preset, out string f) ? f : "";
@@ -231,8 +231,8 @@ namespace UltraVideoEditor
             string tag = (item.ContentTag ?? "").ToLower();
             string label = (v.TopLabel ?? "").ToLower();
 
-            // Noir: crno-beli sadržaj, noćne scene
-            if (label.Contains("night") || label.Contains("noć") || label.Contains("dark"))
+            // Noir: black-and-white content, night scenes
+            if (label.Contains("night") || label.Contains("noc") || label.Contains("dark"))
                 return GradePreset.Moody;
 
             // Vintage: retro, stari materijal

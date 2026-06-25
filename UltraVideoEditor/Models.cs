@@ -53,7 +53,7 @@ namespace UltraVideoEditor
         public bool Enabled { get; set; } = false;
     }
 
-    // Timeline Item sa podrškom za više traka i keyframe-ove
+    // Timeline Item with support for multiple tracks and keyframes
     public class TimelineItem
     {
         private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";

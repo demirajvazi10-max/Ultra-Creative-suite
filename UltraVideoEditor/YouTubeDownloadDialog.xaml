@@ -1,0 +1,176 @@
+<Window x:Class="UltraVideoEditor.YouTubeDownloadDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Import from YouTube"
+        Width="560" Height="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#1E1E1E"
+        Foreground="White"
+        AutomationProperties.Name="Dialog for importing video or audio from YouTube">
+
+    <Window.Resources>
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CaretBrush" Value="White"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,0,20,0"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="#0078D4"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Naslov -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- URL -->
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>  <!-- Tip -->
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>  <!-- Kvalitet -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- Info panel -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- Progress -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- Dugmici -->
+        </Grid.RowDefinitions>
+
+        <!-- Naslov -->
+        <TextBlock Grid.Row="0"
+                   Text="Import from YouTube"
+                   FontSize="18" FontWeight="Bold" Foreground="White"
+                   AutomationProperties.HeadingLevel="Level1"/>
+
+        <!-- URL -->
+        <StackPanel Grid.Row="2">
+            <Label Content="YouTube URL (video or playlist):" Target="{Binding ElementName=txtUrl}"/>
+            <TextBox x:Name="txtUrl"
+                     AutomationProperties.Name="YouTube URL — enter link to video or playlist"
+                     AutomationProperties.HelpText="Accepts a link to a single video or an entire playlist"
+                     KeyDown="TxtUrl_KeyDown"/>
+        </StackPanel>
+
+        <!-- Tip fajla -->
+        <GroupBox Grid.Row="4"
+                  Header="File type"
+                  Foreground="White" BorderBrush="#555"
+                  AutomationProperties.Name="File type selection">
+            <StackPanel Orientation="Horizontal" Margin="8,6">
+                <RadioButton x:Name="rbVideo" Content="Video (MP4)" IsChecked="True"
+                             AutomationProperties.Name="Video, MP4 format"
+                             Checked="FormatType_Changed"/>
+                <RadioButton x:Name="rbAudio" Content="Audio (MP3)"
+                             AutomationProperties.Name="Audio, MP3 format"
+                             Checked="FormatType_Changed"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Kvalitet -->
+        <StackPanel Grid.Row="6" x:Name="pnlQuality">
+            <Label Content="Video quality:" Target="{Binding ElementName=cmbQuality}"/>
+            <ComboBox x:Name="cmbQuality"
+                      AutomationProperties.Name="Video quality selection"
+                      SelectedIndex="0">
+                <ComboBoxItem Content="Best available" Tag="best"/>
+                <ComboBoxItem Content="1080p" Tag="1080"/>
+                <ComboBoxItem Content="720p" Tag="720"/>
+                <ComboBoxItem Content="480p" Tag="480"/>
+                <ComboBoxItem Content="360p" Tag="360"/>
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Info panel (pojavljuje se nakon fetch-a) -->
+        <Border Grid.Row="8"
+                x:Name="pnlInfo"
+                Background="#2D2D2D" BorderBrush="#444" BorderThickness="1"
+                CornerRadius="4" Padding="12,10"
+                Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="txbInfoTitle"
+                           Foreground="White" FontWeight="Bold" FontSize="13"
+                           TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite"/>
+                <TextBlock x:Name="txbInfoMeta"
+                           Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Progress -->
+        <StackPanel Grid.Row="10" x:Name="pnlProgress" Visibility="Collapsed">
+            <ProgressBar x:Name="prgDownload"
+                         Height="10" Minimum="0" Maximum="100" Value="0"
+                         Background="#333" Foreground="#0078D4"
+                         AutomationProperties.Name="Download progress"/>
+            <TextBlock x:Name="txbProgress"
+                       Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Download status"/>
+        </StackPanel>
+
+        <!-- Dugmici -->
+        <Grid Grid.Row="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="btnFetchInfo"
+                    Grid.Column="0"
+                    Content="Load info"
+                    Style="{StaticResource PrimaryBtn}"
+                    AutomationProperties.Name="Load video or playlist information"
+                    Click="BtnFetchInfo_Click"/>
+
+            <Button x:Name="btnDownload"
+                    Grid.Column="2"
+                    Content="Download and add to timeline"
+                    IsEnabled="False"
+                    Style="{StaticResource PrimaryBtn}"
+                    AutomationProperties.Name="Download video or audio and add to timeline"
+                    Click="BtnDownload_Click"/>
+
+            <Button x:Name="btnCancel"
+                    Grid.Column="4"
+                    Content="Cancel"
+                    Background="#3D3D3D" Foreground="White" BorderThickness="0"
+                    AutomationProperties.Name="Cancel and close dialog"
+                    Click="BtnCancel_Click"/>
+        </Grid>
+    </Grid>
+</Window>

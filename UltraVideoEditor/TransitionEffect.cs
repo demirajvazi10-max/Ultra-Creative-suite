@@ -69,16 +69,16 @@ namespace UltraVideoEditor
         /// <summary>
         /// Bira tip tranzicije na osnovu energije scene i sezone.
         /// Energy 1-2 (slow): mekani fade — ne remeti mirne scene.
-        /// Energy 3 (standard): naizmjenično wipe i crossfade — daje ritam.
+        /// Energy 3 (standard): alternating wipe and crossfade — provides rhythm.
         /// Energy 4-5 (fast): slide/wipe — prati akciju.
         /// Sezona winter: preferira slidedown (kao snijeg koji pada).
         /// Sezona spring/summer: preferira slideup (rast, energija).
-        /// Seed je baziran na indeksu klipa — determinstički ali raznovrstan.
+        /// Seed is based on clip index — deterministic but varied.
         /// </summary>
         public static TransitionType PickForEnergy(int energy, string season, int clipIndex)
         {
             int seed = clipIndex * 7 + energy * 13;
-            // Ne koristimo Random(seed) jer C# Random nije garantovano isti između sessija,
+            // We don't use Random(seed) because C# Random is not guaranteed to be the same between sessions,
             // ali seed % N daje stabilan, raznovrstan odabir koji nije uvijek isti.
 
             if (energy <= 2)
@@ -88,7 +88,7 @@ namespace UltraVideoEditor
             }
             else if (energy == 3)
             {
-                // Standardne scene — 4 opcije, naizmjenično
+                // Standard scenes — 4 options, alternating
                 var options = new[]
                 {
                     TransitionType.Crossfade,
@@ -121,7 +121,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                // Energične scene — dinamični slides
+                // Energetic scenes — dynamic slides
                 var options = new[]
                 {
                     TransitionType.SlideLeft,

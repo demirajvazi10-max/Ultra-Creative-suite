@@ -67,7 +67,7 @@ namespace UltraVideoEditor
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 TxtOutputFolder.Text = dlg.SelectedPath;
-                // Ažuriraj output folder za sve pending jobove
+                // Update output folder for all pending jobs
                 foreach (var job in _jobs.Where(j => j.Status == BatchJobStatus.Pending))
                     job.OutputFolder = dlg.SelectedPath;
                 JobsList.Items.Refresh();
@@ -105,7 +105,7 @@ namespace UltraVideoEditor
             var pending = _jobs.Where(j => j.Status == BatchJobStatus.Pending).ToList();
             if (pending.Count == 0)
             {
-                MessageBox.Show("Nema projekata u čekanju. Dodajte nove ili uklonite završene.",
+                MessageBox.Show("No projects in queue. Add new ones or remove completed ones.",
                     "Batch Export", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -119,7 +119,7 @@ namespace UltraVideoEditor
 
             _running             = true;
             _cts                 = new CancellationTokenSource();
-            BtnStartBatch.Content = "⏹ Otkaži";
+            BtnStartBatch.Content = "⏹ Cancel";
             ProgressPanel.Visibility = Visibility.Visible;
             TotalProgressBar.Value   = 0;
             BtnOpenFolder.IsEnabled  = false;
@@ -140,7 +140,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                Log($"Greška: {ex.Message}");
+                Log($"Error: {ex.Message}");
             }
             finally
             {
@@ -155,7 +155,7 @@ namespace UltraVideoEditor
 
                 int okCount = _jobs.Count(j => j.Status == BatchJobStatus.Done);
                 int errCount = _jobs.Count(j => j.Status == BatchJobStatus.Error);
-                Log($"Batch završen — ✅ {okCount} gotovo, ❌ {errCount} grešaka.");
+                Log($"Batch complete — ✅ {okCount} done, ❌ {errCount} errors.");
                 TxtProgressMsg.Text = $"Gotovo: {okCount}/{total}";
                 TotalProgressBar.Value = 100;
             }
@@ -205,7 +205,7 @@ namespace UltraVideoEditor
             int pending = _jobs.Count(j => j.Status == BatchJobStatus.Pending);
             TxtJobCount.Text         = total == 0
                 ? "Nema projekata"
-                : $"{total} projekata  ·  {pending} u čekanju";
+                : $"{total} projects  ·  {pending} pending";
             BtnStartBatch.IsEnabled  = total > 0 && !_running;
         }
 
@@ -220,7 +220,7 @@ namespace UltraVideoEditor
             if (_running)
             {
                 var r = MessageBox.Show("Batch export je u toku. Otkazati?",
-                    "Otkaži", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    "Cancel", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (r != MessageBoxResult.Yes) return;
                 _cts?.Cancel();
             }

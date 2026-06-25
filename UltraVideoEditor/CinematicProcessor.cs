@@ -12,7 +12,7 @@ namespace UltraVideoEditor
 {
     // ═══════════════════════════════════════════════════════════════
     // 1. AUDIO DUCKING (Sidechain)
-    //    Analizira glasnoću vokala i automatski utišava ambijent:
+    //    Analyzes vocal volume and automatically lowers ambient sound:
     //    - Dok peva: ambijent na 10-15%
     //    - Instrumentalne pauze: ambijent fade-in na 25%
     // ═══════════════════════════════════════════════════════════════
@@ -21,7 +21,7 @@ namespace UltraVideoEditor
     {
         /// <summary>
         /// Kreira finalni audio miks sa automatskim duckingom:
-        /// vokali guraju ambijent dole, pauze ga vraćaju gore.
+        /// vocals push ambient down, pauses bring it back up.
         /// </summary>
         public static async Task<string> ApplyDucking(
             string vocalPath,       // pesma (glas + instrumentala)
@@ -35,16 +35,16 @@ namespace UltraVideoEditor
                 return vocalPath;
 
             // FFmpeg sidechaincompress filter:
-            // 1. Detektuje glasnoću vokala (sidechain)
-            // 2. Kada vokali pređe threshold (-18dB), ambient se compresuje na 12%
-            // 3. attack=50ms (brzo reaguje), release=800ms (polako se vraća)
-            // 4. U pauzama se ambient vraća na 25% (0.25)
+            // 1. Detects vocal volume (sidechain)
+            // 2. When vocals exceed threshold (-18dB), ambient is compressed to 12%
+            // 3. attack=50ms (reacts fast), release=800ms (slowly returns)
+            // 4. During pauses ambient returns to 25% (0.25)
             //
             // Filter graf:
             // [0:a] = vocal/music (sidechain izvor)
             // [1:a] = ambient (koji se duckuje)
             // sidechaincompress: threshold pri -18dB, ratio 8:1
-            // Nakon toga: makeup gain vraća ambient na željeni nivo
+            // After that: makeup gain brings ambient back to desired level
 
             string dur = totalDuration.ToString("F2", CultureInfo.InvariantCulture);
 
@@ -58,7 +58,7 @@ namespace UltraVideoEditor
                 // threshold: -18dB = kada vokali pjevaju
                 // ratio: 8 = agresivno kompresovanje ambienta
                 // attack: 50ms = brzo reaguje na glas
-                // release: 800ms = polako se vraća (prirodan fade-in)
+                // release: 800ms = slowly returns (natural fade-in)
                 // makeup: 0.25 = maksimalni nivo ambienta u pauzama (25%)
                 "[sc_amb];" +
                 "[0:a]asplit=2[sc_src][main_vocal];" +
@@ -108,12 +108,12 @@ namespace UltraVideoEditor
             string dur = totalDuration.ToString("F2", CultureInfo.InvariantCulture);
 
             // Jednostavan pristup: ambient na fiksnih 15% tokom cijele pesme
-            // sa fade-in na početku i fade-out na kraju scene
+            // with fade-in at the start and fade-out at the end of the scene
             string filter =
                 $"[1:a]aloop=loop=-1:size=2147483647," +
                 $"atrim=duration={dur}," +
-                $"volume=0.15," +           // 15% glasnoće ambienta
-                $"afade=t=in:st=0:d=1," +   // 1s fade-in na početku
+                $"volume=0.15," +           // 15% ambient volume
+                $"afade=t=in:st=0:d=1," +   // 1s fade-in at start
                 $"afade=t=out:st={Math.Max(0, totalDuration - 2):F1}:d=2" +  // 2s fade-out
                 $"[amb_faded];" +
                 $"[0:a][amb_faded]amix=inputs=2:duration=first[out]";
@@ -167,15 +167,15 @@ namespace UltraVideoEditor
             public int Y         { get; set; }
             public int Width     { get; set; }
             public int Height    { get; set; }
-            public double Score  { get; set; }  // 0-1, viši = aktivniji
+            public double Score  { get; set; }  // 0-1, higher = more active
             public string Zone   { get; set; }  // "left", "center", "right", "top", "bottom"
         }
 
         /// <summary>
-        /// Analizira video i vraća najaktivniji region.
+        /// Analyzes video and returns the most active region.
         /// Koristi samo cropdetect — motion analiza je uklonjena jer je bila
-        /// sporija, pisala u temp fajl, i vraćala samo Zone="center" bez
-        /// korisnih koordinata (što je pogrešno pobijalo cropdetect koji ima prave X/Y).
+        /// slower, wrote to a temp file, and returned only Zone="center" without
+        /// useful coordinates (which incorrectly overrode cropdetect that has real X/Y).
         /// </summary>
         public static async Task<CropRegion> AnalyzeVideo(
             string videoPath,
@@ -193,9 +193,9 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Generiše FFmpeg Ken Burns filter usmjeren ka aktivnom regionu.
+        /// Generates FFmpeg Ken Burns filter directed at the active region.
         ///
-        /// KLJUČNA ISPRAVKA — trim pre zoompan-a:
+        /// KEY FIX — trim before zoompan:
         /// Bez trim filtera, zoompan ignorise -t ogranicenje i procesira
         /// ceo ulazni video (npr. 52s Pixabay klip) frejm po frejm na CPU,
         /// cak i ako trazimo samo 7s izlaza. Sa trim=duration=X, FFmpeg
@@ -208,7 +208,7 @@ namespace UltraVideoEditor
             double duration,
             string style = "zoom_in")
         {
-            // Zona određuje smjer kretanja
+            // Zone determines direction of movement
             string zone = region.Zone ?? "center";
 
             double zoomStart, zoomEnd;
@@ -305,7 +305,7 @@ namespace UltraVideoEditor
             string output = await RunFFmpegGetOutput(ffmpegPath, args, ct);
 
             // Parsiraj POSLEDNJI crop=W:H:X:Y iz outputa
-            // (poslednji je najtačniji — cropdetect se stabilizuje tokom analize)
+            // (last is most accurate — cropdetect stabilizes during analysis)
             var matches = System.Text.RegularExpressions.Regex.Matches(
                 output, @"crop=(\d+):(\d+):(\d+):(\d+)");
 
@@ -328,7 +328,7 @@ namespace UltraVideoEditor
                 else if (y > h * 0.66)  zone = "bottom";
                 else                    zone = "center";
 
-                // FIX D: cropdetect Score = 0.8 (viši od motion analize koja je uklonjena).
+                // FIX D: cropdetect Score = 0.8 (higher than motion analysis which was removed).
                 // Ima konkretne koordinate X/Y — vredniji je od pretpostavke "center".
                 return new CropRegion
                 {
@@ -385,7 +385,7 @@ namespace UltraVideoEditor
         {
             SmartCropCenter,   // Iseci centralni dio
             BlurPadding,       // Blur pozadina + original u sredini
-            SmartCropFace,     // Pokušaj da nađe lice/subjekat (cropdetect)
+            SmartCropFace,     // Try to find face/subject (cropdetect)
         }
 
         /// <summary>
@@ -435,7 +435,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Generiše sve formate odjednom:
+        /// Generates all formats at once:
         /// - Original 16:9
         /// - Shorts 9:16 (BlurPadding)
         /// - Square 1:1 (za Instagram)
@@ -499,7 +499,7 @@ namespace UltraVideoEditor
         private static string BuildSmartCropFilter(int w, int h)
         {
             // Smart crop: cropdetect + scale
-            // Bolje od čistog centra ali bez AI face detection
+            // Better than plain center but without AI face detection
             return $"cropdetect=24:16:0," +
                    $"crop=ih*{w}/{h}:ih," +
                    $"scale={w}:{h}";
@@ -544,8 +544,8 @@ namespace UltraVideoEditor
 
     // ═══════════════════════════════════════════════════════════════
     // 4. VISION AI - LLaVA / Moondream opisi klipova
-    //    Šalje sliku/frame Ollama vision modelu
-    //    i vraća čitljivi opis za screen reader (JAWS)
+    //    Sends image/frame to Ollama vision model
+    //    and returns readable description for screen reader (JAWS)
     // ═══════════════════════════════════════════════════════════════
 
     public static class VisionAI
@@ -561,13 +561,13 @@ namespace UltraVideoEditor
         };
 
         /// <summary>
-        /// Generiše opis slike ili video klipa koristeći Ollama vision model.
-        /// Podržava: LLaVA, Moondream, BakLLaVA, LLaVA-Phi3
+        /// Generates a description of an image or video clip using the Ollama vision model.
+        /// Supports: LLaVA, Moondream, BakLLaVA, LLaVA-Phi3
         /// </summary>
         public static async Task<string> DescribeMedia(
             string mediaPath,
             string ffmpegPath,
-            string ollamaModel = "moondream",  // moondream je najbrži
+            string ollamaModel = "moondream",  // moondream is the fastest
             CancellationToken ct = default)
         {
             if (!File.Exists(mediaPath)) return "Fajl ne postoji.";
@@ -594,7 +594,7 @@ namespace UltraVideoEditor
                 if (tempFrame && File.Exists(imagePath))
                     File.Delete(imagePath);
 
-                // Pošalji Ollama vision modelu
+                // Send to Ollama vision model
                 string description = await QueryVisionModel(
                     base64, ollamaModel, ct);
 
@@ -610,7 +610,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Batch opisivanje - generiše opise za sve klipove na timeline-u.
+        /// Batch description - generates descriptions for all clips on the timeline.
         /// Poziva callback sa svakim opisom (za JAWS live region).
         /// </summary>
         public static async Task DescribeAllClips(
@@ -636,18 +636,18 @@ namespace UltraVideoEditor
                 if (item.IsAudio) continue;
                 if (!string.IsNullOrEmpty(item.AudioDescription) &&
                     item.AudioDescription.Length > 20)
-                    continue; // Već ima opis
+                    continue; // Already has a description
 
                 string desc = await DescribeMedia(item.Path, ffmpegPath, ollamaModel, ct);
 
-                // Skrati opis na razumnu dužinu za JAWS
+                // Truncate description to a reasonable length for JAWS
                 desc = TrimDescription(desc, item.Name);
                 item.AudioDescription = desc;
 
                 count++;
                 onProgress(count, $"Klip {count}: {item.Name} — {desc}");
 
-                // Mali delay između zahtjeva
+                // Small delay between requests
                 await Task.Delay(200, ct);
             }
 
@@ -671,14 +671,14 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Lista preporučenih vision modela sa opisima.
+        /// List of recommended vision models with descriptions.
         /// </summary>
         public static readonly (string model, string desc, string pullCmd)[] RecommendedModels =
         {
-            ("moondream",    "Najbrži (1.7B), odličan za opise slika",   "ollama pull moondream"),
+            ("moondream",    "Fastest (1.7B), great for image descriptions",   "ollama pull moondream"),
             ("llava",        "Balansiran (7B), detaljan opis scena",      "ollama pull llava"),
             ("llava-phi3",   "Precizan (4B), dobar za ljude i akciju",    "ollama pull llava-phi3"),
-            ("bakllava-1",   "Specijalizovan za vizuelni sadržaj",        "ollama pull bakllava-1"),
+            ("bakllava-1",   "Specialized for visual content",        "ollama pull bakllava-1"),
             ("llava:13b",    "Najprecizniji, sporiji (13B)",              "ollama pull llava:13b"),
         };
 
@@ -719,7 +719,7 @@ namespace UltraVideoEditor
             string model,
             CancellationToken ct)
         {
-            // Ollama vision API - šalje base64 sliku
+            // Ollama vision API - sends base64 image
             var request = new
             {
                 model  = model,
@@ -757,7 +757,7 @@ namespace UltraVideoEditor
                        .Replace("I can see ", "")
                        .Trim();
 
-            // Ograniči na 100 karaktera
+            // Limit to 100 characters
             if (desc.Length > 100)
                 desc = desc.Substring(0, 97) + "...";
 

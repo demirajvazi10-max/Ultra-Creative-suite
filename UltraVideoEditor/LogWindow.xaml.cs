@@ -7,7 +7,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-// Ovo rješava Clipboard i KeyEventArgs ambiguity
+// This resolves Clipboard and KeyEventArgs ambiguity
 using WpfClipboard = System.Windows.Clipboard;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 

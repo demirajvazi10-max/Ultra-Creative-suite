@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:UltraVideoEditor"
         Title="🔍 Pixabay Pretraga" Height="850" Width="950"
         WindowStartupLocation="CenterOwner" Background="#1E1E1E"
-        AutomationProperties.Name="Pixabay pretraga slika i videa">
+        AutomationProperties.Name="Pixabay image and video search">
 
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
@@ -23,7 +23,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="🔍 PIXABAY PRETRAGA" FontSize="16" FontWeight="Bold"
+        <TextBlock Text="🔍 PIXABAY SEARCH" FontSize="16" FontWeight="Bold"
                    Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
         <!-- API Key -->
@@ -43,10 +43,10 @@
             <StackPanel>
                 <!-- Red 1: Pojam i dugme -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="🔎 Pojam:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="🔎 Search term:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtSearch" Width="300" Height="30" 
                              Background="#2D2D2D" Foreground="White"
-                             AutomationProperties.Name="Pojam za pretragu"
+                             AutomationProperties.Name="Search term"
                              KeyDown="txtSearch_KeyDown"/>
                     <Button x:Name="btnSearch" Content="🔍 SEARCH" Click="btnSearch_Click"
                             Width="100" Height="30" Background="#FF9800" Foreground="White" Margin="10,0,0,0"/>
@@ -54,55 +54,55 @@
 
                 <!-- Red 2: Tip medija i orijentacija -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="🎬 Tip medija:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="🎬 Media type:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbMediaType" Width="120" Height="25" Background="#2D2D2D" Foreground="White" Margin="0,0,20,0"
                               SelectionChanged="cmbMediaType_SelectionChanged">
-                        <ComboBoxItem Content="📸 Fotografije" Tag="photo" IsSelected="True"/>
-                        <ComboBoxItem Content="🎥 Video zapisi" Tag="video"/>
+                        <ComboBoxItem Content="📸 Photos" Tag="photo" IsSelected="True"/>
+                        <ComboBoxItem Content="🎥 Videos" Tag="video"/>
                     </ComboBox>
 
-                    <TextBlock Text="🔄 Orijentacija:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="🔄 Orientation:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbOrientation" Width="100" Height="25" Background="#2D2D2D" Foreground="White">
-                        <ComboBoxItem Content="Sve" Tag="all" IsSelected="True"/>
-                        <ComboBoxItem Content="📱 Horizontalno" Tag="horizontal"/>
-                        <ComboBoxItem Content="📱 Vertikalno" Tag="vertical"/>
+                        <ComboBoxItem Content="All" Tag="all" IsSelected="True"/>
+                        <ComboBoxItem Content="📱 Horizontal" Tag="horizontal"/>
+                        <ComboBoxItem Content="📱 Vertical" Tag="vertical"/>
                     </ComboBox>
                 </StackPanel>
 
                 <!-- Red 3: Kategorija i boja -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="📁 Kategorija:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="📁 Category:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbCategory" Width="130" Height="25" Background="#2D2D2D" Foreground="White" Margin="0,0,20,0">
                         <ComboBoxItem Content="Sve" Tag="" IsSelected="True"/>
-                        <ComboBoxItem Content="🌿 Priroda" Tag="nature"/>
-                        <ComboBoxItem Content="👨‍👩‍👧‍👦 Ljudi" Tag="people"/>
+                        <ComboBoxItem Content="🌿 Nature" Tag="nature"/>
+                        <ComboBoxItem Content="👨‍👩‍👧‍👦 People" Tag="people"/>
                         <ComboBoxItem Content="🐶 Animals" Tag="animals"/>
                         <ComboBoxItem Content="⚽ Sport" Tag="sports"/>
-                        <ComboBoxItem Content="✈️ Putovanja" Tag="travel"/>
-                        <ComboBoxItem Content="🏢 Zgrade" Tag="buildings"/>
-                        <ComboBoxItem Content="🍕 Hrana" Tag="food"/>
-                        <ComboBoxItem Content="🎵 Muzika" Tag="music"/>
+                        <ComboBoxItem Content="✈️ Travel" Tag="travel"/>
+                        <ComboBoxItem Content="🏢 Buildings" Tag="buildings"/>
+                        <ComboBoxItem Content="🍕 Food" Tag="food"/>
+                        <ComboBoxItem Content="🎵 Music" Tag="music"/>
                     </ComboBox>
 
-                    <TextBlock Text="🎨 Boja (samo slike):" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="🎨 Color (images only):" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbColor" Width="100" Height="25" Background="#2D2D2D" Foreground="White">
                         <ComboBoxItem Content="Sve" Tag="" IsSelected="True"/>
-                        <ComboBoxItem Content="🔴 Crvena" Tag="red"/>
-                        <ComboBoxItem Content="🔵 Plava" Tag="blue"/>
-                        <ComboBoxItem Content="🟢 Zelena" Tag="green"/>
+                        <ComboBoxItem Content="🔴 Red" Tag="red"/>
+                        <ComboBoxItem Content="🔵 Blue" Tag="blue"/>
+                        <ComboBoxItem Content="🟢 Green" Tag="green"/>
                         <ComboBoxItem Content="🟡 Yellow" Tag="yellow"/>
                         <ComboBoxItem Content="🟠 Orange" Tag="orange"/>
-                        <ComboBoxItem Content="🩷 Roze" Tag="pink"/>
-                        <ComboBoxItem Content="⚫ Crna" Tag="black"/>
-                        <ComboBoxItem Content="⚪ Bijela" Tag="white"/>
+                        <ComboBoxItem Content="🩷 Pink" Tag="pink"/>
+                        <ComboBoxItem Content="⚫ Black" Tag="black"/>
+                        <ComboBoxItem Content="⚪ White" Tag="white"/>
                     </ComboBox>
                 </StackPanel>
 
-                <!-- Red 4: Min širina i Editors Choice -->
+                <!-- Row 4: Min width and Editors Choice -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <TextBlock Text="📏 Min. width:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbMinWidth" Width="100" Height="25" Background="#2D2D2D" Foreground="White" Margin="0,0,20,0">
-                        <ComboBoxItem Content="Bilo" Tag="0" IsSelected="True"/>
+                        <ComboBoxItem Content="Any" Tag="0" IsSelected="True"/>
                         <ComboBoxItem Content="640px" Tag="640"/>
                         <ComboBoxItem Content="800px" Tag="800"/>
                         <ComboBoxItem Content="1024px" Tag="1024"/>
@@ -118,7 +118,7 @@
                 <StackPanel x:Name="videoFilters" Orientation="Horizontal" Margin="0,10,0,0" Visibility="Collapsed">
                     <TextBlock Text="⏱ Min. trajanje (s):" Foreground="White" Width="120" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbMinDuration" Width="80" Height="25" Background="#2D2D2D" Foreground="White" Margin="0,0,20,0">
-                        <ComboBoxItem Content="Bilo" Tag="0" IsSelected="True"/>
+                        <ComboBoxItem Content="Any" Tag="0" IsSelected="True"/>
                         <ComboBoxItem Content="3s" Tag="3"/>
                         <ComboBoxItem Content="5s" Tag="5"/>
                         <ComboBoxItem Content="10s" Tag="10"/>
@@ -128,7 +128,7 @@
 
                     <TextBlock Text="📹 Rezolucija videa:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbVideoQuality" Width="100" Height="25" Background="#2D2D2D" Foreground="White">
-                        <ComboBoxItem Content="Sve" Tag="all" IsSelected="True"/>
+                        <ComboBoxItem Content="All" Tag="all" IsSelected="True"/>
                         <ComboBoxItem Content="HD" Tag="hd"/>
                         <ComboBoxItem Content="Full HD" Tag="fullhd"/>
                         <ComboBoxItem Content="4K" Tag="4k"/>

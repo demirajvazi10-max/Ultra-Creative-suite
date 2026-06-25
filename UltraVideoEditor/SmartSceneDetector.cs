@@ -11,8 +11,8 @@ namespace UltraVideoEditor
 {
     // ═══════════════════════════════════════════════════════════════
     // SMART SCENE DETECTOR  — Faza 4A
-    // Detektuje scene u videu na osnovu vizuelnih promena između frejmova.
-    // Funkcioniše nezavisno — ne treba prethodni HighlightResult.
+    // Detects scenes in a video based on visual changes between frames.
+    // Works independently — does not require a prior HighlightResult.
     // ═══════════════════════════════════════════════════════════════
 
     public class SceneSegment
@@ -56,22 +56,22 @@ namespace UltraVideoEditor
             string ffmpegPath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 
-            if (!File.Exists(videoPath))  return Fail($"Video fajl nije pronađen: {videoPath}");
-            if (!File.Exists(ffmpegPath)) return Fail("FFmpeg nije pronađen.");
+            if (!File.Exists(videoPath))  return Fail($"Video file not found: {videoPath}");
+            if (!File.Exists(ffmpegPath)) return Fail("FFmpeg not found.");
 
             var result = new SceneDetectionResult();
             try
             {
-                Report(progress, 5, "Čitam trajanje videa…");
+                Report(progress, 5, "Reading video duration…");
                 double duration = await AIHighlightEngine.GetDurationAsync(videoPath, ffmpegPath, ct);
-                if (duration < 2.0) return Fail("Video je previše kratak za detekciju scena.");
+                if (duration < 2.0) return Fail("Video is too short for scene detection.");
                 result.TotalDuration = duration;
 
                 // 1 — FFmpeg scene detection filter (brz, ne treba VisionAnalyzer)
-                Report(progress, 10, "Pokrećem FFmpeg detekciju promena…");
+                Report(progress, 10, "Starting FFmpeg change detection…");
                 var rawCuts = await DetectCutsViaFFmpegAsync(videoPath, ffmpegPath, duration, ct);
 
-                Report(progress, 35, $"Pronađeno {rawCuts.Count} potencijalnih rezova, filtriram…");
+                Report(progress, 35, $"Found {rawCuts.Count} potential cuts, filtering…");
                 var cutTimes = FilterCuts(rawCuts, duration);
 
                 // 2 — Kreiraj segmente
@@ -83,27 +83,27 @@ namespace UltraVideoEditor
                 await AnalyzeScenesAsync(segments, ffmpegPath, progress, ct);
 
                 // 4 — Thumbnailovi
-                Report(progress, 82, "Generišem thumbnailove…");
+                Report(progress, 82, "Generating thumbnails…");
                 await GenerateThumbnailsAsync(segments, ffmpegPath, ct);
 
                 for (int i = 0; i < segments.Count; i++)
                     segments[i].Index = i + 1;
 
                 result.Scenes = segments;
-                Report(progress, 95, "Generišem izveštaj…");
+                Report(progress, 95, "Generating report…");
                 result.Report = BuildReport(result, videoPath);
                 Report(progress, 100, "Gotovo!");
                 return result;
             }
             catch (OperationCanceledException) { return Fail("Detekcija je otkazana."); }
-            catch (Exception ex)               { return Fail($"Greška: {ex.Message}"); }
+            catch (Exception ex)               { return Fail($"Error: {ex.Message}"); }
         }
 
         // ── FFmpeg scene detekcija ───────────────────────────────────
 
         /// <summary>
         /// Koristi FFmpeg select filter sa scene score-om da detektuje rezove.
-        /// Mnogo brže od frame-by-frame VisionAnalyzer analize.
+        /// Much faster than frame-by-frame VisionAnalyzer analysis.
         /// </summary>
         private static async Task<List<(double Time, double Score)>> DetectCutsViaFFmpegAsync(
             string videoPath, string ffmpegPath, double duration, CancellationToken ct)
@@ -152,7 +152,7 @@ namespace UltraVideoEditor
                 }
             }
 
-            // Ako FFmpeg nije dao ništa (neki formati), fallback: uniformni rezovi svakih ~15s
+            // If FFmpeg gave nothing (some formats), fallback: uniform cuts every ~15s
             if (cuts.Count == 0)
             {
                 double step = 15.0;
@@ -170,8 +170,8 @@ namespace UltraVideoEditor
                 .Select(c => c.Time)
                 .ToList();
 
-            // Ukloni previše bliske rezove (min razmak = MinSceneSec)
-            var filtered = new List<double> { 0.0 }; // uvek počinjemo od 0
+            // Remove cuts that are too close together (min gap = MinSceneSec)
+            var filtered = new List<double> { 0.0 }; // always start from 0
             foreach (var t in times)
             {
                 if (t - filtered.Last() >= MinSceneSec && t < duration - MinSceneSec)
@@ -264,13 +264,13 @@ namespace UltraVideoEditor
             await Task.WhenAll(tasks);
         }
 
-        // ── Izveštaj ─────────────────────────────────────────────────
+        // ── Report ─────────────────────────────────────────────────
 
         private static string BuildReport(SceneDetectionResult result, string videoPath)
         {
             var sb = new StringBuilder();
             sb.AppendLine("╔══════════════════════════════════════════════════════╗");
-            sb.AppendLine("║      SMART SCENE DETECTOR — IZVEŠTAJ  (Faza 4A)      ║");
+            sb.AppendLine("║      SMART SCENE DETECTOR — REPORT  (Phase 4A)      ║");
             sb.AppendLine("╚══════════════════════════════════════════════════════╝");
             sb.AppendLine();
             sb.AppendLine($"   Video:   {Path.GetFileName(videoPath)}");
@@ -280,7 +280,7 @@ namespace UltraVideoEditor
             sb.AppendLine("🎬 DETEKTOVANE SCENE");
             foreach (var s in result.Scenes)
             {
-                string motion = s.Motion == null ? "" : s.Motion.IsStatic ? " [statično]" : $" [{s.Motion.Direction}]";
+                string motion = s.Motion == null ? "" : s.Motion.IsStatic ? " [static]" : $" [{s.Motion.Direction}]";
                 sb.AppendLine($"  [{s.Index:D3}]  {AIHighlightEngine.FormatTime(s.Start)} → " +
                               $"{AIHighlightEngine.FormatTime(s.End)}  ({s.Duration:F1}s)");
                 sb.AppendLine($"         {s.Label}{motion}");

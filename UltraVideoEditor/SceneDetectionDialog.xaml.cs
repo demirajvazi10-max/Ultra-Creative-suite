@@ -64,7 +64,7 @@ namespace UltraVideoEditor
             string videoPath = TxtVideoPath.Text;
             if (!File.Exists(videoPath))
             {
-                MessageBox.Show("Odaberite video fajl.", "Greška",
+                MessageBox.Show("Please select a video file.", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -82,7 +82,7 @@ namespace UltraVideoEditor
             BtnCopyReport.Visibility    = Visibility.Collapsed;
             ProgressPanel.Visibility    = Visibility.Visible;
             ProgressBar.Value           = 0;
-            BtnDetect.Content           = "⏹ Otkaži";
+            BtnDetect.Content           = "⏹ Cancel";
 
             var progress = new Progress<(int Percent, string Message)>(p =>
             {
@@ -105,8 +105,8 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    TxtSceneCount.Text = "Greška.";
-                    MessageBox.Show(_result.Error, "Greška detekcije",
+                    TxtSceneCount.Text = "Error.";
+                    MessageBox.Show(_result.Error, "Detection Error",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
@@ -117,7 +117,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greška: {ex.Message}", "Greška",
+                MessageBox.Show($"Error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -141,7 +141,7 @@ namespace UltraVideoEditor
             {
                 var card = BuildSceneCard(scene);
                 ScenesPanel.Children.Add(card);
-                _selected.Add(scene); // sve uključene po defaultu
+                _selected.Add(scene); // all included by default
             }
 
             TxtSceneCount.Text = $"{scenes.Count} scena  ·  {AIHighlightEngine.FormatTime(_result.TotalDuration)}";
@@ -226,7 +226,7 @@ namespace UltraVideoEditor
             // Motion info
             if (scene.Motion != null)
             {
-                string motionStr = scene.Motion.IsStatic ? "📷 Statičan kadar"
+                string motionStr = scene.Motion.IsStatic ? "📷 Static shot"
                     : $"🎥 Pokret: {scene.Motion.Direction}";
                 info.Children.Add(new TextBlock
                 {
@@ -308,7 +308,7 @@ namespace UltraVideoEditor
             Close();
         }
 
-        // ── Izveštaj ──────────────────────────────────────────────────
+        // ── Report ──────────────────────────────────────────────────
 
         private void BtnCopyReport_Click(object sender, RoutedEventArgs e)
         {

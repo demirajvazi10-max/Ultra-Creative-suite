@@ -16,7 +16,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 return 5.0;
 
-            // Provera keša
+            // Cache check
             if (_durationCache.ContainsKey(filePath))
                 return _durationCache[filePath];
 
@@ -27,7 +27,7 @@ namespace UltraVideoEditor
                     var tcs = new TaskCompletionSource<bool>();
                     media.AddOption("play-and-exit");
 
-                    // OVO JE BILO SPORNO - dodajte underscore da ignorišete upozorenje
+                    // THIS WAS CONTROVERSIAL - add underscore to suppress the warning
                     _ = media.Parse(MediaParseOptions.ParseNetwork);
 
                     void OnParsed(object sender, MediaParsedChangedEventArgs args)

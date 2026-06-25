@@ -24,7 +24,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Drawing;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-// === AMBIGUITY RJEŠENJA ===
+// === AMBIGUITY RESOLUTIONS ===
 using WinForms = System.Windows.Forms;
 using WpfDragDrop = System.Windows.DragDrop;
 using WpfDragEventArgs = System.Windows.DragEventArgs;
@@ -47,18 +47,18 @@ namespace UltraVideoEditor
 {
     public partial class MainWindow : Window
     {
-        // Faza 3 — čuva poslednji highlight rezultat
+        // Phase 3 — stores last highlight result
         private HighlightResult _lastHighlightResult     = null;
         private string          _lastHighlightSourceVideo = null;
         private string          _lastHighlightMusicPath   = null;
 
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
-        private string _introText = "🎵 Nova dječija pjesmica";
-        private string _outroText = "Autor: Iskra Ajvazi. Muzika i tekst: Iskra Ajvazi. Za još predivnih pesmica, zapratite naš YouTube kanal: @Rastimo uz Iskru";
+        private string _introText = "🎵 New children's song";
+        private string _outroText = "Author: Iskra Ajvazi. Music and lyrics: Iskra Ajvazi. For more wonderful songs, follow our YouTube channel: @Rastimo uz Iskru";
 
         public string IntroText
         {
@@ -85,12 +85,12 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Poslednja rezolucija koju je korisnik odabrao u ResolutionDialog-u.
-        /// Čuva se ovde da bi AIVideoCreator mogao da je pročita pre rendera.
+        /// Stored here so AIVideoCreator can read it before render.
         /// </summary>
         public string _selectedResolution = "1920x1080";
 
         /// <summary>
-        /// Delegat koji AIVideoCreator čita putem _targetResolution propertija.
+        /// Delegate that AIVideoCreator reads via the _targetResolution property.
         /// </summary>
         public Func<string> GetExportResolution => () => _selectedResolution;
         private bool isPlaying = false;
@@ -121,7 +121,7 @@ namespace UltraVideoEditor
         private LogWindow _logWindow;
         private TimelineItem _copiedClip = null;
         private RenderEngine _renderEngine;
-        internal string _currentLanguage = "sr";
+        internal string _currentLanguage = "en";
         private string _currentTheme = "dark"; // dark | contrast | light
 
         private List<AnimationScene> _animationScenes = new List<AnimationScene>();
@@ -167,13 +167,13 @@ namespace UltraVideoEditor
                 {
                     isPlaying = true;
                     Dispatcher.Invoke(() => { if (btnPlay != null) btnPlay.Content = "⏸ PAUSE"; });
-                    LogMessage("Reprodukcija pokrenuta", false);
+                    LogMessage("Playback started", false);
                 };
                 _mediaPlayer.Stopped += (s, e) =>
                 {
                     isPlaying = false;
                     Dispatcher.Invoke(() => { if (btnPlay != null) btnPlay.Content = "▶ PLAY"; });
-                    LogMessage("Reprodukcija zaustavljena", false);
+                    LogMessage("Playback stopped", false);
                 };
                 _mediaPlayer.EndReached += (s, e) =>
                 {
@@ -215,7 +215,7 @@ namespace UltraVideoEditor
                 {
                     ApplyLanguage();
                     LoadSavedTheme();
-                    LogMessage("Sistem spreman...", true);
+                    LogMessage("System ready...", true);
                 };
             }
             catch (Exception ex)
@@ -236,7 +236,7 @@ namespace UltraVideoEditor
             // ── AUTO-SCAN: prevodi sve elemente koji imaju Tag="key" ili Tag="emoji|key" ──
             ApplyLanguageToTree(this);
 
-            // ── TABOVI (Header nije Content/Text/ToolTip, poseban slučaj) ──────────
+            // ── TABS (Header is not Content/Text/ToolTip, special case) ──────────
             if (tabTimeline != null) tabTimeline.Header = L("timeline_tab");
             if (tabAI != null) tabAI.Header = L("ai_tab");
             if (tabEffects != null) tabEffects.Header = L("effects_tab");
@@ -245,7 +245,7 @@ namespace UltraVideoEditor
             if (tabAnimation != null) tabAnimation.Header = L("animation_tab");
 
             // ── MENI HEADERS (Tag sistem ne pokriva MenuItem.Header direktno jer
-            //    WPF MenuItem.Header može biti bilo koji objekt; rešavamo posebno) ──
+            //    WPF MenuItem.Header can be any object; handled separately) ──
             ApplyLanguageToMenuItems(this);
 
             // ── JAWS AutomationProperties ─────────────────────────────────────────
@@ -274,7 +274,7 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Rekurzivno prolazi kroz vizuelno stablo i prevodi sve elemente
-        /// koji imaju Tag postavljen kao string ključa prevoda.
+        /// that have Tag set as a translation key string.
         /// 
         /// Tag format:
         ///   "key"           → samo tekst (npr. "cut")
@@ -322,7 +322,7 @@ namespace UltraVideoEditor
             if (fe is System.Windows.Controls.Button btn)
             {
                 btn.Content = content;
-                // ToolTip = samo prevedeni tekst bez shortcuta, da JAWS jasno čita
+                // ToolTip = only translated text without shortcut, so JAWS reads clearly
                 if (btn.ToolTip is string || btn.ToolTip == null)
                     btn.ToolTip = translated + shortcut;
             }
@@ -336,13 +336,13 @@ namespace UltraVideoEditor
         /// Prolazi kroz MenuItem hijerarhiju i prevodi Header-e.
         /// MenuItem.Header je object, pa koristimo Tag konvenciju:
         ///   Tag="key"          → Header = prevod
-        ///   Tag="emoji|key"    → Header = "emoji prevod"  (bez _ prefiksa — JAWS ga čita!)
+        ///   Tag="emoji|key"    → Header = "emoji translation"  (no _ prefix — JAWS reads it!)
         /// </summary>
         private void ApplyLanguageToMenuItems(DependencyObject root)
         {
             string L(string key) => LanguageManager.GetText(key, _currentLanguage);
 
-            // Tražimo MenuItem-e kroz logičko (ne vizuelno) stablo
+            // We search for MenuItems through the logical (not visual) tree
             foreach (var mi in FindLogicalChildren<MenuItem>(root))
             {
                 if (mi.Tag is string tag && !string.IsNullOrEmpty(tag))
@@ -370,17 +370,17 @@ namespace UltraVideoEditor
             }
         }
 
-        private void SetLanguageSerbian_Click(object sender, RoutedEventArgs e) { _currentLanguage = "sr"; ApplyLanguage(); LogMessage("Jezik: Srpski", true); }
+        private void SetLanguageSerbian_Click(object sender, RoutedEventArgs e) { _currentLanguage = "sr"; ApplyLanguage(); LogMessage("Language: Serbian", true); }
         private void SetLanguageEnglish_Click(object sender, RoutedEventArgs e) { _currentLanguage = "en"; ApplyLanguage(); LogMessage("Language: English", true); }
-        private void SetLanguageGerman_Click(object sender, RoutedEventArgs e) { _currentLanguage = "de"; ApplyLanguage(); LogMessage("Sprache: Deutsch", true); }
+        private void SetLanguageGerman_Click(object sender, RoutedEventArgs e) { _currentLanguage = "de"; ApplyLanguage(); LogMessage("Language: German", true); }
 
         // ── TEME ────────────────────────────────────────────────────
         private void SetThemeDark_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "dark"; ApplyTheme(); LogMessage("Tema: Tamna", true); }
+        { _currentTheme = "dark"; ApplyTheme(); LogMessage("Theme: Dark", true); }
         private void SetThemeContrast_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "contrast"; ApplyTheme(); LogMessage("Tema: Visoki kontrast", true); }
+        { _currentTheme = "contrast"; ApplyTheme(); LogMessage("Theme: High contrast", true); }
         private void SetThemeLight_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "light"; ApplyTheme(); LogMessage("Tema: Svetla", true); }
+        { _currentTheme = "light"; ApplyTheme(); LogMessage("Theme: Light", true); }
 
         private void ApplyTheme()
         {
@@ -417,7 +417,7 @@ namespace UltraVideoEditor
                 }
                 catch { }
             }
-            catch (Exception ex) { LogMessage("Greska pri primeni teme: " + ex.Message, false); }
+            catch (Exception ex) { LogMessage("Error applying theme: " + ex.Message, false); }
         }
 
         private void LoadSavedTheme()
@@ -558,69 +558,69 @@ namespace UltraVideoEditor
         {
             if (nativeListView != null)
             {
-                nativeListView.AccessibleName = "Lista klipova na vremenskoj traci. Koristite strelice za navigaciju. Enter ili Space za reprodukciju. Page Up/Down za brzo listanje. Delete za brisanje.";
+                nativeListView.AccessibleName = "List of clips on the timeline. Use arrow keys to navigate. Enter or Space to play. Page Up/Down to scroll quickly. Delete to remove.";
             }
-            AutomationProperties.SetName(btnPlay, "Pusti ili pauziraj, Ctrl Space");
-            AutomationProperties.SetName(btnRenderTool, "Renderuj projekat, Ctrl R");
-            AutomationProperties.SetName(btnCut, "Seci klip, Ctrl X");
-            AutomationProperties.SetName(btnCutAllMarkers, "Seci na svim markerima, Ctrl Shift X");
-            AutomationProperties.SetName(btnMoveLeft, "Pomeri levo, Ctrl levo");
-            AutomationProperties.SetName(btnMoveRight, "Pomeri desno, Ctrl desno");
-            AutomationProperties.SetName(btnDuration, "Podesi trajanje, Ctrl D");
+            AutomationProperties.SetName(btnPlay, "Play or pause, Ctrl Space");
+            AutomationProperties.SetName(btnRenderTool, "Render project, Ctrl R");
+            AutomationProperties.SetName(btnCut, "Cut clip, Ctrl X");
+            AutomationProperties.SetName(btnCutAllMarkers, "Cut at all markers, Ctrl Shift X");
+            AutomationProperties.SetName(btnMoveLeft, "Move left, Ctrl Left");
+            AutomationProperties.SetName(btnMoveRight, "Move right, Ctrl Right");
+            AutomationProperties.SetName(btnDuration, "Set duration, Ctrl D");
             AutomationProperties.SetName(btnVolume, L("acc_set_volume"));
             AutomationProperties.SetName(btnZoomIn, L("acc_zoom_in"));
-            AutomationProperties.SetName(btnZoomOut, "Smanji zoom, Ctrl minus");
-            AutomationProperties.SetName(btnAddMarker, "Dodaj marker, Ctrl M");
+            AutomationProperties.SetName(btnZoomOut, "Zoom out, Ctrl minus");
+            AutomationProperties.SetName(btnAddMarker, "Add marker, Ctrl M");
             AutomationProperties.SetName(btnNextMarker, L("acc_next_marker"));
-            AutomationProperties.SetName(btnPrevMarker, "Prethodni marker, Ctrl Shift P");
-            AutomationProperties.SetName(btnSeekBack, "Premotaj unazad 5 sekundi");
-            AutomationProperties.SetName(btnSeekForward, "Premotaj napred 5 sekundi");
-            AutomationProperties.SetName(tabTimeline, "Timeline tab, lista klipova");
-            AutomationProperties.SetName(tabAI, "AI funkcije tab");
-            AutomationProperties.SetName(tabEffects, "Efekti tab");
-            AutomationProperties.SetName(tabSubtitles, "Titlovi tab");
-            AutomationProperties.SetName(tabTransitions, "Tranzicije tab");
-            AutomationProperties.SetName(tabAnimation, "Animacije tab");
-            AutomationProperties.SetName(sldBrightness, "Kontrola svetline");
-            AutomationProperties.SetName(sldContrast, "Kontrola kontrasta");
-            AutomationProperties.SetName(sldBlur, "Kontrola zamagljenja");
+            AutomationProperties.SetName(btnPrevMarker, "Previous marker, Ctrl Shift P");
+            AutomationProperties.SetName(btnSeekBack, "Seek back 5 seconds");
+            AutomationProperties.SetName(btnSeekForward, "Seek forward 5 seconds");
+            AutomationProperties.SetName(tabTimeline, "Timeline tab, clip list");
+            AutomationProperties.SetName(tabAI, "AI functions tab");
+            AutomationProperties.SetName(tabEffects, "Effects tab");
+            AutomationProperties.SetName(tabSubtitles, "Subtitles tab");
+            AutomationProperties.SetName(tabTransitions, "Transitions tab");
+            AutomationProperties.SetName(tabAnimation, "Animation tab");
+            AutomationProperties.SetName(sldBrightness, "Brightness control");
+            AutomationProperties.SetName(sldContrast, "Contrast control");
+            AutomationProperties.SetName(sldBlur, "Blur control");
             AutomationProperties.SetName(sldBass, L("acc_bass"));
             AutomationProperties.SetName(sldTreble, L("acc_treble"));
-            AutomationProperties.SetName(sldReverb, "Reverb efekat");
-            AutomationProperties.SetName(txtVoiceText, "Tekst za AI glas");
-            AutomationProperties.SetName(txtAIPrompt, "Prompt za AI slike");
-            AutomationProperties.SetName(txtLyrics, "Tekst pesme za sinhronizaciju");
+            AutomationProperties.SetName(sldReverb, "Reverb effect");
+            AutomationProperties.SetName(txtVoiceText, "Text for AI voice");
+            AutomationProperties.SetName(txtAIPrompt, "Prompt for AI images");
+            AutomationProperties.SetName(txtLyrics, "Song lyrics for synchronization");
             AutomationProperties.SetName(btnGenerateVoice, L("acc_generate_voice"));
             AutomationProperties.SetName(btnGenerate, L("acc_generate_frames"));
-            AutomationProperties.SetName(btnSyncLyrics, "Sinhronizuj tekst");
-            AutomationProperties.SetName(txtSubtitleText, "Tekst titla");
+            AutomationProperties.SetName(btnSyncLyrics, "Synchronize lyrics");
+            AutomationProperties.SetName(txtSubtitleText, "Subtitle text");
             AutomationProperties.SetName(txtSubStart, L("acc_subtitle_start"));
-            AutomationProperties.SetName(txtSubEnd, "Kraj u sekundama");
-            AutomationProperties.SetName(btnAddSubtitle, "Dodaj titl");
+            AutomationProperties.SetName(txtSubEnd, "End in seconds");
+            AutomationProperties.SetName(btnAddSubtitle, "Add subtitle");
             AutomationProperties.SetName(btnClearSubtitles, L("acc_clear_subtitles"));
             AutomationProperties.SetName(sldPreviewDuration, L("acc_preview_duration"));
-            AutomationProperties.SetName(cmbTranscribeAudio, "Izbor audio fajla za transkripciju");
-            AutomationProperties.SetName(btnTranscribe, "Pokreni AI transkripciju");
-            AutomationProperties.SetName(txtTranscriptionResult, "Rezultat transkripcije");
-            AutomationProperties.SetName(cmbTrackSelector, "Izbor prikaza trake");
-            AutomationProperties.SetName(lstKeyframes, "Lista keyframe-ova");
-            AutomationProperties.SetName(btnAddKeyframe, "Dodaj keyframe");
-            AutomationProperties.SetName(btnRemoveKeyframe, "Ukloni keyframe");
-            AutomationProperties.SetName(btnApplyKeyframe, "Primeni keyframe");
-            AutomationProperties.SetName(btnPreviewAnimation, "Pregledaj animaciju");
-            AutomationProperties.SetName(sldZoom, "Kontrola zuma");
-            AutomationProperties.SetName(sldRotation, "Kontrola rotacije");
-            AutomationProperties.SetName(sldX, "Kontrola horizontalnog pomeranja");
-            AutomationProperties.SetName(sldY, "Kontrola vertikalnog pomeranja");
-            AutomationProperties.SetName(sldOpacity, "Kontrola providnosti");
-            AutomationProperties.SetName(sldTransitionDuration, "Trajanje tranzicije");
-            AutomationProperties.SetName(lstTransitions, "Lista tranzicija");
-            AutomationProperties.SetName(btnRemoveTransition, "Ukloni tranziciju");
-            AutomationProperties.SetName(chkGPUAcceleration, "GPU ubrzanje");
-            // txtJawsLog mora biti live region
+            AutomationProperties.SetName(cmbTranscribeAudio, "Select audio file for transcription");
+            AutomationProperties.SetName(btnTranscribe, "Start AI transcription");
+            AutomationProperties.SetName(txtTranscriptionResult, "Transcription result");
+            AutomationProperties.SetName(cmbTrackSelector, "Track display selector");
+            AutomationProperties.SetName(lstKeyframes, "Keyframe list");
+            AutomationProperties.SetName(btnAddKeyframe, "Add keyframe");
+            AutomationProperties.SetName(btnRemoveKeyframe, "Remove keyframe");
+            AutomationProperties.SetName(btnApplyKeyframe, "Apply keyframe");
+            AutomationProperties.SetName(btnPreviewAnimation, "Preview animation");
+            AutomationProperties.SetName(sldZoom, "Zoom control");
+            AutomationProperties.SetName(sldRotation, "Rotation control");
+            AutomationProperties.SetName(sldX, "Horizontal position control");
+            AutomationProperties.SetName(sldY, "Vertical position control");
+            AutomationProperties.SetName(sldOpacity, "Opacity control");
+            AutomationProperties.SetName(sldTransitionDuration, "Transition duration");
+            AutomationProperties.SetName(lstTransitions, "Transition list");
+            AutomationProperties.SetName(btnRemoveTransition, "Remove transition");
+            AutomationProperties.SetName(chkGPUAcceleration, "GPU acceleration");
+            // txtJawsLog must be a live region
             if (txtJawsLog != null)
             {
-                AutomationProperties.SetName(txtJawsLog, "Status poruka");
+                AutomationProperties.SetName(txtJawsLog, "Status message");
                 AutomationProperties.SetLiveSetting(txtJawsLog, AutomationLiveSetting.Assertive);
             }
         }
@@ -667,7 +667,7 @@ namespace UltraVideoEditor
                     catch { }
                 }
             };
-            // Pokreni timer odmah ako je pristupačni mod uključen
+            // Start timer immediately if accessibility mode is enabled
             if (accessibilityMode)
                 positionAnnounceTimer.Start();
         }
@@ -693,7 +693,7 @@ namespace UltraVideoEditor
             if (timelineItems.Count > 0 || subtitles.Count > 0)
             {
                 var result = WpfMessageBox.Show(L("save_before_new"),
-                                              "Novi projekat", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                                              "New project", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (result == MessageBoxResult.Yes)
                     SaveProject_Click(null, null);
                 else if (result == MessageBoxResult.Cancel)
@@ -1049,7 +1049,7 @@ namespace UltraVideoEditor
                 return;
             }
             string markerList = string.Join(", ", markers.Select(m => FormatTime(m)));
-            WpfMessageBox.Show($"Markeri:\n{markerList}", "Lista markera", MessageBoxButton.OK, MessageBoxImage.Information);
+            WpfMessageBox.Show($"Markers:\n{markerList}", "Marker list", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ToggleGPUAcceleration_Click(object sender, RoutedEventArgs e)
@@ -1531,7 +1531,7 @@ namespace UltraVideoEditor
                 _mediaPlayer.Play();
                 isPlaying = true;
                 if (btnPlay != null) btnPlay.Content = "⏸ PAUSE";
-                // Najavimo koji klip se pušta i njegovo trajanje
+                // Announce which clip is playing and its duration
                 var selItem = nativeListView?.SelectedItems.Count > 0
                     ? nativeListView.SelectedItems[0].Tag as TimelineItem : null;
                 if (selItem != null)
@@ -1887,7 +1887,7 @@ namespace UltraVideoEditor
                 lstKeyframes.Items.Add(kf);
             }
             if (txtSelectedClip != null)
-                txtSelectedClip.Text = $"Selektovan klip: {item.Name} (Keyframe-ova: {item.Keyframes.Count})";
+                txtSelectedClip.Text = $"Selected clip: {item.Name} (Keyframes: {item.Keyframes.Count})";
         }
 
         private double GetAudioDuration(string filePath)
@@ -1911,7 +1911,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage("Unesi tekst prvo", true); return; }
             btnGenerateVoice.IsEnabled = false;
             prgVoice.Visibility = Visibility.Visible;
-            txtVoiceStatus.Text = "Generisanje...";
+            txtVoiceStatus.Text = "Generating...";
             LogMessage("Generisanje AI glasa...", true);
             string lang = rbSrb.IsChecked == true ? "sr" : "en";
             string voiceoverPath = Path.Combine(currentProjectFolder, "AI_Voiceover.mp3");
@@ -1958,7 +1958,7 @@ namespace UltraVideoEditor
             string accountId = "9b8004123c153014d851b6056d2da4fe";
             btnGenerate.IsEnabled = false;
             prgAI.Visibility = Visibility.Visible;
-            txtAIStatus.Text = "Generisanje preko Cloudflare...";
+            txtAIStatus.Text = "Generating via Cloudflare...";
             LogMessage("Generisanje AI kadrova preko Cloudflare Workers AI...", true);
             string[] prompts = txtAIPrompt.Text.Split(',');
             int generated = 0;
@@ -2058,9 +2058,9 @@ namespace UltraVideoEditor
 
             if (!AITranscription.IsWhisperAvailable())
             {
-                LogMessage("faster-whisper-xxl nije pronađen. Postavi faster-whisper-xxl.exe pored UltraVideoEditor.exe.", true);
+                LogMessage("faster-whisper-xxl not found. Place faster-whisper-xxl.exe next to UltraVideoEditor.exe.", true);
                 WpfMessageBox.Show(
-                    "faster-whisper-xxl nije pronađen.\n\n" +
+                    "faster-whisper-xxl not found.\n\n" +
                     "Preuzmi faster-whisper-xxl.exe i postavi ga pored UltraVideoEditor.exe.\n\n" +
                     "Besplatno: https://github.com/Purfview/whisper-standalone-win/releases",
                     "Whisper nije instaliran", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -2068,7 +2068,7 @@ namespace UltraVideoEditor
             }
 
             btnTranscribe.IsEnabled = false;
-            txtTranscriptionResult.Text = "Transkripcija u toku (large-v3)...";
+            txtTranscriptionResult.Text = "Transcription in progress (large-v3)...";
             LogMessage(L("transcription_running"), true);
             try
             {
@@ -2116,8 +2116,8 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage("Unesi tekst pesme", true); return; }
             btnSyncLyrics.IsEnabled = false;
             prgSync.Visibility = Visibility.Visible;
-            txtSyncStatus.Text = "Sinhronizacija...";
-            LogMessage("Sinhronizacija teksta...", true);
+            txtSyncStatus.Text = "Synchronizing...";
+            LogMessage("Synchronizing lyrics...", true);
             try
             {
                 string[] lines = txtLyrics.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -2126,20 +2126,20 @@ namespace UltraVideoEditor
                 double duration = GetAudioDuration(selectedAudioPath);
                 syncedSubtitles.Clear();
 
-                // SYNC FIX: Pokušavamo Whisper transkripciju za tačne audio timestamps.
-                // Whisper vraća START/END svake linije direktno iz talasnog oblika zvuka,
-                // što eliminiše "theoretical timing" drift.
-                // Fallback: ravnomerna podela ako Whisper nije dostupan ili ne pronađe tekst.
+                // SYNC FIX: Attempting Whisper transcription for accurate audio timestamps.
+                // Whisper returns START/END of each line directly from the audio waveform,
+                // which eliminates "theoretical timing" drift.
+                // Fallback: even distribution if Whisper is unavailable or finds no text.
                 bool usedAlignment = false;
                 if (AITranscription.IsWhisperAvailable())
                 {
                     try
                     {
-                        // FORCED ALIGNMENT: korisnik je već dao tekst, Whisper samo mjeri
-                        // gdje se svaka linija nalazi u audio-u. Bez transkripcije, bez pogađanja.
-                        // Rezultat: milisekunda-tačni timestamps koji prate stvarni glas.
-                        txtSyncStatus.Text = "Whisper sluša glas i poravnava tekst...";
-                        LogMessage("🎵 Forced alignment: Whisper sluša gdje počinje svaka linija...", true);
+                        // FORCED ALIGNMENT: user has already provided text, Whisper only measures
+                        // where each line is in the audio. No transcription, no guessing.
+                        // Result: millisecond-accurate timestamps that follow the real voice.
+                        txtSyncStatus.Text = "Whisper is listening and aligning text...";
+                        LogMessage("🎵 Forced alignment: Whisper detecting where each line begins...", true);
                         string ffmpegPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 
                         var alignResult = await AITranscription.ForcedAlignAsync(
@@ -2169,7 +2169,7 @@ namespace UltraVideoEditor
                                 if (creator != null)
                                 {
                                     creator.SetWordTimings(alignResult.WordTimings);
-                                    LogMessage($"🔤 Word-level sync: {alignResult.WordTimings.Count} riječi", true);
+                                    LogMessage($"🔤 Word-level sync: {alignResult.WordTimings.Count} words", true);
                                 }
                             }
                         }
@@ -2180,7 +2180,7 @@ namespace UltraVideoEditor
                     }
                     catch (Exception alignEx)
                     {
-                        LogMessage($"⚠ Alignment greška: {alignEx.Message} — fallback na ravnomjernu podjelu", true);
+                        LogMessage($"⚠ Alignment error: {alignEx.Message} — falling back to even distribution", true);
                     }
                 }
 
@@ -2190,7 +2190,7 @@ namespace UltraVideoEditor
                     double timePerLine = duration / Math.Max(1, lyrics.Count);
                     for (int i = 0; i < lyrics.Count; i++)
                         syncedSubtitles.Add(new AISubtitle { Text = lyrics[i], Start = i * timePerLine, End = (i + 1) * timePerLine });
-                    LogMessage("Sinhronizacija: ravnomjerna podjela (instalirajte Whisper za audio-precise sync)", true);
+                    LogMessage("Sync: uniform distribution (install Whisper for audio-precise sync)", true);
                 }
 
                 lstAutoSubtitles.Items.Clear();
@@ -2225,8 +2225,8 @@ namespace UltraVideoEditor
             if (_lastHighlightResult == null || !_lastHighlightResult.Success)
             {
                 System.Windows.MessageBox.Show(
-                    "Pokrenite AI Highlight Engine (Ctrl+Shift+H) i završite analizu pre Faze 3.",
-                    "Faza 3", System.Windows.MessageBoxButton.OK,
+                    "Run AI Highlight Engine (Ctrl+Shift+H) and complete the analysis before Phase 3.",
+                    "Phase 3", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
                 return;
             }
@@ -2255,7 +2255,7 @@ namespace UltraVideoEditor
 
         private void ApplyTemplate(ProjectTemplate t)
         {
-            // Primijeni template podešavanja na MainWindow state
+            // Apply template settings to MainWindow state
             if (!string.IsNullOrEmpty(t.Language))
             {
                 _currentLanguage = t.Language;
@@ -2326,7 +2326,7 @@ namespace UltraVideoEditor
             if (timelineItems.Count == 0)
             {
                 System.Windows.MessageBox.Show(
-                    "Timeline je prazan. Dodajte klipoive pre korišćenja AI Asistenta.",
+                    "Timeline is empty. Add clips before using the AI Assistant.",
                     "Timeline AI Asistent",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
@@ -2375,7 +2375,7 @@ namespace UltraVideoEditor
                     UpdateTimelineDisplay();
                     LogMessage($"Dodato {segments.Count} highlight segmenata na timeline.", true);
                     PlayBeep();
-                    // Sačuvaj za Fazu 3
+                    // Save for Phase 3
                     _lastHighlightResult      = dlg.PublicResult;
                     _lastHighlightSourceVideo = dlg.ResultSegments.FirstOrDefault()?.SourcePath;
                     _lastHighlightMusicPath   = "";  // setuje se u Phase3Dialog
@@ -2481,6 +2481,65 @@ namespace UltraVideoEditor
                 PlayBeep();
             }
         }
+        // ── YouTube Import ──────────────────────────────────────────────────────
+        private async void ImportFromYouTube_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new YouTubeDownloadDialog { Owner = this };
+
+            if (dlg.ShowDialog() != true || dlg.DownloadedFiles.Count == 0)
+                return;
+
+            SaveState();
+
+            int added = 0;
+            foreach (var filePath in dlg.DownloadedFiles)
+            {
+                if (!File.Exists(filePath))
+                {
+                    LogMessage($"File not found: {Path.GetFileName(filePath)}", true);
+                    continue;
+                }
+
+                try
+                {
+                    string ext     = Path.GetExtension(filePath).ToLowerInvariant();
+                    bool   isAudio = ext == ".mp3" || ext == ".wav" || ext == ".m4a"
+                                  || ext == ".flac" || ext == ".ogg";
+
+                    int track = isAudio
+                        ? (currentTrackFilter == 2 || currentTrackFilter == 3 ? currentTrackFilter : 2)
+                        : (currentTrackFilter >= 0 && currentTrackFilter <= 1 ? currentTrackFilter : 0);
+
+                    double duration = await GetMediaDurationWithTimeoutAsync(filePath, TimeSpan.FromSeconds(30));
+
+                    timelineItems.Add(new TimelineItem
+                    {
+                        Path        = filePath,
+                        Duration    = duration,
+                        Name        = Path.GetFileName(filePath),
+                        Type        = isAudio ? "Audio" : "Video",
+                        Volume      = 100,
+                        TrackIndex  = track,
+                        VideoEffect = new VideoEffectData()
+                    });
+
+                    LogMessage($"YouTube → Timeline: {Path.GetFileName(filePath)}", true);
+                    added++;
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"Error adding {Path.GetFileName(filePath)}: {ex.Message}", true);
+                }
+            }
+
+            if (added > 0)
+            {
+                UpdateTimelineDisplay();
+                LogMessage($"Sa YouTube-a dodato {added} fajl(ova) na timeline.", true);
+                PlayBeep();
+            }
+        }
+
         // ══════════════════════════════════════════════════════════════════════
         //  StartRenderToPath — render bez dijaloga, za AutoRender iz AIVideoCreator
         //  Koristi isti RenderSimpleAsync poziv kao FinalRender_Click
@@ -2544,18 +2603,18 @@ namespace UltraVideoEditor
                 {
                     long fileSize = new FileInfo(outputPath).Length;
                     LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
-                    txtRenderStatus.Text = "Auto-Render završen!";
+                    txtRenderStatus.Text = "Auto-Render complete!";
                     PlayBeep();
 
                     // Auto-close prozor posle 8 sekundi — ne treba klik
                     _ = Task.Run(async () =>
                     {
-                        await Task.Delay(500); // malo kašnjenje da render engine završi cleanup
+                        await Task.Delay(500); // small delay so render engine finishes cleanup
                         Dispatcher.Invoke(() =>
                         {
                             var toast = new System.Windows.Window
                             {
-                                Title = "Auto-Render završen",
+                                Title = "Auto-Render complete",
                                 Width = 420, Height = 130,
                                 WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
                                 Left = SystemParameters.WorkArea.Right - 440,
@@ -2597,8 +2656,8 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogMessage($"Auto-Render greška: {ex.Message}", true);
-                txtRenderStatus.Text = "Auto-Render greška";
+                LogMessage($"Auto-Render error: {ex.Message}", true);
+                txtRenderStatus.Text = "Auto-Render error";
             }
             finally
             {
@@ -2666,7 +2725,7 @@ namespace UltraVideoEditor
                 if (resolutionDialog.ShowDialog() == true)
                 {
                     selectedResolution = resolutionDialog.SelectedResolution;
-                    _selectedResolution = selectedResolution; // sačuvaj za AIVideoCreator
+                    _selectedResolution = selectedResolution; // save for AIVideoCreator
                 }
             }
 
@@ -2727,7 +2786,7 @@ namespace UltraVideoEditor
                     currentExportSettings,
                     _renderCancellation.Token,
                     useGPUAcceleration,
-                    selectedResolution,  // PROSLIJEĐENA REZOLUCIJA
+                    selectedResolution,  // PASSED RESOLUTION
                     AIVideoCreator.FastRenderMode,  // BRZI RENDER (bez Ken Burns)
                     enableSubtitles,    // HARD-ANCHOR subtitle toggle
                     renderBeatInfo);    // BEAT-SYNC: DownBeat snap za rezove
@@ -3007,7 +3066,7 @@ namespace UltraVideoEditor
                         nativeListView.Items[newIndex].Selected = true;
                         nativeListView.Items[newIndex].EnsureVisible();
                         if (nativeListView.SelectedItems[0].Tag is TimelineItem newItem)
-                            LogMessage($"Selektovan klip {newItem.Index}: {newItem.Name}", true);
+                            LogMessage($"Selected clip {newItem.Index}: {newItem.Name}", true);
                         e.Handled = true;
                     }
                 }
@@ -3828,7 +3887,7 @@ namespace UltraVideoEditor
             // Napravi novu listu
             var newTimeline = new List<TimelineItem>();
 
-            // Dodaj fiksirane video klipove na njihove tačne pozicije
+            // Add pinned video clips to their exact positions
             foreach (var video in fixedVideos)
             {
                 video.Start = video.FixedPosition;
@@ -3836,15 +3895,15 @@ namespace UltraVideoEditor
                 newTimeline.Add(video);
             }
 
-            // Dodaj nefiksirane video klipove – pozicioniraj ih iza najvećeg fiksiranog ili na početak
+            // Add unpinned video clips – position them after the largest pinned or at the start
             double lastEnd = fixedVideos.Any() ? fixedVideos.Max(i => i.End) : 0;
 
-            // Sortiraj nefiksirane po trenutnom Start (da zadrže redoslijed)
+            // Sort unpinned by current Start (to preserve order)
             nonFixedVideos = nonFixedVideos.OrderBy(i => i.Start).ToList();
 
             foreach (var video in nonFixedVideos)
             {
-                // Pronađi prvu slobodnu poziciju koja nije zauzeta fiksiranim klipovima
+                // Find the first free position not occupied by pinned clips
                 while (newTimeline.Any(i => i.Start < lastEnd + video.Duration && i.End > lastEnd))
                 {
                     lastEnd = newTimeline.Where(i => i.Start < lastEnd + video.Duration && i.End > lastEnd)
@@ -3863,7 +3922,7 @@ namespace UltraVideoEditor
                 newTimeline.Add(audio);
             }
 
-            // Sortiraj sve po početku
+            // Sort all by start
             timelineItems = newTimeline.OrderBy(i => i.Start).ToList();
 
             // Log za debug
@@ -3880,7 +3939,7 @@ namespace UltraVideoEditor
             var videoItems = timelineItems.Where(i => i.IsImage || i.IsVideo).ToList();
             var audioItems = timelineItems.Where(i => i.IsAudio).ToList();
 
-            // Samo one sa UseFixedPosition = true zadržavaju fiksnu poziciju
+            // Only those with UseFixedPosition = true retain fixed position
             var fixedItems = videoItems.Where(i => i.UseFixedPosition && i.FixedPosition > 0).ToList();
             var nonFixedItems = videoItems.Where(i => !i.UseFixedPosition || i.FixedPosition <= 0).ToList();
 
@@ -3909,7 +3968,7 @@ namespace UltraVideoEditor
             timelineItems.AddRange(nonFixedItems);
             timelineItems.AddRange(audioItems);
 
-            // Sortiraj po početku
+            // Sort by start
             timelineItems = timelineItems.OrderBy(i => i.Start).ToList();
 
             UpdateTimelineDisplay();
@@ -4136,11 +4195,11 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                // ── JAWS/NVDA ispravan redosljed čitanja ──────────────────────────────
-                // UVIJEK: "N od UKUPNO, Tip: Ime, trajanje X, početak Y, kraj Z"
+                // ── JAWS/NVDA correct reading order ──────────────────────────────
+                // ALWAYS: "N of TOTAL, Type: Name, duration X, start Y, end Z"
                 // NIKAD:  statusna poruka ispred naziva fajla
                 //
-                // Primjer: "1 od 21, Video: Tokom proljeća i jeseni, trajanje 00:09, početak 00:04, kraj 00:13"
+                // Example: "1 of 21, Video: During spring and autumn, duration 00:09, start 00:04, end 00:13"
                 //
                 string typeLabel = item.Type switch
                 {
@@ -4155,18 +4214,18 @@ namespace UltraVideoEditor
                 string total = nativeListView.Items.Count.ToString();
 
                 // Ime klipa: koristi AudioDescription ako postoji (bolji kontekst),
-                // inače samo naziv fajla bez putanje i bez ekstenzije
+                // otherwise just the filename without path and extension
                 string clipName = !string.IsNullOrWhiteSpace(item.AudioDescription)
                     ? item.AudioDescription
                     : Path.GetFileNameWithoutExtension(item.Name ?? string.Empty);
 
-                // Format koji JAWS čita prirodno i u pravom redosljedu:
-                // "1 od 21, Video: Naziv klipa, trajanje 00:09, početak 00:04, kraj 00:13"
+                // Format that JAWS reads naturally and in the right order:
+                // "1 of 21, Video: Clip name, duration 00:09, start 00:04, end 00:13"
                 string msg = string.Format(L("timeline_item_label"), item.Index, total, typeLabel, clipName, duration, start, end);
 
                 LogMessage(msg, true);
 
-                // Notifikacija UIA provajdera — osvježi accessibility tree za JAWS/NVDA
+                // UIA provider notification — refresh accessibility tree for JAWS/NVDA
                 nativeListView.Invoke((System.Windows.Forms.MethodInvoker)(() =>
                 {
                     nativeListView.Refresh();
@@ -4203,13 +4262,13 @@ namespace UltraVideoEditor
             }
             else if (e.KeyCode == WinForms.Keys.Space || e.KeyCode == WinForms.Keys.Enter)
             {
-                // I Space i Enter pokreću play — čitači ekrana često koriste Enter
+                // Both Space and Enter trigger play — screen readers often use Enter
                 TogglePlay_Click(null, null);
                 e.Handled = true;
             }
             else if (e.KeyCode == WinForms.Keys.F6)
             {
-                // F6 čita cijeli opis selektovanog klipa (za JAWS/NVDA)
+                // F6 reads full description of selected clip (for JAWS/NVDA)
                 ProcessSelectedItem();
                 e.Handled = true;
             }
@@ -4279,7 +4338,7 @@ namespace UltraVideoEditor
                         ? $"Ukupno klipova: {filteredItems.Count} | Ukupno trajanje: {FormatTime(GetTotalDuration())} | Zoom: {zoomLevel:F1}x"
                         : "Nema klipova na timeline-u.";
                     txtTimelineInfo.Text = infoText;
-                    // Pomozi screen readerima da pročitaju ažurirani status
+                    // Help screen readers to read the updated status
                     AutomationProperties.SetName(txtTimelineInfo, infoText);
                 }
 
@@ -4434,7 +4493,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogMessage("Greska pri generisanju animacije: " + ex.Message, true);
+                LogMessage("Error generating animation: " + ex.Message, true);
             }
         }
 
@@ -4459,7 +4518,7 @@ namespace UltraVideoEditor
         {
             try
             {
-                // Pronađi audio fajl
+                // Find audio file
                 var audioItem = timelineItems.FirstOrDefault(i => i.IsAudio);
                 if (audioItem == null)
                 {
@@ -4467,7 +4526,7 @@ namespace UltraVideoEditor
                     return;
                 }
 
-                // Pronađi sve slike
+                // Find all images
                 var images = timelineItems.Where(i => i.IsImage &&
                     !i.Name.Contains("Najavni") &&
                     !i.Name.Contains("Odjavni")).ToList();
@@ -4481,10 +4540,10 @@ namespace UltraVideoEditor
                 var dialog = new AutoArrangeDialog(audioItem.Duration, images.Count);
                 if (dialog.ShowDialog() != true) return;
 
-                // Sačuvaj trenutno stanje za Undo
+                // Save current state for Undo
                 SaveState();
 
-                // Ukloni postojeće tekstualne slojeve
+                // Remove existing text layers
                 var existingTextItems = timelineItems.Where(i => i.Name.Contains("Najavni") || i.Name.Contains("Odjavni")).ToList();
                 foreach (var textItem in existingTextItems)
                 {
@@ -4503,11 +4562,11 @@ namespace UltraVideoEditor
 
                 LogMessage($"Auto-raspored: {images.Count} slika, svaka po {timePerImage:F2} sekundi", true);
 
-                // Inicijalizuj lokalnu zvučnu biblioteku ako su zvukovi uključeni
+                // Initialize local sound library if sounds are enabled
                 bool soundsEnabled = dialog.EnableTransitionSounds || dialog.EnableAmbientSounds;
                 if (soundsEnabled)
                 {
-                    LogMessage("🔊 Lokalna zvučna biblioteka aktivna za slideshow", true);
+                    LogMessage("🔊 Local sound library active for slideshow", true);
                 }
                 // Lista za tranzicione zvukove
                 var transitionSounds = new List<TimelineItem>();
@@ -4525,19 +4584,19 @@ namespace UltraVideoEditor
                     img.Start = currentTime;
                     img.End = currentTime + timePerImage;
 
-                    // Ken Burns efekat (ako je uključen)
+                    // Ken Burns effect (if enabled)
                     if (dialog.EnableKenBurns)
                     {
                         AddKenBurnsKeyframes(img, timePerImage);
                     }
                     else
                     {
-                        // Inače koristi odabrani efekat
+                        // Otherwise use the selected effect
                         string effectName = GetEffectName(dialog.EffectMode, dialog.EffectSequence, i);
                         AddKeyframesForEffect(img, effectName, timePerImage);
                     }
 
-                    // Dodaj tekst na sliku ako je uključeno
+                    // Add text to image if enabled
                     if (dialog.TextOnImageEnabled)
                     {
                         string overlayText = dialog.OverlayText;
@@ -4557,7 +4616,7 @@ namespace UltraVideoEditor
                         };
                     }
 
-                    // Dodaj tranzicioni zvuk (pop/whoosh) između scena (osim poslije zadnje)
+                    // Add transition sound (pop/whoosh) between scenes (except after last)
                     if (dialog.EnableTransitionSounds && i < images.Count - 1)
                     {
                         string transitionType = i % 2 == 0 ? "whoosh" : "pop";
@@ -4638,7 +4697,7 @@ namespace UltraVideoEditor
                         LogMessage($"Dodato {ambientSounds.Count} ambijentalnih zvukova", true);
                     }
                 }
-                // DODAJ NAJAVNI TEKST (na početku)
+                // ADD INTRO TEXT (at the start)
                 if (!string.IsNullOrEmpty(dialog.IntroText))
                 {
                     string introImagePath = await CreateTextImage(dialog.IntroText, dialog.IntroDuration, true);
@@ -4706,7 +4765,7 @@ namespace UltraVideoEditor
                     LogMessage($"Dodat logo: {Path.GetFileName(dialog.LogoPath)}", true);
                 }
 
-                // Crossfade između slika (ako je uključen)
+                // Crossfade between images (if enabled)
                 if (dialog.EnableCrossfade)
                 {
                     AddCrossfadeBetweenImages(images, timePerImage, dialog.IntroDuration);
@@ -4723,7 +4782,7 @@ namespace UltraVideoEditor
             }
         }
         /// <summary>
-        /// Kreira sliku sa tekstom za najavni ili odjavni špic
+        /// Creates an image with text for an intro or outro title card
         /// </summary>
         private async Task<string> CreateTextImage(string text, double duration, bool isIntro)
         {
@@ -4792,7 +4851,7 @@ namespace UltraVideoEditor
             return tempPath;
         }
         /// <summary>
-        /// Dodaje crossfade između slika (fade out na kraju jedne, fade in na početku sljedeće)
+        /// Adds crossfade between images (fade out at end of one, fade in at start of next)
         /// </summary>
         private void AddCrossfadeBetweenImages(List<TimelineItem> images, double timePerImage, double introDuration)
         {
@@ -4827,7 +4886,7 @@ namespace UltraVideoEditor
                 var random = new Random();
                 return effects[random.Next(effects.Count)];
             }
-            else // auto - ciklično
+            else // auto - cyclic
             {
                 var autoEffects = new List<string> { "ZoomIn", "SlideLeft", "FadeIn", "ZoomOut", "SlideRight" };
                 return autoEffects[index % autoEffects.Count];
@@ -4930,7 +4989,7 @@ namespace UltraVideoEditor
                 LogMessage($"Tekst '{dialog.Text}' dodat na sliku {item.Index}", true);
                 PlayBeep();
 
-                // Osvježi prikaz u ListView-u
+                // Refresh display in ListView
                 UpdateTimelineDisplay();
             }
         }
@@ -5126,7 +5185,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogMessage($"Seek greška: {ex.Message}", false);
+                LogMessage($"Seek error: {ex.Message}", false);
             }
         }
 
@@ -5240,8 +5299,8 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Pronađi AIVideoCreator instancu u vizuelnom stablu prozora.
-        /// Koristi se za proslijeđivanje word-level timestamps nakon alignment-a.
+        /// Find AIVideoCreator instance in the visual tree of the window.
+        /// Used for passing word-level timestamps after alignment.
         /// </summary>
         private AIVideoCreator FindAIVideoCreator()
         {

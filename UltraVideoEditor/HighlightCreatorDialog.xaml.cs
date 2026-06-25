@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Automation;
 using Microsoft.Win32;
 
-// Eksplicitni aliasi — razrešavaju konflikte System.Drawing / System.Windows.Forms
+// Explicit aliases — resolve conflicts between System.Drawing / System.Windows.Forms
 using Brush            = System.Windows.Media.Brush;
 using Brushes          = System.Windows.Media.Brushes;
 using Color            = System.Windows.Media.Color;
@@ -44,13 +44,13 @@ namespace UltraVideoEditor
         private bool                      _rendering  = false;
 
         /// <summary>
-        /// Lista segmenata koje je korisnik uključio u preview panelu.
-        /// Ažurira se svaki put kad korisnik toggle-uje checkbox.
+        /// List of segments the user has included in the preview panel.
+        /// Updated every time the user toggles a checkbox.
         /// </summary>
         private readonly List<HighlightSegment> _activeSegments = new();
 
         /// <summary>
-        /// Javni rezultat — pozivajući kod može da pročita segmente
+        /// Public result — calling code can read the segments
         /// ako DialogResult == true.
         /// </summary>
         public List<HighlightSegment> ResultSegments =>
@@ -106,7 +106,7 @@ namespace UltraVideoEditor
         {
             var dlg = new SaveFileDialog
             {
-                Title      = "Sačuvaj highlight video",
+                Title      = "Save highlight video",
                 Filter     = "MP4 video|*.mp4",
                 FileName   = Path.GetFileName(TxtOutputPath.Text),
                 InitialDirectory = Path.GetDirectoryName(TxtOutputPath.Text),
@@ -150,7 +150,7 @@ namespace UltraVideoEditor
             }
             if (useMusic && !File.Exists(musicPath))
             {
-                ShowError("Proverite putanju do audio fajla, ili isključite opciju muzike.");
+                ShowError("Check the audio file path, or disable the music option.");
                 return;
             }
 
@@ -185,12 +185,12 @@ namespace UltraVideoEditor
                     // Popuni preview panel
                     PopulatePreviewPanel(_result.Segments);
 
-                    // Izveštaj
+                    // Report
                     TxtReport.Text           = _result.Report;
                     BtnCopyReport.Visibility = Visibility.Visible;
                     BtnExport.Visibility     = Visibility.Visible;
 
-                    // Aktiviraj dugmiće
+                    // Activate buttons
                     BtnApplyToTimeline.IsEnabled = true;
                     BtnRender.IsEnabled          = true;
                     BtnSelectAll.IsEnabled       = true;
@@ -198,14 +198,14 @@ namespace UltraVideoEditor
 
                     // Accessibility: najavi rezultat
                     AutomationProperties.SetName(TxtReport,
-                        $"Analiza završena. Selektovano {_result.Segments.Count} segmenata, " +
+                        $"Analysis complete. Selected {_result.Segments.Count} segments, " +
                         $"ukupno {AIHighlightEngine.FormatTime(_result.TotalDuration)}. " +
                         "Proverite Preview tab za detalje.");
                 }
                 else
                 {
                     ShowError(_result.Error ?? "Analiza nije uspela.");
-                    TxtSegmentCount.Text = "Analiza neuspešna.";
+                    TxtSegmentCount.Text = "Analysis failed.";
                 }
             }
             catch (OperationCanceledException)
@@ -216,7 +216,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                ShowError($"Neočekivana greška: {ex.Message}");
+                ShowError($"Unexpected error: {ex.Message}");
             }
             finally
             {
@@ -234,7 +234,7 @@ namespace UltraVideoEditor
         // ── Faza 2 / B: Preview panel ─────────────────────────────────
 
         /// <summary>
-        /// Dinamički gradi listu kartica za svaki segment.
+        /// Dynamically builds the card list for each segment.
         /// Svaka kartica ima: thumbnail, checkbox, trajanje, skor, arc opis, frame score bar.
         /// </summary>
         private void PopulatePreviewPanel(List<HighlightSegment> segments)
@@ -246,7 +246,7 @@ namespace UltraVideoEditor
 
             foreach (var seg in segments)
             {
-                // Sve segmente uključujemo po defaultu
+                // All segments included by default
                 _activeSegments.Add(seg);
 
                 var card = BuildSegmentCard(seg, isChecked: true, onToggle: (isOn) =>
@@ -395,7 +395,7 @@ namespace UltraVideoEditor
             chk.Checked   += (_, _) => onToggle(true);
             chk.Unchecked += (_, _) => onToggle(false);
             AutomationProperties.SetName(chk,
-                $"Uključi segment {seg.Order}, " +
+                $"Include segment {seg.Order}, " +
                 $"trajanje {seg.Duration:F1} sekundi");
 
             // Skor badge
@@ -417,13 +417,13 @@ namespace UltraVideoEditor
                     Foreground = Brushes.White,
                 },
             };
-            AutomationProperties.SetName(scoreBadge, $"Skor važnosti: {seg.ImportanceScore:F0} od 100");
+            AutomationProperties.SetName(scoreBadge, $"Importance score: {seg.ImportanceScore:F0} out of 100");
 
             header.Children.Add(scoreBadge);
             header.Children.Add(chk);
             infoPanel.Children.Add(header);
 
-            // Sadržaj
+            // Content
             if (!string.IsNullOrEmpty(seg.ContentDescription))
             {
                 infoPanel.Children.Add(new TextBlock
@@ -437,7 +437,7 @@ namespace UltraVideoEditor
             }
 
             // Arc opis (Faza 2 / C)
-            if (!string.IsNullOrEmpty(seg.ArcDescription) && seg.ArcDescription != "bez izraženog arc-a")
+            if (!string.IsNullOrEmpty(seg.ArcDescription) && seg.ArcDescription != "no distinct arc")
             {
                 var arcBorder = new Border
                 {
@@ -522,7 +522,7 @@ namespace UltraVideoEditor
             double dur  = _activeSegments.Sum(s => s.Duration);
             TxtSegmentCount.Text = total == 0
                 ? "Nema segmenata"
-                : $"{active}/{total} segmenata uključeno  ·  {AIHighlightEngine.FormatTime(dur)}";
+                : $"{active}/{total} segments included  ·  {AIHighlightEngine.FormatTime(dur)}";
         }
 
         private void UpdateRenderButtonState()
@@ -578,7 +578,7 @@ namespace UltraVideoEditor
 
             if (useMusic && !File.Exists(musicPath))
             {
-                ShowError("Audio fajl nije pronađen. Proverite putanju.");
+                ShowError("Audio file not found. Check the path.");
                 return;
             }
             if (string.IsNullOrEmpty(outputPath))
@@ -598,7 +598,7 @@ namespace UltraVideoEditor
             if (File.Exists(outputPath))
             {
                 var confirm = MessageBox.Show(
-                    $"Fajl već postoji:\n{outputPath}\n\nPrepiši ga?",
+                    $"File already exists:\n{outputPath}\n\nOverwrite it?",
                     "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.Yes) return;
             }
@@ -635,11 +635,11 @@ namespace UltraVideoEditor
                     ct         : _cts.Token);
 
                 MessageBox.Show(
-                    $"✅ Video uspešno renderovan!\n\n{outputPath}\n\n" +
+                    $"✅ Video successfully rendered!\n\n{outputPath}\n\n" +
                     $"Trajanje: {AIHighlightEngine.FormatTime(renderResult.TotalDuration)}\n" +
                     $"Segmenata: {renderResult.Segments.Count}\n" +
                     $"Rezolucija: {resolution}",
-                    "Render završen",
+                    "Render complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -651,7 +651,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                ShowError($"Greška tokom rendera: {ex.Message}");
+                ShowError($"Error during render: {ex.Message}");
             }
             finally
             {
@@ -715,7 +715,7 @@ namespace UltraVideoEditor
             Close();
         }
 
-        // ── Izveštaj ─────────────────────────────────────────────────
+        // ── Report ──────────────────────────────────────────────────
 
         private void BtnCopyReport_Click(object sender, RoutedEventArgs e)
         {
@@ -733,7 +733,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(TxtReport.Text)) return;
             var dlg = new SaveFileDialog
             {
-                Title    = "Sačuvaj izveštaj",
+                Title    = "Save report",
                 Filter   = "Tekstualni fajl|*.txt",
                 FileName = $"highlight_report_{DateTime.Now:yyyyMMdd_HHmm}.txt",
             };
@@ -742,10 +742,10 @@ namespace UltraVideoEditor
                 try
                 {
                     File.WriteAllText(dlg.FileName, TxtReport.Text, System.Text.Encoding.UTF8);
-                    MessageBox.Show($"Sačuvano:\n{dlg.FileName}", "Sačuvano",
+                    MessageBox.Show($"Saved:\n{dlg.FileName}", "Saved",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch (Exception ex) { ShowError($"Greška: {ex.Message}"); }
+                catch (Exception ex) { ShowError($"Error: {ex.Message}"); }
             }
         }
 
@@ -775,7 +775,7 @@ namespace UltraVideoEditor
             if (_analyzing || _rendering)
             {
                 var c = MessageBox.Show(
-                    "Operacija je u toku. Otkaži i zatvori?",
+                    "Operation in progress. Cancel and close?",
                     "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (c != MessageBoxResult.Yes) return;
                 _cts?.Cancel();
@@ -795,7 +795,7 @@ namespace UltraVideoEditor
 
         private void SetAnalyzeButtonToCancel()
         {
-            BtnAnalyze.Content =  "⏹ Otkaži";
+            BtnAnalyze.Content =  "⏹ Cancel";
             BtnAnalyze.Click  -= BtnAnalyze_Click;
             BtnAnalyze.Click  += BtnCancelAnalysis_Click;
             BtnAnalyze.IsEnabled = true;
@@ -817,7 +817,7 @@ namespace UltraVideoEditor
             }
             TxtReport.Text           = $"⚠️  {message}";
             ProgressPanel.Visibility = Visibility.Collapsed;
-            MessageBox.Show(message, "AI Highlight Engine — Greška",
+            MessageBox.Show(message, "AI Highlight Engine — Error",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 

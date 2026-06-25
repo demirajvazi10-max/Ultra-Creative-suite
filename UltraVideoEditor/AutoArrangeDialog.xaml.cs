@@ -94,9 +94,9 @@ namespace UltraVideoEditor
                 ? System.IO.Directory.GetFiles(soundsDir, "*.*", System.IO.SearchOption.AllDirectories).Length
                 : 0;
             WpfMessageBox.Show(
-                $"Lokalna zvučna biblioteka: {soundsDir}\n\nBroj fajlova: {count}\n\n" +
+                $"Local sound library: {soundsDir}\n\nNumber of files: {count}\n\n" +
                 "Stavi MP3/WAV fajlove u Assets/Sounds/ i podfolderima.\n" +
-                "AI automatski analizira nazive fajlova i bira odgovarajući zvuk.",
+                "AI automatically analyzes file names and selects the appropriate sound.",
                 "Lokalna biblioteka zvukova", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

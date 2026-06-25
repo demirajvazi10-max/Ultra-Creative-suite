@@ -37,9 +37,9 @@ namespace UltraVideoEditor
         public string ColorHex          { get; set; }   // npr. "#F5C842"
 
         [JsonPropertyName("color_purpose")]
-        public string ColorPurpose      { get; set; }   // zašto baš ta boja
+        public string ColorPurpose      { get; set; }   // why that specific color
 
-        // 2. Kompozicija - pravilo trećina
+        // 2. Composition - rule of thirds
         [JsonPropertyName("composition")]
         public string Composition       { get; set; }   // "subject left third", "centered"
 
@@ -55,12 +55,12 @@ namespace UltraVideoEditor
 
         // 4. Audio-Visual Sync - vizuelni akcenti
         [JsonPropertyName("visual_accent")]
-        public string VisualAccent      { get; set; }   // ključna riječ za akcent
+        public string VisualAccent      { get; set; }   // key word for accent
 
         [JsonPropertyName("accent_action")]
-        public string AccentAction      { get; set; }   // šta se dešava u videu
+        public string AccentAction      { get; set; }   // what is happening in the video
 
-        // 5. Cinematic query (prošireni sa kompozicijom)
+        // 5. Cinematic query (expanded with composition)
         [JsonPropertyName("cinematic_query")]
         public string CinematicQuery    { get; set; }   // finalni Pixabay query
     }
@@ -92,7 +92,7 @@ namespace UltraVideoEditor
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // GENERIČKI VIDEO ENGINE - radi za bilo koju pesmu
+    // GENERIC VIDEO ENGINE - works for any song
     // ═══════════════════════════════════════════════════════════════
 
     public static class VideoEngine
@@ -132,7 +132,7 @@ namespace UltraVideoEditor
         };
 
         // ─────────────────────────────────────────────────────────────
-        // GLAVNI METOD: Generiši shot listu iz stihova
+        // MAIN METHOD: Generate shot list from lyrics
         // Input:  lista stihova + ukupno trajanje
         // Output: lista LyricShot objekata spremnnih za Pixabay
         // ─────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ namespace UltraVideoEditor
             if (lyrics == null || lyrics.Count == 0)
                 return new List<LyricShot>();
 
-            // Izračunaj trajanje po stihu
+            // Calculate duration per lyric line
             double perLyric = Math.Round(totalDurationSeconds / lyrics.Count, 2);
             var    shots    = new List<LyricShot>();
             string prevShotType = "";
@@ -208,7 +208,7 @@ namespace UltraVideoEditor
         }
 
         // ─────────────────────────────────────────────────────────────
-        // ALTERNATIVNI METOD: Ollama generiše JSON za svaki stih
+        // ALTERNATIVE METHOD: Ollama generates JSON for each lyric line
         // Program samo validilja i popunjava praznine
         // ─────────────────────────────────────────────────────────────
         public static List<LyricShot> MergeWithAIOutput(
@@ -216,7 +216,7 @@ namespace UltraVideoEditor
             double totalDuration,
             string ollamaJsonResponse)
         {
-            // Pokušaj parsirati Ollama output
+            // Try to parse Ollama output
             List<LyricShot> aiShots = null;
             try
             {
@@ -250,7 +250,7 @@ namespace UltraVideoEditor
                 if (!string.IsNullOrEmpty(shot.Data?.ShotType) &&
                     shot.Data.ShotType == prevShot)
                 {
-                    // Promijeni na sljedeći u rotaciji
+                    // Move to next in rotation
                     int idx = Array.IndexOf(ShotRotation, prevShot);
                     shot.Data.ShotType = ShotRotation[(idx + 1) % 3];
                 }
@@ -311,7 +311,7 @@ namespace UltraVideoEditor
             if (isChorus && vibe >= 8 && prev != "Close Up")
                 return "Close Up";
 
-            // Inače striktna rotacija
+            // Otherwise strict rotation
             string next;
             do
             {
@@ -323,7 +323,7 @@ namespace UltraVideoEditor
 
         private static int CalculateVibe(int idx, int total, bool isChorus, VideoIntent intent)
         {
-            // Emotivni luk: početak miran, sredina dinamična, kraj smirena
+            // Emotional arc: calm start, dynamic middle, calm end
             double pos = (double)idx / total;
 
             int baseVibe = isChorus ? 8 :
@@ -344,7 +344,7 @@ namespace UltraVideoEditor
         private static string BuildVerseQuery(
             string lyric, VideoIntent intent, int vibe, int idx, int total)
         {
-            // Izvuci ključne riječi iz stiha (ignoruj kratke i učestale riječi)
+            // Extract keywords from the lyric line (ignore short and frequent words)
             var stopWords = new HashSet<string>
                 {"i","je","da","se","u","na","za","od","do","sa","ma","pa","a","ali","kad"};
 
@@ -359,15 +359,15 @@ namespace UltraVideoEditor
             // Kontekstualni predmetni mapping - srpske -> engleske asocijacije
             var wordMap = new Dictionary<string, string>
             {
-                {"šeta","child walking park"},   {"trči","children running"},
+                {"seta","child walking park"},   {"trci","children running"},
                 {"smej","laughing happy child"},  {"snega","children snow playing"},
                 {"zima","winter children snow"},  {"leto","summer children outdoor"},
                 {"park","children park nature"},  {"mama","mother child tender"},
                 {"tata","father child family"},   {"baka","grandmother child warm"},
                 {"deka","grandfather child"},     {"sladol","child ice cream summer"},
-                {"čokol","child hot chocolate"},  {"sunce","sunny day children"},
+                {"cokol","child hot chocolate"},  {"sunce","sunny day children"},
                 {"priro","children nature walk"}, {"zdravo","active child healthy"},
-                {"šetaj","child walking cinematic"},{"jutro","morning child sunshine"},
+                {"setaj","child walking cinematic"},{"jutro","morning child sunshine"},
             };
 
             // Provjeri da li neki keyword matchuje predmetni mapping
@@ -411,7 +411,7 @@ namespace UltraVideoEditor
 
         private static string BuildChorusQuery(VideoIntent intent)
         {
-            // Refren uvijek ima istu vizuelnu temu - srž pesme
+            // Chorus always has the same visual theme - core of the song
             return intent.Type switch
             {
                 "hype"   => "children running joyful slow motion dynamic bokeh high quality",

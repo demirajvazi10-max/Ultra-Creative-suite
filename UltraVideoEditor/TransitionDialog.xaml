@@ -1,7 +1,7 @@
 ﻿<Window x:Class="UltraVideoEditor.TransitionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Dodaj tranziciju" Height="200" Width="350"
+        Title="Add transition" Height="200" Width="350"
         WindowStartupLocation="CenterOwner"
         Background="#2D2D2D">
     <Grid Margin="20">
@@ -22,7 +22,7 @@
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button x:Name="btnOk" Content="✅ POTVRDI" Click="Ok_Click" Width="100" Height="35" 
+            <Button x:Name="btnOk" Content="✅ CONFIRM" Click="Ok_Click" Width="100" Height="35" 
                     Background="#2E7D32" Foreground="White" Margin="0,0,10,0"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" 
                     Background="#B71C1C" Foreground="White"/>

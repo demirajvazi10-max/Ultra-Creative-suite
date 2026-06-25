@@ -68,10 +68,10 @@ namespace UltraVideoEditor
         private const string QWEN_MODEL_ALT  = "qwen2.5-vl";
         private const string QWEN_MODEL_ALT2 = "qwen2.5vl"; // instaliran bez crtice
 
-        // Keširani naziv modela — detektuje se jednom u InitializeQwenAsync, ne per-frejm
+        // Cached model name — detected once in InitializeQwenAsync, not per-frame
         private static string _resolvedQwenModel = null;
 
-        // Log helper za statički kontekst (Qwen analiza)
+        // Log helper for static context (Qwen analysis)
         private static void LogToMainWindowStatic(string msg)
         {
             try
@@ -85,8 +85,8 @@ namespace UltraVideoEditor
             catch { }
         }
 
-        // QWEN_PROMPT se više ne koristi direktno — koristiti BuildContextualQwenPrompt()
-        // Ostaje kao fallback za pozive koji ne prosljeđuju kontekst
+        // QWEN_PROMPT is no longer used directly — use BuildContextualQwenPrompt()
+        // Remains as fallback for calls that do not pass context
         private const string QWEN_PROMPT =
             "Analyze this image for a family music video. Respond ONLY in JSON:\n" +
             "{\"score\":7,\"outdoor\":true,\"children\":false,\"faces\":true,\"animals\":false," +
@@ -147,7 +147,7 @@ namespace UltraVideoEditor
             sb.AppendLine("- people posing directly at camera with forced/dental-commercial smile (posed stock look)");
             sb.AppendLine("- corporate wellness, maternity lifestyle, or adult-only content (unless lyric demands it)");
             sb.AppendLine("- image is 'airy and empty' with no clear subject or focal point");
-            // PATCH 10: Action Focus — kognitivno prilagođavanje za djecu do 6 god
+            // PATCH 10: Action Focus — cognitive adaptation for children up to age 6
             sb.AppendLine("- CLUTTERED SCENE REJECT: scene with 20+ people in background where main subject is unclear — score max 4, set reject='cluttered background too busy'");
             sb.AppendLine("- REJECT: visually noisy scenes with too many competing focal points (busy market, crowded festival, traffic intersection with many cars) — child loses attention");
             sb.AppendLine("- REJECT: scenes where the main subject (child/animal) is surrounded by distracting unrelated elements that occupy more than 60% of the frame");
@@ -163,7 +163,7 @@ namespace UltraVideoEditor
             sb.AppendLine("- dark/desaturated/vintage filter — must look VIBRANT and CLEAN, not washed out");
             sb.AppendLine("- wide establishing shots where people appear smaller than 1/4 of frame height");
             sb.AppendLine("- rapid camera shake, handheld shaky footage, aggressive zoom or whip-pan");
-            // PATCH 9: Anomalija-Fix "Vrtić Preciznost"
+            // PATCH 9: Anomaly-Fix "Kindergarten Precision"
             sb.AppendLine("- ANOMALIJA 2 (REJECT): gramophone, turntable, vinyl record player, DJ mixer, mixing console, recording studio equipment, audio mixer, synthesizer, amplifier — child does NOT know what this is, reject immediately");
             sb.AppendLine("- ANOMALIJA 1 (HARD REJECT, NO EXCEPTIONS): ANY person holding or swinging a kettlebell, dumbbell, barbell, or any metal weight — INSTANT REJECT score=1. ANY gym machine visible in frame — INSTANT REJECT. This is the #1 most critical rule. One frame with a weight = reject the entire clip.");
             sb.AppendLine("- ANOMALIJA 3 (REJECT): urban cold shots — concrete skyline, busy street with cars, skyscrapers without greenery, cold/blue toned city shots");
@@ -328,7 +328,7 @@ namespace UltraVideoEditor
                     return false;
                 }
 
-                // Detektuj i keširaj tačan naziv modela — jednom za ceo video
+                // Detect and cache the exact model name — once per entire video
                 if (await _ollamaClient.IsModelAvailable(QWEN_MODEL))
                     _resolvedQwenModel = QWEN_MODEL;
                 else if (await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT))
@@ -340,7 +340,7 @@ namespace UltraVideoEditor
                 if (hasQwen)
                 {
                     _qwenAvailable = true;
-                    log?.Invoke($"✅ VisionAnalyzer: Qwen2-VL aktivan ({_resolvedQwenModel}) — AI analiza slike omogućena");
+                    log?.Invoke($"✅ VisionAnalyzer: Qwen2-VL active ({_resolvedQwenModel}) — AI image analysis enabled");
                 }
                 else
                 {
@@ -375,7 +375,7 @@ namespace UltraVideoEditor
             if (!File.Exists(videoPath))
                 return MakeResult(5.0, "Fajl ne postoji");
 
-            // Ako je videoPath već slika (jpg/png) — preskačemo ekstrakciju
+            // If videoPath is already an image (jpg/png) — we skip extraction
             string ext = Path.GetExtension(videoPath).ToLowerInvariant();
             bool isImage = ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp";
             if (isImage)
@@ -479,7 +479,7 @@ namespace UltraVideoEditor
             try
             {
                 // Biramo model koji je dostupan
-                // Koristimo keširani model — bez 3x IsModelAvailable per frejm
+                // Using cached model — no 3x IsModelAvailable per frame
                 string model = _resolvedQwenModel ?? QWEN_MODEL_ALT2;
 
                 // Koristimo dinamicki prompt ako imamo kontekst, inace fallback na staticki
@@ -502,7 +502,7 @@ namespace UltraVideoEditor
 
                 var parsed = ParseQwenResponse(response);
                 if (parsed == null)
-                    LogToMainWindowStatic($"   ⚠️ Qwen: parse neuspješan. Response: {response.Substring(0, Math.Min(200, response.Length))}");
+                    LogToMainWindowStatic($"   ⚠️ Qwen: parse failed. Response: {response.Substring(0, Math.Min(200, response.Length))}");
                 return parsed;
             }
             catch
@@ -515,7 +515,7 @@ namespace UltraVideoEditor
         {
             try
             {
-                // Qwen2.5vl može da vrati tekst ispred JSON-a — izvuci samo JSON blok
+                // Qwen2.5vl may return text before JSON — extract only the JSON block
                 string json = raw ?? "";
 
                 // Ukloni markdown wrap
@@ -639,7 +639,7 @@ namespace UltraVideoEditor
                           && File.Exists(outputPath)
                           && new FileInfo(outputPath).Length > 512;
 
-                // PATCH 9: Fallback — ako ss=1 nije upio frejm (video kraći od 1s), pokušaj sa ss=0
+                // PATCH 9: Fallback — if ss=1 didn't capture a frame (video shorter than 1s), try ss=0
                 if (!valid && File.Exists(ffmpegPath))
                 {
                     if (File.Exists(outputPath)) File.Delete(outputPath);

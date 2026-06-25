@@ -1,13 +1,13 @@
 <Window x:Class="UltraVideoEditor.BatchExportDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Batch Export — Više projekata"
+        Title="Batch Export — Multiple Projects"
         Width="820" Height="660"
         MinWidth="600" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Batch Export dijalog">
+        AutomationProperties.Name="Batch Export dialog">
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#F59E0B"/>
         <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
@@ -60,11 +60,11 @@
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="Dodaj više .iskra projekata i renderi ih sve jednim klikom"
+            <TextBlock Text="Add multiple .iskra projects and render them all with one click"
                        FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
         </StackPanel>
 
-        <!-- Podešavanja -->
+        <!-- Settings -->
         <Border Grid.Row="1" Background="{StaticResource CardBrush}"
                 CornerRadius="10" Padding="14,12" Margin="0,0,0,10">
             <Grid>
@@ -83,7 +83,7 @@
                               Foreground="{StaticResource TextPrimaryBrush}"
                               BorderBrush="{StaticResource BorderBrush}"
                               FontSize="13" Padding="8,6"
-                              AutomationProperties.Name="Izaberi format za batch export">
+                              AutomationProperties.Name="Select format for batch export">
                         <ComboBoxItem Content="YouTube FHD (MP4)" Tag="youtube" IsSelected="True"/>
                         <ComboBoxItem Content="TikTok / Reels (9:16)" Tag="reels"/>
                         <ComboBoxItem Content="MP3 Audio" Tag="mp3"/>
@@ -99,23 +99,23 @@
                                 Content="📁" Style="{StaticResource SecBtn}"
                                 Padding="10,6" Margin="6,0,0,0"
                                 Click="BtnPickFolder_Click"
-                                AutomationProperties.Name="Odaberi output folder"/>
+                                AutomationProperties.Name="Select output folder"/>
                         <TextBox x:Name="TxtOutputFolder"
                                  Background="{StaticResource SurfaceBrush}"
                                  Foreground="{StaticResource TextPrimaryBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  BorderThickness="1" Padding="8,6" FontSize="12"
-                                 IsReadOnly="True" Text="Nije odabran…"
-                                 AutomationProperties.Name="Putanja output foldera"/>
+                                 IsReadOnly="True" Text="Not selected…"
+                                 AutomationProperties.Name="Output folder path"/>
                     </DockPanel>
                 </StackPanel>
 
-                <!-- Dodaj projekte -->
+                <!-- Add projects -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
-                    <Button x:Name="BtnAddProjects" Content="➕ Dodaj projekte"
+                    <Button x:Name="BtnAddProjects" Content="➕ Add projects"
                             Style="{StaticResource PrimaryBtn}"
                             Click="BtnAddProjects_Click"
-                            AutomationProperties.Name="Dodaj .iskra projekat fajlove"/>
+                            AutomationProperties.Name="Add .iskra project files"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -155,16 +155,16 @@
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <Button x:Name="BtnClearDone" DockPanel.Dock="Right"
-                                Content="Ukloni završene" Style="{StaticResource SecBtn}"
+                                Content="Remove completed" Style="{StaticResource SecBtn}"
                                 FontSize="11" Padding="10,4"
                                 Margin="0,0,0,0" Click="BtnClearDone_Click"
-                                AutomationProperties.Name="Ukloni završene jobove iz liste"/>
+                                AutomationProperties.Name="Remove completed jobs from list"/>
                         <Button x:Name="BtnRemoveSelected" DockPanel.Dock="Right"
-                                Content="Ukloni" Style="{StaticResource SecBtn}"
+                                Content="Remove" Style="{StaticResource SecBtn}"
                                 FontSize="11" Padding="10,4" Margin="0,0,8,0"
                                 Click="BtnRemoveSelected_Click"
-                                AutomationProperties.Name="Ukloni selektovani job"/>
-                        <TextBlock x:Name="TxtJobCount" Text="Nema projekata"
+                                AutomationProperties.Name="Remove selected job"/>
+                        <TextBlock x:Name="TxtJobCount" Text="No projects"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" VerticalAlignment="Center"
                                    AutomationProperties.LiveSetting="Polite"/>
@@ -174,10 +174,10 @@
                           Background="Transparent" BorderThickness="0"
                           Foreground="{StaticResource TextPrimaryBrush}"
                           FontSize="12" SelectionMode="Single"
-                          AutomationProperties.Name="Lista batch export jobova">
+                          AutomationProperties.Name="Batch export jobs list">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="Projekat"  Width="200"
+                            <GridViewColumn Header="Project"  Width="200"
                                             DisplayMemberBinding="{Binding ProjectName}"/>
                             <GridViewColumn Header="Format"    Width="130"
                                             DisplayMemberBinding="{Binding FormatId}"/>
@@ -202,26 +202,26 @@
                      FontFamily="Consolas" FontSize="11"
                      IsReadOnly="True" TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
-                     AutomationProperties.Name="Log poruke batch exporta"/>
+                     AutomationProperties.Name="Batch export log messages"/>
         </Border>
 
-        <!-- Dugmići -->
+        <!-- Buttons -->
         <DockPanel Grid.Row="5" LastChildFill="False">
             <Button x:Name="BtnStartBatch" DockPanel.Dock="Left"
-                    Content="▶ Pokreni Batch Export"
+                    Content="▶ Start Batch Export"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" IsEnabled="False"
                     Click="BtnStartBatch_Click"
-                    AutomationProperties.Name="Pokreni batch export svih projekata"/>
+                    AutomationProperties.Name="Start batch export of all projects"/>
             <Button x:Name="BtnClose" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
             <Button x:Name="BtnOpenFolder" DockPanel.Dock="Right"
-                    Content="📁 Otvori folder" Style="{StaticResource SecBtn}"
+                    Content="📁 Open folder" Style="{StaticResource SecBtn}"
                     Padding="16,9" Margin="0,0,8,0" IsEnabled="False"
                     Click="BtnOpenFolder_Click"
-                    AutomationProperties.Name="Otvori output folder"/>
+                    AutomationProperties.Name="Open output folder"/>
         </DockPanel>
     </Grid>
 </Window>

@@ -77,14 +77,14 @@ namespace UltraVideoEditor
         public static string VisionModel => GetInstallerConfig().OllamaVisionModel;
 
         /// <summary>
-        /// Resetuje keš konfiguracije — pozovi ako se installer_config.json promijeni u toku rada.
+        /// Resets configuration cache — call if installer_config.json changes at runtime.
         /// </summary>
         public static void ResetConfigCache() { lock (_configLock) { _cachedConfig = null; } }
 
         private readonly HttpClient _httpClient;
         private readonly string _ollamaUrl = "http://localhost:11434/api/generate";
 
-        // Statički HttpClient za provjere dostupnosti — sprečava socket exhaustion
+        // Static HttpClient for availability checks — prevents socket exhaustion
         // kada se IsOllamaRunning poziva 30+ puta po video generisanju
         private static readonly HttpClient _checkClient = new HttpClient
         {
@@ -94,7 +94,7 @@ namespace UltraVideoEditor
         public OllamaClient()
         {
             _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(600); // 10 minuta — Qwen2.5:14B prvi load može biti spor
+            _httpClient.Timeout = TimeSpan.FromSeconds(600); // 10 minutes — Qwen2.5:14B first load can be slow
         }
 
         public async Task<string> GenerateAsync(string prompt, string model = null, CancellationToken ct = default)
@@ -116,7 +116,7 @@ namespace UltraVideoEditor
                     options = new
                     {
                         temperature = 0.3,
-                        num_predict = 2000,  // Povećano za duže odgovore
+                        num_predict = 2000,  // Increased for longer responses
                         top_p = 0.9,
                         top_k = 40
                     }
@@ -158,7 +158,7 @@ namespace UltraVideoEditor
         {
             try
             {
-                // Koristimo statički _checkClient — ne kreiramo novu instancu pri svakom pozivu
+                // Using static _checkClient — not creating a new instance on each call
                 var response = await _checkClient.GetAsync("http://localhost:11434/api/tags");
                 return response.IsSuccessStatusCode;
             }
@@ -169,9 +169,9 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Šalje sliku (Base64) Qwen2-VL modelu i vraća opis/analizu slike.
+        /// Sends image (Base64) to Qwen2-VL model and returns image description/analysis.
         /// imagePath: putanja do PNG/JPG fajla (ekstrahovanog frejma iz videa).
-        /// prompt: šta da analizira, npr. "Describe the scene in this image. Is it outdoor or indoor?
+        /// prompt: what to analyze, e.g. "Describe the scene in this image. Is it outdoor or indoor?
         ///         Are there children, faces, animals? Rate image quality 1-10. List key visual elements."
         /// </summary>
         /// <summary>
@@ -298,7 +298,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Provjeri da li je određeni model dostupan u Ollama.
+        /// Check whether a specific model is available in Ollama.
         /// </summary>
         public async Task<bool> IsModelAvailable(string modelName)
         {

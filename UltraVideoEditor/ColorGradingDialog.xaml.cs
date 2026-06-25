@@ -41,7 +41,7 @@ namespace UltraVideoEditor
             TxtClipCount.Text = $"{_items.Count} video klipoiva na timeline-u";
         }
 
-        // ── Preset dugmići ────────────────────────────────────────────
+        // ── Preset buttons ────────────────────────────────────────────
 
         private void BuildPresetButtons()
         {
@@ -116,7 +116,7 @@ namespace UltraVideoEditor
             BtnDeselectAll.IsEnabled = false;
             ProgressPanel.Visibility = Visibility.Visible;
             ProgressBar.Value        = 0;
-            BtnAnalyze.Content       = "⏹ Otkaži";
+            BtnAnalyze.Content       = "⏹ Cancel";
             _cts = new CancellationTokenSource();
 
             var progress = new Progress<(int Percent, string Message)>(p =>
@@ -144,7 +144,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greška: {ex.Message}", "Color Grading",
+                MessageBox.Show($"Error: {ex.Message}", "Color Grading",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -298,7 +298,7 @@ namespace UltraVideoEditor
             var confirm = MessageBox.Show(
                 $"Primeniti color grade na {count} klipoiva?\n\n" +
                 "Grade filter se upisuje u ContentTag svakog klipa\n" +
-                "i primenjuje se pri sledećem renderu.",
+                "and is applied at the next render.",
                 "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
 

@@ -18,7 +18,7 @@ namespace UltraVideoEditor
         public string Raw        { get; set; }  // originalni tekst korisnika
         public string Action     { get; set; }  // npr. "remove_short", "sort_by_score", "keep_faces"
         public string Param      { get; set; }  // parametar (npr. "2" za min sekunde)
-        public string Explanation{ get; set; }  // šta je AI razumeo
+        public string Explanation{ get; set; }  // what the AI understood
     }
 
     public class AssistantResult
@@ -44,9 +44,9 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(userText))
                 return Fail("Unesite komandu.");
             if (items == null || items.Count == 0)
-                return Fail("Timeline je prazan. Dodajte klipoive pre korišćenja asistenta.");
+                return Fail("Timeline is empty. Add clips before using the assistant.");
 
-            // 1 — pokušaj lokalni Ollama
+            // 1 — try local Ollama
             AssistantCommand cmd = null;
             try
             {
@@ -64,7 +64,7 @@ namespace UltraVideoEditor
             // 2 — ako nema Ollame, rule-based parsing
             cmd ??= RuleBasedParse(userText);
 
-            // 3 — izvrši komandu
+            // 3 — execute command
             return ExecuteCommand(cmd, items);
         }
 
@@ -122,78 +122,78 @@ namespace UltraVideoEditor
             text = text.ToLowerInvariant().Trim();
             var cmd = new AssistantCommand { Raw = text };
 
-            // "ukloni klipoive ispod/kraće od X sekund(i/e)"
+            // "remove clips below/shorter than X second(s)"
             var mShort = System.Text.RegularExpressions.Regex.Match(
                 text, @"(?:ispod|kra[cć]|manji|manje)\s+(?:od\s+)?([\d,\.]+)\s*(?:sek|s\b)");
             if (mShort.Success)
             {
                 cmd.Action      = "remove_short";
                 cmd.Param       = mShort.Groups[1].Value.Replace(',', '.');
-                cmd.Explanation = $"Ukloni klipoive kraće od {cmd.Param}s";
+                cmd.Explanation = $"Remove clips shorter than {cmd.Param}s";
                 return cmd;
             }
 
-            // "ukloni klipoive duže od X sekundi"
+            // "remove clips longer than X seconds"
             var mLong = System.Text.RegularExpressions.Regex.Match(
                 text, @"(?:duž|du[zž]|ve[cć]|vi[sš]e)\s+(?:od\s+)?([\d,\.]+)\s*(?:sek|s\b)");
             if (mLong.Success)
             {
                 cmd.Action      = "remove_long";
                 cmd.Param       = mLong.Groups[1].Value.Replace(',', '.');
-                cmd.Explanation = $"Ukloni klipoive duže od {cmd.Param}s";
+                cmd.Explanation = $"Remove clips longer than {cmd.Param}s";
                 return cmd;
             }
 
-            // "zadrži samo sa licima / lice"
+            // "keep only with faces / face"
             if (text.Contains("lic") || text.Contains("face") || text.Contains("osob"))
-            { cmd.Action = "keep_faces"; cmd.Explanation = "Zadrži samo klipoive sa licima"; return cmd; }
+            { cmd.Action = "keep_faces"; cmd.Explanation = "Keep only clips with faces"; return cmd; }
 
-            // "zadrži samo eksterijer / na otvorenom"
+            // "keep only exterior / outdoors"
             if (text.Contains("exterij") || text.Contains("exterij") || text.Contains("otvor") || text.Contains("outdoor") || text.Contains("spolj"))
-            { cmd.Action = "keep_outdoor"; cmd.Explanation = "Zadrži samo klipoive u eksterijeru"; return cmd; }
+            { cmd.Action = "keep_outdoor"; cmd.Explanation = "Keep only exterior clips"; return cmd; }
 
-            // "zadrži samo interior / unutra"
+            // "keep only interior / indoors"
             if (text.Contains("interij") || text.Contains("unutra") || text.Contains("indoor"))
-            { cmd.Action = "keep_indoor"; cmd.Explanation = "Zadrži samo klipoive u interijeru"; return cmd; }
+            { cmd.Action = "keep_indoor"; cmd.Explanation = "Keep only interior clips"; return cmd; }
 
             // "sortiraj po skoru / oceni"
             if ((text.Contains("sortiraj") || text.Contains("sort")) &&
                 (text.Contains("skor") || text.Contains("ocen") || text.Contains("score")))
-            { cmd.Action = "sort_by_score"; cmd.Explanation = "Sortiraj po AI skoru opadajuće"; return cmd; }
+            { cmd.Action = "sort_by_score"; cmd.Explanation = "Sort by AI score descending"; return cmd; }
 
             // "sortiraj po trajanju"
             if ((text.Contains("sortiraj") || text.Contains("sort")) && text.Contains("trajanj"))
-            { cmd.Action = "sort_by_duration"; cmd.Explanation = "Sortiraj po trajanju rastuće"; return cmd; }
+            { cmd.Action = "sort_by_duration"; cmd.Explanation = "Sort by duration ascending"; return cmd; }
 
             // "vrati original / reset / originalni redosled"
             if (text.Contains("original") || text.Contains("reset") || text.Contains("vrati"))
             { cmd.Action = "sort_original"; cmd.Explanation = "Vrati originalni redosled"; return cmd; }
 
-            // "zadrži prvih N / top N"
+            // "keep first N / top N"
             var mTop = System.Text.RegularExpressions.Regex.Match(
                 text, @"(?:prvih|top|zadr[zž]i)\s+(\d+)");
             if (mTop.Success)
             {
                 cmd.Action      = "keep_top_n";
                 cmd.Param       = mTop.Groups[1].Value;
-                cmd.Explanation = $"Zadrži prvih {cmd.Param} klipoiva";
+                cmd.Explanation = $"Keep first {cmd.Param} clips";
                 return cmd;
             }
 
-            // "ukloni statične / bez pokreta"
+            // "remove static / without motion"
             if (text.Contains("stati") || text.Contains("bez pokreta") || text.Contains("mirn"))
-            { cmd.Action = "remove_static"; cmd.Explanation = "Ukloni statične klipoive"; return cmd; }
+            { cmd.Action = "remove_static"; cmd.Explanation = "Remove static clips"; return cmd; }
 
-            // "zadrži pokret / sa pokretom"
+            // "keep motion / with motion"
             if (text.Contains("pokret") || text.Contains("motion") || text.Contains("dinami"))
-            { cmd.Action = "keep_motion"; cmd.Explanation = "Zadrži samo klipoive sa pokretom"; return cmd; }
+            { cmd.Action = "keep_motion"; cmd.Explanation = "Keep only clips with motion"; return cmd; }
 
             cmd.Action      = "unknown";
             cmd.Explanation = "Komanda nije prepoznata.";
             return cmd;
         }
 
-        // ── Izvršavanje komandi ───────────────────────────────────────
+        // ── Command execution ───────────────────────────────────────
 
         private static AssistantResult ExecuteCommand(AssistantCommand cmd, List<TimelineItem> items)
         {
@@ -205,12 +205,12 @@ namespace UltraVideoEditor
 
             if (cmd == null || cmd.Action == "unknown")
             {
-                result.Error = "Komanda nije prepoznata. Pokušajte sa:\n" +
-                               "• \"ukloni klipoive kraće od 2 sekunde\"\n" +
-                               "• \"zadrži samo klipoive sa licima\"\n" +
+                result.Error = "Command not recognized. Try:\n" +
+                               "• \"remove clips shorter than 2 seconds\"\n" +
+                               "• \"keep only clips with faces\"\n" +
                                "• \"sortiraj po skoru\"\n" +
-                               "• \"zadrži prvih 10\"\n" +
-                               "• \"ukloni statične klipoive\"";
+                               "• \"keep first 10\"\n" +
+                               "• \"remove static clips\"";
                 return result;
             }
 
@@ -221,24 +221,24 @@ namespace UltraVideoEditor
                 case "remove_short":
                     double minS = TryParseDouble(cmd.Param, 2.0);
                     updated = items.Where(i => i.Duration >= minS).ToList();
-                    result.Summary = $"Uklonjeno {items.Count - updated.Count} klipoiva kraćih od {minS}s.";
+                    result.Summary = $"Removed {items.Count - updated.Count} clips shorter than {minS}s.";
                     break;
 
                 case "remove_long":
                     double maxS = TryParseDouble(cmd.Param, 30.0);
                     updated = items.Where(i => i.Duration <= maxS).ToList();
-                    result.Summary = $"Uklonjeno {items.Count - updated.Count} klipoiva dužih od {maxS}s.";
+                    result.Summary = $"Removed {items.Count - updated.Count} clips longer than {maxS}s.";
                     break;
 
                 case "keep_faces":
-                    // AccessibilityDescription ili ContentDescription sadrži info o licima
+                    // AccessibilityDescription or ContentDescription contains info about faces
                     updated = items.Where(i =>
                         (i.AccessibilityDescription ?? "").ToLower().Contains("lic") ||
                         (i.ContentTag ?? "").ToLower().Contains("face") ||
                         (i.AccessibilityDescription ?? "").ToLower().Contains("face") ||
                         (i.ContentTag ?? "").ToLower().Contains("lic")).ToList();
                     if (updated.Count == 0) updated = items; // nema metadata → ostavi sve
-                    result.Summary = $"Zadržano {updated.Count} klipoiva sa detektovanim licima.";
+                    result.Summary = $"Kept {updated.Count} clips with detected faces.";
                     break;
 
                 case "keep_outdoor":
@@ -248,7 +248,7 @@ namespace UltraVideoEditor
                         (i.AccessibilityDescription ?? "").ToLower().Contains("outdoor") ||
                         (i.ContentTag ?? "").ToLower().Contains("outdoor")).ToList();
                     if (updated.Count == 0) updated = items;
-                    result.Summary = $"Zadržano {updated.Count} eksternih klipoiva.";
+                    result.Summary = $"Kept {updated.Count} exterior clips.";
                     break;
 
                 case "keep_indoor":
@@ -258,7 +258,7 @@ namespace UltraVideoEditor
                         (i.AccessibilityDescription ?? "").ToLower().Contains("indoor") ||
                         (i.ContentTag ?? "").ToLower().Contains("indoor")).ToList();
                     if (updated.Count == 0) updated = items;
-                    result.Summary = $"Zadržano {updated.Count} internih klipoiva.";
+                    result.Summary = $"Kept {updated.Count} interior clips.";
                     break;
 
                 case "sort_by_score":
@@ -266,19 +266,19 @@ namespace UltraVideoEditor
                         .OrderByDescending(i => ExtractScore(i))
                         .ToList();
                     RenumberFixed(updated);
-                    result.Summary = "Klipoivi sortirani po AI skoru (opadajuće).";
+                    result.Summary = "Clips sorted by AI score (descending).";
                     break;
 
                 case "sort_by_duration":
                     updated = items.OrderBy(i => i.Duration).ToList();
                     RenumberFixed(updated);
-                    result.Summary = "Klipoivi sortirani po trajanju (rastuće).";
+                    result.Summary = "Clips sorted by duration (ascending).";
                     break;
 
                 case "sort_original":
                     updated = items.OrderBy(i => i.TrackIndex).ThenBy(i => i.Start).ToList();
                     RenumberFixed(updated);
-                    result.Summary = "Originalni redosled vraćen.";
+                    result.Summary = "Original order restored.";
                     break;
 
                 case "keep_top_n":
@@ -286,15 +286,15 @@ namespace UltraVideoEditor
                     updated = items
                         .OrderByDescending(i => ExtractScore(i))
                         .Take(n).ToList();
-                    result.Summary = $"Zadržano prvih {updated.Count} klipoiva po AI skoru.";
+                    result.Summary = $"Kept first {updated.Count} clips by AI score.";
                     break;
 
                 case "remove_static":
                     updated = items.Where(i =>
-                        !(i.AccessibilityDescription ?? "").ToLower().Contains("statič") &&
+                        !(i.AccessibilityDescription ?? "").ToLower().Contains("static") &&
                         !(i.ContentTag ?? "").ToLower().Contains("static")).ToList();
                     if (updated.Count == 0) updated = items;
-                    result.Summary = $"Uklonjeno {items.Count - updated.Count} statičnih klipoiva.";
+                    result.Summary = $"Removed {items.Count - updated.Count} static clips.";
                     break;
 
                 case "keep_motion":
@@ -302,12 +302,12 @@ namespace UltraVideoEditor
                         (i.AccessibilityDescription ?? "").ToLower().Contains("pokret") ||
                         (i.ContentTag ?? "").ToLower().Contains("motion")).ToList();
                     if (updated.Count == 0) updated = items;
-                    result.Summary = $"Zadržano {updated.Count} klipoiva sa pokretom.";
+                    result.Summary = $"Kept {updated.Count} clips with motion.";
                     break;
 
                 case "trim_silence":
                     updated = items.Where(i => i.Duration >= 0.5).ToList();
-                    result.Summary = $"Uklonjeno {items.Count - updated.Count} previše kratkih klipoiva (<0.5s).";
+                    result.Summary = $"Removed {items.Count - updated.Count} clips that are too short (<0.5s).";
                     break;
 
                 default:
@@ -317,7 +317,7 @@ namespace UltraVideoEditor
 
             result.UpdatedItems = updated;
             if (string.IsNullOrEmpty(result.Summary))
-                result.Summary = $"Izvršeno: {cmd.Explanation}. {result.ResultCount}/{result.OriginalCount} klipoiva.";
+                result.Summary = $"Executed: {cmd.Explanation}. {result.ResultCount}/{result.OriginalCount} clips.";
 
             return result;
         }
@@ -326,14 +326,14 @@ namespace UltraVideoEditor
 
         private static double ExtractScore(TimelineItem item)
         {
-            // Pokušaj parsiranje iz AccessibilityDescription (format "skor:7.5")
+            // Try parsing from AccessibilityDescription (format "score:7.5")
             var desc = item.AccessibilityDescription ?? item.ContentTag ?? "";
             var m    = System.Text.RegularExpressions.Regex.Match(desc, @"skor[:\s]*([\d\.]+)");
             if (m.Success && double.TryParse(m.Groups[1].Value,
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out double s))
                 return s;
-            // Fallback: po dužini (duži = bolji)
+            // Fallback: by duration (longer = better)
             return item.Duration;
         }
 

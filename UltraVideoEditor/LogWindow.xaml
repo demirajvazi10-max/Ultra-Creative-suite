@@ -4,7 +4,7 @@
         Title="📋 Log - Event history" Height="450" Width="700"
         WindowStartupLocation="CenterOwner"
         Background="#1E1E1E"
-        AutomationProperties.Name="Prozor sa istorijom log poruka">
+        AutomationProperties.Name="Window with log message history">
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -16,7 +16,7 @@
         <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="📋 EVENT HISTORY" FontSize="16" FontWeight="Bold" 
                        Foreground="#00E676" VerticalAlignment="Center"/>
-            <Button x:Name="btnCopyAll" Content="📋 KOPIRAJ SVE" Click="CopyAll_Click"
+            <Button x:Name="btnCopyAll" Content="📋 COPY ALL" Click="CopyAll_Click"
                     Width="120" Height="30" Background="#4A148C" Foreground="White" Margin="20,0,5,0"/>
             <Button x:Name="btnClear" Content="🗑 CLEAR" Click="Clear_Click"
                     Width="100" Height="30" Background="#B71C1C" Foreground="White"/>
@@ -25,7 +25,7 @@
         <ListBox x:Name="lstLog" Grid.Row="1" Background="#2D2D2D" Foreground="#00FF00"
                  FontFamily="Consolas" FontSize="12"
                  AutomationProperties.Name="Log messages list, event history"
-                 AutomationProperties.HelpText="Koristite strelice gore/dole za navigaciju kroz poruke. Ctrl+C za kopiranje selektovane poruke.">
+                 AutomationProperties.HelpText="Use up/down arrows to navigate messages. Ctrl+C to copy selected message.">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
@@ -38,8 +38,8 @@
         </ListBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Name="txtStatus" Text="Spreman" Foreground="#00E676" FontSize="11"/>
-            <Button x:Name="btnClose" Content="❌ ZATVORI" Click="Close_Click"
+            <TextBlock x:Name="txtStatus" Text="Ready" Foreground="#00E676" FontSize="11"/>
+            <Button x:Name="btnClose" Content="❌ CLOSE" Click="Close_Click"
                     Width="100" Height="30" Background="#333" Foreground="White" Margin="20,0,0,0"/>
         </StackPanel>
     </Grid>

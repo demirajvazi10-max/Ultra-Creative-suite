@@ -13,9 +13,9 @@ namespace UltraVideoEditor
     // SMART AUDIO MIXER  —  Faza 3 / A
     //
     // Miksuje originalni zvuk klipova sa muzikom:
-    //   - Ducking: muzika se stišava kad ima dijalog/govor
+    //   - Ducking: music is lowered when there is dialog/speech
     //   - Fade in/out na granicama segmenata
-    //   - Normalizacija glasnoće
+    //   - Volume normalization
     //   - Finalni stereo mix
     //
     // Koristi ffmpeg filtere: sidechaincompress, afade, loudnorm, amix
@@ -23,13 +23,13 @@ namespace UltraVideoEditor
 
     public class AudioMixSettings
     {
-        /// <summary>Glasnoća muzike kad nema dijaloga (0–100).</summary>
+        /// <summary>Music volume when there is no dialog (0–100).</summary>
         public double MusicVolume        { get; set; } = 85.0;
 
-        /// <summary>Glasnoća muzike tokom duckinga (0–100).</summary>
+        /// <summary>Music volume during ducking (0–100).</summary>
         public double MusicDuckedVolume  { get; set; } = 25.0;
 
-        /// <summary>Glasnoća originalnog zvuka klipova (0–100).</summary>
+        /// <summary>Volume of original clip audio (0–100).</summary>
         public double ClipVolume         { get; set; } = 70.0;
 
         /// <summary>Trajanje fade-in/out na prelazima (sekunde).</summary>
@@ -62,10 +62,10 @@ namespace UltraVideoEditor
         /// Miksuje zvuk za finalni highlight video.
         /// </summary>
         /// <param name="videoPath">Putanja do video fajla (sa originalnim zvukom).</param>
-        /// <param name="musicPath">Putanja do muzičkog fajla.</param>
-        /// <param name="outputPath">Gde da sačuva rezultat (audio fajl .aac ili .m4a).</param>
+        /// <param name="musicPath">Path to the music file.</param>
+        /// <param name="outputPath">Where to save the result (audio file .aac or .m4a).</param>
         /// <param name="totalDuration">Ukupno trajanje videa (sekunde).</param>
-        /// <param name="settings">Podešavanja miksa.</param>
+        /// <param name="settings">Mix settings.</param>
         /// <param name="progress">Progress callback.</param>
         /// <param name="ct">Cancellation token.</param>
         public static async Task<AudioMixResult> MixAsync(
@@ -83,11 +83,11 @@ namespace UltraVideoEditor
                 AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 
             if (!File.Exists(ffmpegPath))
-                return Fail("FFmpeg nije pronađen.");
+                return Fail("FFmpeg not found.");
             if (!File.Exists(videoPath))
-                return Fail($"Video nije pronađen: {videoPath}");
+                return Fail($"Video not found: {videoPath}");
             if (!File.Exists(musicPath))
-                return Fail($"Muzika nije pronađena: {musicPath}");
+                return Fail($"Music not found: {musicPath}");
 
             progress?.Report((10, "Gradim audio filter graph…"));
 
@@ -95,17 +95,17 @@ namespace UltraVideoEditor
             string args          = BuildFfmpegArgs(videoPath, musicPath, outputPath,
                                                     filterComplex, settings, totalDuration);
 
-            progress?.Report((25, "Pokrećem ffmpeg audio miks…"));
+            progress?.Report((25, "Starting ffmpeg audio mix…"));
 
             var (exitCode, log) = await RunFfmpegAsync(ffmpegPath, args, ct);
 
             if (exitCode != 0)
-                return Fail($"FFmpeg greška (exit {exitCode}): {ExtractError(log)}", log);
+                return Fail($"FFmpeg error (exit {exitCode}): {ExtractError(log)}", log);
 
-            progress?.Report((90, "Merjem glasnoću (LUFS)…"));
+            progress?.Report((90, "Measuring volume (LUFS)…"));
             double lufs = await MeasureLoudnessAsync(outputPath, ffmpegPath, ct);
 
-            progress?.Report((100, "Audio miks završen."));
+            progress?.Report((100, "Audio mix complete."));
 
             return new AudioMixResult
             {
@@ -130,7 +130,7 @@ namespace UltraVideoEditor
             {
                 if (item.IsAudioTrack)
                 {
-                    // Muzička traka
+                    // Music track
                     item.Volume = settings.MuteOriginalAudio ? 0 : settings.MusicVolume;
                 }
                 else if (item.IsVideoTrack)
@@ -299,12 +299,12 @@ namespace UltraVideoEditor
 
         private static string ExtractError(string log)
         {
-            if (string.IsNullOrEmpty(log)) return "nepoznata greška";
+            if (string.IsNullOrEmpty(log)) return "unknown error";
             var lines = log.Split('\n');
             return lines.LastOrDefault(l => l.Contains("Error") || l.Contains("Invalid") ||
                                             l.Contains("error") || l.Contains("failed"))
                    ?? lines.LastOrDefault(l => !string.IsNullOrWhiteSpace(l))
-                   ?? "nepoznata greška";
+                   ?? "unknown error";
         }
     }
 }

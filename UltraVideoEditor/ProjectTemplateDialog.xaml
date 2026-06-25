@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Project Templates dijalog">
+        AutomationProperties.Name="Project Templates dialog">
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#06B6D4"/>
         <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
@@ -81,7 +81,7 @@
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="Sačuvaj podešavanja projekta · Učitaj template u novi projekat"
+            <TextBlock Text="Save project settings · Load template into a new project"
                        FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
         </StackPanel>
 
@@ -102,7 +102,7 @@
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" Background="{StaticResource CardBrush}"
                             CornerRadius="8,8,0,0" Padding="10,8">
-                        <TextBlock Text="Sačuvani templatei"
+                        <TextBlock Text="Saved templates"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="11"/>
                     </Border>
@@ -111,7 +111,7 @@
                              Foreground="{StaticResource TextPrimaryBrush}"
                              FontSize="13" Padding="6"
                              SelectionChanged="TemplateList_SelectionChanged"
-                             AutomationProperties.Name="Lista project templatea"/>
+                             AutomationProperties.Name="Project templates list"/>
                 </Grid>
             </Border>
 
@@ -121,18 +121,18 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
                     <StackPanel x:Name="DetailsPanel">
                         <!-- Naziv -->
-                        <TextBlock Text="Naziv" Foreground="{StaticResource TextMutedBrush}"
+                        <TextBlock Text="Name" Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="11" Margin="0,0,0,4"/>
                         <TextBox x:Name="TxtTemplateName" Style="{StaticResource InputBox}"
                                  Margin="0,0,0,12"
-                                 AutomationProperties.Name="Naziv templatea"/>
+                                 AutomationProperties.Name="Template name"/>
 
                         <!-- Opis -->
-                        <TextBlock Text="Opis" Foreground="{StaticResource TextMutedBrush}"
+                        <TextBlock Text="Description" Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="11" Margin="0,0,0,4"/>
                         <TextBox x:Name="TxtTemplateDesc" Style="{StaticResource InputBox}"
                                  Margin="0,0,0,16"
-                                 AutomationProperties.Name="Opis templatea"/>
+                                 AutomationProperties.Name="Template description"/>
 
                         <Separator Background="{StaticResource BorderBrush}" Margin="0,0,0,16"/>
 
@@ -145,7 +145,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="Profil" Foreground="{StaticResource TextMutedBrush}"
+                                <TextBlock Text="Profile" Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="CmbExportProfile"
                                           Background="{StaticResource SurfaceBrush}"
@@ -155,14 +155,14 @@
                                           AutomationProperties.Name="Export profil"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Jezik" Foreground="{StaticResource TextMutedBrush}"
+                                <TextBlock Text="Language" Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="CmbLanguage"
                                           Background="{StaticResource SurfaceBrush}"
                                           Foreground="{StaticResource TextPrimaryBrush}"
                                           BorderBrush="{StaticResource BorderBrush}"
                                           FontSize="12" Padding="6,5"
-                                          AutomationProperties.Name="Jezik projekta">
+                                          AutomationProperties.Name="Project language">
                                     <ComboBoxItem Content="Srpski (sr)"   Tag="sr" IsSelected="True"/>
                                     <ComboBoxItem Content="English (en)"  Tag="en"/>
                                     <ComboBoxItem Content="Deutsch (de)"  Tag="de"/>
@@ -175,25 +175,25 @@
                             <CheckBox x:Name="ChkYouTube"  Content="YouTube FHD"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       IsChecked="True" Margin="0,0,16,6"
-                                      AutomationProperties.Name="Uključi YouTube FHD export"/>
+                                      AutomationProperties.Name="Enable YouTube FHD export"/>
                             <CheckBox x:Name="ChkReels"    Content="Reels/TikTok"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Margin="0,0,16,6"
-                                      AutomationProperties.Name="Uključi Reels TikTok export"/>
+                                      AutomationProperties.Name="Enable Reels TikTok export"/>
                             <CheckBox x:Name="ChkMP3"      Content="MP3 Audio"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Margin="0,0,16,6"
-                                      AutomationProperties.Name="Uključi MP3 audio export"/>
-                            <CheckBox x:Name="ChkSubtitles" Content="Titlovi"
+                                      AutomationProperties.Name="Enable MP3 audio export"/>
+                            <CheckBox x:Name="ChkSubtitles" Content="Subtitles"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Margin="0,0,0,6"
-                                      AutomationProperties.Name="Uključi titlove"/>
+                                      AutomationProperties.Name="Enable subtitles"/>
                         </WrapPanel>
 
                         <Separator Background="{StaticResource BorderBrush}" Margin="0,0,0,16"/>
 
                         <!-- AI -->
-                        <TextBlock Text="🎨  AI podešavanja" Foreground="{StaticResource TextPrimaryBrush}"
+                        <TextBlock Text="🎨  AI settings" Foreground="{StaticResource TextPrimaryBrush}"
                                    FontWeight="SemiBold" FontSize="13" Margin="0,0,0,10"/>
                         <StackPanel Margin="0,0,0,8">
                             <TextBlock Text="Color Grade preset" Foreground="{StaticResource TextMutedBrush}"
@@ -210,7 +210,7 @@
                             <CheckBox x:Name="ChkGPU"        Content="GPU render"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Margin="0,0,16,0"
-                                      AutomationProperties.Name="Koristi GPU render"/>
+                                      AutomationProperties.Name="Use GPU render"/>
                             <CheckBox x:Name="ChkFastRender" Content="Fast render"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       AutomationProperties.Name="Koristi fast render"/>
@@ -222,22 +222,22 @@
 
         <!-- Akcije na templateima -->
         <WrapPanel Grid.Row="2" Margin="0,0,0,10">
-            <Button x:Name="BtnNewTemplate"    Content="➕ Novi"
+            <Button x:Name="BtnNewTemplate"    Content="➕ New"
                     Style="{StaticResource SecBtn}" Padding="12,7" Margin="0,0,8,0"
                     Click="BtnNewTemplate_Click"
-                    AutomationProperties.Name="Kreiraj novi template"/>
-            <Button x:Name="BtnSaveTemplate"   Content="💾 Sačuvaj"
+                    AutomationProperties.Name="Create new template"/>
+            <Button x:Name="BtnSaveTemplate"   Content="💾 Save"
                     Style="{StaticResource PrimaryBtn}" Padding="12,7" Margin="0,0,8,0"
                     Click="BtnSaveTemplate_Click"
-                    AutomationProperties.Name="Sačuvaj template"/>
-            <Button x:Name="BtnDeleteTemplate" Content="🗑 Obriši"
+                    AutomationProperties.Name="Save template"/>
+            <Button x:Name="BtnDeleteTemplate" Content="🗑 Delete"
                     Style="{StaticResource SecBtn}" Padding="12,7" Margin="0,0,8,0"
                     IsEnabled="False" Click="BtnDeleteTemplate_Click"
-                    AutomationProperties.Name="Obriši selektovani template"/>
-            <Button x:Name="BtnImportTemplate" Content="📥 Uvezi"
+                    AutomationProperties.Name="Delete selected template"/>
+            <Button x:Name="BtnImportTemplate" Content="📥 Import"
                     Style="{StaticResource SecBtn}" Padding="12,7" Margin="0,0,8,0"
                     Click="BtnImportTemplate_Click"
-                    AutomationProperties.Name="Uvezi template iz fajla"/>
+                    AutomationProperties.Name="Import template from file"/>
             <Button x:Name="BtnExportTemplate" Content="📤 Izvezi"
                     Style="{StaticResource SecBtn}" Padding="12,7"
                     IsEnabled="False" Click="BtnExportTemplate_Click"
@@ -253,9 +253,9 @@
                     Click="BtnApplyTemplate_Click"
                     AutomationProperties.Name="Primeni selektovani template na trenutni projekat"/>
             <Button x:Name="BtnClose" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
         </DockPanel>
     </Grid>
 </Window>

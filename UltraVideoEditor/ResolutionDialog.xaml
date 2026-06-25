@@ -1,7 +1,7 @@
 ﻿<Window x:Class="UltraVideoEditor.ResolutionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Odabir rezolucije" Height="200" Width="350"
+        Title="Select resolution" Height="200" Width="350"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="#1E1E1E">
     <Grid Margin="15">
@@ -11,7 +11,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="📹 Odaberite rezoluciju videa" FontSize="14" FontWeight="Bold"
+        <TextBlock Text="📹 Select video resolution" FontSize="14" FontWeight="Bold"
                    Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
         <ComboBox x:Name="cmbResolution" Grid.Row="1" Height="30" Background="#2D2D2D" Foreground="White" Margin="0,0,0,20">
@@ -22,7 +22,7 @@
         </ComboBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button Content="✅ POTVRDI" Click="Ok_Click" Width="100" Height="35" 
+            <Button Content="✅ CONFIRM" Click="Ok_Click" Width="100" Height="35" 
                     Background="#2E7D32" Foreground="White" Margin="0,0,10,0"/>
             <Button Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" 
                     Background="#B71C1C" Foreground="White"/>

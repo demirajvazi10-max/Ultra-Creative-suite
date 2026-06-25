@@ -1,0 +1,21 @@
+{
+  "name": "Pixabay",
+  "description": "Besplatan video i slike. Primarni provajder Iskre. 5000 zahtjeva/sat. Registracija na pixabay.com",
+  "apiKeyUrl": "https://pixabay.com/api/docs/",
+  "searchVideoUrl": "https://pixabay.com/api/videos/?safesearch=true&per_page=30&video_type=film&min_duration=5&max_duration=60",
+  "searchImageUrl": "https://pixabay.com/api/?image_type=photo&safesearch=true&per_page=30",
+  "authType": "queryParam",
+  "authParamName": "key",
+  "queryParam": "q",
+  "extraParams": {},
+  "responseMap": {
+    "hitsArray": "hits",
+    "downloadUrl": "videos.large.url",
+    "tags": "tags",
+    "duration": "duration",
+    "width": "videos.large.width",
+    "height": "videos.large.height",
+    "pageUrl": "pageURL",
+    "author": "user"
+  }
+}

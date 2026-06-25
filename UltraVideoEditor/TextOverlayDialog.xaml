@@ -1,10 +1,10 @@
 ﻿<Window x:Class="UltraVideoEditor.TextOverlayDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="🎨 Profesionalni tekst na slici" Height="550" Width="450"
+        Title="🎨 Professional text on image" Height="550" Width="450"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="#1E1E1E"
-        AutomationProperties.Name="Dijalog za dodavanje teksta na sliku">
+        AutomationProperties.Name="Dialog for adding text to image">
 
     <Grid Margin="15">
         <Grid.RowDefinitions>
@@ -23,11 +23,11 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="🎨 PROFESIONALNI TEKST NA SLICI" FontSize="16" FontWeight="Bold"
+        <TextBlock Text="🎨 PROFESSIONAL TEXT ON IMAGE" FontSize="16" FontWeight="Bold"
                    Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
         <!-- Tekst -->
-        <TextBlock Grid.Row="1" Text="Tekst:" Foreground="White" Margin="0,5,0,3"/>
+        <TextBlock Grid.Row="1" Text="Text:" Foreground="White" Margin="0,5,0,3"/>
         <TextBox x:Name="txtText" Grid.Row="2" Height="60" TextWrapping="Wrap" 
                  AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
                  Background="#2D2D2D" Foreground="White" Margin="0,0,0,10"
@@ -46,7 +46,7 @@
             <ComboBoxItem Content="Tahoma"/>
         </ComboBox>
 
-        <!-- Veličina fonta -->
+        <!-- Font size -->
         <TextBlock Grid.Row="5" Text="Font size:" Foreground="White" Margin="0,5,0,3"/>
         <ComboBox x:Name="cmbFontSize" Grid.Row="6" Height="30" Background="#2D2D2D" Foreground="White" Margin="0,0,0,10"
                   IsEditable="True" Text="48">
@@ -60,17 +60,17 @@
         </ComboBox>
 
         <!-- Boja teksta -->
-        <TextBlock Grid.Row="7" Text="Boja teksta:" Foreground="White" Margin="0,5,0,3"/>
+        <TextBlock Grid.Row="7" Text="Text color:" Foreground="White" Margin="0,5,0,3"/>
         <ComboBox x:Name="cmbTextColor" Grid.Row="8" Height="30" Background="#2D2D2D" Foreground="White" Margin="0,0,0,10">
             <ComboBoxItem Content="⚪ White" Tag="#FFFFFF" IsSelected="True"/>
-            <ComboBoxItem Content="⚫ Crna" Tag="#000000"/>
-            <ComboBoxItem Content="🔴 Crvena" Tag="#FF0000"/>
-            <ComboBoxItem Content="🟢 Zelena" Tag="#00FF00"/>
-            <ComboBoxItem Content="🔵 Plava" Tag="#0000FF"/>
+            <ComboBoxItem Content="⚫ Black" Tag="#000000"/>
+            <ComboBoxItem Content="🔴 Red" Tag="#FF0000"/>
+            <ComboBoxItem Content="🟢 Green" Tag="#00FF00"/>
+            <ComboBoxItem Content="🔵 Blue" Tag="#0000FF"/>
             <ComboBoxItem Content="🟡 Yellow" Tag="#FFFF00"/>
             <ComboBoxItem Content="🟠 Orange" Tag="#FFA500"/>
             <ComboBoxItem Content="🟣 Purple" Tag="#800080"/>
-            <ComboBoxItem Content="🩷 Roze" Tag="#FFC0CB"/>
+            <ComboBoxItem Content="🩷 Pink" Tag="#FFC0CB"/>
             <ComboBoxItem Content="🤎 Brown" Tag="#8B4513"/>
             <ComboBoxItem Content="🩶 Gray" Tag="#808080"/>
             <ComboBoxItem Content="💙 Dark blue" Tag="#00008B"/>
@@ -99,7 +99,7 @@
             <Button x:Name="btnApply" Content="✅ DODAJ TEKST" Click="Apply_Click"
                     Width="120" Height="35" Background="#2E7D32" Foreground="White"
                     FontSize="13" FontWeight="Bold" Margin="0,0,10,0"
-                    AutomationProperties.Name="Dodaj tekst na sliku"/>
+                    AutomationProperties.Name="Add text to image"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click"
                     Width="100" Height="35" Background="#B71C1C" Foreground="White"
                     FontSize="13" FontWeight="Bold"

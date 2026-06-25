@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="AI Highlight Engine dijalog v2">
+        AutomationProperties.Name="AI Highlight Engine dialog v2">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
@@ -108,43 +108,43 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                    <TextBlock Text="📹  Video fajl"
+                    <TextBlock Text="📹  Video file"
                                Foreground="{StaticResource TextMutedBrush}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <DockPanel>
                         <Button x:Name="BtnPickVideo" DockPanel.Dock="Right"
-                                Content="Odaberi" Style="{StaticResource SecondaryButton}"
+                                Content="Browse" Style="{StaticResource SecondaryButton}"
                                 Padding="12,7" Margin="6,0,0,0"
                                 Click="BtnPickVideo_Click"
-                                AutomationProperties.Name="Odaberi video fajl"/>
+                                AutomationProperties.Name="Select video file"/>
                         <TextBox x:Name="TxtVideoPath" Style="{StaticResource InputBox}"
-                                 IsReadOnly="True" Text="Nije odabran…"
+                                 IsReadOnly="True" Text="Not selected…"
                                  Foreground="{StaticResource TextMutedBrush}"
-                                 AutomationProperties.Name="Putanja do video fajla"/>
+                                 AutomationProperties.Name="Video file path"/>
                     </DockPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="8,0,0,0">
                     <DockPanel Margin="0,0,0,4">
                         <CheckBox x:Name="ChkUseMusic" DockPanel.Dock="Left"
-                                  Content="🎵  Audio fajl (pesma)"
+                                  Content="🎵  Audio file (song)"
                                   Foreground="{StaticResource TextMutedBrush}"
                                   FontSize="12" VerticalAlignment="Center"
                                   IsChecked="True"
                                   Checked="ChkUseMusic_Changed"
                                   Unchecked="ChkUseMusic_Changed"
-                                  AutomationProperties.Name="Dodaj muziku na highlight"/>
+                                  AutomationProperties.Name="Add music to highlight"/>
                     </DockPanel>
                     <DockPanel x:Name="MusicPanel">
                         <Button x:Name="BtnPickMusic" DockPanel.Dock="Right"
-                                Content="Odaberi" Style="{StaticResource SecondaryButton}"
+                                Content="Browse" Style="{StaticResource SecondaryButton}"
                                 Padding="12,7" Margin="6,0,0,0"
                                 Click="BtnPickMusic_Click"
-                                AutomationProperties.Name="Odaberi audio fajl"/>
+                                AutomationProperties.Name="Select audio file"/>
                         <TextBox x:Name="TxtMusicPath" Style="{StaticResource InputBox}"
-                                 IsReadOnly="True" Text="Nije odabran…"
+                                 IsReadOnly="True" Text="Not selected…"
                                  Foreground="{StaticResource TextMutedBrush}"
-                                 AutomationProperties.Name="Putanja do audio fajla"/>
+                                 AutomationProperties.Name="Audio file path"/>
                     </DockPanel>
                 </StackPanel>
             </Grid>
@@ -171,15 +171,15 @@
                                 Content="…" Style="{StaticResource SecondaryButton}"
                                 Padding="10,7" Margin="6,0,0,0"
                                 Click="BtnPickOutput_Click"
-                                AutomationProperties.Name="Odaberi output putanju"/>
+                                AutomationProperties.Name="Select output path"/>
                         <TextBox x:Name="TxtOutputPath" Style="{StaticResource InputBox}"
                                  Text="highlight_output.mp4"
-                                 AutomationProperties.Name="Putanja za output video"/>
+                                 AutomationProperties.Name="Output video path"/>
                     </DockPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                    <TextBlock Text="📐  Rezolucija"
+                    <TextBlock Text="📐  Resolution"
                                Foreground="{StaticResource TextMutedBrush}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <ComboBox x:Name="CmbResolution"
@@ -187,7 +187,7 @@
                               Foreground="{StaticResource TextPrimaryBrush}"
                               BorderBrush="{StaticResource BorderBrush}"
                               Padding="10,7" Width="130"
-                              AutomationProperties.Name="Rezolucija output videa">
+                              AutomationProperties.Name="Output video resolution">
                         <ComboBoxItem Content="1920x1080 (FHD)" Tag="1920x1080" IsSelected="True"/>
                         <ComboBoxItem Content="1280x720 (HD)"   Tag="1280x720"/>
                         <ComboBoxItem Content="3840x2160 (4K)"  Tag="3840x2160"/>
@@ -201,14 +201,14 @@
                                FontSize="12" Margin="0,0,0,4"/>
                     <CheckBox x:Name="ChkUseGPU" Content="GPU (NVENC)" IsChecked="True"
                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
-                              AutomationProperties.Name="Koristi GPU NVENC encoding"/>
+                              AutomationProperties.Name="Use GPU NVENC encoding"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" VerticalAlignment="Bottom">
-                    <Button x:Name="BtnRender" Content="🎬 Renderuj"
+                    <Button x:Name="BtnRender" Content="🎬 Render"
                             Style="{StaticResource PrimaryButton}"
                             IsEnabled="False" Click="BtnRender_Click"
-                            AutomationProperties.Name="Pokreni render"/>
+                            AutomationProperties.Name="Start render"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -223,7 +223,7 @@
                                DockPanel.Dock="Right"
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
-                    <TextBlock x:Name="TxtProgressMsg" Text="Pokrećem…"
+                    <TextBlock x:Name="TxtProgressMsg" Text="Starting…"
                                Foreground="{StaticResource TextPrimaryBrush}"
                                FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
@@ -258,7 +258,7 @@
 
             <!-- Tab 1: Preview -->
             <TabItem Header="🎞  Preview segmenata"
-                     AutomationProperties.Name="Preview selektovanih segmenata">
+                     AutomationProperties.Name="Preview of selected segments">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -269,18 +269,18 @@
                                LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                     Margin="8,4">
-                            <Button x:Name="BtnSelectAll" Content="Sve"
+                            <Button x:Name="BtnSelectAll" Content="All"
                                     Style="{StaticResource SecondaryButton}"
                                     FontSize="11" Padding="10,4" Margin="0,0,6,0"
                                     IsEnabled="False" Click="BtnSelectAll_Click"
-                                    AutomationProperties.Name="Uključi sve segmente"/>
-                            <Button x:Name="BtnDeselectAll" Content="Ništa"
+                                    AutomationProperties.Name="Select all segments"/>
+                            <Button x:Name="BtnDeselectAll" Content="None"
                                     Style="{StaticResource SecondaryButton}"
                                     FontSize="11" Padding="10,4"
                                     IsEnabled="False" Click="BtnDeselectAll_Click"
-                                    AutomationProperties.Name="Isključi sve segmente"/>
+                                    AutomationProperties.Name="Deselect all segments"/>
                         </StackPanel>
-                        <TextBlock x:Name="TxtSegmentCount" Text="Nema segmenata"
+                        <TextBlock x:Name="TxtSegmentCount" Text="No segments"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" VerticalAlignment="Center" Margin="12,8"
                                    AutomationProperties.LiveSetting="Polite"/>
@@ -295,8 +295,8 @@
             </TabItem>
 
             <!-- Tab 2: Izvestaj -->
-            <TabItem Header="📋  Izveštaj"
-                     AutomationProperties.Name="Tekstualni izveštaj analize">
+            <TabItem Header="📋  Report"
+                     AutomationProperties.Name="Text analysis report">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -311,14 +311,14 @@
                                     Style="{StaticResource SecondaryButton}"
                                     FontSize="11" Padding="10,4" Margin="0,0,6,0"
                                     Visibility="Collapsed" Click="BtnCopyReport_Click"
-                                    AutomationProperties.Name="Kopiraj izveštaj"/>
-                            <Button x:Name="BtnExport" Content="Sačuvaj .txt"
+                                    AutomationProperties.Name="Copy report"/>
+                            <Button x:Name="BtnExport" Content="Save .txt"
                                     Style="{StaticResource SecondaryButton}"
                                     FontSize="11" Padding="10,4"
                                     Visibility="Collapsed" Click="BtnExport_Click"
-                                    AutomationProperties.Name="Sačuvaj izveštaj"/>
+                                    AutomationProperties.Name="Save report"/>
                         </StackPanel>
-                        <TextBlock Text="Kompletan izveštaj analize"
+                        <TextBlock Text="Complete analysis report"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" Margin="12,8" VerticalAlignment="Center"/>
                     </DockPanel>
@@ -330,8 +330,8 @@
                              FontFamily="Consolas, Courier New" FontSize="12"
                              IsReadOnly="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
-                             Text="Ovde će se pojaviti izveštaj nakon analize."
-                             AutomationProperties.Name="Tekstualni izveštaj analize"/>
+                             Text="The report will appear here after analysis."
+                             AutomationProperties.Name="Text analysis report"/>
                 </Grid>
             </TabItem>
         </TabControl>
@@ -339,21 +339,21 @@
         <!-- Dugmici -->
         <DockPanel Grid.Row="5" LastChildFill="False">
             <Button x:Name="BtnCancel" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecondaryButton}"
+                    Content="Close" Style="{StaticResource SecondaryButton}"
                     Padding="16,9" Click="BtnCancel_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
             <Button x:Name="BtnApplyToTimeline" DockPanel.Dock="Right"
-                    Content="✅ Dodaj na timeline"
+                    Content="✅ Add to timeline"
                     Style="{StaticResource PrimaryButton}"
                     Padding="16,9" Margin="0,0,8,0" IsEnabled="False"
                     Click="BtnApplyToTimeline_Click"
-                    AutomationProperties.Name="Dodaj segmente na timeline"/>
+                    AutomationProperties.Name="Add segments to timeline"/>
             <Button x:Name="BtnAnalyze" DockPanel.Dock="Left"
                     Content="🔍 Analiziraj video"
                     Style="{StaticResource PrimaryButton}"
                     Padding="16,9" IsEnabled="False"
                     Click="BtnAnalyze_Click"
-                    AutomationProperties.Name="Pokreni AI analizu"/>
+                    AutomationProperties.Name="Start AI analysis"/>
         </DockPanel>
     </Grid>
 </Window>

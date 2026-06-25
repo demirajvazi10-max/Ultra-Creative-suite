@@ -12,8 +12,8 @@ namespace UltraVideoEditor
     // ═══════════════════════════════════════════════════════════════
     // EXPORT PIPELINE  —  Faza 3 / D
     //
-    // Finalni output u više formata odjednom:
-    //   - MP4  1920×1080  (YouTube/opšta upotreba)
+    // Final output in multiple formats at once:
+    //   - MP4  1920×1080  (YouTube/general use)
     //   - MP4  1080×1920  (Instagram Reels / TikTok, vertical crop)
     //   - MP3             (audio-only, 192kbps)
     //   - TXT             (accessibility report)
@@ -38,7 +38,7 @@ namespace UltraVideoEditor
         /// <summary>Putanja do miksovanog audio fajla (ulaz, opciono).</summary>
         public string MixedAudioPath    { get; set; }
 
-        /// <summary>Folder gde se smeštaju svi export-ovani fajlovi.</summary>
+        /// <summary>Folder where all exported files are stored.</summary>
         public string OutputFolder      { get; set; }
 
         /// <summary>Baza za imena fajlova (npr. "highlight_20250608").</summary>
@@ -53,7 +53,7 @@ namespace UltraVideoEditor
         /// <summary>Odluke o prelazima (za report).</summary>
         public List<TransitionDecision> Transitions { get; set; }
 
-        /// <summary>Audio podešavanja (za report).</summary>
+        /// <summary>Audio settings (for report).</summary>
         public AudioMixSettings AudioSettings { get; set; }
 
         /// <summary>Koristiti GPU encoding.</summary>
@@ -79,7 +79,7 @@ namespace UltraVideoEditor
             new ExportFormat
             {
                 Id = "report", Label = "Accessibility Report",
-                Description = "TXT izveštaj sa audio-description i navigacionim markerima",
+                Description = "TXT report with audio-description and navigation markers",
             },
         };
     }
@@ -107,7 +107,7 @@ namespace UltraVideoEditor
         // ── Javni API ────────────────────────────────────────────────
 
         /// <summary>
-        /// Exportuje sve omogućene formate iz ExportJob-a.
+        /// Exports all enabled formats from ExportJob.
         /// </summary>
         public static async Task<ExportPipelineResult> ExportAllAsync(
             ExportJob job,
@@ -116,12 +116,12 @@ namespace UltraVideoEditor
         {
             if (job == null) throw new ArgumentNullException(nameof(job));
             if (!File.Exists(job.SourceVideoPath))
-                throw new FileNotFoundException($"Source video nije pronađen: {job.SourceVideoPath}");
+                throw new FileNotFoundException($"Source video not found: {job.SourceVideoPath}");
 
             string ffmpegPath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
             if (!File.Exists(ffmpegPath))
-                throw new FileNotFoundException("FFmpeg nije pronađen.");
+                throw new FileNotFoundException("FFmpeg not found.");
 
             Directory.CreateDirectory(job.OutputFolder);
 
@@ -153,7 +153,7 @@ namespace UltraVideoEditor
             }
 
             pipeline.Summary = BuildSummary(pipeline, job);
-            progress?.Report((100, "Export završen."));
+            progress?.Report((100, "Export complete."));
             return pipeline;
         }
 
@@ -321,7 +321,7 @@ namespace UltraVideoEditor
             sb.AppendLine("╚══════════════════════════════════════════════════════╝");
             sb.AppendLine();
             sb.AppendLine($"Output folder: {job.OutputFolder}");
-            sb.AppendLine($"Uspešno: {pipeline.SuccessCount}/{pipeline.Results.Count}");
+            sb.AppendLine($"Successful: {pipeline.SuccessCount}/{pipeline.Results.Count}");
             sb.AppendLine();
 
             foreach (var r in pipeline.Results)

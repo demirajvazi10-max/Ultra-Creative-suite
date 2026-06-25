@@ -111,7 +111,7 @@ namespace UltraVideoEditor
         {
             double start = -1;
 
-            // Čitanje početka iz txtStart
+            // Read start time from txtStart
             if (double.TryParse(txtStart.Text.Replace(',', '.'),
                                 NumberStyles.Any, CultureInfo.InvariantCulture, out start))
             {
@@ -124,7 +124,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            // Čitanje trajanja
+            // Read duration
             if (double.TryParse(txtDuration.Text.Replace(',', '.'),
                                 NumberStyles.Any, CultureInfo.InvariantCulture, out double dur) && dur > 0)
             {

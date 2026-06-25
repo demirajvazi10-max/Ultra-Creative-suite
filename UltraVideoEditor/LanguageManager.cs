@@ -1760,7 +1760,7 @@ namespace UltraVideoEditor
             _translations["de"] = de;
         }
 
-        public static string GetText(string key, string language = "sr")
+        public static string GetText(string key, string language = "en")
         {
             if (_translations.ContainsKey(language) && _translations[language].ContainsKey(key))
                 return _translations[language][key];

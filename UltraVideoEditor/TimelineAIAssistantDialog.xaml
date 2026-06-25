@@ -1,13 +1,13 @@
 <Window x:Class="UltraVideoEditor.TimelineAIAssistantDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Timeline AI Asistent — Faza 4B"
+        Title="Timeline AI Assistant — Phase 4B"
         Width="720" Height="580"
         MinWidth="520" MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Timeline AI Asistent dijalog">
+        AutomationProperties.Name="Timeline AI Assistant dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
@@ -87,7 +87,7 @@
 
         <!-- Naslov -->
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="🤖  Timeline AI Asistent"
+            <TextBlock Text="🤖  Timeline AI Assistant"
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
@@ -100,40 +100,40 @@
         <Border Grid.Row="1" Background="{StaticResource CardBrush}"
                 CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="💡 Primeri komandi:"
+                <TextBlock Text="💡 Command examples:"
                            Foreground="{StaticResource TextMutedBrush}" FontSize="11"
                            Margin="0,0,0,6"/>
                 <WrapPanel>
-                    <Button x:Name="BtnEx1" Content="ukloni kraće od 2s"
+                    <Button x:Name="BtnEx1" Content="remove shorter than 2s"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,6,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: ukloni klipoive kraće od 2 sekunde"/>
-                    <Button x:Name="BtnEx2" Content="zadrži samo lica"
+                            AutomationProperties.Name="Example: remove clips shorter than 2 seconds"/>
+                    <Button x:Name="BtnEx2" Content="keep faces only"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,6,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: zadrži samo klipoive sa licima"/>
-                    <Button x:Name="BtnEx3" Content="sortiraj po skoru"
+                            AutomationProperties.Name="Example: keep only clips with faces"/>
+                    <Button x:Name="BtnEx3" Content="sort by score"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,6,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: sortiraj po skoru"/>
-                    <Button x:Name="BtnEx4" Content="zadrži prvih 10"
+                            AutomationProperties.Name="Example: sort by score"/>
+                    <Button x:Name="BtnEx4" Content="keep first 10"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,6,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: zadrži prvih 10 klipoiva"/>
-                    <Button x:Name="BtnEx5" Content="ukloni statične"
+                            AutomationProperties.Name="Example: keep first 10 clips"/>
+                    <Button x:Name="BtnEx5" Content="remove static"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,6,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: ukloni statične klipoive"/>
-                    <Button x:Name="BtnEx6" Content="sortiraj po trajanju"
+                            AutomationProperties.Name="Example: remove static clips"/>
+                    <Button x:Name="BtnEx6" Content="sort by duration"
                             Style="{StaticResource SecBtn}" FontSize="10"
                             Padding="8,4" Margin="0,0,0,4"
                             Click="BtnExample_Click"
-                            AutomationProperties.Name="Primer: sortiraj po trajanju"/>
+                            AutomationProperties.Name="Example: sort by duration"/>
                 </WrapPanel>
             </StackPanel>
         </Border>
@@ -143,17 +143,17 @@
                 CornerRadius="8" Padding="12" Margin="0,0,0,10">
             <DockPanel>
                 <Button x:Name="BtnExecute" DockPanel.Dock="Right"
-                        Content="▶ Izvrši" Style="{StaticResource PrimaryBtn}"
+                        Content="▶ Execute" Style="{StaticResource PrimaryBtn}"
                         Padding="16,9" Margin="8,0,0,0"
                         Click="BtnExecute_Click"
-                        AutomationProperties.Name="Izvrši AI komandu"/>
+                        AutomationProperties.Name="Execute AI command"/>
                 <Button x:Name="BtnMic" DockPanel.Dock="Right"
-                        Content="🎙 Govori"
+                        Content="🎙 Speak"
                         Padding="14,9" Margin="8,0,0,0"
                         FontSize="13" FontWeight="SemiBold"
                         BorderThickness="0" Cursor="Hand"
                         Click="BtnMic_Click"
-                        AutomationProperties.Name="Drži i govori komandu — Speech to Text">
+                        AutomationProperties.Name="Hold and speak command — Speech to Text">
                     <Button.Style>
                         <Style TargetType="Button">
                             <Setter Property="Foreground" Value="White"/>
@@ -181,8 +181,8 @@
                 <TextBox x:Name="TxtCommand" Style="{StaticResource InputBox}"
                          Text="" FontSize="14"
                          KeyDown="TxtCommand_KeyDown"
-                         AutomationProperties.Name="Unesite AI komandu"
-                         AutomationProperties.HelpText="Pritisnite Enter, dugme Izvrši ili 🎙 Govori za glasovnu komandu"/>
+                         AutomationProperties.Name="Enter AI command"
+                         AutomationProperties.HelpText="Press Enter, the Execute button or 🎙 Speak for voice command"/>
             </DockPanel>
         </Border>
 
@@ -212,23 +212,23 @@
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <Button x:Name="BtnUndoLast" DockPanel.Dock="Right"
-                                Content="↩ Poništi" Style="{StaticResource SecBtn}"
+                                Content="↩ Undo" Style="{StaticResource SecBtn}"
                                 FontSize="11" Padding="10,4"
                                 IsEnabled="False" Click="BtnUndoLast_Click"
-                                AutomationProperties.Name="Poništi poslednju komandu"/>
+                                AutomationProperties.Name="Undo last command"/>
                         <Button x:Name="BtnApplyAll" DockPanel.Dock="Right"
-                                Content="✅ Primeni na timeline" Style="{StaticResource PrimaryBtn}"
+                                Content="✅ Apply to timeline" Style="{StaticResource PrimaryBtn}"
                                 FontSize="11" Padding="10,4" Margin="0,0,8,0"
                                 IsEnabled="False" Click="BtnApplyAll_Click"
-                                AutomationProperties.Name="Primeni promene na timeline"/>
-                        <TextBlock Text="📜  Istorija komandi"
+                                AutomationProperties.Name="Apply changes to timeline"/>
+                        <TextBlock Text="📜  Command history"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" VerticalAlignment="Center"/>
                     </DockPanel>
                 </Border>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
                     <StackPanel x:Name="HistoryPanel"
-                                AutomationProperties.Name="Istorija izvršenih komandi"/>
+                                AutomationProperties.Name="History of executed commands"/>
                 </ScrollViewer>
             </Grid>
         </Border>
@@ -236,9 +236,9 @@
         <!-- Footer -->
         <DockPanel Grid.Row="5" LastChildFill="False">
             <Button x:Name="BtnClose" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
         </DockPanel>
     </Grid>
 </Window>

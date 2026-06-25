@@ -66,7 +66,7 @@ namespace UltraVideoEditor
             // Provjera da li postoji mikrofon
             if (WaveInEvent.DeviceCount == 0)
             {
-                ShowStatus("⚠️  Mikrofon nije pronađen.", null, true, isError: true);
+                ShowStatus("⚠️  Microphone not found.", null, true, isError: true);
                 return;
             }
 
@@ -104,7 +104,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                ShowStatus($"⚠️  Greška mikrofona: {ex.Message}", null, true, isError: true);
+                ShowStatus($"⚠️  Microphone error: {ex.Message}", null, true, isError: true);
                 _recording = false;
             }
         }
@@ -144,19 +144,19 @@ namespace UltraVideoEditor
                 {
                     TxtCommand.Text = result.FullText.Trim();
                     ShowStatus($"✅ Prepoznato: \"{result.FullText.Trim()}\"", null, true, false);
-                    // Automatski izvrši
+                    // Execute automatically
                     await Task.Delay(400);
                     BtnExecute_Click(null, null);
                 }
                 else
                 {
-                    ShowStatus("⚠️  Whisper nije prepoznao komandu. Pokušajte ponovo.",
+                    ShowStatus("⚠️  Whisper did not recognize the command. Please try again.",
                                result.ErrorMessage, true, isError: true);
                 }
             }
             catch (Exception ex)
             {
-                ShowStatus($"⚠️  Greška transkripcije: {ex.Message}", null, true, isError: true);
+                ShowStatus($"⚠️  Transcription error: {ex.Message}", null, true, isError: true);
             }
             finally
             {
@@ -172,7 +172,7 @@ namespace UltraVideoEditor
             if (e.Key == Key.Enter) BtnExecute_Click(sender, e);
         }
 
-        // ── Izvršavanje ───────────────────────────────────────────────
+        // ── Execution ───────────────────────────────────────────────
 
         private async void BtnExecute_Click(object sender, RoutedEventArgs e)
         {
@@ -219,13 +219,13 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                ShowStatus($"Greška: {ex.Message}", null, false, isError: true);
+                ShowStatus($"Error: {ex.Message}", null, false, isError: true);
             }
             finally
             {
                 _running             = false;
                 BtnExecute.IsEnabled = true;
-                BtnExecute.Content   = "▶ Izvrši";
+                BtnExecute.Content   = "▶ Execute";
                 _cts?.Dispose(); _cts = null;
             }
         }
@@ -236,7 +236,7 @@ namespace UltraVideoEditor
         {
             if (_undoStack.Count == 0) return;
             _workingItems = _undoStack.Pop();
-            TxtSubtitle.Text = $"Timeline: {_workingItems.Count} klipoiva (poništeno)";
+            TxtSubtitle.Text = $"Timeline: {_workingItems.Count} clips (undone)";
             BtnUndoLast.IsEnabled = _undoStack.Count > 0;
             if (_undoStack.Count == 0) _hasChanges = false;
 
@@ -244,7 +244,7 @@ namespace UltraVideoEditor
             if (HistoryPanel.Children.Count > 0)
                 HistoryPanel.Children.RemoveAt(HistoryPanel.Children.Count - 1);
 
-            ShowStatus("↩ Poslednja komanda je poništena.", null, true);
+            ShowStatus("↩ Last command has been undone.", null, true);
         }
 
         // ── Primeni na timeline ───────────────────────────────────────

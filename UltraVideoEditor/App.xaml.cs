@@ -9,7 +9,7 @@ namespace UltraVideoEditor
         {
             base.OnStartup(e);
 
-            // Pristupačnost za čitače ekrana
+            // Accessibility for screen readers
             // NE koristite AutomationProperties.SetName na App klasi
             // Umjesto toga, postavite naslov prozora
         }

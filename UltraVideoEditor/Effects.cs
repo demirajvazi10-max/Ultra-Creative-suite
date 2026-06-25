@@ -29,7 +29,7 @@ namespace UltraVideoEditor
             if (settings == null) return "";
             string filter = "";
 
-            // Bass boost (100Hz) i Treble boost (4000Hz) koristeći equalizer filter
+            // Bass boost (100Hz) and Treble boost (4000Hz) using equalizer filter
             if (settings.BassBoost > 0)
             {
                 double bassGain = settings.BassBoost / 5.0; // 0-20 -> 0-4

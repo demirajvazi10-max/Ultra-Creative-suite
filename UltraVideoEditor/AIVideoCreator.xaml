@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="🎬 AI Video Creator" Height="950" Width="950"
         WindowStartupLocation="CenterOwner" Background="#1E1E1E"
-        AutomationProperties.Name="AI Video Creator - automatsko kreiranje videa">
+        AutomationProperties.Name="AI Video Creator - automatic video creation">
 
     <Grid Margin="15">
         <Grid.RowDefinitions>
@@ -30,28 +30,28 @@
         <!-- Status Ollama -->
         <Border Grid.Row="1" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <TextBlock x:Name="txtOllamaStatus" Foreground="#FF9800" TextWrapping="Wrap"
-                       Text="🔍 Provjeravam Ollama..."/>
+                       Text="🔍 Checking Ollama..."/>
         </Border>
 
-        <!-- Tekst pesme -->
+        <!-- Song lyrics -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,5,0,3">
-            <TextBlock Text="📝 Tekst pesme (jedan stih po redu):" Foreground="White"
+            <TextBlock Text="📝 Song lyrics (one line per row):" Foreground="White"
                        VerticalAlignment="Center" Margin="0,0,10,0"/>
             <!-- Dugme za automatsku transkripciju -->
-            <Button x:Name="btnAutoTranscribe" Content="🎤 Transkribuj iz audio"
+            <Button x:Name="btnAutoTranscribe" Content="🎤 Transcribe from audio"
                     Height="26" Padding="8,0"
                     Background="#1565C0" Foreground="White" BorderThickness="0"
                     FontSize="11" Cursor="Hand"
                     Click="btnAutoTranscribe_Click"
-                    AutomationProperties.Name="Automatski transkribuj tekst iz audio fajla pomocu Whisper AI"
+                    AutomationProperties.Name="Automatically transcribe text from audio file using Whisper AI"
                     ToolTip="Whisper AI automatically recognizes song lyrics from the loaded audio file"/>
             <TextBlock x:Name="txtTranscribeStatus" Foreground="#FF9800" FontSize="10"
                        VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
         </StackPanel>
         <TextBox x:Name="txtLyrics" Grid.Row="3" Height="100" TextWrapping="Wrap" AcceptsReturn="True"
                  Background="#2D2D2D" Foreground="White" FontSize="12" Padding="5"
-                 AutomationProperties.Name="Polje za unos teksta pesme. Pritisnite Tab za dugme Transkribuj koje automatski popunjava tekst iz audio fajla."
-                 AutomationProperties.HelpText="Unesite stihove pesme, svaki stih u novom redu. Ili koristite dugme Transkribuj za automatsko prepoznavanje."
+                 AutomationProperties.Name="Song lyrics input field. Press Tab for the Transcribe button which auto-fills text from the audio file."
+                 AutomationProperties.HelpText="Enter song lyrics, each line on a new row. Or use the Transcribe button for automatic recognition."
                  TextChanged="txtLyrics_TextChanged"/>
 
         <!-- Filteri -->
@@ -60,15 +60,15 @@
                 <TextBlock Text="🎛️ Filteri pretrage" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Tip medija:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="Media type:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbMediaType" Width="120" Height="25" Background="#2D2D2D" Foreground="White">
-                        <ComboBoxItem Content="Video zapisi" Tag="video" IsSelected="True"/>
-                        <ComboBoxItem Content="Slike" Tag="photo"/>
+                        <ComboBoxItem Content="Videos" Tag="video" IsSelected="True"/>
+                        <ComboBoxItem Content="Images" Tag="photo"/>
                     </ComboBox>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Min. rezolucija:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="Min. resolution:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbMinResolution" Width="120" Height="25" Background="#2D2D2D" Foreground="White">
                         <ComboBoxItem Content="HD (720p)" Tag="720" IsSelected="True"/>
                         <ComboBoxItem Content="Full HD (1080p)" Tag="1080"/>
@@ -79,7 +79,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Tabela za pregled ključnih riječi -->
+        <!-- Table for keyword preview -->
         <Border Grid.Row="5" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
                 <TextBlock Text="🔑 AI keyword suggestions (automatic)" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -94,14 +94,14 @@
                 <TextBlock Text="🏷️ Logo kanala" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Putanja do loga:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+                    <TextBlock Text="Logo path:" Foreground="White" Width="100" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtLogoPath" Width="250" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"/>
                     <Button x:Name="btnBrowseLogo" Content="📂" Click="btnBrowseLogo_Click" Width="40" Height="25" Background="#FF9800" Foreground="White"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
                     <CheckBox x:Name="chkShowLogo" Content="Show logo at start" Foreground="White" IsChecked="False" Margin="0,0,20,0"/>
-                    <TextBlock Text="Trajanje loga (s):" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="Logo duration (s):" Foreground="White" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtLogoDuration" Width="50" Height="25" Text="5" Background="#2D2D2D" Foreground="White" Margin="5,0,0,0"/>
                 </StackPanel>
             </StackPanel>
@@ -110,22 +110,22 @@
         <!-- Tekstovi -->
         <Border Grid.Row="7" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="📝 Tekstovi" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Text="📝 Texts" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Najavni tekst (naslov pjesme):" Foreground="White" Width="140" VerticalAlignment="Center"/>
+                    <TextBlock Text="Intro text (song title):" Foreground="White" Width="140" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtIntroText" Width="260" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
                              Text=""/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Odjavni tekst:" Foreground="White" Width="140" VerticalAlignment="Center"/>
+                    <TextBlock Text="Outro text:" Foreground="White" Width="140" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtOutroText" Width="260" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
                              Text=""/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Ime kanala:" Foreground="White" Width="140" VerticalAlignment="Center"/>
+                    <TextBlock Text="Channel name:" Foreground="White" Width="140" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtChannelName" Width="250" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
                              Text="Rastimo uz Iskru"/>
                 </StackPanel>
@@ -139,13 +139,13 @@
                           Foreground="White" IsChecked="False" Margin="0,0,0,8"
                           AutomationProperties.Name="Show lyrics on screen during video"/>
 
-                <CheckBox x:Name="chkTransitionSounds" Content="🔊 Zvukovi pri promjeni scena (pop/whoosh efekti)" 
+                <CheckBox x:Name="chkTransitionSounds" Content="🔊 Sounds on scene change (pop/whoosh effects)" 
                           Foreground="White" IsChecked="True" Margin="0,0,0,8"
                           AutomationProperties.Name="Add sounds during scene transitions"/>
 
-                <CheckBox x:Name="chkAmbientSounds" Content="🌳 Ambijentalni zvukovi (ptice, more, vjetar...)" 
+                <CheckBox x:Name="chkAmbientSounds" Content="🌳 Ambient sounds (birds, sea, wind...)" 
                           Foreground="White" IsChecked="True" Margin="0,0,0,8"
-                          AutomationProperties.Name="Dodaj ambijentalne zvukove prema scenama"/>
+                          AutomationProperties.Name="Add ambient sounds according to scenes"/>
 
                 <CheckBox x:Name="chkVoiceNarration" Content="🗣️ Voice scene narration (describes what is happening)" 
                           Foreground="White" IsChecked="False" Margin="0,0,0,5"
@@ -198,10 +198,10 @@
                              Background="#2D2D2D" Foreground="White" Padding="3"
                              VerticalContentAlignment="Center"
                              Text="C:\Videos\iskra_video.mp4"
-                             ToolTip="Puna putanja gdje se čuva finalni video"/>
+                             ToolTip="Full path where the final video is saved"/>
                     <Button Content="📁" Width="28" Height="25" Margin="4,0,0,0"
                             Background="#333" Foreground="White"
-                            Click="btnAutoRenderBrowse_Click" ToolTip="Odaberi folder"/>
+                            Click="btnAutoRenderBrowse_Click" ToolTip="Select folder"/>
                 </StackPanel>
             </StackPanel>
         </Border>

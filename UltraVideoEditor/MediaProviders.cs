@@ -5,15 +5,15 @@
 //  ARHITEKTURA:
 //  ─────────────────────────────────────────────────────────────────────────────
 //  IMediaProvider  — interfejs koji svaki provajder mora implementirati
-//  MediaProviderRegistry — singleton koji drži sve registrovane provajdere
-//  MediaProviderSettings — čuva/učitava API ključeve (šifrovano, bez koda)
+//  MediaProviderRegistry — singleton holding all registered providers
+//  MediaProviderSettings — stores/loads API keys (encrypted, no code changes)
 //
-//  DODAVANJE NOVOG PROVAJDERA (4 koraka, bez mijenjanja postojećeg koda):
+//  ADDING A NEW PROVIDER (4 steps, without changing existing code):
 //  ─────────────────────────────────────────────────────────────────────
 //  KORAK 1: Napravi klasu koja implementira IMediaProvider (vidi primjer dole)
 //  KORAK 2: Registruj je u MediaProviderRegistry.RegisterDefaults() — 1 linija
 //  KORAK 3: U MediaProvidersDialog.xaml dodaj UI blok (copy-paste Coverr bloka)
-//  KORAK 4: Korisnik unese API ključ iz Tools → Media Provajderi — bez koda!
+//  STEP 4: User enters API key via Tools → Media Providers — no code!
 //
 //  PRIMJER MINIMALNOG PROVAJDERA:
 //  ─────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ using Newtonsoft.Json.Linq;
 namespace UltraVideoEditor
 {
     // ══════════════════════════════════════════════════════════════════════════
-    //  Rezultat pretrage — zajednički format za sve provajdere
+    //  Search result — common format for all providers
     // ══════════════════════════════════════════════════════════════════════════
     public class MediaSearchResult
     {
@@ -72,7 +72,7 @@ namespace UltraVideoEditor
         /// <summary>Trajanje video klipa u sekundama (0 za slike)</summary>
         public double DurationSeconds { get; set; }
 
-        /// <summary>Širina u pikselima</summary>
+        /// <summary>Width in pixels</summary>
         public int Width { get; set; }
 
         /// <summary>Visina u pikselima</summary>
@@ -99,15 +99,15 @@ namespace UltraVideoEditor
         /// <summary>Kratki opis (za tooltip u Settings-u)</summary>
         string Description { get; }
 
-        /// <summary>URL za registraciju/API ključ (za Settings panel)</summary>
+        /// <summary>URL for registration/API key (for Settings panel)</summary>
         string ApiKeyUrl { get; }
 
-        /// <summary>True ako je provajder konfigurisan (ima API ključ)</summary>
+        /// <summary>True if the provider is configured (has an API key)</summary>
         bool IsConfigured { get; }
 
         /// <summary>
-        /// Pretraži video ili slike.
-        /// Vraća listu rezultata, sortiranu po relevantnosti.
+        /// Search for videos or images.
+        /// Returns a list of results, sorted by relevance.
         /// Prazna lista = nema rezultata (ne baci exception).
         /// </summary>
         Task<List<MediaSearchResult>> SearchAsync(
@@ -121,12 +121,12 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  MediaProviderRegistry — Singleton, drži sve registrovane provajdere
+    //  MediaProviderRegistry — Singleton, holds all registered providers
     //
     //  WATERFALL logika:
-    //  1. Primarni provajder (Pixabay) — pokušaj
-    //  2. Ako 0 rezultata → sljedeći (Pexels)
-    //  3. Ako 0 rezultata → sljedeći (Coverr itd.)
+    //  1. Primary provider (Pixabay) — try
+    //  2. If 0 results → next (Pexels)
+    //  3. If 0 results → next (Coverr etc.)
     //  4. Ako svi failuju → Emergency pool
     // ══════════════════════════════════════════════════════════════════════════
     public class MediaProviderRegistry
@@ -144,19 +144,19 @@ namespace UltraVideoEditor
 
         private void RegisterDefaults()
         {
-            // Redosljed = prioritet waterfall-a — ugrađeni provajderi
+            // Order = waterfall priority — built-in providers
             _providers.Add(new PixabayProvider());
             _providers.Add(new PexelsProvider());
             _providers.Add(new CoverrProvider());
 
-            // Dinamički JSON provajderi iz .iskraprovider fajlova
+            // Dynamic JSON providers from .iskraprovider files
             // Korisnik stavi fajl u folder → automatski se pojavljuje u Settings panelu
             foreach (var jp in JsonProviderLoader.LoadAll())
                 _providers.Add(jp);
         }
 
         /// <summary>
-        /// Reload dinamičkih provajdera bez restarta aplikacije.
+        /// Reload dynamic providers without restarting the application.
         /// Poziva se kada korisnik doda novi .iskraprovider fajl.
         /// </summary>
         public void ReloadJsonProviders()
@@ -169,13 +169,13 @@ namespace UltraVideoEditor
         /// <summary>Svi registrovani provajderi (za Settings panel).</summary>
         public IReadOnlyList<IMediaProvider> All => _providers;
 
-        /// <summary>Samo konfigurisani (imaju API ključ).</summary>
+        /// <summary>Only configured ones (have an API key).</summary>
         public IReadOnlyList<IMediaProvider> Configured
             => _providers.Where(p => p.IsConfigured).ToList();
 
         /// <summary>
-        /// Waterfall pretraga: pokušava provajdere po redu dok ne dobije rezultat.
-        /// Vraća (rezultat, imeProvajdera) ili (null, null) ako svi failuju.
+        /// Waterfall search: tries providers in order until a result is obtained.
+        /// Returns (result, providerName) or (null, null) if all fail.
         /// </summary>
         public async Task<(MediaSearchResult result, string providerName)> SearchWaterfallAsync(
             string query,
@@ -203,17 +203,17 @@ namespace UltraVideoEditor
 
                     if (safe.Count > 0)
                     {
-                        // Uzmi nasumičan iz prvih 10 (raznovrsnost)
+                        // Take a random one from the first 10 (variety)
                         var pick = safe[new Random().Next(Math.Min(10, safe.Count))];
                         log?.Invoke($"   ✅ [{provider.Name}] Nadjen: {pick.Tags?.Substring(0, Math.Min(40, pick.Tags?.Length ?? 0))}");
                         return (pick, provider.Name);
                     }
 
-                    log?.Invoke($"   ⏭ [{provider.Name}] 0 kids-safe rezultata — probam sljedeći");
+                    log?.Invoke($"   ⏭ [{provider.Name}] 0 kids-safe results — trying next");
                 }
                 catch (Exception ex)
                 {
-                    log?.Invoke($"   ❌ [{provider.Name}] Greška: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
+                    log?.Invoke($"   ❌ [{provider.Name}] Error: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
                 }
             }
             return (null, null);
@@ -221,7 +221,7 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  MediaProviderSettings — Čuva/učitava API ključeve bez mijenjanja koda
+    //  MediaProviderSettings — Stores/loads API keys without changing code
     //  Koristi isti Windows DPAPI mehanizam kao stari GetPixabayApiKey()
     // ══════════════════════════════════════════════════════════════════════════
     public static class MediaProviderSettings
@@ -230,7 +230,7 @@ namespace UltraVideoEditor
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "UltraVideoEditor", "Providers");
 
-        /// <summary>Učitaj API ključ za dati provajder.</summary>
+        /// <summary>Load API key for the given provider.</summary>
         public static string LoadKey(string providerName)
         {
             try
@@ -238,7 +238,7 @@ namespace UltraVideoEditor
                 Directory.CreateDirectory(SettingsDir);
                 string safeName = MakeSafe(providerName);
 
-                // Pokušaj šifrovani .bin fajl
+                // Try encrypted .bin file
                 string binPath = Path.Combine(SettingsDir, $"{safeName}.bin");
                 if (File.Exists(binPath))
                 {
@@ -247,7 +247,7 @@ namespace UltraVideoEditor
                     return Encoding.UTF8.GetString(dec).Trim();
                 }
 
-                // Fallback: .txt fajl (za ručno postavljanje)
+                // Fallback: .txt file (for manual setup)
                 string txtPath = Path.Combine(SettingsDir, $"{safeName}.txt");
                 if (File.Exists(txtPath))
                     return File.ReadAllText(txtPath).Trim();
@@ -256,7 +256,7 @@ namespace UltraVideoEditor
             return null;
         }
 
-        /// <summary>Sačuvaj API ključ za dati provajder (šifrovano).</summary>
+        /// <summary>Save API key for the given provider (encrypted).</summary>
         public static bool SaveKey(string providerName, string key)
         {
             try
@@ -272,7 +272,7 @@ namespace UltraVideoEditor
             catch { return false; }
         }
 
-        /// <summary>Obriši API ključ (deaktivira provajder).</summary>
+        /// <summary>Delete API key (deactivates provider).</summary>
         public static void DeleteKey(string providerName)
         {
             string safeName = MakeSafe(providerName);
@@ -283,7 +283,7 @@ namespace UltraVideoEditor
             }
         }
 
-        /// <summary>Vraća listu svih provajdera koji imaju sačuvan ključ.</summary>
+        /// <summary>Returns a list of all providers that have a saved key.</summary>
         public static List<string> GetConfiguredProviders()
         {
             if (!Directory.Exists(SettingsDir)) return new();
@@ -302,7 +302,7 @@ namespace UltraVideoEditor
     public class PixabayProvider : IMediaProvider
     {
         public string Name        => "Pixabay";
-        public string Description => "Besplatni video i slike. Najbrži, 5000 req/sat.";
+        public string Description => "Free video and images. Fastest, 5000 req/hour.";
         public string ApiKeyUrl   => "https://pixabay.com/api/docs/";
 
         public bool IsConfigured
@@ -392,7 +392,7 @@ namespace UltraVideoEditor
     public class PexelsProvider : IMediaProvider
     {
         public string Name        => "Pexels";
-        public string Description => "Besplatni video i slike. Odličan fallback za Pixabay. 200 req/sat.";
+        public string Description => "Free video and images. Excellent fallback for Pixabay. 200 req/hour.";
         public string ApiKeyUrl   => "https://www.pexels.com/api/new/";
 
         public bool IsConfigured
@@ -443,7 +443,7 @@ namespace UltraVideoEditor
                     var files = v["video_files"] as JArray;
                     if (files == null) continue;
 
-                    // Preferiraj HD (1920x1080) ili najveći dostupni
+                    // Prefer HD (1920x1080) or largest available
                     var best = files
                         .OrderByDescending(f => f["width"]?.Value<int>() ?? 0)
                         .FirstOrDefault(f => (f["width"]?.Value<int>() ?? 0) >= minWidth);
@@ -500,7 +500,7 @@ namespace UltraVideoEditor
 
     // ══════════════════════════════════════════════════════════════════════════
     //  CoverrProvider — Placeholder za Coverr.co
-    //  Besplatan, specijalizovan za lifestyle/dječiji sadržaj
+    //  Free, specialized for lifestyle/children's content
     //  API dokumentacija: https://coverr.co/api
     // ══════════════════════════════════════════════════════════════════════════
     public class CoverrProvider : IMediaProvider
@@ -579,18 +579,18 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  MediaProviderMigrator — Migracija starih Pixabay ključeva u novi sistem
+    //  MediaProviderMigrator — Migration of old Pixabay keys to the new system
     //  Poziva se jednom pri startu aplikacije
     // ══════════════════════════════════════════════════════════════════════════
     public static class MediaProviderMigrator
     {
         /// <summary>
-        /// Čita stari pixabay_key.bin/.txt i migrira u novi Provider sistem.
-        /// Bezbedan za višestruko pozivanje (ne migrira ponovo ako već postoji).
+        /// Reads old pixabay_key.bin/.txt and migrates to the new Provider system.
+        /// Safe for multiple calls (does not migrate again if already exists).
         /// </summary>
         public static void MigrateIfNeeded()
         {
-            // Ako Pixabay već ima ključ u novom sistemu, nema potrebe
+            // If Pixabay already has a key in the new system, no need
             if (!string.IsNullOrEmpty(MediaProviderSettings.LoadKey("Pixabay")))
                 return;
 
@@ -661,7 +661,7 @@ namespace UltraVideoEditor
         /// <summary>Put do trajanja u sekundama</summary>
         public string Duration     { get; set; } = "duration";
 
-        /// <summary>Put do širine</summary>
+        /// <summary>Path to width</summary>
         public string Width        { get; set; } = "width";
 
         /// <summary>Put do visine</summary>
@@ -675,13 +675,13 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  JsonMediaProvider — Dinamički provajder učitan iz .iskraprovider fajla
+    //  JsonMediaProvider — Dynamic provider loaded from .iskraprovider file
     //
-    //  Prosječan korisnik:
+    //  Average user:
     //  1. Dobije/preuzme "NekiServis.iskraprovider" fajl
     //  2. Stavi ga u %AppData%\UltraVideoEditor\Providers\
     //  3. Restartuje Iskru
-    //  4. Unese API ključ kroz Tools → Media Provajderi
+    //  4. Enter API key via Tools → Media Providers
     //  Nula koda, nula Visual Studio-a.
     // ══════════════════════════════════════════════════════════════════════════
     public class JsonMediaProvider : IMediaProvider
@@ -802,7 +802,7 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  JsonProviderLoader — Skenira Providers folder i učitava .iskraprovider
+    //  JsonProviderLoader — Scans the Providers folder and loads .iskraprovider files
     // ══════════════════════════════════════════════════════════════════════════
     public static class JsonProviderLoader
     {
@@ -811,7 +811,7 @@ namespace UltraVideoEditor
             "UltraVideoEditor", "Providers");
 
         /// <summary>
-        /// Učitava sve .iskraprovider fajlove iz Providers foldera.
+        /// Loads all .iskraprovider files from the Providers folder.
         /// Poziva se iz MediaProviderRegistry.RegisterDefaults().
         /// </summary>
         public static List<JsonMediaProvider> LoadAll()
@@ -832,7 +832,7 @@ namespace UltraVideoEditor
                 }
                 catch
                 {
-                    // Preskočiti oštećene fajlove tiho — ne krahirati aplikaciju
+                    // Silently skip damaged files — do not crash the application
                 }
             }
             return result;

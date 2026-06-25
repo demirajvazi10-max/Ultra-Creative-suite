@@ -11,14 +11,14 @@ namespace UltraVideoEditor
     // ═══════════════════════════════════════════════════════════════
     // ACCESSIBILITY REPORT GENERATOR  —  Faza 3 / C
     //
-    // Generiše kompletan audio-description skript za sve segmente.
-    // Izlaz je TXT fajl čitljiv screen readerom i TTS engineom.
+    // Generates a complete audio-description script for all segments.
+    // Output is a TXT file readable by a screen reader and TTS engine.
     //
-    // Struktura izveštaja:
+    // Report structure:
     //   1. Zaglavlje (metadata, trajanje, BPM)
     //   2. Per-segment audio description
     //   3. Navigacioni markeri (timestamp per segment)
-    //   4. Sažetak za TTS (kraće, bez ASCII art)
+    //   4. TTS summary (shorter, no ASCII art)
     // ═══════════════════════════════════════════════════════════════
 
     public class AccessibilityReportOptions
@@ -26,16 +26,16 @@ namespace UltraVideoEditor
         /// <summary>Ime projekta / videa za zaglavlje.</summary>
         public string ProjectName       { get; set; } = "Highlight Video";
 
-        /// <summary>Jezik izveštaja ("sr" ili "en").</summary>
+        /// <summary>Report language ("sr" or "en").</summary>
         public string Language          { get; set; } = "sr";
 
-        /// <summary>Da li uključiti TTS-optimizovanu verziju na kraju.</summary>
+        /// <summary>Whether to include TTS-optimized version at the end.</summary>
         public bool   IncludeTtsSummary { get; set; } = true;
 
-        /// <summary>Da li uključiti navigacione markere (timestamp listu).</summary>
+        /// <summary>Whether to include navigation markers (timestamp list).</summary>
         public bool   IncludeNavMarkers { get; set; } = true;
 
-        /// <summary>Da li uključiti detalje o prelazima.</summary>
+        /// <summary>Whether to include transition details.</summary>
         public bool   IncludeTransitions{ get; set; } = true;
     }
 
@@ -53,7 +53,7 @@ namespace UltraVideoEditor
         // ── Javni API ────────────────────────────────────────────────
 
         /// <summary>
-        /// Generiše accessibility report i opciono ga čuva na disk.
+        /// Generates an accessibility report and optionally saves it to disk.
         /// </summary>
         public static async Task<AccessibilityReport> GenerateAsync(
             HighlightResult              result,
@@ -75,7 +75,7 @@ namespace UltraVideoEditor
                 ? BuildTtsSummary(result, options)
                 : "";
 
-            // Sačuvaj ako je putanja prosleđena
+            // Save if path was provided
             if (!string.IsNullOrEmpty(outputPath))
             {
                 try
@@ -87,7 +87,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    return Fail($"Greška pri čuvanju: {ex.Message}");
+                    return Fail($"Error saving: {ex.Message}");
                 }
             }
 
@@ -131,17 +131,17 @@ namespace UltraVideoEditor
                                  : $"Music BPM:    {result.BPM:F1} BPM");
             sb.AppendLine();
 
-            // ── Audio podešavanja ────────────────────────────────────
+            // ── Audio settings ────────────────────────────────────
             if (audio != null)
             {
                 sb.AppendLine(sr ? "🔊 AUDIO MIX" : "🔊 AUDIO MIX");
-                sb.AppendLine(sr ? $"   Glasnoća muzike:      {audio.MusicVolume:F0}%"
+                sb.AppendLine(sr ? $"   Music volume:         {audio.MusicVolume:F0}%"
                                  : $"   Music volume:         {audio.MusicVolume:F0}%");
-                sb.AppendLine(sr ? $"   Glasnoća originalnog: {audio.ClipVolume:F0}%"
+                sb.AppendLine(sr ? $"   Original volume:      {audio.ClipVolume:F0}%"
                                  : $"   Original clip volume: {audio.ClipVolume:F0}%");
-                sb.AppendLine(sr ? $"   Ducking:              {(audio.EnableDucking ? "Uključen" : "Isključen")}"
+                sb.AppendLine(sr ? $"   Ducking:              {(audio.EnableDucking ? "Enabled" : "Disabled")}"
                                  : $"   Ducking:              {(audio.EnableDucking ? "Enabled" : "Disabled")}");
-                sb.AppendLine(sr ? $"   Normalizacija (LUFS): {(audio.NormalizeLoudness ? "-14 LUFS (YouTube)" : "Isključena")}"
+                sb.AppendLine(sr ? $"   Normalization (LUFS): {(audio.NormalizeLoudness ? "-14 LUFS (YouTube)" : "Disabled")}"
                                  : $"   Loudness norm (LUFS): {(audio.NormalizeLoudness ? "-14 LUFS (YouTube)" : "Disabled")}");
                 sb.AppendLine();
             }
@@ -160,7 +160,7 @@ namespace UltraVideoEditor
                 // Audio description tekst
                 sb.AppendLine($"       {BuildSegmentDescription(seg, sr)}");
 
-                // Tehničke info
+                // Technical info
                 sb.AppendLine(sr
                     ? $"       Skor: {seg.ImportanceScore:F0}/100  " +
                       $"Izvor: {Path.GetFileName(seg.SourcePath)} " +
@@ -170,7 +170,7 @@ namespace UltraVideoEditor
                       $"[{FormatTime(seg.SourceStart)}–{FormatTime(seg.SourceEnd)}]");
 
                 if (!string.IsNullOrEmpty(seg.ArcDescription) &&
-                    seg.ArcDescription != "bez izraženog arc-a")
+                    seg.ArcDescription != "no distinct arc")
                 {
                     sb.AppendLine(sr
                         ? $"       Razvoj kadra: {seg.ArcDescription}"
@@ -197,7 +197,7 @@ namespace UltraVideoEditor
             if (opts.IncludeNavMarkers)
             {
                 sb.AppendLine(sr ? "🗺️  NAVIGACIONI MARKERI" : "🗺️  NAVIGATION MARKERS");
-                sb.AppendLine(sr ? "(Za screen reader: koristite Ctrl+F da tražite timestamp)"
+                sb.AppendLine(sr ? "(For screen reader: use Ctrl+F to search for timestamp)"
                                  : "(For screen reader: use Ctrl+F to search for timestamp)");
                 sb.AppendLine();
 
@@ -221,9 +221,9 @@ namespace UltraVideoEditor
             int    dynamic  = result.Segments.Count(s => s.Motion != null && s.Motion.HasStrongMotion);
 
             sb.AppendLine(sr
-                ? $"   Prosečni skor:       {avgScore:F1}/100\n" +
-                  $"   Sa dinamičnim arc-om: {withArc}/{result.Segments.Count}\n" +
-                  $"   Dinamični kadrovi:    {dynamic}/{result.Segments.Count}\n" +
+                ? $"   Average score:       {avgScore:F1}/100\n" +
+                  $"   With dynamic arc:    {withArc}/{result.Segments.Count}\n" +
+                  $"   Dynamic frames:      {dynamic}/{result.Segments.Count}\n" +
                   $"   Pokrivenost targeta:  {result.TotalDuration / result.TargetDuration * 100:F1}%"
                 : $"   Average score:        {avgScore:F1}/100\n" +
                   $"   With dynamic arc:     {withArc}/{result.Segments.Count}\n" +
@@ -282,20 +282,20 @@ namespace UltraVideoEditor
         {
             var parts = new List<string>();
 
-            // Sadržaj
+            // Content
             if (!string.IsNullOrEmpty(seg.ContentDescription))
                 parts.Add(sr
-                    ? $"Prikazan sadržaj: {seg.ContentDescription}."
+                    ? $"Displayed content: {seg.ContentDescription}."
                     : $"Content: {seg.ContentDescription}.");
 
             // Kretanje kamere
             if (seg.Motion != null)
             {
                 if (seg.Motion.IsStatic)
-                    parts.Add(sr ? "Statičan kadar." : "Static shot.");
+                    parts.Add(sr ? "Static shot." : "Static shot.");
                 else if (seg.Motion.HasStrongMotion)
                     parts.Add(sr
-                        ? $"Dinamično kretanje kamere {seg.Motion.Direction}."
+                        ? $"Dynamic camera movement {seg.Motion.Direction}."
                         : $"Dynamic camera movement {seg.Motion.Direction}.");
                 else
                     parts.Add(sr ? "Blago kretanje kamere." : "Gentle camera movement.");

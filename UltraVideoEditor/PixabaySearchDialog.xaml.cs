@@ -78,7 +78,7 @@ namespace UltraVideoEditor
 
             _isVideoMode = selected.Tag?.ToString() == "video";
 
-            // Prikaži/sakrij video filtere
+            // Show/hide video filters
             if (videoFilters != null)
                 videoFilters.Visibility = _isVideoMode ? Visibility.Visible : Visibility.Collapsed;
 

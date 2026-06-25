@@ -13,26 +13,26 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Trajanje klipa (sekunde):" Foreground="White" FontSize="14" Margin="0,0,0,10"
-                   AutomationProperties.Name="Uputstvo za unos trajanja"/>
+        <TextBlock Text="Clip duration (seconds):" Foreground="White" FontSize="14" Margin="0,0,0,10"
+                   AutomationProperties.Name="Duration input instruction"/>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
             <TextBox x:Name="txtDuration" Width="100" Height="35" Text="5" 
                      TextAlignment="Center" FontSize="16" Margin="0,0,10,0"
-                     AutomationProperties.Name="Polje za unos trajanja u sekundama"
+                     AutomationProperties.Name="Duration input field in seconds"
                      AutomationProperties.HelpText="Enter seconds, decimal comma also accepted"/>
-            <TextBlock Text="sekundi" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+            <TextBlock Text="seconds" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button x:Name="btnOk" Content="✅ POTVRDI" Click="Ok_Click" Width="100" Height="35" 
+            <Button x:Name="btnOk" Content="✅ CONFIRM" Click="Ok_Click" Width="100" Height="35" 
                     Background="#2E7D32" Foreground="White" Margin="0,0,10,0"
-                    AutomationProperties.Name="Potvrdi trajanje"
-                    AutomationProperties.HelpText="Primenjuje uneto trajanje na klip"/>
+                    AutomationProperties.Name="Confirm duration"
+                    AutomationProperties.HelpText="Applies the entered duration to the clip"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" 
                     Background="#B71C1C" Foreground="White"
                     AutomationProperties.Name="Cancel"
-                    AutomationProperties.HelpText="Odustaje od promene trajanja"/>
+                    AutomationProperties.HelpText="Cancels the duration change"/>
         </StackPanel>
     </Grid>
 </Window>

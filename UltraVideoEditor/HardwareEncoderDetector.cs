@@ -21,7 +21,7 @@ namespace UltraVideoEditor
     {
         private static string ffmpegPath;
         private static List<HardwareEncoderInfo> _cachedEncoders;
-        // SemaphoreSlim sprečava race condition ako se GetAvailableEncodersAsync pozove paralelno
+        // SemaphoreSlim prevents race condition if GetAvailableEncodersAsync is called in parallel
         private static readonly SemaphoreSlim _cacheLock = new SemaphoreSlim(1, 1);
 
         static HardwareEncoderDetector()
@@ -30,7 +30,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća listu svih dostupnih hardverskih enkodera za H.264
+        /// Returns a list of all available hardware encoders for H.264
         /// </summary>
         public static async Task<List<HardwareEncoderInfo>> GetAvailableEncodersAsync(string codec = "h264")
         {
@@ -38,7 +38,7 @@ namespace UltraVideoEditor
             if (_cachedEncoders != null)
                 return _cachedEncoders;
 
-            // Lock sprečava duplo testiranje enkodera ako se pozove paralelno
+            // Lock prevents double testing of encoder if called in parallel
             await _cacheLock.WaitAsync();
             try
             {
@@ -78,7 +78,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća najbolji dostupni hardverski enkoder (ili null ako nijedan ne radi)
+        /// Returns the best available hardware encoder (or null if none work)
         /// </summary>
         public static async Task<string> GetBestEncoderAsync(string codec = "h264")
         {
@@ -87,7 +87,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća odgovarajuće parametre za FFmpeg na osnovu odabranog enkodera
+        /// Returns appropriate FFmpeg parameters based on the selected encoder
         /// </summary>
         public static string GetEncoderParams(string encoderName, string quality = "high")
         {
@@ -125,7 +125,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Testira da li određeni enkoder radi
+        /// Tests whether a specific encoder works
         /// </summary>
         private static async Task<bool> TestEncoderAsync(string encoderName, string testInputFile)
         {
@@ -169,7 +169,7 @@ namespace UltraVideoEditor
         /// </summary>
         private static async Task CreateTestVideoFile(string outputPath)
         {
-            // Generiše 1 sekundu test videa (crveni ekran)
+            // Generates 1 second of test video (red screen)
             var args = $"-y -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=30 -c:v libx264 -t 1 \"{outputPath}\"";
 
             var process = new Process
@@ -188,7 +188,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Resetuje keš (pozovite ako se hardver promeni)
+        /// Resets the cache (call if hardware changes)
         /// </summary>
         public static void ResetCache()
         {

@@ -56,11 +56,11 @@ namespace UltraVideoEditor
             var styleItem = cmbStyle.SelectedItem as ComboBoxItem;
             AnimationStyle = styleItem?.Tag?.ToString() ?? "FadeIn";
 
-            // Čitanje boje teksta iz combo box-a
+            // Read text color from combo box
             var textColorItem = cmbTextColor.SelectedItem as ComboBoxItem;
             TextColor = textColorItem?.Tag?.ToString() ?? "#FFFFFF";
 
-            // Čitanje boje pozadine iz combo box-a
+            // Read background color from combo box
             var bgColorItem = cmbBgColor.SelectedItem as ComboBoxItem;
             BgColor = bgColorItem?.Tag?.ToString() ?? "#000000";
 

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace UltraVideoEditor
 {
     // ═══════════════════════════════════════════════════════════════
-    // PROJECT TEMPLATE — čuva podešavanja bez klipoiva
+    // PROJECT TEMPLATE — stores settings without clips
     // ═══════════════════════════════════════════════════════════════
 
     public class ProjectTemplate
@@ -14,7 +14,7 @@ namespace UltraVideoEditor
         public string  Version         { get; set; } = "1.0";
         public DateTime CreatedAt      { get; set; } = DateTime.Now;
 
-        // Export podešavanja
+        // Export settings
         public string  ExportFormat    { get; set; } = "MP4";   // MP4, YouTube, Reels, MP3
         public string  ExportQuality   { get; set; } = "Medium";
         public string  ExportResolution{ get; set; } = "1920x1080";
@@ -27,7 +27,7 @@ namespace UltraVideoEditor
         public bool    ExportMP3       { get; set; } = false;
         public bool    ExportTxt       { get; set; } = false;
 
-        // AI podešavanja
+        // AI settings
         public string  ColorGradePreset{ get; set; } = "Auto";  // GradePreset.ToString()
         public string  Language        { get; set; } = "sr";
         public bool    UseGPU          { get; set; } = false;
@@ -38,7 +38,7 @@ namespace UltraVideoEditor
         public string  DefaultMusicPath{ get; set; } = "";
         public double  MusicVolume     { get; set; } = 1.0;
 
-        // Timeline podešavanja
+        // Timeline settings
         public double  ZoomLevel       { get; set; } = 1.0;
         public int     TrackFilter     { get; set; } = -1;
     }
@@ -64,17 +64,17 @@ namespace UltraVideoEditor
         public BatchJobStatus Status       { get; set; } = BatchJobStatus.Pending;
         public string         ErrorMessage { get; set; } = "";
         public double         ProgressPct  { get; set; } = 0;
-        public string         OutputFile   { get; set; } = "";   // rezultujući fajl
+        public string         OutputFile   { get; set; } = "";   // output file
 
         // Computed
         public string ProjectName => System.IO.Path.GetFileNameWithoutExtension(ProjectPath);
         public string StatusLabel => Status switch
         {
-            BatchJobStatus.Pending  => "⏳ Čeka",
+            BatchJobStatus.Pending  => "⏳ Pending",
             BatchJobStatus.Running  => "▶ Render…",
             BatchJobStatus.Done     => "✅ Gotovo",
-            BatchJobStatus.Error    => "❌ Greška",
-            BatchJobStatus.Skipped  => "⏭ Preskočen",
+            BatchJobStatus.Error    => "❌ Error",
+            BatchJobStatus.Skipped  => "⏭ Skipped",
             _                       => "?"
         };
     }

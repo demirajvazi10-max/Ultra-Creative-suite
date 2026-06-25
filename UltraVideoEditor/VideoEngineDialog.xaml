@@ -4,7 +4,7 @@
         Title="AI Video Engine" Height="720" Width="780"
         WindowStartupLocation="CenterOwner"
         Background="#1A1A2E" Foreground="White"
-        AutomationProperties.Name="AI Video Engine - profesionalni automatski video montazer za decije pesme">
+        AutomationProperties.Name="AI Video Engine - professional automatic video editor for children's songs">
 
     <Grid Margin="15">
         <Grid.RowDefinitions>
@@ -21,16 +21,16 @@
         <StackPanel HorizontalAlignment="Center" Margin="0,0,0,10">
             <TextBlock Text="AI VIDEO ENGINE" FontSize="22" FontWeight="Bold"
                        Foreground="#00E676" HorizontalAlignment="Center"/>
-            <TextBlock Text="Profesionalni automatski video montazer za decije pesme"
+            <TextBlock Text="Professional automatic video editor for children's songs"
                        Foreground="#888888" FontSize="11" HorizontalAlignment="Center"/>
         </StackPanel>
 
         <!-- Status -->
         <Border Grid.Row="1" Background="#1E1E1E" CornerRadius="6" Padding="10" Margin="0,0,0,8">
-            <TextBlock x:Name="txtStatus" Text="Inicijalizacija..."
+            <TextBlock x:Name="txtStatus" Text="Initializing..."
                        Foreground="#FF9800" TextWrapping="Wrap" FontSize="12"
                        AutomationProperties.LiveSetting="Assertive"
-                       AutomationProperties.Name="Status AI engine-a"/>
+                       AutomationProperties.Name="AI engine status"/>
         </Border>
 
         <!-- Opcije -->
@@ -41,13 +41,13 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="STIL VIDEA" FontSize="12" FontWeight="Bold"
+                    <TextBlock Text="VIDEO STYLE" FontSize="12" FontWeight="Bold"
                                Foreground="#00E676" Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <TextBlock Text="Intent:" Foreground="White" Width="60" VerticalAlignment="Center"/>
                         <ComboBox x:Name="cmbIntent" Width="190" Height="26"
                                   Background="#2D2D2D" Foreground="White"
-                                  AutomationProperties.Name="Stil i namjena videa">
+                                  AutomationProperties.Name="Video style and purpose">
                             <ComboBoxItem Tag="emotional" IsSelected="True">Emotional - ljubavna / porodica</ComboBoxItem>
                             <ComboBoxItem Tag="hype">Hype - energican, brzi rezovi</ComboBoxItem>
                             <ComboBoxItem Tag="dark">Dark - dramatican stil</ComboBoxItem>
@@ -55,46 +55,46 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Medij:" Foreground="White" Width="60" VerticalAlignment="Center"/>
+                        <TextBlock Text="Media:" Foreground="White" Width="60" VerticalAlignment="Center"/>
                         <ComboBox x:Name="cmbMedia" Width="130" Height="26"
                                   Background="#2D2D2D" Foreground="White"
-                                  AutomationProperties.Name="Tip medija za preuzimanje">
+                                  AutomationProperties.Name="Media type for download">
                             <ComboBoxItem Tag="video" IsSelected="True">Video klipovi</ComboBoxItem>
                             <ComboBoxItem Tag="image">Slike</ComboBoxItem>
                         </ComboBox>
-                        <CheckBox x:Name="chkTitles" Content="Titlovi"
+                        <CheckBox x:Name="chkTitles" Content="Subtitles"
                                   Foreground="White" Margin="12,0,0,0"
                                   VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                    <TextBlock Text="AI GENERISANJE" FontSize="12" FontWeight="Bold"
+                    <TextBlock Text="AI GENERATION" FontSize="12" FontWeight="Bold"
                                Foreground="#00E676" Margin="0,0,0,6"/>
                     <CheckBox x:Name="chkUseOllama"
-                              Content="Koristi Ollama AI za query-je"
+                              Content="Use Ollama AI for queries"
                               Foreground="White" Margin="0,0,0,4"
-                              AutomationProperties.Name="Ukljuci Ollama AI za generisanje Pixabay search query-ja"/>
+                              AutomationProperties.Name="Enable Ollama AI for generating Pixabay search queries"/>
                     <CheckBox x:Name="chkAmbient" IsChecked="True"
                               Content="🌳 Ambijentalni zvukovi (lokalna biblioteka)"
                               Foreground="White" Margin="0,4,0,4"
-                              AutomationProperties.Name="Preuzmi ambijentalne zvukove iz lokalne biblioteke i miksuj ispod muzike na 15 posto"/>
-                    <TextBlock x:Name="txtFreesoundInfo" Text="Lokalna biblioteka: provjera..."
+                              AutomationProperties.Name="Download ambient sounds from local library and mix under music at 15 percent"/>
+                    <TextBlock x:Name="txtFreesoundInfo" Text="Local library: checking..."
                                Foreground="#888888" FontSize="11" TextWrapping="Wrap"
                                Margin="0,0,0,4"/>
                     <TextBlock x:Name="txtOllamaInfo"
-                               Text="Ollama: provjera..." Foreground="#888888"
+                               Text="Ollama: checking..." Foreground="#888888"
                                FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Stihovi -->
+        <!-- Lyrics -->
         <Border Grid.Row="3" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <TextBlock Text="STIHOVI PESME" FontSize="12" FontWeight="Bold"
+                    <TextBlock Text="SONG LYRICS" FontSize="12" FontWeight="Bold"
                                Foreground="#00E676" VerticalAlignment="Center"/>
-                    <TextBlock Text=" — jedan stih po redu (refren ce biti automatski prepoznat)"
+                    <TextBlock Text=" — one lyric per row (chorus will be automatically recognized)"
                                Foreground="#888888" FontSize="11"
                                VerticalAlignment="Center" Margin="5,0,0,0"/>
                     <Button x:Name="btnAnalyze" Content="ANALIZIRAJ"
@@ -105,8 +105,8 @@
                 <TextBox x:Name="txtLyrics" Height="85" TextWrapping="Wrap"
                          AcceptsReturn="True" Background="#2D2D2D" Foreground="White"
                          Padding="8" VerticalScrollBarVisibility="Auto"
-                         AutomationProperties.Name="Stihovi pesme, jedan po redu"
-                         AutomationProperties.HelpText="Unesite stihove pesme, jedan stih po redu. Refren ce biti automatski prepoznat po ponavljanju."/>
+                         AutomationProperties.Name="Song lyrics, one per row"
+                         AutomationProperties.HelpText="Enter song lyrics, one per row. The chorus will be automatically recognized by repetition."/>
             </StackPanel>
         </Border>
 
@@ -118,7 +118,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <TextBlock Text="SHOT LISTA" FontSize="12" FontWeight="Bold"
+                    <TextBlock Text="SHOT LIST" FontSize="12" FontWeight="Bold"
                                Foreground="#00E676" VerticalAlignment="Center"/>
                     <TextBlock x:Name="txtShotCount" Text=""
                                Foreground="#888888" FontSize="11"
@@ -127,7 +127,7 @@
                 <ListBox x:Name="lstShots" Grid.Row="1"
                          Background="#2D2D2D" Foreground="White"
                          SelectionChanged="lstShots_SelectionChanged"
-                         AutomationProperties.Name="Shot lista - navigiraj strelicama za opis svakog kadra">
+                         AutomationProperties.Name="Shot list - navigate with arrows for description of each shot">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,2">
@@ -183,25 +183,25 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button x:Name="btnExportJson" Content="IZVEZI JSON"
+            <Button x:Name="btnExportJson" Content="EXPORT JSON"
                     Click="btnExportJson_Click" Height="34"
                     Background="#333" Foreground="White" Margin="0,0,6,0"
-                    AutomationProperties.Name="Izvezi shot listu kao JSON fajl"/>
+                    AutomationProperties.Name="Export shot list as JSON file"/>
             <Button x:Name="btnGenerate" Grid.Column="1"
-                    Content="KREIRAJ VIDEO" Click="btnGenerate_Click"
+                    Content="CREATE VIDEO" Click="btnGenerate_Click"
                     Height="34" Width="150" Margin="0,0,6,0"
                     Background="#2E7D32" Foreground="White" FontWeight="Bold"
-                    AutomationProperties.Name="Pokreni kreiranje - preuzmi medije i dodaj na timeline"/>
+                    AutomationProperties.Name="Start creation - download media and add to timeline"/>
             <Button x:Name="btnStop" Grid.Column="2"
-                    Content="ZAUSTAVI" Click="btnStop_Click"
+                    Content="STOP" Click="btnStop_Click"
                     Height="34" Width="100" IsEnabled="False" Margin="0,0,6,0"
                     Background="#B71C1C" Foreground="White" FontWeight="Bold"
-                    AutomationProperties.Name="Zaustavi operaciju"/>
+                    AutomationProperties.Name="Stop operation"/>
             <Button x:Name="btnClose" Grid.Column="3"
                     Content="ZATVORI" Click="btnClose_Click"
                     Height="34" Width="90"
                     Background="#424242" Foreground="White"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
         </Grid>
     </Grid>
 </Window>

@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Faza 3 dijalog: Tranzicije, Audio Miks, Accessibility i Export">
+        AutomationProperties.Name="Phase 3 dialog: Transitions, Audio Mix, Accessibility and Export">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
@@ -91,12 +91,12 @@
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="Tranzicije · Smart Audio Miks · Accessibility · Multi-format Export"
+            <TextBlock Text="Transitions · Smart Audio Mix · Accessibility · Multi-format Export"
                        FontSize="12" Foreground="{StaticResource TextMutedBrush}"
                        Margin="0,3,0,0"/>
         </StackPanel>
 
-        <!-- Scroll sadržaj -->
+        <!-- Scroll content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
@@ -112,47 +112,47 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="Glasnoća muzike (%)"
+                                <TextBlock Text="Music volume (%)"
                                            Style="{StaticResource FieldLabel}"/>
                                 <Slider x:Name="SliderMusicVol"
                                         Minimum="0" Maximum="100" Value="85"
                                         TickFrequency="5" IsSnapToTickEnabled="True"
                                         Foreground="{StaticResource AccentBrush}"
-                                        AutomationProperties.Name="Glasnoća muzike"/>
+                                        AutomationProperties.Name="Music volume"/>
                                 <TextBlock x:Name="TxtMusicVol" Text="85%"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11" Margin="0,2,0,8"/>
 
-                                <TextBlock Text="Glasnoća originalnog zvuka (%)"
+                                <TextBlock Text="Original audio volume (%)"
                                            Style="{StaticResource FieldLabel}"/>
                                 <Slider x:Name="SliderClipVol"
                                         Minimum="0" Maximum="100" Value="70"
                                         TickFrequency="5" IsSnapToTickEnabled="True"
                                         Foreground="{StaticResource AccentBrush}"
-                                        AutomationProperties.Name="Glasnoća originalnog zvuka"/>
+                                        AutomationProperties.Name="Original audio volume"/>
                                 <TextBlock x:Name="TxtClipVol" Text="70%"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                 <CheckBox x:Name="ChkDucking"
-                                          Content="Ducking (muzika se stišava na dijalogu)"
+                                          Content="Ducking (music lowers during dialogue)"
                                           IsChecked="True"
                                           Foreground="{StaticResource TextPrimaryBrush}"
                                           FontSize="12" Margin="0,0,0,8"
-                                          AutomationProperties.Name="Uključi audio ducking"/>
+                                          AutomationProperties.Name="Enable audio ducking"/>
                                 <CheckBox x:Name="ChkNormalize"
-                                          Content="Normalizuj na -14 LUFS (YouTube)"
+                                          Content="Normalize to -14 LUFS (YouTube)"
                                           IsChecked="True"
                                           Foreground="{StaticResource TextPrimaryBrush}"
                                           FontSize="12" Margin="0,0,0,8"
-                                          AutomationProperties.Name="Normalizuj glasnoću"/>
+                                          AutomationProperties.Name="Normalize volume"/>
                                 <CheckBox x:Name="ChkMuteOriginal"
-                                          Content="Mute originalni zvuk (samo muzika)"
+                                          Content="Mute original audio (music only)"
                                           IsChecked="False"
                                           Foreground="{StaticResource TextPrimaryBrush}"
                                           FontSize="12"
-                                          AutomationProperties.Name="Mute originalni zvuk klipova"/>
+                                          AutomationProperties.Name="Mute original clip audio"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -165,12 +165,12 @@
                                    Style="{StaticResource SectionHeader}"
                                    AutomationProperties.HeadingLevel="Level2"/>
                         <CheckBox x:Name="ChkEnableTransitions"
-                                  Content="Automatski dodaj prelaze između segmenata (beat-synced)"
+                                  Content="Automatically add transitions between segments (beat-synced)"
                                   IsChecked="True"
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   FontSize="12" Margin="0,0,0,8"
-                                  AutomationProperties.Name="Uključi automatske prelaze"/>
-                        <TextBlock Text="Tip prelaza se bira na osnovu sadržaja: action→flash, portrait→dissolve, arc→wipe…"
+                                  AutomationProperties.Name="Enable automatic transitions"/>
+                        <TextBlock Text="Transition type is selected based on content: action→flash, portrait→dissolve, arc→wipe…"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
@@ -183,23 +183,23 @@
                                    Style="{StaticResource SectionHeader}"
                                    AutomationProperties.HeadingLevel="Level2"/>
                         <CheckBox x:Name="ChkGenReport"
-                                  Content="Generiši audio-description izveštaj (TXT)"
+                                  Content="Generate audio-description report (TXT)"
                                   IsChecked="True"
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   FontSize="12" Margin="0,0,0,8"
-                                  AutomationProperties.Name="Generiši accessibility report"/>
+                                  AutomationProperties.Name="Generate accessibility report"/>
                         <CheckBox x:Name="ChkTtsSummary"
-                                  Content="Uključi TTS-optimizovani sažetak"
+                                  Content="Include TTS-optimized summary"
                                   IsChecked="True"
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   FontSize="12" Margin="0,0,0,4"
-                                  AutomationProperties.Name="Uključi TTS sažetak"/>
+                                  AutomationProperties.Name="Include TTS summary"/>
                         <CheckBox x:Name="ChkNavMarkers"
-                                  Content="Uključi navigacione markere (timestamp lista)"
+                                  Content="Include navigation markers (timestamp list)"
                                   IsChecked="True"
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   FontSize="12"
-                                  AutomationProperties.Name="Uključi navigacione markere"/>
+                                  AutomationProperties.Name="Include navigation markers"/>
                     </StackPanel>
                 </Border>
 
@@ -219,17 +219,17 @@
                                     Style="{StaticResource SecondaryButton}"
                                     Padding="12,7" Margin="6,0,0,0"
                                     Click="BtnPickFolder_Click"
-                                    AutomationProperties.Name="Odaberi output folder"/>
+                                    AutomationProperties.Name="Select output folder"/>
                             <TextBox x:Name="TxtOutputFolder"
                                      Background="{StaticResource SurfaceBrush}"
                                      Foreground="{StaticResource TextPrimaryBrush}"
                                      BorderBrush="{StaticResource BorderBrush}"
                                      BorderThickness="1" Padding="8,6"
                                      FontSize="12"
-                                     AutomationProperties.Name="Output folder putanja"/>
+                                     AutomationProperties.Name="Output folder path"/>
                         </DockPanel>
 
-                        <TextBlock Text="Formati za export:"
+                        <TextBlock Text="Export formats:"
                                    Style="{StaticResource FieldLabel}"/>
                         <WrapPanel Margin="0,4,0,0">
                             <CheckBox x:Name="ChkExportYoutube"
@@ -237,13 +237,13 @@
                                       IsChecked="True"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       FontSize="12" Margin="0,0,16,6"
-                                      AutomationProperties.Name="Export za YouTube FHD"/>
+                                      AutomationProperties.Name="Export for YouTube FHD"/>
                             <CheckBox x:Name="ChkExportReels"
                                       Content="📱 Reels / TikTok (1080×1920)"
                                       IsChecked="True"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       FontSize="12" Margin="0,0,16,6"
-                                      AutomationProperties.Name="Export za Instagram Reels i TikTok"/>
+                                      AutomationProperties.Name="Export for Instagram Reels and TikTok"/>
                             <CheckBox x:Name="ChkExportMp3"
                                       Content="🎵 MP3 Audio"
                                       IsChecked="True"
@@ -283,7 +283,7 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg"
-                               Text="Pokrećem…"
+                               Text="Starting…"
                                Foreground="{StaticResource TextPrimaryBrush}"
                                FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
@@ -296,23 +296,23 @@
             </StackPanel>
         </Border>
 
-        <!-- Dugmići -->
+        <!-- Buttons -->
         <DockPanel Grid.Row="3" LastChildFill="False">
             <Button x:Name="BtnClose"
                     DockPanel.Dock="Right"
-                    Content="Zatvori"
+                    Content="Close"
                     Style="{StaticResource SecondaryButton}"
                     Padding="16,9"
                     Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
             <Button x:Name="BtnRun"
                     DockPanel.Dock="Left"
-                    Content="🚀 Pokreni Fazu 3"
+                    Content="🚀 Start Phase 3"
                     Style="{StaticResource PrimaryButton}"
                     Padding="20,9"
                     Click="BtnRun_Click"
-                    AutomationProperties.Name="Pokreni sve Faza 3 operacije"
-                    AutomationProperties.HelpText="Primenjuje tranzicije, audio miks, generiše accessibility report i exportuje u sve odabrane formate"/>
+                    AutomationProperties.Name="Start all Phase 3 operations"
+                    AutomationProperties.HelpText="Applies transitions, audio mix, generates accessibility report and exports to all selected formats"/>
         </DockPanel>
     </Grid>
 </Window>

@@ -48,7 +48,7 @@ namespace UltraVideoEditor
         private string _audioPath;
         private double _totalDuration;
         private BeatInfo _beatInfo;
-        private double _audioStartSeconds = 0.0;  // Sekunde tišine na početku audio fajla
+        private double _audioStartSeconds = 0.0;  // Seconds of silence at the start of the audio file
         private double _cutAdvanceMs = 120.0;      // ms ranije od beat peaka (default 120ms)
         private List<AITranscription.WordTiming> _wordTimings = new();  // Whisper word timestamps
         private Dictionary<int, double> _lyricEndTimestamps = new Dictionary<int, double>(); // Whisper end times
@@ -69,7 +69,7 @@ namespace UltraVideoEditor
         private SongContext _songContext = new SongContext(); // Iskra AI-First: kontekst za StrictQueryEngine
 
         // ── Auto-Render: pokreni render automatski posle generisanja ─────────
-        // Korisnik postavi putanju, čekirа checkbox, krene spavati :)
+        // User sets path, checks checkbox, goes to sleep :)
         public string AutoRenderOutputPath { get; set; } = "";
         public bool AutoRenderEnabled { get; set; } = false;
         // Setuju se iz scene loopa da bi bili dostupni unutar SearchAndDownloadMedia
@@ -78,7 +78,7 @@ namespace UltraVideoEditor
         private string _detectedSeason = "";
 
         /// <summary>
-        /// Keširana rezolucija — čita se jednom na UI threadu pri pokretanju generisanja.
+        /// Cached resolution — read once on the UI thread at the start of generation.
         /// Koristi se sa background threadova bez Dispatcher problema.
         /// </summary>
         private string _cachedResolution = "1920x1080";
@@ -105,7 +105,7 @@ namespace UltraVideoEditor
             _cachedLang = string.IsNullOrWhiteSpace(lang) ? "sr" : lang;
         }
 
-        /// <summary>Širina u pikselima iz _targetResolution.</summary>
+        /// <summary>Width in pixels from _targetResolution.</summary>
         private int _targetWidth
         {
             get
@@ -126,7 +126,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// min_height za Pixabay API pretragu: za 4K tražimo 2160, za 1080 tražimo 1080, itd.
+        /// min_height for Pixabay API search: for 4K we request 2160, for 1080 we request 1080, etc.
         /// </summary>
         private int _pixabayMinHeight => _targetHeight;
 
@@ -143,8 +143,8 @@ namespace UltraVideoEditor
 
         private readonly HashSet<string> _usedMediaUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // FIX-COOLDOWN: Prati kada je određeni query tematski tip zadnji put korišćen
-        // Sprječava vizuelno ponavljanje sličnih kadrova (potok, šuma) u kratkom periodu
+        // FIX-COOLDOWN: Tracks when a specific query theme type was last used
+        // Prevents visual repetition of similar shots (stream, forest) in a short period
         // Key = normalized query tema (npr "stream water nature"), Value = zadnji timestamp scene
         private readonly Dictionary<string, int> _queryThemeCooldown =
             new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -153,7 +153,7 @@ namespace UltraVideoEditor
         private readonly HashSet<string> _seenPixabayIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _seenPexelsIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _queryUseCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        // Page rotation — kad se iscrpi prva stranica (30 rezultata), uzimamo sljedeću
+        // Page rotation — when the first page (30 results) is exhausted, we take the next
         private readonly Dictionary<string, int> _queryPageMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         private List<string> _universalKeywords = new List<string>
@@ -214,7 +214,7 @@ namespace UltraVideoEditor
 
         private async void AIVideoCreator_Loaded(object sender, RoutedEventArgs e)
         {
-            AutomationProperties.SetName(this, "AI Video Creator dijalog");
+            AutomationProperties.SetName(this, "AI Video Creator dialog");
             txtOllamaStatus.Text = L("ol_checking");
             txtOllamaStatus.Foreground = System.Windows.Media.Brushes.Orange;
 
@@ -278,11 +278,11 @@ namespace UltraVideoEditor
             int count = LocalSoundLibrary.GetSoundCount();
             if (count > 0)
             {
-                LogToMainWindow($"🔊 Lokalna zvučna biblioteka: {count} fajlova — ambijentalni zvukovi aktivni.");
+                LogToMainWindow($"🔊 Local sound library: {count} files — ambient sounds active.");
             }
             else
             {
-                LogToMainWindow("⚠️ Assets/Sounds/ prazan ili ne postoji — ambijentalni zvukovi neće biti dostupni.");
+                LogToMainWindow("⚠️ Assets/Sounds/ is empty or does not exist — ambient sounds will not be available.");
                 LogToMainWindow("   Postavi MP3/WAV fajlove u Assets/Sounds/ za aktivaciju.");
                 _enableAmbientSounds = false;
                 if (chkAmbientSounds != null) chkAmbientSounds.IsChecked = false;
@@ -331,7 +331,7 @@ namespace UltraVideoEditor
             {
                 var dlg = new Microsoft.Win32.OpenFileDialog
                 {
-                    Title = "Izaberi audio fajl za transkripciju",
+                    Title = "Select audio file for transcription",
                     Filter = L("filter_audio_video")
                 };
                 if (dlg.ShowDialog() != true) return;
@@ -341,21 +341,21 @@ namespace UltraVideoEditor
             if (!AITranscription.IsWhisperAvailable())
             {
                 var msg = L("whisper_not_found_msg") + Environment.NewLine + Environment.NewLine +
-                          "Instaliraj ga na jedan od ova dva nacina:" + Environment.NewLine + Environment.NewLine +
-                          "OPCIJA A - Python (preporuceno):" + Environment.NewLine +
+                          "Install it in one of these two ways:" + Environment.NewLine + Environment.NewLine +
+                          "OPTION A - Python (recommended):" + Environment.NewLine +
                           "  pip install openai-whisper" + Environment.NewLine + Environment.NewLine +
-                          "OPCIJA B - Standalone (bez Python-a):" + Environment.NewLine +
-                          "  Preuzmi faster-whisper-xxl.exe" + Environment.NewLine +
-                          "  i stavi ga pored UltraVideoEditor.exe" + Environment.NewLine + Environment.NewLine +
-                          "Nakon instalacije, ponovo pokreni aplikaciju.";
+                          "OPTION B - Standalone (no Python required):" + Environment.NewLine +
+                          "  Download faster-whisper-xxl.exe" + Environment.NewLine +
+                          "  and place it next to UltraVideoEditor.exe" + Environment.NewLine + Environment.NewLine +
+                          "After installation, restart the application.";
                 WpfMessageBox.Show(msg, L("whisper_not_found_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             btnAutoTranscribe.IsEnabled = false;
-            btnAutoTranscribe.Content = "⏳ Transkribujem...";
+            btnAutoTranscribe.Content = "⏳ Transcribing...";
             if (txtTranscribeStatus != null)
-                txtTranscribeStatus.Text = "Pokrecem Whisper...";
+                txtTranscribeStatus.Text = "Starting Whisper...";
 
             var progress = new Progress<string>(msg =>
             {
@@ -404,7 +404,7 @@ namespace UltraVideoEditor
             finally
             {
                 btnAutoTranscribe.IsEnabled = true;
-                btnAutoTranscribe.Content = "🎤 Transkribuj iz audio";
+                btnAutoTranscribe.Content = "🎤 Transcribe from audio";
             }
         }
 
@@ -413,7 +413,7 @@ namespace UltraVideoEditor
             var mainWindow = WpfApp.Current.MainWindow as MainWindow;
             if (mainWindow == null) { WpfMessageBox.Show(L("mainwindow_not_available"), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error); return; }
 
-            CacheResolutionFromUIThread(); // čitamo rezoluciju dok smo još na UI threadu
+            CacheResolutionFromUIThread(); // read resolution while still on UI thread
 
             _enableTransitionSounds = chkTransitionSounds.IsChecked == true;
             _enableAmbientSounds = chkAmbientSounds.IsChecked == true;
@@ -574,19 +574,19 @@ namespace UltraVideoEditor
             string allText = string.Join(" ", lyrics).ToLower();
             var scores = new Dictionary<string, int> { ["music"] = 0, ["lullaby"] = 0, ["party"] = 0, ["love"] = 0, ["sad"] = 0, ["adventure"] = 0, ["nature"] = 0, ["dance"] = 0, ["school"] = 0, ["animal"] = 0, ["christmas"] = 0, ["outdoor"] = 0, ["seasons"] = 0, ["health"] = 0, ["fun"] = 1 };
 
-            string[] musicW = { "muzik", "melodij", "pesm", "pjesm", "svira", "instrument", "nota", "ritam", "zvuk", "gitara", "klavir", "bubanj", "violina", "flauta", "pevaj", "pjevaj", "muzičar", "koncert", "slušaj muzik", "blago muzik" };
-            string[] lullabyW = { "spavaj", "usni", "sni", "laku noć", "uspavanka", "sleep", "lullaby", "goodnight", "moonlight" };
-            string[] partyW = { "sretan", "srećan", "rođendan", "baloni", "torta", "birthday", "party", "balloon", "cake", "celebrate" };
+            string[] musicW = { "muzik", "melodij", "pesm", "pjesm", "svira", "instrument", "nota", "ritam", "zvuk", "gitara", "klavir", "bubanj", "violina", "flauta", "pevaj", "pjevaj", "muzicar", "koncert", "slusaj muzik", "blago muzik" };
+            string[] lullabyW = { "spavaj", "usni", "sni", "laku noc", "uspavanka", "sleep", "lullaby", "goodnight", "moonlight" };
+            string[] partyW = { "sretan", "srecan", "rodjendan", "baloni", "torta", "birthday", "party", "balloon", "cake", "celebrate" };
             string[] loveW = { "volim", "ljubav", "srce", "draga", "dragi", "love", "heart", "kiss", "hug", "romance" };
-            string[] sadW = { "plačem", "suze", "tužan", "tuga", "cry", "tears", "sad", "alone", "lonely", "goodbye" };
-            string[] adventW = { "istraži", "avantura", "planina", "šuma", "adventure", "explore", "mountain", "forest", "discover" };
-            string[] natureW = { "cvijet", "proljeće", "jesen", "zima", "ljeto", "priroda", "flower", "spring", "autumn", "winter", "summer", "nature" };
-            string[] danceW = { "pleši", "igraj", "ples", "ritam", "dance", "dancing", "rhythm", "music", "sing" };
-            string[] schoolW = { "škola", "učenje", "knjiga", "učitelj", "school", "learn", "book", "teacher", "class" };
+            string[] sadW = { "placem", "suze", "tuzan", "tuga", "cry", "tears", "sad", "alone", "lonely", "goodbye" };
+            string[] adventW = { "istrazi", "avantura", "planina", "suma", "adventure", "explore", "mountain", "forest", "discover" };
+            string[] natureW = { "cvijet", "proljece", "jesen", "zima", "ljeto", "priroda", "flower", "spring", "autumn", "winter", "summer", "nature" };
+            string[] danceW = { "plesi", "igraj", "ples", "ritam", "dance", "dancing", "rhythm", "music", "sing" };
+            string[] schoolW = { "skola", "ucenje", "knjiga", "ucitelj", "school", "learn", "book", "teacher", "class" };
             string[] animalW = { "pas", "maca", "konj", "zec", "ptica", "dog", "cat", "horse", "bunny", "animal" };
-            string[] xmasW = { "božić", "nova godina", "snijeg", "jelka", "christmas", "santa", "snow", "holiday", "gift" };
-            string[] outdoorW = { "šetaj", "šetnja", "trči", "park", "outdoor", "walk", "run", "playground", "park", "outside" };
-            string[] seasonsW = { "proleće", "proljeće", "jesen", "zima", "leto", "ljeto", "spring", "autumn", "fall", "winter", "summer", "seasons" };
+            string[] xmasW = { "bozic", "nova godina", "snijeg", "jelka", "christmas", "santa", "snow", "holiday", "gift" };
+            string[] outdoorW = { "setaj", "setnja", "trci", "park", "outdoor", "walk", "run", "playground", "park", "outside" };
+            string[] seasonsW = { "prolece", "proljece", "jesen", "zima", "leto", "ljeto", "spring", "autumn", "fall", "winter", "summer", "seasons" };
             string[] healthW = { "zdravlje", "zdravo", "zdravi", "kretanje", "health", "healthy", "exercise", "active", "fit", "movement" };
 
             foreach (var w in musicW) if (allText.Contains(w)) scores["music"] += 4;
@@ -608,7 +608,7 @@ namespace UltraVideoEditor
             string mood = ctx switch { "music" => "upbeat", "lullaby" => "calm", "sad" => "melancholy", "love" => "romantic", "party" => "excited", "adventure" => "energetic", "dance" => "upbeat", "christmas" => "joyful", "animal" => "playful", "school" => "curious", "nature" => "peaceful", "outdoor" => "happy", _ => "happy" };
 
             string season = "none";
-            if (allText.Contains("proleć") || allText.Contains("spring")) season = "spring";
+            if (allText.Contains("prolec") || allText.Contains("spring")) season = "spring";
             else if (allText.Contains("jesen") || allText.Contains("autumn")) season = "autumn";
             else if (allText.Contains("zima") || allText.Contains("winter")) season = "winter";
             else if (allText.Contains("leto") || allText.Contains("summer")) season = "summer";
@@ -616,20 +616,20 @@ namespace UltraVideoEditor
 
             string themeByCtx = ctx switch
             {
-                "music" => "Dječija pjesma o muzici",
-                "lullaby" => "Uspavanka",
-                "party" => "Vesela proslava",
-                "love" => "Pjesma o ljubavi",
-                "sad" => "Tužna pjesma",
-                "adventure" => "Avantura",
-                "nature" => "Priroda i životinje",
-                "dance" => "Ples i ritam",
-                "school" => "Školska pjesma",
-                "animal" => "Životinje",
-                "christmas" => "Božićna pjesma",
-                "outdoor" => "Dječija pjesma o šetnji i igri",
-                "health" => "Zdravlje i aktivnost djece",
-                _ => "Dječija pjesma"
+                "music" => "Children's song about music",
+                "lullaby" => "Lullaby",
+                "party" => "Fun celebration",
+                "love" => "Love song",
+                "sad" => "Sad song",
+                "adventure" => "Adventure",
+                "nature" => "Nature and animals",
+                "dance" => "Dance and rhythm",
+                "school" => "School song",
+                "animal" => "Animals",
+                "christmas" => "Christmas song",
+                "outdoor" => "Children's song about walking and playing",
+                "health" => "Children's health and activity",
+                _ => "Children's song"
             };
 
             return new SongAnalysis
@@ -673,20 +673,20 @@ namespace UltraVideoEditor
                 string batchText = string.Join("\n", batch.Select((l, idx) => $"{batchStart + idx + 1}. {l}"));
 
                 string prompt =
-                    "VIDEO REZIJA - SIMBOLICKA I KONTEKSTUALNA INTERPRETACIJA\n\n" +
-                    "Tema pjesme: " + analysis.Theme + " | Stil: " + analysis.VisualStyle + " | Mood: " + analysis.Mood + "\n\n" +
-                    "Stihovi:\n" + batchText + "\n\n" +
-                    "KORAK 1 - GLAGOL RADNJE: ta RADNJA mora biti dominantna u kadru.\n" +
-                    "Primjeri: gledam u nebo -> person looking up at sky\n" +
-                    "trcim poljem -> child running through meadow\n\n" +
-                    "KORAK 2 - SIMBOLIKA: fokus na AKTIVNOSTI, ne bukvalnom objektu.\n" +
-                    "imam kucu na majici -> child wearing graphic tee clothing\n\n" +
-                    "KORAK 3 - VIZUELNA METAFORA: trazi EMOCIJU u vizualnom ekvivalentu.\n" +
-                    "srce mi se smije -> child laughing sunlight warm rays\n" +
-                    "lako mi je -> child arms open spinning outdoor freedom\n\n" +
-                    "PRAVILA: specificna radnja, lica s emocijom.\n" +
-                    "ZABRANJENO: genericno happy child in park, pejzazi bez osobe.\n\n" +
-                    "Odgovori ISKLJUCIVO JSON:\n[\n" +
+                    "VIDEO DIRECTION - SYMBOLIC AND CONTEXTUAL INTERPRETATION\n\n" +
+                    "Song theme: " + analysis.Theme + " | Style: " + analysis.VisualStyle + " | Mood: " + analysis.Mood + "\n\n" +
+                    "Lyrics:\n" + batchText + "\n\n" +
+                    "STEP 1 - ACTION VERB: that ACTION must dominate the frame.\n" +
+                    "Examples: looking at the sky -> person looking up at sky\n" +
+                    "running through the field -> child running through meadow\n\n" +
+                    "STEP 2 - SYMBOLISM: focus on the ACTIVITY, not the literal object.\n" +
+                    "wearing a house on shirt -> child wearing graphic tee clothing\n\n" +
+                    "STEP 3 - VISUAL METAPHOR: find the EMOTION in a visual equivalent.\n" +
+                    "my heart is smiling -> child laughing sunlight warm rays\n" +
+                    "I feel light -> child arms open spinning outdoor freedom\n\n" +
+                    "RULES: specific action, faces with emotion.\n" +
+                    "FORBIDDEN: generic happy child in park, landscapes without a person.\n\n" +
+                    "Respond ONLY with JSON:\n[\n" +
                     "  {\"line\": " + (batchStart + 1) + ", \"keywords\": \"primary EN query max 6 words\", \"fallback_keywords\": \"fallback EN max 5 words\", \"ambient\": \"sound\"},\n" +
                     "  {\"line\": " + (batchStart + 2) + ", \"keywords\": \"...\", \"fallback_keywords\": \"...\", \"ambient\": \"...\"}\n]";
 
@@ -710,7 +710,7 @@ namespace UltraVideoEditor
                                     r.Keywords.Length < 5;
 
                                 bool hasCyrillic = r.Keywords?.Any(c => c > 0x400 && c < 0x500) ?? false;
-                                bool hasLatin = r.Keywords?.Any(c => "šđčćžŠĐČĆŽ".Contains(c)) ?? false;
+                                bool hasLatin = r.Keywords?.Any(c => "sdjcz".Contains(c)) ?? false; // simplified latin check
 
                                 var genericPhrases = new[] { "happy child", "child playing", "children playing", "warm colors", "soft light" };
                                 bool isTooGeneric = genericPhrases.Any(p => r.Keywords?.ToLower() == p);
@@ -729,7 +729,7 @@ namespace UltraVideoEditor
                                     "cemetery", "graveyard", "funeral" };
                                 bool hasAdultContent = adultKeywords.Any(w => r.Keywords?.ToLower().Contains(w) ?? false);
 
-                                // Kontekstualne zabrane — spriječava kamin/slaninu u health/outdoor pesmama
+                                // Contextual bans — prevents fireplace/bacon in health/outdoor songs
                                 var contextForbidden = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase) {
                                     { "health",   new[] { "fireplace", "campfire indoor", "cooking", "frying", "kitchen", "bacon", "candle warm", "chimney", "living room cozy", "hot drink" } },
                                     { "outdoor",  new[] { "fireplace", "indoor cozy", "kitchen", "cooking", "living room" } },
@@ -1003,48 +1003,48 @@ namespace UltraVideoEditor
                 {"kamion","truck"}, {"bus","bus"}, {"autobus","bus"}, {"voz","train"},
                 {"bicikl","bicycle"}, {"motor","motorcycle"}, {"avion","airplane"},
 
-                {"pas","dog"}, {"mačka","cat"}, {"macka","cat"}, {"patka","duck"},
+                {"pas","dog"}, {"macka","cat"}, {"patka","duck"},
                 {"veverica","squirrel"}, {"zec","rabbit"}, {"ptica","bird"},
                 {"riba","fish"}, {"konj","horse"},
 
-                // PATCH 3 — Domestic Animal Override: divlje/stočne životinje → dog
+                // PATCH 3 — Domestic Animal Override: wild/farm animals → dog
                 {"krava","dog"}, {"ovca","dog"}, {"koza","dog"},
                 {"vuk","dog"}, {"medved","dog"}, {"lisica","dog"},
                 {"jelen","dog"}, {"los","dog"},
 
-                {"park","park"}, {"parkić","park"}, {"šuma","forest"}, {"suma","forest"},
-                {"plaža","beach"}, {"more","sea"}, {"reka","river"}, {"rijeka","river"},
-                // VIBE CHECK: planina → garden, livada → garden, dvorište → playground
-                {"planina","garden"}, {"livada","garden"}, {"bašta","garden"},
-                {"dvorište","playground"}, {"ulica","street"}, {"grad","city"},
-                {"škola","school"}, {"kuća","house"}, {"dom","home"},
+                {"park","park"}, {"parkic","park"}, {"suma","forest"},
+                {"plaza","beach"}, {"more","sea"}, {"reka","river"}, {"rijeka","river"},
+                // VIBE CHECK: mountain → garden, meadow → garden, yard → playground
+                {"planina","garden"}, {"livada","garden"}, {"basta","garden"},
+                {"dvoriste","playground"}, {"ulica","street"}, {"grad","city"},
+                {"skola","school"}, {"kuca","house"}, {"dom","home"},
 
-                {"sladoled","ice cream"}, {"torta","cake"}, {"čokolada","chocolate"},
+                {"sladoled","ice cream"}, {"torta","cake"}, {"cokolada","chocolate"},
                 {"jabuka","apple"}, {"banana","banana"}, {"hleb","bread"},
-                {"čaj","tea"}, {"sok","juice"}, {"mleko","milk"},
+                {"caj","tea"}, {"sok","juice"}, {"mleko","milk"},
 
                 // ACTION BIAS: smeje → smiling (toplije od laughing)
-                {"trči","running"}, {"trčanje","running"}, {"šeta","walking"},
-                {"šetaj","walking"}, {"šetnja","walking"}, {"skače","jumping"},
-                {"igra","playing"}, {"pleše","dancing"}, {"peva","singing"},
-                {"čita","reading"}, {"crta","drawing"}, {"slika","painting"},
+                {"trci","running"}, {"trcanje","running"}, {"seta","walking"},
+                {"setaj","walking"}, {"setnja","walking"}, {"skace","jumping"},
+                {"igra","playing"}, {"plese","dancing"}, {"peva","singing"},
+                {"cita","reading"}, {"crta","drawing"}, {"slika","painting"},
                 {"spava","sleeping"}, {"jede","eating"}, {"pije","drinking"},
                 {"pliva","swimming"}, {"vozi","riding"}, {"nosi","carrying"},
-                {"grli","hugging"}, {"smeje","smiling"}, {"plače","crying"},
+                {"grli","hugging"}, {"smeje","smiling"}, {"place","crying"},
 
                 // PATCH 2 — Seasonal Override: zima/sneg → summer/sunny
-                {"prolece","spring"}, {"proleće","spring"}, {"proljeće","spring"},
+                {"prolece","spring"}, {"prolece","spring"}, {"proljece","spring"},
                 {"leto","summer"}, {"ljeto","summer"}, {"jesen","autumn"},
                 {"zima","summer"}, {"sneg","sunny"}, {"snijeg","sunny"},
-                {"kiša","rain"}, {"sunce","sun"}, {"vetar","wind"}, {"vjetar","wind"},
+                {"kisa","rain"}, {"sunce","sun"}, {"vetar","wind"}, {"vjetar","wind"},
 
-                {"lopta","ball"}, {"igračka","toy"}, {"lutka","doll"},
+                {"lopta","ball"}, {"igracka","toy"}, {"lutka","doll"},
                 {"knjiga","book"}, {"olovka","pencil"}, {"torba","bag"},
-                {"kapa","hat"}, {"čizme","boots"}, {"rukavice","gloves"},
-                {"šal","scarf"}, {"kaput","coat"}, {"haljina","dress"},
+                {"kapa","hat"}, {"cizme","boots"}, {"rukavice","gloves"},
+                {"sal","scarf"}, {"kaput","coat"}, {"haljina","dress"},
 
-                {"sretan","happy"}, {"srečan","happy"}, {"vesel","joyful"},
-                {"tužan","sad"}, {"ljut","angry"}, {"uplašen","scared"},
+                {"sretan","happy"}, {"srecan","happy"}, {"vesel","joyful"},
+                {"tuzan","sad"}, {"ljut","angry"}, {"uplasen","scared"},
                 {"zdravo","healthy"}, {"jako","strong"}, {"malo","little"},
                 {"veliko","big"}, {"lepo","beautiful"}, {"lijepo","beautiful"},
             };
@@ -1075,29 +1075,29 @@ namespace UltraVideoEditor
                 "desert", "static", "empty", "lonely",
                 "abandoned", "ghost", "wasteland", "void",
 
-                // === PATCH 6: Gym/Fitness Ban (hirurški — samo bilder) ===
+                // === PATCH 6: Gym/Fitness Ban (surgical — bodybuilder only) ===
                 "gym", "fitness", "workout", "kettlebell", "bodybuilding",
                 "weightlifting", "dumbbell", "barbell", "crossfit",
 
                 // === PATCH 8: Kids Edition — Adult Content Vibe Filter ===
-                // Trudnoća / medicinski anatomski planovi
+                // Pregnancy / medical anatomical shots
                 "pregnant", "pregnancy", "maternity", "prenatal", "belly", "bump",
                 "ultrasound", "embryo", "fetus", "womb", "obstetric",
                 // Teretana — dodatni izrazi
                 "treadmill", "pushup", "situp", "plank", "squat", "lunge",
                 "deadlift", "pullup", "chinup", "burpee",
                 "hiit", "cardio", "spinning", "aerobic",
-                // Saobraćaj / urbane gužve
+                // Traffic / urban crowds
                 "traffic", "highway", "freeway", "motorway", "intersection",
                 "commute", "rush", "crowded", "subway", "metro",
-                // Kliničko / medicinsko
+                // Clinical / medical
                 "hospital", "clinic", "surgery", "medical", "doctor", "nurse",
                 "injection", "syringe", "pill", "medicine", "pharmacy",
-                // Previše odraslo / apstraktno
+                // Too adult / abstract
                 "corporate", "business", "meeting", "conference",
                 "dating", "romance", "intimate", "adult",
 
-                // === PATCH 9: Anomalija-Fix "Vrtić Preciznost" ===
+                // === PATCH 9: Anomaly-Fix "Kindergarten Precision" ===
                 // ANOMALIJA 2: Tech/Audio oprema — gramofon, mikset, studio
                 "gramophone", "turntable", "vinyl", "record player", "vinyl record",
                 "audio mixer", "mixing board", "sound board", "mixing console",
@@ -1106,9 +1106,9 @@ namespace UltraVideoEditor
                 "headphones professional", "microphone studio", "speaker system",
                 "amplifier", "synthesizer", "equalizer", "audio interface",
 
-                // === PATCH 11: Proširena gym crna lista — hvatamo sve Pixabay tag varijante ===
-                // Kettlebell specifično (Pixabay koristi razne varijante)
-                "girja", "girje", "tegovi", "teg", "bučica", "bučice",
+                // === PATCH 11: Extended gym blacklist — catching all Pixabay tag variants ===
+                // Kettlebell specific (Pixabay uses various variants)
+                "girja", "girje", "tegovi", "teg", "bucica", "bucice",
                 "kettlebell swing", "kettlebell workout", "kettlebell training",
                 "dumbbell workout", "dumbbell exercise", "weight training",
                 "strength training", "muscle training", "gym training",
@@ -1116,12 +1116,12 @@ namespace UltraVideoEditor
                 "sports equipment", "workout equipment", "gym equipment",
                 "athletic training", "physical training", "body workout",
                 "sport exercise", "fitness exercise", "health exercise",
-                // Sve što zvuči kao "vežbanje" a nije dečija igra
+                // Anything that sounds like "exercise" but is not children's play
                 "jogging adult", "running adult", "cycling adult", "swimming adult",
                 "sport adult", "athlete", "athletics", "sportsman", "sportswoman",
             };
 
-            // VIBE CHECK: zameni generički "nature" sa "park" u ulaznim stringovima
+            // VIBE CHECK: replace generic "nature" with "park" in input strings
             keywords = System.Text.RegularExpressions.Regex.Replace(keywords ?? "", @"\bnature\b", "park", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             style = System.Text.RegularExpressions.Regex.Replace(style ?? "", @"\bnature\b", "garden", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
@@ -1136,7 +1136,7 @@ namespace UltraVideoEditor
             var englishWords = new List<string>();
             foreach (var word in parts)
             {
-                string clean = System.Text.RegularExpressions.Regex.Replace(word, @"[^a-zA-ZšđčćžŠĐČĆŽ\-]", "");
+                string clean = System.Text.RegularExpressions.Regex.Replace(word, @"[^a-zA-Z\-]", "");
                 if (string.IsNullOrEmpty(clean)) continue;
 
                 if (srToEn.TryGetValue(clean, out string translated))
@@ -1194,7 +1194,7 @@ namespace UltraVideoEditor
                 finalWords.AddRange(append);
 
             // ─────────────────────────────────────────────────────────────
-            // PATCH 4 — CHILD PLAY BOOST (Sestričinin feedback)
+            // PATCH 4 — CHILD PLAY BOOST (niece's feedback)
             //   Svaki query: "happy children playing <kontekst> playground kids fun"
             // ─────────────────────────────────────────────────────────────
             const string CHILD_PLAY_PREFIX = "happy children playing";
@@ -1239,18 +1239,18 @@ namespace UltraVideoEditor
             string lower = lyric.ToLower();
 
             // ── KORAK 0: Subject Hierarchy — simbolika vs. bukvalnost ─────────
-            // Detekcija fraza gdje imenica je DETALJ odjeće/predmeta, ne primarni subjekt
+            // Detection of phrases where the noun is a DETAIL of clothing/object, not the primary subject
             bool isClothingDetail = (lower.Contains("na majici") || lower.Contains("na dresu") ||
                                      lower.Contains("na jakni") || lower.Contains("na kaputu") ||
-                                     lower.Contains("na šeširu") || lower.Contains("on shirt") ||
+                                     lower.Contains("na sesiru") || lower.Contains("on shirt") ||
                                      lower.Contains("on jacket") || lower.Contains("on hat"));
             if (isClothingDetail)
                 return "child wearing colorful outfit graphic tee clothing detail candid";
 
             // Vizuelna metafora — apstraktne emotivne fraze → vizuelni ekvivalent emocije
-            bool isAbstractEmotion = (lower.Contains("srce mi se") || lower.Contains("duša mi") ||
+            bool isAbstractEmotion = (lower.Contains("srce mi se") || lower.Contains("dusa mi") ||
                                        lower.Contains("heart is") || lower.Contains("soul is") ||
-                                       lower.Contains("lako mi je") || lower.Contains("teško mi") ||
+                                       lower.Contains("lako mi je") || lower.Contains("tesko mi") ||
                                        lower.Contains("sve je lijepo") || lower.Contains("sve je lepo") ||
                                        lower.Contains("svijetlim") || lower.Contains("svetlim") ||
                                        lower.Contains("sjajim") || lower.Contains("lebdim"));
@@ -1268,54 +1268,54 @@ namespace UltraVideoEditor
 
             // Action Priority — glagol radnje kao dominantni element
             // "gledam u nebo" → osoba koja gleda, ne samo nebo
-            if ((lower.Contains("gledam") || lower.Contains("gledaš") || lower.Contains("looking")) &&
+            if ((lower.Contains("gledam") || lower.Contains("gledas") || lower.Contains("looking")) &&
                 (lower.Contains("nebo") || lower.Contains("sky") || lower.Contains("zvijezde") || lower.Contains("stars")))
                 return "child looking up sky wonder outdoor candid";
-            if ((lower.Contains("trčim") || lower.Contains("trčiš") || lower.Contains("trče") || lower.Contains("running")) &&
+            if ((lower.Contains("trcim") || lower.Contains("trcis") || lower.Contains("trce") || lower.Contains("running")) &&
                 !lower.Contains("auto") && !lower.Contains("bicikl"))
                 return "child running outdoor meadow candid natural";
-            if (lower.Contains("skačem") || lower.Contains("skači") || lower.Contains("skačemo") || lower.Contains("jumping"))
+            if (lower.Contains("skacem") || lower.Contains("skaci") || lower.Contains("skacemo") || lower.Contains("jumping"))
                 return "child jumping outdoor joyful candid natural";
-            if (lower.Contains("plešem") || lower.Contains("plesati") || lower.Contains("plešemo") || lower.Contains("dancing"))
+            if (lower.Contains("plasem") || lower.Contains("plesati") || lower.Contains("plasemo") || lower.Contains("dancing"))
                 return "child dancing outdoor joyful movement candid";
             if (lower.Contains("pjevam") || lower.Contains("pjevamo") || lower.Contains("singing"))
                 return "child singing joyful outdoor candid natural";
             // ─────────────────────────────────────────────────────────────────
 
-            // ── Sezonska logika — ako stih pominje godišnje doba, prisilno koristimo sezonske kadrove
+            // ── Seasonal logic — if the lyric mentions a season, we force seasonal shots
             if (lower.Contains("zima") || lower.Contains("zimska") || lower.Contains("zimski") ||
                 lower.Contains("winter") || lower.Contains("sneg") || lower.Contains("snijeg") ||
                 lower.Contains("mraz") || lower.Contains("led "))
                 return "children winter snow playing outdoor cozy warm";
 
-            if (lower.Contains("prolece") || lower.Contains("proleće") || lower.Contains("proljeće") ||
+            if (lower.Contains("prolece") || lower.Contains("prolece") || lower.Contains("proljece") ||
                 lower.Contains("spring") || lower.Contains("cvet") || lower.Contains("cvijet") ||
                 lower.Contains("cveta") || lower.Contains("cvjeta"))
                 return "children spring park flowers blooming sunny";
 
             if (lower.Contains("leto") || lower.Contains("ljeto") || lower.Contains("ljetna") ||
                 lower.Contains("letnja") || lower.Contains("summer") || lower.Contains("sunce") ||
-                lower.Contains("plažа") || lower.Contains("plaža"))
+                lower.Contains("plaza"))
                 return "children summer sunny outdoor playing beach";
 
             if (lower.Contains("jesen") || lower.Contains("jesenja") || lower.Contains("jesenji") ||
-                lower.Contains("autumn") || lower.Contains("fall ") || lower.Contains("lišće") ||
-                lower.Contains("lisce") || lower.Contains("lišce"))
+                lower.Contains("autumn") || lower.Contains("fall ") || lower.Contains("lisce") ||
+                lower.Contains("lisce"))
                 return "children autumn leaves park golden colors";
             if (lower.Contains("automobil") || lower.Contains(" auto ") || lower.Contains("kolima") ||
-                lower.Contains("autić") || lower.Contains("kola ") || lower.Contains(" kola"))
+                lower.Contains("autic") || lower.Contains("kola ") || lower.Contains(" kola"))
                 return "car driving street";
             if (lower.Contains("bicikl") || lower.Contains("biciklo") || lower.Contains("biciklu"))
                 return "child riding bicycle park";
             if (lower.Contains("trotinet") || lower.Contains("romobil"))
                 return "child riding scooter street";
-            if (lower.Contains("kamion") || lower.Contains("kamionić"))
+            if (lower.Contains("kamion") || lower.Contains("kamionic"))
                 return "truck driving road";
-            if (lower.Contains("avion") || lower.Contains("avionić") || lower.Contains("helikopter"))
+            if (lower.Contains("avion") || lower.Contains("avionic") || lower.Contains("helikopter"))
                 return "airplane flying sky clouds";
-            if (lower.Contains("voz") || lower.Contains("vozić") || lower.Contains("lokomot"))
+            if (lower.Contains("voz") || lower.Contains("vozic") || lower.Contains("lokomot"))
                 return "train railway station";
-            if (lower.Contains("brod") || lower.Contains("čamac") || lower.Contains("jedrilica") || lower.Contains("barka"))
+            if (lower.Contains("brod") || lower.Contains("camac") || lower.Contains("jedrilica") || lower.Contains("barka"))
                 return "boat sailing water";
             if (lower.Contains("traktor") || lower.Contains("kombajn"))
                 return "tractor farm field";
@@ -1325,7 +1325,7 @@ namespace UltraVideoEditor
                 return "bus city street children";
             if (lower.Contains("raketa") || lower.Contains("svemirsk") || lower.Contains("svemir"))
                 return "rocket space stars universe";
-            if (lower.Contains("tenkić") || lower.Contains("tenk"))
+            if (lower.Contains("tenkic") || lower.Contains("tenk"))
                 return "toy tank children playing";
             if (lower.Contains("vatrogasn") || lower.Contains("vatrogasac"))
                 return "fire truck firefighter action";
@@ -1336,40 +1336,40 @@ namespace UltraVideoEditor
             if (lower.Contains("skuter"))
                 return "scooter riding street";
 
-            if (lower.Contains(" pas ") || lower.Contains("psa ") || lower.Contains("psić") ||
-                lower.Contains("štenad") || lower.Contains("štene") || lower.Contains("psu "))
+            if (lower.Contains(" pas ") || lower.Contains("psa ") || lower.Contains("psic") ||
+                lower.Contains("stenad") || lower.Contains("stene") || lower.Contains("psu "))
                 return "dog playing happy";
-            if (lower.Contains("mačka") || lower.Contains("maca") || lower.Contains("mačić") ||
+            if (lower.Contains("macka") || lower.Contains("maca") || lower.Contains("macic") ||
                 lower.Contains("mace") || lower.Contains("macu"))
                 return "cat cute kitten";
-            if (lower.Contains("konj") || lower.Contains("kobila") || lower.Contains("ždreb"))
+            if (lower.Contains("konj") || lower.Contains("kobila") || lower.Contains("zdreb"))
                 return "horse running field";
-            if (lower.Contains("krava") || lower.Contains("telić") || lower.Contains("tele"))
+            if (lower.Contains("krava") || lower.Contains("telic") || lower.Contains("tele"))
                 return "cow farm meadow";
             if (lower.Contains("ovca") || lower.Contains("ovce") || lower.Contains("jagnje"))
                 return "sheep meadow farm";
-            if (lower.Contains("svinja") || lower.Contains("prasić") || lower.Contains("prase"))
+            if (lower.Contains("svinja") || lower.Contains("prasic") || lower.Contains("prase"))
                 return "pig farm cute";
-            if (lower.Contains("kokoška") || lower.Contains("pilic") || lower.Contains("pilić") || lower.Contains("pile"))
+            if (lower.Contains("kokos") || lower.Contains("pilic") || lower.Contains("pile"))
                 return "chicken farm chick cute";
-            if (lower.Contains("patka") || lower.Contains("pačić"))
+            if (lower.Contains("patka") || lower.Contains("pacic"))
                 return "duck pond water cute";
-            if (lower.Contains("zec") || lower.Contains("kunić") || lower.Contains("zečić"))
+            if (lower.Contains("zec") || lower.Contains("kunic") || lower.Contains("zecic"))
                 return "rabbit cute bunny";
-            if (lower.Contains("miš") || lower.Contains("hrčak"))
+            if (lower.Contains("mis") || lower.Contains("hrcak"))
                 return "mouse hamster cute small animal";
             if (lower.Contains("papagaj") || lower.Contains("papigica"))
                 return "parrot colorful bird";
 
-            if (lower.Contains("lav") || lower.Contains("lavić") || lower.Contains("lavica"))
+            if (lower.Contains("lav") || lower.Contains("lavic") || lower.Contains("lavica"))
                 return "lion savanna wild";
-            if (lower.Contains("slon") || lower.Contains("slonić"))
+            if (lower.Contains("slon") || lower.Contains("slonic"))
                 return "elephant nature wild";
-            if (lower.Contains("medved") || lower.Contains("medvjed") || lower.Contains("medvedić"))
+            if (lower.Contains("medved") || lower.Contains("medvjed") || lower.Contains("medvedic"))
                 return "bear forest nature";
             if (lower.Contains("leptir") || lower.Contains("leptiric"))
                 return "butterfly flower garden";
-            if (lower.Contains("pčela") || lower.Contains("bumbara") || lower.Contains("bumbar"))
+            if (lower.Contains("pcela") || lower.Contains("bumbara") || lower.Contains("bumbar"))
                 return "bee flower honey garden";
             if (lower.Contains("riba") || lower.Contains("ribica") || lower.Contains("ribe"))
                 return "fish swimming water aquarium";
@@ -1377,7 +1377,7 @@ namespace UltraVideoEditor
                 return "dolphin ocean jumping";
             if (lower.Contains("kit"))
                 return "whale ocean water";
-            if (lower.Contains("kornjača") || lower.Contains("kornjace"))
+            if (lower.Contains("kornjaca"))
                 return "turtle slow nature";
             if (lower.Contains("zmija"))
                 return "snake nature grass";
@@ -1387,7 +1387,7 @@ namespace UltraVideoEditor
                 return "cheetah running fast wild";
             if (lower.Contains("majmun") || lower.Contains("majmunica"))
                 return "monkey jungle climbing";
-            if (lower.Contains("žirafa"))
+            if (lower.Contains("zirafa"))
                 return "giraffe savanna tall";
             if (lower.Contains("kengur"))
                 return "kangaroo australia jumping";
@@ -1395,9 +1395,9 @@ namespace UltraVideoEditor
                 return "penguin ice cute";
             if (lower.Contains("polarni medved") || lower.Contains("polarni"))
                 return "polar bear arctic snow";
-            if (lower.Contains("lisica") || lower.Contains("lisičica"))
+            if (lower.Contains("lisica") || lower.Contains("lisicica"))
                 return "fox forest cute";
-            if (lower.Contains("vuk") || lower.Contains("vuče"))
+            if (lower.Contains("vuk") || lower.Contains("vuce"))
                 return "wolf forest nature";
             if (lower.Contains("jelen") || lower.Contains("srna"))
                 return "deer forest nature";
@@ -1415,7 +1415,7 @@ namespace UltraVideoEditor
             if (lower.Contains("ptic") || lower.Contains("vrabac") || lower.Contains("lastavic") ||
                 lower.Contains("golub") || lower.Contains("sova") || lower.Contains("orao") ||
                 lower.Contains("soko") || lower.Contains("kos ") || lower.Contains("slavuj") ||
-                lower.Contains("čvorak") || lower.Contains("roda") || lower.Contains("čaplja"))
+                lower.Contains("cvorak") || lower.Contains("roda") || lower.Contains("caplja"))
                 return "birds flying sky nature";
             if (lower.Contains("papagaj"))
                 return "parrot colorful tropical";
@@ -1423,13 +1423,13 @@ namespace UltraVideoEditor
             if (lower.Contains("mama") && lower.Contains("tata")) return "family parents child walking";
             if (lower.Contains("mama") || lower.Contains("majka") || lower.Contains("majko"))
                 return "mother child hug love";
-            if (lower.Contains("tata") || lower.Contains("otac") || lower.Contains("oče"))
+            if (lower.Contains("tata") || lower.Contains("otac") || lower.Contains("oce"))
                 return "father child playing outdoor";
             if (lower.Contains("baka") || lower.Contains("nana") || lower.Contains("baba"))
                 return "grandmother grandchild hugging park warm tender elderly child";
             if (lower.Contains("deka") || lower.Contains("deda") || lower.Contains("djed"))
                 return "grandfather grandchild playing park outdoor elderly child happy";
-            if (lower.Contains("brat ") || lower.Contains("brate") || lower.Contains("bratić"))
+            if (lower.Contains("brat ") || lower.Contains("brate") || lower.Contains("bratic"))
                 return "siblings brothers playing";
             if (lower.Contains("sestra") || lower.Contains("sestrica"))
                 return "sisters siblings playing";
@@ -1437,12 +1437,12 @@ namespace UltraVideoEditor
                 return "children friends playing";
             if (lower.Contains("porodic") || lower.Contains("familij"))
                 return "family outdoor together";
-            if (lower.Contains("beba") || lower.Contains("bebac") || lower.Contains("novorođen"))
+            if (lower.Contains("beba") || lower.Contains("bebac") || lower.Contains("novoroden"))
                 return "baby cute toddler smiling happy";
-            if (lower.Contains("dete") || lower.Contains("dijete") || lower.Contains("dječak") ||
-                lower.Contains("devojčica") || lower.Contains("djevojčica"))
+            if (lower.Contains("dete") || lower.Contains("dijete") || lower.Contains("djecak") ||
+                lower.Contains("devojcica") || lower.Contains("djevojcica"))
                 return "child playing outdoor happy";
-            if (lower.Contains("učiteljic") || lower.Contains("nastavnic") || lower.Contains("profesor"))
+            if (lower.Contains("uciteljic") || lower.Contains("nastavnic") || lower.Contains("profesor"))
                 return "teacher classroom children learning";
             if (lower.Contains("doktor") || lower.Contains("lekar") || lower.Contains("ljekar"))
                 return "doctor children hospital care";
@@ -1453,12 +1453,12 @@ namespace UltraVideoEditor
             if (lower.Contains("vila") || lower.Contains("vilenjak") || lower.Contains("bajk"))
                 return "fairy tale magical children";
 
-            if (lower.Contains("sladoled") && (lower.Contains("čaj") || lower.Contains("zima") || lower.Contains("zimi")))
+            if (lower.Contains("sladoled") && (lower.Contains("caj") || lower.Contains("zima") || lower.Contains("zimi")))
                 return "child eating ice cream summer park happy";
             if (lower.Contains("sladoled")) return "child eating ice cream summer park happy";
-            if (lower.Contains("čokolada") || lower.Contains("cokolada"))
+            if (lower.Contains("cokolada"))
                 return "child chocolate happy";
-            if (lower.Contains("torta") || lower.Contains("kolač") || lower.Contains("cupcake"))
+            if (lower.Contains("torta") || lower.Contains("kolac") || lower.Contains("cupcake"))
                 return "birthday cake children celebrating";
             if (lower.Contains("jabuka")) return "child eating apple healthy";
             if (lower.Contains("banana") || lower.Contains("banane"))
@@ -1467,43 +1467,43 @@ namespace UltraVideoEditor
                 return "child eating strawberry fruit summer";
             if (lower.Contains("lubenica"))
                 return "child eating watermelon summer";
-            if (lower.Contains("pomorandža") || lower.Contains("narandža") || lower.Contains("limun"))
+            if (lower.Contains("pomorandza") || lower.Contains("narandza") || lower.Contains("limun"))
                 return "citrus fruit colorful fresh";
-            if (lower.Contains("čaj")) return "child drinking hot chocolate warm cozy";
+            if (lower.Contains("caj")) return "child drinking hot chocolate warm cozy";
             if (lower.Contains("sok")) return "child drinking juice fresh";
             if (lower.Contains("mleko") || lower.Contains("mlijeko"))
                 return "child drinking milk healthy";
             if (lower.Contains("pizza"))
                 return "children eating pizza happy";
-            if (lower.Contains("palačink") || lower.Contains("crepe"))
+            if (lower.Contains("palacink") || lower.Contains("crepe"))
                 return "child eating pancakes breakfast";
             if (lower.Contains("med ") || lower.Contains("medu"))
                 return "honey jar sweet";
             if (lower.Contains("kokice") || lower.Contains("popcorn"))
                 return "children eating popcorn movie";
-            if (lower.Contains("bombon") || lower.Contains("slatkiš") || lower.Contains("gumeni"))
+            if (lower.Contains("bombon") || lower.Contains("slatkis") || lower.Contains("gumeni"))
                 return "child candy sweets colorful";
-            if (lower.Contains("hleb") || lower.Contains("hljeb") || lower.Contains("sendvič"))
+            if (lower.Contains("hleb") || lower.Contains("hljeb") || lower.Contains("sendvic"))
                 return "child eating sandwich lunch";
-            if (lower.Contains("večera") || lower.Contains("ručak") || lower.Contains("doručak"))
+            if (lower.Contains("vecera") || lower.Contains("rucak") || lower.Contains("dorucak"))
                 return "family eating meal together";
             if (lower.Contains("kafa") || lower.Contains("espresso"))
                 return "children drinking hot chocolate cozy winter";
             if (lower.Contains("voda ") || lower.Contains("vodu") || lower.Contains("pijem"))
                 return "child drinking water healthy";
 
-            if (lower.Contains("trči") || lower.Contains("trčanje") || lower.Contains("juriš") ||
-                lower.Contains("trčati") || lower.Contains("trčeći"))
+            if (lower.Contains("trci") || lower.Contains("trcanje") || lower.Contains("juris") ||
+                lower.Contains("trcati") || lower.Contains("trceci"))
                 return "children running park playground sunny happy";
-            if (lower.Contains("šetaj") || lower.Contains("šeta ") || lower.Contains("šetnja") ||
-                lower.Contains("šeće") || lower.Contains("šetati") || lower.Contains("šetnjicu"))
+            if (lower.Contains("setaj") || lower.Contains("seta ") || lower.Contains("setnja") ||
+                lower.Contains("sece") || lower.Contains("setati") || lower.Contains("setnjicu"))
                 return "children walking park sunny green happy";
-            if (lower.Contains("skoči") || lower.Contains("skači") || lower.Contains("skakanje") ||
+            if (lower.Contains("skoci") || lower.Contains("skaci") || lower.Contains("skakanje") ||
                 lower.Contains("skakutanje") || lower.Contains("skokovit"))
                 return "child jumping happy";
             if (lower.Contains("pliva") || lower.Contains("kupanje") || lower.Contains("plivanje"))
                 return "child swimming pool water";
-            if (lower.Contains("rolanje") || lower.Contains("klizanje") || lower.Contains("klizalište"))
+            if (lower.Contains("rolanje") || lower.Contains("klizanje") || lower.Contains("klizaliste"))
                 return "child ice skating winter";
             if (lower.Contains("skijanje") || lower.Contains("skija") || lower.Contains("ski"))
                 return "child skiing winter snow mountain";
@@ -1512,7 +1512,7 @@ namespace UltraVideoEditor
             if (lower.Contains("fudbal") || lower.Contains("nogomet") || lower.Contains("loptu") ||
                 lower.Contains("lopta "))
                 return "children playing football soccer";
-            if (lower.Contains("košarka") || lower.Contains("koš "))
+            if (lower.Contains("kosarka") || lower.Contains("kos "))
                 return "basketball children playing";
             if (lower.Contains("tenis") || lower.Contains("reket"))
                 return "tennis children sport";
@@ -1524,7 +1524,7 @@ namespace UltraVideoEditor
                 return "yoga meditation peaceful";
             if (lower.Contains("gimnastik") || lower.Contains("akrobat"))
                 return "gymnastics child flexible sport";
-            if (lower.Contains("karate") || lower.Contains("džudo") || lower.Contains("borilačk"))
+            if (lower.Contains("karate") || lower.Contains("dzudo") || lower.Contains("borilack"))
                 return "martial arts children sport";
             if (lower.Contains("biciklizm") || lower.Contains("vozi bicikl"))
                 return "child riding bicycle outdoor";
@@ -1532,12 +1532,12 @@ namespace UltraVideoEditor
                 return "hiking mountain trail nature";
             if (lower.Contains("ribolov") || lower.Contains("pecanje"))
                 return "fishing lake child outdoor";
-            if (lower.Contains("jedrilica") || lower.Contains("jedričarenje") || lower.Contains("vesla"))
+            if (lower.Contains("jedrilica") || lower.Contains("jedricarenje") || lower.Contains("vesla"))
                 return "sailing boat water outdoor";
             if (lower.Contains("padobran") || lower.Contains("skakanje padobranom"))
                 return "parachute sky adventure";
 
-            if (lower.Contains("pleši") || lower.Contains("plešeš") || lower.Contains("ples") ||
+            if (lower.Contains("plesi") || lower.Contains("pleses") || lower.Contains("ples") ||
                 lower.Contains("tancuj") || lower.Contains("zaigra") || lower.Contains("igra kolo"))
                 return "children dancing joyful";
             if (lower.Contains("peva") || lower.Contains("pjeva") || lower.Contains("pevaj") ||
@@ -1546,41 +1546,41 @@ namespace UltraVideoEditor
             if (lower.Contains("crta") || lower.Contains("risanje") || lower.Contains("boji") ||
                 lower.Contains("bojanka") || lower.Contains("akvarelom") || lower.Contains("kistom"))
                 return "child drawing painting art colorful";
-            if (lower.Contains("čita") || lower.Contains("knjig") || lower.Contains("priča") ||
+            if (lower.Contains("cita") || lower.Contains("knjig") || lower.Contains("prica") ||
                 lower.Contains("bajka") || lower.Contains("lektir"))
                 return "child reading book library";
             if (lower.Contains("igraj") || lower.Contains("igra ") || lower.Contains("igraju") ||
                 lower.Contains("igrajmo") || lower.Contains("igrajte"))
                 return "children playing joyful";
             if (lower.Contains("smej") || lower.Contains("smije") || lower.Contains("blistaj") ||
-                lower.Contains("kesi") || lower.Contains("kikoće"))
+                lower.Contains("kesi") || lower.Contains("kikose"))
                 return "children laughing happy faces";
-            if (lower.Contains("spava") || lower.Contains("toneš u san") || lower.Contains("zaspi") ||
+            if (lower.Contains("spava") || lower.Contains("tones u san") || lower.Contains("zaspi") ||
                 lower.Contains("drijema") || lower.Contains("drijemat"))
                 return "child sleeping peaceful";
-            if (lower.Contains("sanja") || lower.Contains("snovi") || lower.Contains("snoviđ"))
+            if (lower.Contains("sanja") || lower.Contains("snovi") || lower.Contains("snovid"))
                 return "child dreaming stars night sky";
             if (lower.Contains("grli") || lower.Contains("zagrli") || lower.Contains("zagrliti") ||
                 lower.Contains("mazi") || lower.Contains("mazi"))
                 return "children hugging friendship love";
-            if (lower.Contains("ljuljaška") || lower.Contains("ljulja") || lower.Contains("tobogan"))
+            if (lower.Contains("ljuljaska") || lower.Contains("ljulja") || lower.Contains("tobogan"))
                 return "child playground swing slide";
-            if (lower.Contains("pesak") || lower.Contains("pješčanik") || lower.Contains("sanduk"))
+            if (lower.Contains("pesak") || lower.Contains("pjescanik") || lower.Contains("sanduk"))
                 return "child playing sand sandbox";
             if (lower.Contains("lopta") || lower.Contains("balon") || lower.Contains("balonom"))
                 return "child playing ball balloon colorful";
-            if (lower.Contains("zmaj") || lower.Contains("zmajevima") || lower.Contains("zmajić"))
+            if (lower.Contains("zmaj") || lower.Contains("zmajevima") || lower.Contains("zmajic"))
                 return "child flying kite wind outdoor";
             if (lower.Contains("puzzle") || lower.Contains("slagalica"))
                 return "child playing puzzle indoor";
             if (lower.Contains("lego") || lower.Contains("kocke") || lower.Contains("graditi") ||
                 lower.Contains("gradi kulu"))
                 return "child building blocks lego";
-            if (lower.Contains("skrivač") || lower.Contains("žmure") || lower.Contains("sakriven"))
+            if (lower.Contains("skrivac") || lower.Contains("zmure") || lower.Contains("sakriven"))
                 return "children hide seek playing";
             if (lower.Contains("karnevar") || lower.Contains("karneval") || lower.Contains("maskaradu"))
                 return "carnival costume children celebration";
-            if (lower.Contains("pozorišt") || lower.Contains("kazalište") || lower.Contains("pozornica"))
+            if (lower.Contains("pozoriset") || lower.Contains("kazaliste") || lower.Contains("pozornica"))
                 return "children theater stage performance";
             if (lower.Contains("lutak") || lower.Contains("lutke") || lower.Contains("marioneta"))
                 return "puppet show children theater";
@@ -1592,60 +1592,60 @@ namespace UltraVideoEditor
                 return "children water park swimming fun";
             if (lower.Contains("piknik"))
                 return "family picnic outdoor nature";
-            if (lower.Contains("kampovanje") || lower.Contains("kamp") || lower.Contains("šator"))
+            if (lower.Contains("kampovanje") || lower.Contains("kamp") || lower.Contains("sator"))
                 return "camping tent nature outdoor";
-            if (lower.Contains("vatromet") || lower.Contains("svečanost") || lower.Contains("proslava"))
+            if (lower.Contains("vatromet") || lower.Contains("svecanos") || lower.Contains("proslava"))
                 return "fireworks celebration night colorful";
 
-            if (lower.Contains("uči") || lower.Contains("učiti") || lower.Contains("nauči") ||
-                lower.Contains("uciti") || lower.Contains("uciš"))
+            if (lower.Contains("uci") || lower.Contains("uciti") || lower.Contains("nauci") ||
+                lower.Contains("uciti") || lower.Contains("ucis"))
                 return "child learning school studying";
-            if (lower.Contains("škola") || lower.Contains("razred") || lower.Contains("učionica"))
+            if (lower.Contains("skola") || lower.Contains("razred") || lower.Contains("ucionica"))
                 return "school children classroom learning";
-            if (lower.Contains("domaći zadatak") || lower.Contains("zadatak") || lower.Contains("domaći"))
+            if (lower.Contains("domaci zadatak") || lower.Contains("zadatak") || lower.Contains("domaci"))
                 return "child doing homework studying";
-            if (lower.Contains("pismo") || lower.Contains("pisanje") || lower.Contains("piše"))
+            if (lower.Contains("pismo") || lower.Contains("pisanje") || lower.Contains("pise"))
                 return "child writing letter paper";
-            if (lower.Contains("muzička škola") || lower.Contains("hora") || lower.Contains("hor "))
+            if (lower.Contains("muzicka skola") || lower.Contains("hora") || lower.Contains("hor "))
                 return "children choir singing school";
-            if (lower.Contains("kuvanje") || lower.Contains("kuva") || lower.Contains("pravi kolač"))
+            if (lower.Contains("kuvanje") || lower.Contains("kuva") || lower.Contains("pravi kolac"))
                 return "child cooking baking kitchen";
             if (lower.Contains("fotografij") || lower.Contains("fotoaparat") || lower.Contains("slika prirodu"))
                 return "child photography camera nature";
-            if (lower.Contains("pravi") || lower.Contains("izrađuj") || lower.Contains("kreacij"))
+            if (lower.Contains("pravi") || lower.Contains("izraduj") || lower.Contains("kreacij"))
                 return "child crafts making creative";
             if (lower.Contains("origami") || lower.Contains("papir"))
                 return "child paper crafts origami";
-            if (lower.Contains("botanik") || lower.Contains("biljke") || lower.Contains("cvećara"))
+            if (lower.Contains("botanik") || lower.Contains("biljke") || lower.Contains("cvecara"))
                 return "child gardening plants flowers";
-            if (lower.Contains("sadi") || lower.Contains("zaliva") || lower.Contains("bašta"))
+            if (lower.Contains("sadi") || lower.Contains("zaliva") || lower.Contains("basta"))
                 return "child planting garden watering";
 
-            if (lower.Contains("parkić") || lower.Contains(" park ") || lower.Contains("parku"))
+            if (lower.Contains("parkic") || lower.Contains(" park ") || lower.Contains("parku"))
                 return "children playing park playground sunny happy";
-            if (lower.Contains("plaža") || lower.Contains("more ") || lower.Contains("mora") ||
+            if (lower.Contains("plaza") || lower.Contains("more ") || lower.Contains("mora") ||
                 lower.Contains("obala") || lower.Contains("pesak mora"))
                 return "child beach sea summer";
-            if (lower.Contains("šuma") || lower.Contains("šumi") || lower.Contains("šumarak"))
+            if (lower.Contains("suma") || lower.Contains("sumi") || lower.Contains("sumarak"))
                 return "children forest nature trees";
             if (lower.Contains("planina") || lower.Contains("vrh") || lower.Contains("planinski"))
                 return "mountain nature hiking landscape";
             if (lower.Contains("reka") || lower.Contains("potok") || lower.Contains("reci") ||
-                lower.Contains("riječica"))
+                lower.Contains("rjecica"))
                 return "river stream water nature";
             if (lower.Contains("jezero") || lower.Contains("jezerc"))
                 return "lake water nature reflection";
             if (lower.Contains("livada") || lower.Contains("polje") || lower.Contains("njiva"))
                 return "meadow flowers field nature";
-            if (lower.Contains("bašta") || lower.Contains("vrt ") || lower.Contains("vrtu"))
+            if (lower.Contains("basta") || lower.Contains("vrt ") || lower.Contains("vrtu"))
                 return "garden flowers colorful outdoor";
-            if (lower.Contains("pećina") || lower.Contains("spilja"))
+            if (lower.Contains("pecina") || lower.Contains("spilja"))
                 return "cave nature adventure";
             if (lower.Contains("vodopad") || lower.Contains("kaskad"))
                 return "waterfall nature beautiful";
             if (lower.Contains("desert") || lower.Contains("pustinja"))
                 return "desert sand dunes landscape";
-            if (lower.Contains("džungla") || lower.Contains("prašuma"))
+            if (lower.Contains("dzungla") || lower.Contains("prasuma"))
                 return "jungle tropical nature";
             if (lower.Contains("arktik") || lower.Contains("antarktik") || lower.Contains("led ") ||
                 lower.Contains("ledenjak"))
@@ -1657,11 +1657,11 @@ namespace UltraVideoEditor
                 return "night sky stars milky way";
             if (lower.Contains("mesec ") || lower.Contains("mjesec ") || lower.Contains("punog meseca"))
                 return "moon night sky stars";
-            if (lower.Contains("sunce") || lower.Contains("sunčano") || lower.Contains("sunčani"))
+            if (lower.Contains("sunce") || lower.Contains("suncano") || lower.Contains("suncani"))
                 return "sunshine bright sunny outdoor";
             if (lower.Contains("duga") || lower.Contains("dugom"))
                 return "rainbow colorful sky nature";
-            if (lower.Contains("kiša") || lower.Contains("kišica") || lower.Contains("kaplje"))
+            if (lower.Contains("kisa") || lower.Contains("kisica") || lower.Contains("kaplje"))
                 return "rain drops children playing puddle";
             if (lower.Contains("oluja") || lower.Contains("grmljavina") || lower.Contains("munja"))
                 return "storm lightning dramatic sky";
@@ -1670,48 +1670,48 @@ namespace UltraVideoEditor
             if (lower.Contains("vetar") || lower.Contains("vjetar") || lower.Contains("povjetarac"))
                 return "wind blowing leaves nature";
 
-            if (lower.Contains("grad ") || lower.Contains("gradu") || lower.Contains("gradić"))
+            if (lower.Contains("grad ") || lower.Contains("gradu") || lower.Contains("gradic"))
                 return "city street urban children";
             if (lower.Contains("ulica") || lower.Contains("ulici") || lower.Contains("trotoar"))
                 return "street sidewalk city";
-            if (lower.Contains("kuća") || lower.Contains("kući") || lower.Contains(" dom ") ||
+            if (lower.Contains("kuca") || lower.Contains("kuci") || lower.Contains(" dom ") ||
                 lower.Contains("doma") || lower.Contains("domov"))
                 return "home family house cozy";
-            if (lower.Contains("dvorišt") || lower.Contains("dvorište"))
+            if (lower.Contains("dvorist"))
                 return "children backyard playing";
-            if (lower.Contains("zoo") || lower.Contains("zoološki") || lower.Contains("zoovrt"))
+            if (lower.Contains("zoo") || lower.Contains("zoloski") || lower.Contains("zoovrt"))
                 return "zoo animals children visiting";
             if (lower.Contains("muzej") || lower.Contains("galerij"))
                 return "museum children visit art";
             if (lower.Contains("bioskop") || lower.Contains("kino") || lower.Contains("film"))
                 return "cinema movie children popcorn";
-            if (lower.Contains("bibliotek") || lower.Contains("knjižnica"))
+            if (lower.Contains("bibliotek") || lower.Contains("knjiznica"))
                 return "library books children reading";
-            if (lower.Contains("tržni centar") || lower.Contains("prodavnica") || lower.Contains("prodavaonica"))
+            if (lower.Contains("trzni centar") || lower.Contains("prodavnica") || lower.Contains("prodavaonica"))
                 return "shopping mall children family";
-            if (lower.Contains("crkva") || lower.Contains("džamija") || lower.Contains("hram"))
+            if (lower.Contains("crkva") || lower.Contains("dzamija") || lower.Contains("hram"))
                 return "church architecture peaceful";
             if (lower.Contains("bolnica"))
                 return "hospital doctor care";
             if (lower.Contains("aerodrom"))
                 return "airport airplane travel";
-            if (lower.Contains("kolodvor") || lower.Contains("železnička stanica") || lower.Contains("stanica"))
+            if (lower.Contains("kolodvor") || lower.Contains("zeleznicka stanica") || lower.Contains("stanica"))
                 return "train station travel";
-            if (lower.Contains("luka") || lower.Contains("pristanište"))
+            if (lower.Contains("luka") || lower.Contains("pristaniste"))
                 return "harbor boats port";
-            if (lower.Contains("tržnica") || lower.Contains("pijaca") || lower.Contains("pijaci"))
+            if (lower.Contains("trznica") || lower.Contains("pijaca") || lower.Contains("pijaci"))
                 return "market colorful food outdoor";
-            if (lower.Contains("kafić") || lower.Contains("restoran"))
+            if (lower.Contains("kafic") || lower.Contains("restoran"))
                 return "cafe restaurant family";
             if (lower.Contains("hotel") || lower.Contains("odmor") || lower.Contains("ljetovanje") ||
                 lower.Contains("letovanje"))
                 return "hotel vacation family travel";
 
-            if (lower.Contains("proleć") || lower.Contains("proljeć") || lower.Contains("cvet") ||
-                lower.Contains("cvijet") || lower.Contains("trešnja cveta") || lower.Contains("latica"))
+            if (lower.Contains("prolec") || lower.Contains("proljec") || lower.Contains("cvet") ||
+                lower.Contains("cvijet") || lower.Contains("tresnja cveta") || lower.Contains("latica"))
                 return "spring flowers blooming child";
             if (lower.Contains("jesen") || lower.Contains("opada") || lower.Contains("jesenj") ||
-                lower.Contains("žuto lišće") || lower.Contains("zlatno lišće"))
+                lower.Contains("zuto lisce") || lower.Contains("zlatno lisce"))
                 return "autumn leaves falling colorful";
             if (lower.Contains("zima ") || lower.Contains("zimska") || lower.Contains("zimski") ||
                 lower.Contains("sneg ") || lower.Contains("snijeg") || lower.Contains("mraz"))
@@ -1720,27 +1720,27 @@ namespace UltraVideoEditor
                 lower.Contains("ljetni") || lower.Contains("toplo") || lower.Contains("vrelo"))
                 return "summer sunny outdoor children";
 
-            if (lower.Contains("čizme") || lower.Contains("gumene čizme"))
+            if (lower.Contains("cizme") || lower.Contains("gumene cizme"))
                 return "child winter boots snow";
             if (lower.Contains("rukavice"))
                 return "child winter gloves snow";
             if (lower.Contains("skafander") || lower.Contains("kombinezon"))
                 return "child winter suit snow outdoor";
-            if (lower.Contains("kapa ") || lower.Contains("kapu") || lower.Contains("šešir"))
+            if (lower.Contains("kapa ") || lower.Contains("kapu") || lower.Contains("sesir"))
                 return "child hat winter colorful";
-            if (lower.Contains("šal ") || lower.Contains("šalom"))
+            if (lower.Contains("sal ") || lower.Contains("salom"))
                 return "child scarf winter cozy";
             if (lower.Contains("kaput") || lower.Contains("jakna") || lower.Contains("mantil"))
                 return "child coat winter dressed";
-            if (lower.Contains("kupaći") || lower.Contains("plivačke naočale"))
+            if (lower.Contains("kupaci") || lower.Contains("plivacke naocale"))
                 return "child swimsuit pool summer";
-            if (lower.Contains("čarapa") || lower.Contains("čarape"))
+            if (lower.Contains("carapa") || lower.Contains("carape"))
                 return "colorful socks child cute";
             if (lower.Contains("haljina") || lower.Contains("suknjica"))
                 return "girl dress colorful beautiful";
             if (lower.Contains("pantalone") || lower.Contains("traperice"))
                 return "child casual clothes";
-            if (lower.Contains("pidžama") || lower.Contains("pidzama"))
+            if (lower.Contains("pidzama") || lower.Contains("pidzama"))
                 return "child pajamas bedtime cute";
 
             if (lower.Contains("gitara") || lower.Contains("gitaru") || lower.Contains("gitarom"))
@@ -1763,17 +1763,17 @@ namespace UltraVideoEditor
                 return "child playing musical instrument";
             if (lower.Contains("pesm") || lower.Contains("pjesm") || lower.Contains("pjesmica"))
                 return "child singing microphone stage";
-            if (lower.Contains("slušaj") || lower.Contains("sluša ") || lower.Contains("slušati") ||
-                lower.Contains("slušamo") || lower.Contains("slušaš"))
+            if (lower.Contains("slusaj") || lower.Contains("slusa ") || lower.Contains("slusati") ||
+                lower.Contains("slusamo") || lower.Contains("slus"))
                 return "child listening headphones music";
             if (lower.Contains("melodija") || lower.Contains("nota") || lower.Contains("note "))
                 return "music notes flying colorful";
             // PATCH 9: Re-Contextualization — zamena za anomalije iz Test2.mp4
-            // Anomalija 1 zamena: zdravlje/pokret/aktivnost → dečija igra, NE teretana
-            if (lower.Contains("zdrav") || lower.Contains("jak") || lower.Contains("snažan") ||
+            // Anomaly 1 replacement: health/movement/activity → children's play, NOT gym
+            if (lower.Contains("zdrav") || lower.Contains("jak") || lower.Contains("snazan") ||
                 lower.Contains("health") || lower.Contains("strong") || lower.Contains("active"))
                 return "children jumping playing active outdoor park sandbox butterfly fun";
-            // Anomalija 2 zamena: muzika/ritam/nota → deca plešu u krug, NE gramofon
+            // Anomaly 2 replacement: music/rhythm/note → children dancing in circle, NOT gramophone
             if (lower.Contains("nota") || lower.Contains("melodij") || lower.Contains("pesma") ||
                 lower.Contains("muzik") || lower.Contains("song") || lower.Contains("melody") ||
                 lower.Contains("music") || lower.Contains("beat"))
@@ -1785,21 +1785,21 @@ namespace UltraVideoEditor
                 return "music concert stage performance";
             if (lower.Contains("muzik") || lower.Contains("glazb"))
                 return "music colorful notes children";
-            if (lower.Contains("radio") || lower.Contains("zvučnik"))
+            if (lower.Contains("radio") || lower.Contains("zvucnik"))
                 return "music radio listening colorful";
 
-            if (lower.Contains("srećan") || lower.Contains("sretna") || lower.Contains("sretan") ||
-                lower.Contains("sreća") || lower.Contains("sreca") || lower.Contains("radost") ||
+            if (lower.Contains("srecan") || lower.Contains("sretna") || lower.Contains("sretan") ||
+                lower.Contains("sreca") || lower.Contains("radost") ||
                 lower.Contains("veseo") || lower.Contains("vesela"))
                 return "happy child joyful smiling";
-            if (lower.Contains("tužan") || lower.Contains("tužna") || lower.Contains("plač") ||
+            if (lower.Contains("tuzan") || lower.Contains("tuzna") || lower.Contains("plac") ||
                 lower.Contains("suze") || lower.Contains("placem"))
                 return "child sad crying emotional";
             if (lower.Contains("ljut") || lower.Contains("besn") || lower.Contains("srdit"))
                 return "child angry frustrated emotional";
-            if (lower.Contains("uplašen") || lower.Contains("strah") || lower.Contains("bojim"))
+            if (lower.Contains("uplasen") || lower.Contains("strah") || lower.Contains("bojim"))
                 return "child scared surprised";
-            if (lower.Contains("izneneđen") || lower.Contains("iznenađenje") || lower.Contains("wow"))
+            if (lower.Contains("iznenadjen") || lower.Contains("iznenadjenje") || lower.Contains("wow"))
                 return "child surprised amazed face";
             if (lower.Contains("ponosan") || lower.Contains("ponosna") || lower.Contains("ponos"))
                 return "child proud achievement success";
@@ -1812,36 +1812,36 @@ namespace UltraVideoEditor
             if (lower.Contains("zaljubljen") || lower.Contains("voli") || lower.Contains("ljubav") ||
                 lower.Contains("srce") || lower.Contains("dragi") || lower.Contains("draga"))
                 return "love heart children friendship";
-            if (lower.Contains("osećanj") || lower.Contains("osjećanj") || lower.Contains("emocij"))
+            if (lower.Contains("osecanj") || lower.Contains("osjjecanj") || lower.Contains("emocij"))
                 return "child expressive emotional face";
             if (lower.Contains("smireno") || lower.Contains("mirno") || lower.Contains("spokojno"))
                 return "child calm peaceful serene";
-            if (lower.Contains("uzbuđen") || lower.Contains("uzbuđena") || lower.Contains("euforičan"))
+            if (lower.Contains("uzbudjen") || lower.Contains("uzbudjean") || lower.Contains("euforican"))
                 return "child excited happy energetic";
 
-            if (lower.Contains("rođendan") || lower.Contains("rodjendan"))
+            if (lower.Contains("rodjendan"))
                 return "birthday party children celebration cake";
-            if (lower.Contains("božić") || lower.Contains("bozic") || lower.Contains("jelka") ||
+            if (lower.Contains("bozic") || lower.Contains("jelka") ||
                 lower.Contains("deda mraz") || lower.Contains("santa"))
                 return "christmas tree gifts children";
-            if (lower.Contains("nova godina") || lower.Contains("silvest") || lower.Contains("doček"))
+            if (lower.Contains("nova godina") || lower.Contains("silvest") || lower.Contains("docek"))
                 return "new year celebration fireworks children";
             if (lower.Contains("uskrs") || lower.Contains("vaskrs") || lower.Contains("jaje") ||
                 lower.Contains("jaja") || lower.Contains("zec uskrs"))
                 return "easter eggs colorful spring children";
-            if (lower.Contains("halloween") || lower.Contains("noć vještica") || lower.Contains("bundeva"))
+            if (lower.Contains("halloween") || lower.Contains("noc vjest") || lower.Contains("bundeva"))
                 return "halloween pumpkin children costumes";
             if (lower.Contains("valentinovo") || lower.Contains("srce poklanjam"))
                 return "valentines day heart love flowers";
-            if (lower.Contains("dan majki") || lower.Contains("majčin dan"))
+            if (lower.Contains("dan majki") || lower.Contains("majcin dan"))
                 return "mothers day flowers love family";
-            if (lower.Contains("dan očeva") || lower.Contains("očev dan"))
+            if (lower.Contains("dan oceva") || lower.Contains("ocev dan"))
                 return "fathers day family love outdoor";
-            if (lower.Contains("školski praznici") || lower.Contains("raspust"))
+            if (lower.Contains("skolski praznici") || lower.Contains("raspust"))
                 return "school holidays children vacation";
-            if (lower.Contains("festival") || lower.Contains("svečanost"))
+            if (lower.Contains("festival") || lower.Contains("svecanos"))
                 return "festival celebration colorful people";
-            if (lower.Contains("vjenčanje") || lower.Contains("venčanje") || lower.Contains("svadba"))
+            if (lower.Contains("vjencanje") || lower.Contains("vencanje") || lower.Contains("svadba"))
                 return "wedding celebration flowers";
             if (lower.Contains("penzij") || lower.Contains("odlazak u penziju"))
                 return "retirement celebration family";
@@ -1852,87 +1852,87 @@ namespace UltraVideoEditor
                 return "blue sky water bright";
             if (lower.Contains("zelena") || lower.Contains("zeleno") || lower.Contains("zelen"))
                 return "green nature grass outdoor";
-            if (lower.Contains("žuta") || lower.Contains("žuto") || lower.Contains("žut") ||
-                lower.Contains("sunčano žut"))
+            if (lower.Contains("zuta") || lower.Contains("zuto") || lower.Contains("zut") ||
+                lower.Contains("suncano zut"))
                 return "yellow sunshine bright cheerful";
-            if (lower.Contains("narančasta") || lower.Contains("narandžasta") || lower.Contains("oranž"))
+            if (lower.Contains("narancasta") || lower.Contains("narandzasta") || lower.Contains("oranz"))
                 return "orange colorful warm sunset";
-            if (lower.Contains("ljubičasta") || lower.Contains("violetna") || lower.Contains("lila"))
+            if (lower.Contains("ljubicasta") || lower.Contains("violetna") || lower.Contains("lila"))
                 return "purple violet colorful flowers";
-            if (lower.Contains("ružičasta") || lower.Contains("roze") || lower.Contains("pink"))
+            if (lower.Contains("ruzicasta") || lower.Contains("roze") || lower.Contains("pink"))
                 return "pink flowers cute colorful";
             if (lower.Contains("zlatna") || lower.Contains("zlatno") || lower.Contains("zlato"))
                 return "golden sunlight treasure bright";
-            if (lower.Contains("bela") || lower.Contains("bijela") || lower.Contains("snežno bel"))
+            if (lower.Contains("bela") || lower.Contains("bijela") || lower.Contains("snezno bel"))
                 return "white pure clean snow";
-            if (lower.Contains("šarena") || lower.Contains("šareno") || lower.Contains("raznobojn"))
+            if (lower.Contains("sarena") || lower.Contains("sareno") || lower.Contains("raznobojn"))
                 return "colorful rainbow bright children";
             if (lower.Contains("duga") || lower.Contains("duginih boja"))
                 return "rainbow colors bright beautiful";
 
-            if (lower.Contains("oči") || lower.Contains("okice") || lower.Contains("oko ") ||
+            if (lower.Contains("oci") || lower.Contains("okice") || lower.Contains("oko ") ||
                 lower.Contains("okom") || lower.Contains("pogled") || lower.Contains("gleda") ||
-                lower.Contains("vidi") || lower.Contains("otvori oči") || lower.Contains("utvori"))
+                lower.Contains("vidi") || lower.Contains("otvori oci") || lower.Contains("utvori"))
                 return "child eyes open looking curious";
             if (lower.Contains("ruke") || lower.Contains("ruku") || lower.Contains("rukom") ||
-                lower.Contains("rukica") || lower.Contains("rukice") || lower.Contains("šaka") ||
-                lower.Contains("prsti") || lower.Contains("drži se za ruku"))
+                lower.Contains("rukica") || lower.Contains("rukice") || lower.Contains("saka") ||
+                lower.Contains("prsti") || lower.Contains("drzi se za ruku"))
                 return "child hands holding together";
             if (lower.Contains("noge") || lower.Contains("nogama") || lower.Contains("nogice") ||
-                lower.Contains("stopala") || lower.Contains("stopalo") || lower.Contains("nožice"))
+                lower.Contains("stopala") || lower.Contains("stopalo") || lower.Contains("nozice"))
                 return "child feet walking barefoot grass";
             if (lower.Contains("glava") || lower.Contains("glavica") || lower.Contains("kosa") ||
                 lower.Contains("kosom") || lower.Contains("pletenice") || lower.Contains("frizura"))
                 return "child hair cute portrait";
-            if (lower.Contains("uši") || lower.Contains("uho") || lower.Contains("ušice") ||
-                lower.Contains("čuje") || lower.Contains("sluša") || lower.Contains("čuti"))
+            if (lower.Contains("usi") || lower.Contains("uho") || lower.Contains("usice") ||
+                lower.Contains("cuje") || lower.Contains("slusa") || lower.Contains("cuti"))
                 return "child listening ears music";
-            if (lower.Contains("nos") || lower.Contains("nosić") || lower.Contains("miriše") ||
+            if (lower.Contains("nos") || lower.Contains("nosic") || lower.Contains("mirise") ||
                 lower.Contains("miris") || lower.Contains("vonj"))
                 return "child smelling flowers nature";
             if (lower.Contains("usta") || lower.Contains("usne") || lower.Contains("osmeh") ||
-                lower.Contains("osmijeh") || lower.Contains("smiješak") || lower.Contains("zubi") ||
+                lower.Contains("osmijeh") || lower.Contains("smjesak") || lower.Contains("zubi") ||
                 lower.Contains("zub ") || lower.Contains("jezik"))
                 return "child smile teeth happy portrait";
             if (lower.Contains("lice") || lower.Contains("lica") || lower.Contains("obrazi") ||
                 lower.Contains("obraz") || lower.Contains("crvenila"))
                 return "child face portrait expression";
             if (lower.Contains("srce ") || lower.Contains("srcem") || lower.Contains("kuca srce") ||
-                lower.Contains("srčeko"))
+                lower.Contains("srceko"))
                 return "heart love warm feeling";
-            if (lower.Contains("stomak") || lower.Contains("trbušić") || lower.Contains("stomačić"))
+            if (lower.Contains("stomak") || lower.Contains("trbusic") || lower.Contains("stomacic"))
                 return "child belly laughing cute";
-            if (lower.Contains("leđa") || lower.Contains("ramena") || lower.Contains("rame"))
+            if (lower.Contains("ledja") || lower.Contains("ramena") || lower.Contains("rame"))
                 return "child back shoulder outdoor";
             if (lower.Contains("koljena") || lower.Contains("kolena") || lower.Contains("koljenice"))
                 return "child kneeling sitting outdoor";
             if (lower.Contains("telo") || lower.Contains("tijelo") || lower.Contains("celo telo") ||
                 lower.Contains("cijelo tijelo"))
                 return "child body healthy active outdoor";
-            if (lower.Contains("koža") || lower.Contains("put") || lower.Contains("ten"))
+            if (lower.Contains("koza") || lower.Contains("put") || lower.Contains("ten"))
                 return "child skin healthy outdoor";
-            if (lower.Contains("mišić") || lower.Contains("jak") || lower.Contains("snažan") ||
+            if (lower.Contains("misic") || lower.Contains("jak") || lower.Contains("snazan") ||
                 lower.Contains("snazna"))
                 return "child strong muscles active sport";
 
             if (lower.Contains("jutro") || lower.Contains("zora") || lower.Contains("osvanu") ||
-                lower.Contains("počni dan") || lower.Contains("pocni dan") || lower.Contains("probudi"))
+                lower.Contains("pocni dan") || lower.Contains("probudi"))
                 return "child morning waking up sunrise";
             if (lower.Contains("podne") || lower.Contains("podnev"))
                 return "sunny midday outdoor children";
-            if (lower.Contains("veče") || lower.Contains("večer") || lower.Contains("sumrak") ||
+            if (lower.Contains("vece") || lower.Contains("vecer") || lower.Contains("sumrak") ||
                 lower.Contains("zalazak"))
                 return "sunset evening colorful sky";
-            if (lower.Contains("noć ") || lower.Contains("noću") || lower.Contains("laku noć") ||
-                lower.Contains("završi dan") || lower.Contains("zavrsi dan"))
+            if (lower.Contains("noc ") || lower.Contains("nocu") || lower.Contains("laku noc") ||
+                lower.Contains("zavrsi dan"))
                 return "child evening bedtime stars";
-            if (lower.Contains("ponoć") || lower.Contains("u ponoć"))
+            if (lower.Contains("ponoc") || lower.Contains("u ponoc"))
                 return "midnight stars moon night";
 
-            if (lower.Contains("sanja") || lower.Contains("snovi") || lower.Contains("maštam") ||
+            if (lower.Contains("sanja") || lower.Contains("snovi") || lower.Contains("mastam") ||
                 lower.Contains("sanjar"))
                 return "child dreaming stars imagination";
-            if (lower.Contains("mašta") || lower.Contains("fantazij") || lower.Contains("imaginacij"))
+            if (lower.Contains("masta") || lower.Contains("fantazij") || lower.Contains("imaginacij"))
                 return "children imagination magical fantasy";
             if (lower.Contains("sloboda") || lower.Contains("slobodan") || lower.Contains("leti slobodn"))
                 return "freedom outdoor running open";
@@ -1945,11 +1945,11 @@ namespace UltraVideoEditor
                 return "hope bright future children";
             if (lower.Contains("mir ") || lower.Contains("miru") || lower.Contains("miran"))
                 return "peace calm nature serene";
-            if (lower.Contains("hrabrost") || lower.Contains("hrabar") || lower.Contains("odvažan"))
+            if (lower.Contains("hrabrost") || lower.Contains("hrabar") || lower.Contains("odvazcan"))
                 return "brave child confident strong";
-            if (lower.Contains("blago") || lower.Contains("dragocen") || lower.Contains("najveć"))
+            if (lower.Contains("blago") || lower.Contains("dragocen") || lower.Contains("najvec"))
                 return "treasure gift golden child";
-            if (lower.Contains("čudo") || lower.Contains("čudesno") || lower.Contains("magičn"))
+            if (lower.Contains("cudo") || lower.Contains("cudesno") || lower.Contains("magicn"))
                 return "magic wonder children amazed";
             if (lower.Contains("rast") || lower.Contains("sazrev") || lower.Contains("odrastanj"))
                 return "child growing learning achievement";
@@ -1957,24 +1957,24 @@ namespace UltraVideoEditor
                 return "children group together teamwork";
             if (lower.Contains("priroda") || lower.Contains("sve oko nas") || lower.Contains("okol"))
                 return "nature outdoor children exploring";
-            if (lower.Contains("simbol") || lower.Contains("znak") || lower.Contains("moćan"))
+            if (lower.Contains("simbol") || lower.Contains("znak") || lower.Contains("mocan"))
                 return "child happiness joy celebration";
-            if (lower.Contains("kraj") || lower.Contains("završetak") || lower.Contains("finali"))
+            if (lower.Contains("kraj") || lower.Contains("zavrsetak") || lower.Contains("finali"))
                 return "children celebration finish happy";
-            if (lower.Contains("početak") || lower.Contains("novi poče") || lower.Contains("polazak"))
+            if (lower.Contains("pocetak") || lower.Contains("novi poce") || lower.Contains("polazak"))
                 return "child new beginning adventure";
             if (lower.Contains("put ") || lower.Contains("putovan") || lower.Contains("avantum"))
                 return "journey adventure children travel";
-            if (lower.Contains("zvuk") || lower.Contains("buka") || lower.Contains("tišina"))
+            if (lower.Contains("zvuk") || lower.Contains("buka") || lower.Contains("tisina"))
                 return "sound waves music colorful";
             if (lower.Contains("svetlost") || lower.Contains("svjetlost") || lower.Contains("sjaj") ||
                 lower.Contains("sija") || lower.Contains("blista"))
                 return "light bright shining beautiful";
-            if (lower.Contains("tama") || lower.Contains("mrak") || lower.Contains("noćna"))
+            if (lower.Contains("tama") || lower.Contains("mrak") || lower.Contains("nocna"))
                 return "night stars moon dark sky";
             if (lower.Contains("toplina") || lower.Contains("toplota") || lower.Contains("greje"))
                 return "warm cozy home family";
-            if (lower.Contains("hladnoć") || lower.Contains("hladno") || lower.Contains("smrzava"))
+            if (lower.Contains("hladnoc") || lower.Contains("hladno") || lower.Contains("smrzava"))
                 return "cold winter snow outdoor";
 
             if (!string.IsNullOrEmpty(analysis.Context) && !string.IsNullOrEmpty(analysis.Mood))
@@ -2029,11 +2029,11 @@ namespace UltraVideoEditor
 
             if (lower.Contains("reka") || lower.Contains("rijeka") ||
                 lower.Contains("potok") || lower.Contains("bujica") ||
-                lower.Contains("izvor") || lower.Contains("voda teč") ||
-                lower.Contains("fontana") || lower.Contains("česma"))
+                lower.Contains("izvor") || lower.Contains("voda tec") ||
+                lower.Contains("fontana") || lower.Contains("cesma"))
                 return "ambience creek stream";
 
-            if (lower.Contains("more") || lower.Contains("plaža") ||
+            if (lower.Contains("more") || lower.Contains("plaza") ||
                 lower.Contains("talas") || lower.Contains("obala") ||
                 lower.Contains("brod") || lower.Contains("ocean"))
                 return "ambience ocean shore";
@@ -2042,7 +2042,7 @@ namespace UltraVideoEditor
                 lower.Contains("bara") || lower.Contains("lokva"))
                 return "liquid water splash";
 
-            if (lower.Contains("kiša") || lower.Contains("pada kiša") ||
+            if (lower.Contains("kisa") || lower.Contains("pada kisa") ||
                 lower.Contains("kaplja") || lower.Contains("mokro") ||
                 lower.Contains("drizzle"))
                 return "weather ambience rain drips";
@@ -2059,41 +2059,41 @@ namespace UltraVideoEditor
 
             if (lower.Contains("zima") || lower.Contains("sneg") ||
                 lower.Contains("snijeg") || lower.Contains("mraz") ||
-                lower.Contains("led") || lower.Contains("mećava"))
+                lower.Contains("led") || lower.Contains("mecava"))
                 return isJoyfulContext
                     ? "weather snow boots jumping"
                     : "weather ambience blizzard";
 
-            if (lower.Contains("čizme") || lower.Contains("rukavice") ||
+            if (lower.Contains("cizme") || lower.Contains("rukavice") ||
                 lower.Contains("skafander") || lower.Contains("kapu") ||
-                lower.Contains("šal") || lower.Contains("kaput"))
+                lower.Contains("sal") || lower.Contains("kaput"))
                 return isJoyfulContext
                     ? "weather snow footstep"
                     : "weather ambience blizzard";
 
-            if (lower.Contains("šuma") || lower.Contains("suma") ||
-                lower.Contains("drveć") || lower.Contains("grana") ||
-                lower.Contains("lisće") || lower.Contains("lišće") ||
-                lower.Contains("šušti"))
+            if (lower.Contains("suma") ||
+                lower.Contains("drvec") || lower.Contains("grana") ||
+                lower.Contains("lisce") || lower.Contains("lisce") ||
+                lower.Contains("susti"))
                 return "ambience nature trail";
 
-            if (lower.Contains("proljeć") || lower.Contains("proleć") ||
+            if (lower.Contains("proljec") || lower.Contains("prolec") ||
                 lower.Contains("cvijet") || lower.Contains("cvece") ||
                 lower.Contains("bujanje") || lower.Contains("procvat"))
                 return "animal bird chirp";
 
             if (lower.Contains("leto") || lower.Contains("ljeto") ||
                 lower.Contains("sunce") || lower.Contains("toplo") ||
-                lower.Contains("vrućina") || lower.Contains("cvrčci"))
+                lower.Contains("vrucina") || lower.Contains("cvrcci"))
                 return "animal ambience crickets";
 
-            if (lower.Contains("jesen") || lower.Contains("lišće pada") ||
+            if (lower.Contains("jesen") || lower.Contains("lisce pada") ||
                 lower.Contains("opada") || lower.Contains("zlatno") ||
-                lower.Contains("žuto lišće"))
+                lower.Contains("zuto lisce"))
                 return "ambience dirt road woods";
 
-            if (lower.Contains("trči") || lower.Contains("trčanje") ||
-                lower.Contains("skoči") || lower.Contains("skači") ||
+            if (lower.Contains("trci") || lower.Contains("trcanje") ||
+                lower.Contains("skoci") || lower.Contains("skaci") ||
                 lower.Contains("blistaj") || lower.Contains("juri"))
                 return "ambience children group playground";
 
@@ -2102,25 +2102,25 @@ namespace UltraVideoEditor
                 lower.Contains("haha") || lower.Contains("raduj"))
                 return "ambience children group playground";
 
-            if (lower.Contains("šetaj") || lower.Contains("šetnja") ||
+            if (lower.Contains("setaj") || lower.Contains("setnja") ||
                 lower.Contains("hodaj") || lower.Contains("korak") ||
-                lower.Contains("prošetaj") || lower.Contains("idi"))
+                lower.Contains("prosetaj") || lower.Contains("idi"))
                 return "ambience nature trail";
 
             if (lower.Contains("igraj") || lower.Contains("igra ") ||
                 lower.Contains("igrice") || lower.Contains("zabav"))
                 return "ambience children group playground";
 
-            if (lower.Contains("prskal") || lower.Contains("tušir") ||
+            if (lower.Contains("prskal") || lower.Contains("tusir") ||
                 lower.Contains("kupan"))
                 return "ambience children sprinkler";
 
-            if (lower.Contains("park") || lower.Contains("parkić") ||
-                lower.Contains("klackalica") || lower.Contains("ljuljaška") ||
+            if (lower.Contains("park") || lower.Contains("parkic") ||
+                lower.Contains("klackalica") || lower.Contains("ljuljaska") ||
                 lower.Contains("tobogan") || lower.Contains("peskovnik"))
                 return "ambience children group playground distant";
 
-            if (lower.Contains("dvorišt") || lower.Contains("bašt") ||
+            if (lower.Contains("dvorist") || lower.Contains("bast") ||
                 lower.Contains("vrt"))
                 return "ambience backyard road";
 
@@ -2128,7 +2128,7 @@ namespace UltraVideoEditor
                 lower.Contains("sokak") || lower.Contains("centar"))
                 return "ambience downtown area";
 
-            if (lower.Contains("kuća") || lower.Contains("kuca") ||
+            if (lower.Contains("kuca") ||
                 lower.Contains("dom") || lower.Contains("soba") ||
                 lower.Contains("unutra") || lower.Contains("topla"))
                 return isJoyfulContext
@@ -2136,7 +2136,7 @@ namespace UltraVideoEditor
                     : "ambience nature 180";
 
             if (lower.Contains("planina") || lower.Contains("vrh") ||
-                lower.Contains("klisura") || lower.Contains("pećina"))
+                lower.Contains("klisura") || lower.Contains("pecina"))
                 return "ambience nature field windy";
 
             if (lower.Contains("movar") || lower.Contains("bara") ||
@@ -2146,39 +2146,39 @@ namespace UltraVideoEditor
             if (lower.Contains("sladoled"))
                 return "ambience children group playground";
 
-            if (lower.Contains("čaj") || lower.Contains("kakao") ||
-                lower.Contains("čokolada") || lower.Contains("topli napit"))
+            if (lower.Contains("caj") || lower.Contains("kakao") ||
+                lower.Contains("cokolada") || lower.Contains("topli napit"))
                 return isJoyfulContext
                     ? "ambience backyard road"
                     : "ambience nature 180";
 
-            if (lower.Contains("torta") || lower.Contains("kolač") ||
-                lower.Contains("slatkiš") || lower.Contains("roćendan"))
+            if (lower.Contains("torta") || lower.Contains("kolac") ||
+                lower.Contains("slatkis") || lower.Contains("rocendan"))
                 return "ambience children group playground";
 
-            if (lower.Contains("pas") || lower.Contains("kučić") ||
-                lower.Contains("štene"))
+            if (lower.Contains("pas") || lower.Contains("kucic") ||
+                lower.Contains("stene"))
                 return "animal dog bark";
 
-            if (lower.Contains("maca") || lower.Contains("mačka") ||
-                lower.Contains("mače"))
+            if (lower.Contains("maca") || lower.Contains("macka") ||
+                lower.Contains("mace"))
                 return "animal mammal cat domestic meow";
 
             if (lower.Contains("konj") || lower.Contains("konjanik"))
                 return "animal horse canters";
 
-            if (lower.Contains("pčela") || lower.Contains("leptir") ||
+            if (lower.Contains("pcela") || lower.Contains("leptir") ||
                 lower.Contains("buba"))
                 return "animal ambience crickets";
 
-            if (lower.Contains("žaba") || lower.Contains("kvakav"))
+            if (lower.Contains("zaba") || lower.Contains("kvakav"))
                 return "animal frog chirp";
 
             if (lower.Contains("zec") || lower.Contains("vjeverica") ||
-                lower.Contains("jelenić"))
+                lower.Contains("jelenic"))
                 return "ambience nature trail";
 
-            if (lower.Contains("majmun") || lower.Contains("džungla"))
+            if (lower.Contains("majmun") || lower.Contains("dzungla"))
                 return "animal ambience jungle";
 
             if (lower.Contains("mama") || lower.Contains("majka") ||
@@ -2194,20 +2194,20 @@ namespace UltraVideoEditor
                 return "ambience children group playground";
 
             if (lower.Contains("spavaj") || lower.Contains("zaspi") ||
-                lower.Contains("laku noć") || lower.Contains("usni") ||
+                lower.Contains("laku noc") || lower.Contains("usni") ||
                 lower.Contains("san ") || lower.Contains("sanjaj"))
                 return isJoyfulContext
                     ? "animal bird chirp"
                     : "ambience nature 180";
 
-            if (lower.Contains("noć") || lower.Contains("zvijezd") ||
-                lower.Contains("mesec") || lower.Contains("tišina"))
+            if (lower.Contains("noc") || lower.Contains("zvijezd") ||
+                lower.Contains("mesec") || lower.Contains("tisina"))
                 return isJoyfulContext
                     ? "animal bird chirp"
                     : "ambience night crickets";
 
             if (lower.Contains("zdravo") || lower.Contains("zdravlje") ||
-                lower.Contains("jako") || lower.Contains("snažno") ||
+                lower.Contains("jako") || lower.Contains("snazno") ||
                 lower.Contains("sport") || lower.Contains("trening"))
                 return "ambience children group playground";
 
@@ -2309,18 +2309,18 @@ namespace UltraVideoEditor
             {
                 "lullaby" => "Mirna uspavanka",
                 "party" => "Vesela proslava",
-                "love" => "Ljubavna priča",
+                "love" => "Love Story",
                 "sad" => "Emotivno putovanje",
                 "adventure" => "Uzbudljiva avantura",
                 "dance" => "Veseli ples",
-                "christmas" => "Čarobni Božić",
-                "outdoor" => "Aktivni život na otvorenom",
-                "seasons" => "Ljepota godišnjih doba",
+                "christmas" => "Magical Christmas",
+                "outdoor" => "Active Outdoor Life",
+                "seasons" => "Beauty of the Seasons",
                 "health" => "Zdravo i aktivno dijete",
-                _ => "Vesela dječija pjesma"
+                _ => "Cheerful Children's Song"
             });
 
-            LogToMainWindow($"✅ Story board kreiran: {scenes.Count} scena za temu: '{overallTheme}'");
+            LogToMainWindow($"✅ Story board created: {scenes.Count} scena za temu: '{overallTheme}'");
             return new StoryBoard { Scenes = scenes, MainCharacter = analysis.MainSubject ?? "Happy child", OverallTheme = overallTheme };
         }
 
@@ -2348,7 +2348,7 @@ namespace UltraVideoEditor
             // Normalni narativni luk: intro → buildup → peak → wind_down → outro
             // intro    0-12%  : uspostavljanje atmosfere, sporiji rezovi
             // buildup  12-35% : energija raste, raznovrsnost lokacija
-            // peak     35-70% : maksimalna energija, brži rezovi
+            // peak     35-70% : maximum energy, faster cuts
             // wind_down 70-88%: smiruje se
             // outro    88-100%: memorabilna finalna slika
             if (pos < 0.12) return 2; // intro
@@ -2373,36 +2373,36 @@ namespace UltraVideoEditor
         {
             string lower = lyric.ToLower();
 
-            if (lower.Contains("trči") || lower.Contains("trčanje") || lower.Contains("juri")) return "running";
-            if (lower.Contains("šetaj") || lower.Contains("šeta") || lower.Contains("šetnja") || lower.Contains("šeće") || lower.Contains("hoda")) return "walking";
-            if (lower.Contains("skoči") || lower.Contains("skači") || lower.Contains("skakanje") || lower.Contains("poskakuje")) return "jumping";
-            if (lower.Contains("leti") || lower.Contains("leteći") || lower.Contains("lebdi")) return "flying";
+            if (lower.Contains("trci") || lower.Contains("trcanje") || lower.Contains("juri")) return "running";
+            if (lower.Contains("setaj") || lower.Contains("seta") || lower.Contains("setnja") || lower.Contains("sece") || lower.Contains("hoda")) return "walking";
+            if (lower.Contains("skoci") || lower.Contains("skaci") || lower.Contains("skakanje") || lower.Contains("poskakuje")) return "jumping";
+            if (lower.Contains("leti") || lower.Contains("leteci") || lower.Contains("lebdi")) return "flying";
             if (lower.Contains("pliva") || lower.Contains("kupanje") || lower.Contains("ronjen")) return "swimming";
             if (lower.Contains("vozi") || lower.Contains("bicikl")) return "riding bicycle";
-            if (lower.Contains("pleši") || lower.Contains("plešeš") || lower.Contains("zaigraj") || lower.Contains("zaigra") || lower.Contains("brza") || lower.Contains("tancuj")) return "dancing";
+            if (lower.Contains("plesi") || lower.Contains("pleses") || lower.Contains("zaigraj") || lower.Contains("zaigra") || lower.Contains("brza") || lower.Contains("tancuj")) return "dancing";
             if (lower.Contains("penje") || lower.Contains("penjanje") || lower.Contains("penj")) return "climbing";
 
             if (lower.Contains("peva") || lower.Contains("pjeva") || lower.Contains("pevaj") || lower.Contains("pjevaj") || lower.Contains("zapeva")) return "singing";
             if (lower.Contains("svira") || lower.Contains("sviranje")) return "playing instrument";
             if (lower.Contains("crta") || lower.Contains("slika") || lower.Contains("boji") || lower.Contains("pravi")) return "drawing painting";
-            if (lower.Contains("čita") || lower.Contains("knjig")) return "reading book";
+            if (lower.Contains("cita") || lower.Contains("knjig")) return "reading book";
             if (lower.Contains("igraj") || lower.Contains("igra") || lower.Contains("igraju")) return "playing";
             if (lower.Contains("gradi") || lower.Contains("pravi") || lower.Contains("kocke")) return "building blocks";
-            if (lower.Contains("lopta") || lower.Contains("šutiraj") || lower.Contains("baca")) return "playing ball";
+            if (lower.Contains("lopta") || lower.Contains("sutiraj") || lower.Contains("baca")) return "playing ball";
 
             if (lower.Contains("smej") || lower.Contains("smije") || lower.Contains("smeh") || lower.Contains("smijeh") || lower.Contains("blistaj")) return "laughing";
-            if (lower.Contains("plač") || lower.Contains("suza")) return "crying";
+            if (lower.Contains("plac") || lower.Contains("suza")) return "crying";
             if (lower.Contains("grli") || lower.Contains("zagrli") || lower.Contains("mazi")) return "hugging";
             if (lower.Contains("ljubi") || lower.Contains("polj")) return "kissing cheek";
 
             if (lower.Contains("spava") || lower.Contains("sanja") || lower.Contains("zaspi") || lower.Contains("zadrema") || lower.Contains("lagana")) return "sleeping";
-            if (lower.Contains("odmara") || lower.Contains("sedi") || lower.Contains("sjedi") || lower.Contains("leži")) return "relaxing";
-            if (lower.Contains("slušaj") || lower.Contains("sluša") || lower.Contains("slusaj")) return "listening";
+            if (lower.Contains("odmara") || lower.Contains("sedi") || lower.Contains("sjedi") || lower.Contains("lezi")) return "relaxing";
+            if (lower.Contains("slusaj") || lower.Contains("slusa")) return "listening";
 
             if (lower.Contains("jede") || lower.Contains("jedi") || lower.Contains("sladoled") || lower.Contains("torta")) return "eating";
-            if (lower.Contains("pije") || lower.Contains("pij") || lower.Contains("sok") || lower.Contains("čaj")) return "drinking";
+            if (lower.Contains("pije") || lower.Contains("pij") || lower.Contains("sok") || lower.Contains("caj")) return "drinking";
 
-            if (lower.Contains("upoznaj") || lower.Contains("otkriva") || lower.Contains("istražu")) return "exploring";
+            if (lower.Contains("upoznaj") || lower.Contains("otkriva") || lower.Contains("istrazu")) return "exploring";
             if (lower.Contains("gleda") || lower.Contains("posmatra") || lower.Contains("vidi") || lower.Contains("viri")) return "watching";
 
             return "enjoying";
@@ -2412,7 +2412,7 @@ namespace UltraVideoEditor
         {
             if (storyBoard?.Scenes == null || storyBoard.Scenes.Count < 3)
             {
-                LogToMainWindow("❌ Validacija neuspješna: Nema dovoljno scena");
+                LogToMainWindow("❌ Validation failed: Not enough scenes");
                 return false;
             }
 
@@ -2442,9 +2442,9 @@ namespace UltraVideoEditor
             }
 
             if (valid)
-                LogToMainWindow("✅ Story board validacija uspješna!");
+                LogToMainWindow("✅ Story board validation successful!");
             else
-                LogToMainWindow("❌ Story board validacija neuspješna");
+                LogToMainWindow("❌ Story board validation failed");
 
             return valid;
         }
@@ -2469,7 +2469,7 @@ namespace UltraVideoEditor
 
                     if (scenes != null && scenes.Count > 0)
                     {
-                        LogToMainWindow($"✅ Uspješno parsirano {scenes.Count} scena");
+                        LogToMainWindow($"✅ Successfully parsed {scenes.Count} scenes");
 
                         string overallTheme = _detectedContext switch
                         {
@@ -2499,7 +2499,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Greška pri parsiranju: {ex.Message}");
+                LogToMainWindow($"❌ Parse error: {ex.Message}");
             }
 
             return CreateFallbackStoryBoard();
@@ -2722,7 +2722,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"❌ Greška pri preuzimanju muzike: {ex.Message}");
+                    LogToMainWindow($"❌ Error downloading music: {ex.Message}");
                 }
             }
 
@@ -2812,7 +2812,7 @@ namespace UltraVideoEditor
 
             if (!_enableAmbientSounds || string.IsNullOrEmpty(soundType) || soundType == "none")
             {
-                LogToMainWindow($"🔊 Ambijentalni zvukovi isključeni ili soundType prazan");
+                LogToMainWindow($"🔊 Ambient sounds disabled or soundType empty");
                 return null;
             }
 
@@ -2848,26 +2848,26 @@ namespace UltraVideoEditor
                 return aiAmbient;
 
             if (lower.Contains("ptic") || lower.Contains("bird") ||
-                lower.Contains("cvrkut") || lower.Contains("šume") ||
-                lower.Contains("šuma") || lower.Contains("drveć") ||
+                lower.Contains("cvrkut") || lower.Contains("sume") ||
+                lower.Contains("suma") || lower.Contains("drvec") ||
                 lower.Contains("prirode") || lower.Contains("grana"))
                 return "animal bird chirp";
 
-            if (lower.Contains("park") || lower.Contains("šetanj") ||
-                lower.Contains("staza") || lower.Contains("pješčan") ||
+            if (lower.Contains("park") || lower.Contains("setanj") ||
+                lower.Contains("staza") || lower.Contains("pjescan") ||
                 lower.Contains("koraka") || lower.Contains("hodanj"))
                 return "ambience nature trail";
 
             if (lower.Contains("djec") || lower.Contains("djet") || lower.Contains("child") ||
                 lower.Contains("igre") || lower.Contains("playground") ||
-                lower.Contains("kretanj") || lower.Contains("trčanj"))
+                lower.Contains("kretanj") || lower.Contains("trcanj"))
                 return "ambience children group playground";
 
             if (lower.Contains("zim") || lower.Contains("snijeg") || lower.Contains("sneg") ||
                 lower.Contains("snow") || lower.Contains("hlad") || lower.Contains("mraz"))
                 return "weather snow boots jumping";
 
-            if (lower.Contains("kiša") || lower.Contains("rain") ||
+            if (lower.Contains("kisa") || lower.Contains("rain") ||
                 lower.Contains("kaplja") || lower.Contains("mokro"))
                 return "weather ambience rain drips";
 
@@ -2885,38 +2885,38 @@ namespace UltraVideoEditor
                 return "ambience creek stream";
 
             if (lower.Contains("more") || lower.Contains("ocean") ||
-                lower.Contains("plaža") || lower.Contains("talas"))
+                lower.Contains("plaza") || lower.Contains("talas"))
                 return "ambience ocean shore";
 
-            if (lower.Contains("kuć") || lower.Contains("restoran") || lower.Contains("indoor") ||
+            if (lower.Contains("kuc") || lower.Contains("restoran") || lower.Contains("indoor") ||
                 lower.Contains("topli") || lower.Contains("dom") || lower.Contains("soba"))
                 return "ambience backyard road";
 
             if (lower.Contains("ljeto") || lower.Contains("leto") || lower.Contains("summer") ||
-                lower.Contains("sunce") || lower.Contains("toplo") || lower.Contains("cvrčci"))
+                lower.Contains("sunce") || lower.Contains("toplo") || lower.Contains("cvrcci"))
                 return "animal ambience crickets";
 
-            if (lower.Contains("noć") || lower.Contains("night") ||
+            if (lower.Contains("noc") || lower.Contains("night") ||
                 lower.Contains("zvijezd") || lower.Contains("mesec"))
                 return "ambience night crickets";
 
-            if (lower.Contains("džungla") || lower.Contains("jungle") ||
+            if (lower.Contains("dzungla") || lower.Contains("jungle") ||
                 lower.Contains("tropsk") || lower.Contains("majmun"))
                 return "animal ambience jungle";
 
             if (lower.Contains("pas") || lower.Contains("dog") ||
-                lower.Contains("kučić") || lower.Contains("bark"))
+                lower.Contains("kucic") || lower.Contains("bark"))
                 return "animal dog bark";
 
             if (lower.Contains("konj") || lower.Contains("horse") ||
                 lower.Contains("kopita"))
                 return "animal horse canters";
 
-            if (lower.Contains("mačka") || lower.Contains("cat") ||
+            if (lower.Contains("macka") || lower.Contains("cat") ||
                 lower.Contains("maca") || lower.Contains("meow"))
                 return "animal mammal cat domestic meow";
 
-            if (lower.Contains("žaba") || lower.Contains("frog"))
+            if (lower.Contains("zaba") || lower.Contains("frog"))
                 return "animal frog chirp";
 
             return InferAmbientFromLyric(lyric, context);
@@ -3003,7 +3003,7 @@ namespace UltraVideoEditor
                 if (_soundIndex == null)
                 {
                     _soundIndex = BuildSoundIndex(soundsDir);
-                    LogToMainWindow($"🎵 Zvučni indeks: {_soundIndex.Count} fajlova u Assets/Sounds/");
+                    LogToMainWindow($"🎵 Sound index: {_soundIndex.Count} files in Assets/Sounds/");
                 }
             }
 
@@ -3154,7 +3154,7 @@ namespace UltraVideoEditor
 
             if (found == null && filteredIndex.Count < _soundIndex.Count)
             {
-                LogToMainWindow($"⚠️ Blacklist filter nije dao rezultat — pokušavam full indeks");
+                LogToMainWindow($"⚠️ Blacklist filter returned no result — trying full index");
                 found = FindBestMatch(_soundIndex, expandedTags);
             }
 
@@ -3224,7 +3224,7 @@ namespace UltraVideoEditor
         {
             if (!_enableAmbientSounds || scenes.All(s => string.IsNullOrEmpty(s.AmbientPath)))
             {
-                LogToMainWindow("🔊 Ambijentalni zvukovi isključeni ili nema zvukova za miksanje");
+                LogToMainWindow("🔊 Ambient sounds disabled or no sounds to mix");
                 return musicPath;
             }
 
@@ -3278,10 +3278,10 @@ namespace UltraVideoEditor
                         ? Math.Clamp(duration * 0.30, 0.5, 1.5)
                         : Math.Clamp(duration * 0.20, 0.3, 1.0);
 
-                    // AFADE FIX: afade mjeri poziciju u uzorcima od POČETKA STREAMA, ne na timeline-u.
-                    // Nakon asetpts=PTS-STARTPTS, stream počinje od t=0.
+                    // AFADE FIX: afade measures position in samples from the START OF STREAM, not on timeline.
+                    // After asetpts=PTS-STARTPTS, stream starts from t=0.
                     // Stari kod koristio st=startTime (npr. 86.7s) unutar streama koji traje 1.6s —
-                    // FFmpeg je ubrzavao audio da "dohvati" tu poziciju → ptice zvučale kao miševi.
+                    // FFmpeg was speeding up audio to "catch" that position → birds sounded like mice.
                     // Fix: st=0 za fade-in (odmah), st=(duration-fadeOut) za fade-out (relativno).
                     filterParts.Add(
                         $"[{ambientIndex}:a]" +
@@ -3337,14 +3337,14 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                LogToMainWindow("⚠️ Miksanje zvuka prekoračilo timeout (120s) - koristim originalnu muziku");
+                LogToMainWindow("⚠️ Audio mixing exceeded timeout (120s) - using original music");
                 try { process.Kill(); } catch { }
                 return musicPath;
             }
 
             if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
             {
-                LogToMainWindow($"✅ Ambijentalni zvukovi uspješno miksnani (gain={ambientVolume:F2}, crossfade=1s)");
+                LogToMainWindow($"✅ Ambient sounds successfully mixed (gain={ambientVolume:F2}, crossfade=1s)");
                 return outputPath;
             }
 
@@ -3394,7 +3394,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ Greška pri generisanju zvuka: {ex.Message}");
+                LogToMainWindow($"⚠️ Sound generation error: {ex.Message}");
             }
 
             return null;
@@ -3486,7 +3486,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ WriteWav greška: {ex.Message}");
+                LogToMainWindow($"⚠️ WriteWav error: {ex.Message}");
                 return false;
             }
         }
@@ -3497,7 +3497,7 @@ namespace UltraVideoEditor
 
         // ── RHYTHMIC PACING VARIATION ─────────────────────────────────────────────
         // Distribucija: 30% fast (1.5-2s), 50% standard (2.8-3.2s), 20% slow (5-6s)
-        // Ne radi se nasumično — prati Energy: visoka=fast, srednja=standard, niska=slow
+        // Not random — follows Energy: high=fast, medium=standard, low=slow
         // Poziva se POSLE beat-snap korekcije da ne remeti audio sync,
         // ali SAMO ako nema lyric timestamps (instrumentalna muzika).
         // Ako postoje timestamps, trajanje je vezano za stihove — ne diramo ga.
@@ -3505,10 +3505,10 @@ namespace UltraVideoEditor
         private void ApplyRhythmicPacing(List<StoryScene> scenes, bool hasLyricTimestamps)
         {
             if (scenes == null || scenes.Count < 3) return;
-            // Kada postoje lyric timestamps, trajanje je određeno audio pozicijama — ne menjamo
+            // When lyric timestamps exist, duration is determined by audio positions — do not change
             if (hasLyricTimestamps) return;
 
-            var rng = new Random(42); // seed=42 → reproducibilnost između rendera
+            var rng = new Random(42); // seed=42 → reproducibility between renders
             int total = scenes.Count;
 
             var byEnergy = scenes
@@ -3556,7 +3556,7 @@ namespace UltraVideoEditor
             _audioPath = audioPath;
             _totalDuration = totalDuration;
 
-            btnGenerate.Content = "🎬 AI kreira priču...";
+            btnGenerate.Content = "🎬 AI is creating story...";
             AnnounceToUser(L("ai_analyzing_song_story"), 5);
 
             var storyBoard = await GenerateStoryBoard(_lyricLines, _cts?.Token ?? CancellationToken.None);
@@ -3567,7 +3567,7 @@ namespace UltraVideoEditor
                 storyBoard = CreateFallbackStoryBoard();
             }
 
-            LogToMainWindow($"📖 Priča kreirana: {storyBoard.Scenes.Count} scena");
+            LogToMainWindow($"📖 Story created: {storyBoard.Scenes.Count} scena");
             LogToMainWindow($"👤 Glavni lik: {storyBoard.MainCharacter}");
             LogToMainWindow($"🎬 Tema: {storyBoard.OverallTheme}");
 
@@ -3576,28 +3576,28 @@ namespace UltraVideoEditor
             if (_beatInfo.IsValid)
                 LogToMainWindow($"🥁 Beat detection: {_beatInfo.BPM:F0} BPM, {_beatInfo.BeatTimes.Count} udaraca, confidence={_beatInfo.Confidence:F2}");
             else
-                LogToMainWindow("🥁 Beat detection: nije pronađen ritam, koristim Whisper trajanja");
+                LogToMainWindow("🥁 Beat detection: no rhythm found, using Whisper durations");
 
             // Piano Mode log
             if (_beatInfo.PianoMode)
-                LogToMainWindow($"🎹 Piano mode aktivan: {_beatInfo.PhraseBeats.Count} melodijskih fraza, gustoća nota={_beatInfo.NoteDensity:F2} " +
+                LogToMainWindow($"🎹 Piano mode active: {_beatInfo.PhraseBeats.Count} melodic phrases, note density={_beatInfo.NoteDensity:F2} " +
                     $"({(_beatInfo.NoteDensity < 0.3 ? "tiha/spora" : _beatInfo.NoteDensity > 0.7 ? "brza/gusta" : "umjerena")}) " +
-                    $"→ dinamički pacing kadrova {(4.5 - _beatInfo.NoteDensity * 2.7):F1}s prosječno");
+                    $"→ dynamic shot pacing {(4.5 - _beatInfo.NoteDensity * 2.7):F1}s average");
 
             _audioStartSeconds = _beatInfo.AudioStartSeconds;
-            // ── LOOK-AHEAD: dinamički cut-advance na osnovu BPM ─────────────────
+            // ── LOOK-AHEAD: dynamic cut-advance based on BPM ─────────────────
             // 80BPM→80ms, 120BPM→100ms, 160BPM→120ms — skalira sa tempom pesme
             double bpmBasedAdvance = 60.0 + (_beatInfo.BPM / 120.0) * 50.0;
             _cutAdvanceMs = Math.Max(60, Math.Min(150, bpmBasedAdvance));
 
             if (_audioStartSeconds > 0.05)
-                LogToMainWindow($"🔇 Audio start offset: {_audioStartSeconds:F2}s tišine na početku → video kreće tačno kad muzika");
+                LogToMainWindow($"🔇 Audio start offset: {_audioStartSeconds:F2}s silence at start → video starts exactly when music does");
             LogToMainWindow($"✂️ Cut-advance: {_cutAdvanceMs:F0}ms look-ahead (BPM={_beatInfo.BPM:F0}) — rez ide ispred beata");
 
             // DURATION FIX: totalDuration mora biti efektivno trajanje audio streama,
             // ne raw trajanje fajla. RenderEngine koristi -ss AudioStartSeconds na audio inputu
-            // što skraćuje audio stream za tačno tu vrijednost. Ako segmenti pokrivaju 177s
-            // ali audio svira samo 169s (177-8), -shortest reže output na 169s = 2:49.
+            // which shortens the audio stream by exactly that value. If segments cover 177s
+            // but audio plays only 169s (177-8), -shortest cuts output to 169s = 2:49.
             // Fix: planiramo segmente na effectiveDuration = rawDuration - AudioStartSeconds.
             if (_audioStartSeconds > 0.05)
             {
@@ -3612,7 +3612,7 @@ namespace UltraVideoEditor
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX aktivan" : "🧠 VisionAnalyzer: FFmpeg mod");
 
-            // Pokušaj Qwen2-VL — ako uspije, koristi se kao prioritet 1 ispred ONNX
+            // Try Qwen2-VL — if successful, used as priority 1 ahead of ONNX
             bool qwenOk = await VisionAnalyzer.InitializeQwenAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             if (qwenOk)
                 LogToMainWindow("🤖 VisionAnalyzer: Qwen2-VL aktivan — koristim AI analizu slike");
@@ -3630,7 +3630,7 @@ namespace UltraVideoEditor
             _tempVideoFolder = Path.Combine(Path.GetTempPath(), $"UVE_Story_{Guid.NewGuid()}");
             Directory.CreateDirectory(_tempVideoFolder);
 
-            // CLEANUP: Tiho briši stare UVE_* temp foldere starije od 12h (prethodne sesije).
+            // CLEANUP: Silently delete old UVE_* temp folders older than 12h (previous sessions).
             string _activeTempFolder = _tempVideoFolder;
             _ = Task.Run(() =>
             {
@@ -3683,7 +3683,7 @@ namespace UltraVideoEditor
             {
                 // Formula: (60s / BPM) * beatsPerCut = sekunde po kadru
                 double bpmBasedMax = Math.Round((60.0 / _beatInfo.BPM) * beatsPerCut, 2);
-                // Clamp: nikad manje od 1.5s (ne stiže da se vidi), nikad više od 8s
+                // Clamp: never less than 1.5s (not enough time to see), never more than 8s
                 MAX_LYRIC_SCENE_DURATION = Math.Max(1.5, Math.Min(8.0, bpmBasedMax));
                 LogToMainWindow($"🥁 BPM {_beatInfo.BPM:F0} × {beatsPerCut} udarca = max {MAX_LYRIC_SCENE_DURATION:F1}s po kadru");
             }
@@ -3706,17 +3706,17 @@ namespace UltraVideoEditor
                 if (_lyricTimestamps.Count > 0 && _lyricTimestamps.ContainsKey(si))
                 {
                     // CUT-ADVANCE: rez se pravi _cutAdvanceMs ranije od audio peaka
-                    // da oko doživi promjenu slike u istoj milisekundi kad uho čuje vokal
+                    // so the eye experiences the image change in the same millisecond the ear hears the vocal
                     double cutAdvanceSec = _cutAdvanceMs / 1000.0;
                     sc.StartTime = Math.Max(0, _lyricTimestamps[si] - cutAdvanceSec);
 
                     // WORD-SYNC: ako imamo word-level timestamps iz Whispera,
-                    // pokušaj da nađeš ključnu riječ scene i snapuj StartTime na nju.
-                    // Na taj način npr. "sladoled" → klip kreće tačno kad se ta riječ izgovori.
-                    // Radi u prozoru ±2s oko stih-level timestamps da izbjegnemo pogrešna poklapanja.
+                    // try to find the scene keyword and snap StartTime to it.
+                    // This way e.g. "sladoled" → clip starts exactly when that word is spoken.
+                    // Works in ±2s window around lyric-level timestamps to avoid wrong matches.
                     if (_wordTimings != null && _wordTimings.Count > 0)
                     {
-                        // Skupi kandidatske ključne riječi: Keywords, Action, prve riječi Description
+                        // Collect candidate keywords: Keywords, Action, first words of Description
                         var candidateWords = new List<string>();
                         if (!string.IsNullOrWhiteSpace(sc.Keywords))
                             candidateWords.AddRange(sc.Keywords.Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
@@ -3735,7 +3735,7 @@ namespace UltraVideoEditor
                         foreach (var cw in candidateWords)
                         {
                             string cwNorm = cw.ToLowerInvariant().Trim('.', ',', '!', '?', ';', ':');
-                            if (cwNorm.Length < 3) continue; // ignoriši kratke riječi (i, je, na...)
+                            if (cwNorm.Length < 3) continue; // ignore short words (i, je, na...)
                             var match = _wordTimings.FirstOrDefault(wt =>
                                 wt.StartSecond >= windowStart &&
                                 wt.StartSecond <= windowEnd &&
@@ -3817,7 +3817,7 @@ namespace UltraVideoEditor
             double remainingDuration = Math.Round(totalDuration - lyricsTotalDuration, 2);
 
             // ── Rhythmic Pacing: varirajemo trajanje scena po 30/50/20 distribuciji ──
-            // Pozivamo POSLE računanja StartTime/Duration, ali SAMO za instrumentalnu muziku
+            // Called AFTER computing StartTime/Duration, but ONLY for instrumental music
             ApplyRhythmicPacing(storyBoard.Scenes, _lyricTimestamps.Count > 0);
 
             LogToMainWindow($"📊 Trajanje audio: {FormatTime(totalDuration)} | Stihovi: {FormatTime(lyricsTotalDuration)} | Instrumentalni rep: {FormatTime(Math.Max(0, remainingDuration))}");
@@ -3972,13 +3972,13 @@ namespace UltraVideoEditor
                             string themeLower = storyBoard.OverallTheme.ToLower();
                             if (themeLower.Contains("muzik") || themeLower.Contains("pesm"))
                                 bRollKeywords.AddRange(new[] { "music concert children stage", "musical notes colorful animation", "children singing together group" });
-                            else if (themeLower.Contains("prirod") || themeLower.Contains("šum"))
+                            else if (themeLower.Contains("prirod") || themeLower.Contains("sum"))
                                 bRollKeywords.AddRange(new[] { "nature outdoor children exploring", "forest path sunlight children", "meadow flowers wind children" });
                             else if (themeLower.Contains("porodic") || themeLower.Contains("ljubav"))
                                 bRollKeywords.AddRange(new[] { "family together outdoor happy warm", "parents children hugging love", "home family cozy warm happy" });
                         }
                         if (bRollKeywords.Count == 0)
-                            // FIX-BROLL: Proširena lista querija za default/fun context
+                            // FIX-BROLL: Extended query list for default/fun context
                             // Prioritet: djeca i emocije prvo, priroda kao fill-in
                             // SmartOutroPool rotira posljednjih 8 klipova → raznovrsniji outro
                             bRollKeywords.AddRange(new[] {
@@ -3991,7 +3991,7 @@ namespace UltraVideoEditor
                                 "parent child hands holding walking outdoor",
                                 "family outdoor together golden hour warm light",
                                 "child running meadow happy slow motion",
-                                // Priroda kao vizuelni oddah između dječijih kadrova
+                                // Nature as visual breathing room between children's shots
                                 "children playing park nature sunny day cinematic",
                                 "kids jumping playing outdoor joyful bright",
                                 "nature path sunlight dappled morning forest",
@@ -4021,10 +4021,10 @@ namespace UltraVideoEditor
                 for (int i = 0; i < introClips; i++)
                 {
                     string kw = bRollKeywords[i % bRollKeywords.Count];
-                    // FIX-CINEMATIC: Dodani filmski kvalitetni termini za premijum stock osećaj
-                    // "soft cinematic lighting" → toplija, mekša rasvjeta
+                    // FIX-CINEMATIC: Added cinematic quality terms for premium stock feel
+                    // "soft cinematic lighting" → warmer, softer lighting
                     // "shallow depth of field" → bokeh efekat, ne flat stock look
-                    // "candid moment" → autentično, ne posed
+                    // "candid moment" → authentic, not posed
                     string styleEnhance = _detectedContext switch
                     {
                         "lullaby" => "soft cinematic lighting gentle bokeh calm",
@@ -4047,7 +4047,7 @@ namespace UltraVideoEditor
                         bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                     }
 
-                    // Treći pokušaj: ultra-safe generički upit
+                    // Third attempt: ultra-safe generic query
                     if (string.IsNullOrEmpty(bMediaPath))
                     {
                         var introSafe = new[] { "children playing outdoor", "nature landscape sunny", "kids park happy", "flowers garden nature" };
@@ -4091,11 +4091,11 @@ namespace UltraVideoEditor
                 if (outroPortion > 0.5)
                 {
                     // OUTRO-FIX: Koristimo fiksni max 3.5s po kadru (ne actualDurationPerClip koji
-                    // može biti ~64s kad search feli za sve kadrove osim prvog).
-                    // Gemini analiza: zadnjih 74s video se "zaključao" na isti kadar potoka.
-                    // Uzrok: kad SearchAndDownloadMedia vrati "" za 16+ kadrova, svi se preskače
+                    // can be ~64s when search fails for all shots except the first).
+                    // Gemini analysis: last 74s video "locked" onto same stream shot.
+                    // Cause: when SearchAndDownloadMedia returns "" for 16+ shots, all are skipped
                     // u sortedSegments petlji (File.Exists("") = false → continue).
-                    // Fix: (1) max 3.5s/kadru, (2) recycle pool od uspješnih intro kadrova,
+                    // Fix: (1) max 3.5s/shot, (2) recycle pool of successful intro shots,
                     //      (3) fade-out tag na zadnjim 3 kadra outro sekcije.
                     const double OUTRO_MAX_CLIP_DURATION = 3.5;
                     double outroEffectiveDurPerClip = Math.Min(actualDurationPerClip, OUTRO_MAX_CLIP_DURATION);
@@ -4120,7 +4120,7 @@ namespace UltraVideoEditor
                         .ToList();
 
                     // Ako lyrics pool prazan (nema dovoljno scena), dodaj zadnjih 50% intro segmenata
-                    // (ne cijeli — samo drugu polovinu, vizuelno udaljenije od početka)
+                    // (not all — only the second half, visually further from the start)
                     if (outroRecyclePool.Count < 3)
                     {
                         var introFallback = introSegments
@@ -4136,7 +4136,7 @@ namespace UltraVideoEditor
 
                     int recycleIdx = 0;
 
-                    // Garantovani ultra-safe fallback upiti koji uvijek pronađu rezultate na Pixabay
+                    // Guaranteed ultra-safe fallback queries that always find results on Pixabay
                     var ultraSafeFallbacks = new[]
                     {
                         "children playing outdoor sunny day",
@@ -4174,16 +4174,16 @@ namespace UltraVideoEditor
                             bMediaPath = await SearchAndDownloadMedia(altKw, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                         }
 
-                        // Treći pokušaj: ultra-safe generički upit koji uvijek pronađe nešto
+                        // Third attempt: ultra-safe generic query that always finds something
                         if (string.IsNullOrEmpty(bMediaPath))
                         {
                             string safeQuery = ultraSafeFallbacks[i % ultraSafeFallbacks.Length];
                             bMediaPath = await SearchAndDownloadMedia(safeQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                             if (!string.IsNullOrEmpty(bMediaPath))
-                                LogToMainWindow($"   ✅ Outro {i + 1}: ultra-safe fallback uspješan ('{safeQuery}')");
+                                LogToMainWindow($"   ✅ Outro {i + 1}: ultra-safe fallback successful ('{safeQuery}')");
                         }
 
-                        // OUTRO-FIX: Ako svi pokušaji failuju, recikliraj klip iz pool-a
+                        // OUTRO-FIX: If all attempts fail, recycle clip from pool
                         // umjesto da ostavimo prazan Path koji uzrokuje rupe u trajanju videa.
                         if (string.IsNullOrEmpty(bMediaPath) && outroRecyclePool.Count > 0)
                         {
@@ -4199,7 +4199,7 @@ namespace UltraVideoEditor
                                 bMediaPath = await TrimVideoToDuration(bMediaPath, outroClipDuration, _tempVideoFolder);
                         }
 
-                        // Zadnja 3 kadra dobivaju fade-out tag za postepen završetak
+                        // Last 3 shots get fade-out tag for gradual ending
                         bool isFadeOutClip = (i >= outroClips - 3);
                         string outroDesc = isFadeOutClip
                             ? (i == outroClips - 1 ? "🎵 Outro - kraj|fadeout=1" : "🎵 Outro - fadeout|fadeout=1")
@@ -4256,7 +4256,7 @@ namespace UltraVideoEditor
                     string emotionBoost = scene.Emotion;
 
                     // ── ZERO-FALLBACK: StrictQueryEngine je jedini izvor query-a ─────────
-                    // GetHardCodedQuery vrši TAČAN match na _actionMap.
+                    // GetHardCodedQuery performs EXACT match on _actionMap.
                     // Ako nema mape → NULL → GenerateBlackFrame (vidljiv debug signal).
                     // BuildLiteralSearchQuery se NE koristi kao fallback.
                     // ─────────────────────────────────────────────────────────────────────
@@ -4268,16 +4268,16 @@ namespace UltraVideoEditor
                     string lyricForQuery = !string.IsNullOrEmpty(scene.FullLyric) ? scene.FullLyric : scene.Description;
                     string primaryQuery = null;
 
-                    // ── DINAMIČKA SEZONA PO STIHU ─────────────────────────────────────────
-                    // Svaki stih može pomenuti drugu sezonu — ne zakucavamo globalnu
-                    // "Leti kupite sladoled" → summer, "Kad je zima nosi čizme" → winter
+                    // ── DYNAMIC SEASON PER LYRIC ─────────────────────────────────────────
+                    // Each lyric can mention a different season — we do not hardcode a global one
+                    // "Leti kupite sladoled" → summer, "Kad je zima nosi cizme" → winter
                     string lyricSeason = StrictQueryEngine.DetectSeasonFromLyric(lyricForQuery);
                     LogToMainWindow($"   🗓 Sezona: globalna={_songContext.Season}, po stihu={lyricSeason ?? "nema"}");
 
                     // FIX-SEASON: Uvijek sinkronizuj _currentSeason sa lyric sezonom
                     // Ranije: mijenjalo se samo ako lyricSeason != globalna sezona
                     // Problem: _currentSeason ostajao na staroj vrijednosti, StrictSeason filtrirao krive klipove
-                    // Fix: ako stih ima sezonu, ona je authoritative; ako nema, zadrži prethodnu lyric sezonu
+                    // Fix: if lyric has a season, it is authoritative; if not, keep previous lyric season
                     if (lyricSeason != null)
                     {
                         // Stih eksplicitno pominje sezonu — koristi je za ovaj kadar
@@ -4301,23 +4301,23 @@ namespace UltraVideoEditor
 
                     // LITERAL SYNC FIX — SLOJ 0: ActionMap direktni match (prije Ollame)
                     // Problem: Ollama overriduje actionMap pa "sladoled" → generic child query
-                    // umjesto točnog "child eating ice cream".
-                    // Rješenje: ako actionMap ima direktan lexical hit na konkretnu imenicu u stihu,
-                    // taj query ide kao PRIORITET i Ollama ga može samo proširiti, ne zamijeniti.
+                    // instead of exact "child eating ice cream".
+                    // Solution: if actionMap has a direct lexical hit on a specific noun in the lyric,
+                    // that query goes as PRIORITY and Ollama can only extend it, not replace it.
                     string actionMapDirectHit = null;
                     {
                         string directQuery = StrictQueryEngine.GetHardCodedQuery(lyricForQuery);
                         if (!string.IsNullOrEmpty(directQuery))
                         {
-                            // Provjeri da li je match na konkretnu imenicu (objekt/akcija, ne generički kontekst)
-                            // GetHardCodedQuery vraća samo ako postoji direktan keyword match u stihu
+                            // Check if match is on a specific noun (object/action, not generic context)
+                            // GetHardCodedQuery returns only if there is a direct keyword match in the lyric
                             actionMapDirectHit = StrictQueryEngine.ValidateAndFilter(directQuery, _songContext);
                             if (!string.IsNullOrEmpty(actionMapDirectHit))
                                 LogToMainWindow($"   🎯 ActionMap direktni hit (prioritet): '{actionMapDirectHit}'");
                         }
                     }
 
-                    // SLOJ 1: Ollama — sa semantičkom klasifikacijom stiha (FIX Tag-Semantic Gap)
+                    // LAYER 1: Ollama — with semantic classification of the lyric (FIX Tag-Semantic Gap)
                     if (_ollamaRunning)
                     {
                         try
@@ -4327,15 +4327,15 @@ namespace UltraVideoEditor
 
                             // FIX-CLOSEUP: Detekcija close-up stihova
                             // Kada stih pominje dete/lice/ruku/osmeh → forsiraj close-up hint u promptu
-                            // Close-up kadrovi drže pažnju dece 3-7g mnogo bolje od wide kadrova
+                            // Close-up shots hold the attention of children aged 3-7 much better than wide shots
                             bool needsCloseUp = false;
                             {
                                 string lyricLow = lyricForQuery.ToLower();
                                 var closeUpTriggers = new[] {
                                     "dete","dijete","decu","djece","mali","mala","malo","klinac","klinka",
-                                    "ruku","rukicu","rukom","ruke","ručica","ručice",
-                                    "oči","oče","očima","lice","licem","lica",
-                                    "osmeh","osmijeh","smeška","smešak","smije","smeje","smeje",
+                                    "ruku","rukicu","rukom","ruke","rucica","rucice",
+                                    "oci","oce","ocima","lice","licem","lica",
+                                    "osmeh","osmijeh","smeska","smesak","smije","smeje","smeje",
                                     "mama","tata","baka","deka","mamu","tatu"
                                 };
                                 needsCloseUp = closeUpTriggers.Any(t => lyricLow.Contains(t));
@@ -4354,16 +4354,16 @@ namespace UltraVideoEditor
                             }
                             else
                             {
-                                // FIX-OLLAMA-DEBUG: Loguj raw output da vidimo zašto se odbacuje
+                                // FIX-OLLAMA-DEBUG: Log raw output to see why it is being rejected
                                 string rawPreview = string.IsNullOrWhiteSpace(ollamaRaw)
                                     ? "(prazan odgovor)"
                                     : ollamaRaw.Substring(0, Math.Min(80, ollamaRaw.Length)).Replace("\n", "↵").Replace("\r", "");
                                 LogToMainWindow($"   ⚠️ Ollama nije dala upotrebljiv query | Raw: '{rawPreview}'");
                             }
 
-                            // LITERAL SYNC FIX: ActionMap direktni hit pobjeđuje Ollamu
+                            // LITERAL SYNC FIX: ActionMap direct hit beats Ollama
                             // "sladoled" → actionMap = "child eating ice cream" (konkretan)
-                            // Ollama = "child running park joy" (generički) → mora izgubiti
+                            // Ollama = "child running park joy" (generic) → must lose
                             if (!string.IsNullOrEmpty(actionMapDirectHit))
                             {
                                 if (primaryQuery != actionMapDirectHit)
@@ -4373,7 +4373,7 @@ namespace UltraVideoEditor
                         }
                         catch (Exception ollamaEx)
                         {
-                            LogToMainWindow($"   ⚠️ Ollama greška: {ollamaEx.Message}");
+                            LogToMainWindow($"   ⚠️ Ollama error: {ollamaEx.Message}");
                         }
                     }
 
@@ -4397,13 +4397,13 @@ namespace UltraVideoEditor
                     }
 
                     // FIX-COOLDOWN: Anti-ponavljanje vizuelnih tema unutar 4 scene (~12-16s)
-                    // Gemini: "određeni vizuelni motivi se ponavljaju (kadrovi potoka/šume)"
-                    // Rješenje: normalizuj query na 2-3 ključne riječi, prati cooldown po temi
-                    // Ako je ista tema bila korištena unutar QUERY_COOLDOWN_SCENES scena → varira query
+                    // Gemini: "certain visual motifs repeat (stream/forest shots)"
+                    // Solution: normalize query to 2-3 keywords, track cooldown per theme
+                    // If the same theme was used within QUERY_COOLDOWN_SCENES scenes → vary query
                     _currentSceneIndex++;
                     if (!string.IsNullOrEmpty(primaryQuery))
                     {
-                        // Normalizuj query na prvih 2-3 riječi = "tema" (npr. "children stream water" → "children stream")
+                        // Normalize query to first 2-3 words = "theme" (e.g. "children stream water" → "children stream")
                         var queryWords = primaryQuery.ToLower()
                             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                             .Where(w => w.Length > 3) // filtriraj kratke function words
@@ -4428,7 +4428,7 @@ namespace UltraVideoEditor
                             primaryQuery = variant;
                         }
 
-                        // Ažuriraj cooldown za ovu temu
+                        // Update cooldown for this theme
                         _queryThemeCooldown[queryTheme] = _currentSceneIndex;
                     }
 
@@ -4463,10 +4463,10 @@ namespace UltraVideoEditor
                     var subSceneQueries = DetectSubSceneQueries(scene.Description, styleConsistency);
                     if (subSceneQueries != null && subSceneQueries.Count >= 2 && mediaType == "video")
                     {
-                        LogToMainWindow($"   🎬 Sub-scene detekcija: {subSceneQueries.Count} vizuelnih objekata → montaža klipova");
+                        LogToMainWindow($"   🎬 Sub-scene detection: {subSceneQueries.Count} visual objects → clip montage");
                         mediaPath = await BuildSubSceneVideo(subSceneQueries, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                         if (mediaPath != null)
-                            LogToMainWindow($"   ✅ Sub-scene video kreiran: {subSceneQueries.Count} klipa");
+                            LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} klipa");
                         else
                             LogToMainWindow($"   ⚠ Sub-scene video nije uspio, koristim standardni path");
                     }
@@ -4474,38 +4474,38 @@ namespace UltraVideoEditor
                     double effectiveDuration = Math.Min(scene.Duration, MAX_LYRIC_SCENE_DURATION);
                     if (effectiveDuration != scene.Duration)
                     {
-                        LogToMainWindow($"   ⚠️ Scena {i + 1}: Duration {scene.Duration:F1}s → ograničeno na {effectiveDuration:F1}s (MAX_LYRIC_SCENE_DURATION)");
+                        LogToMainWindow($"   ⚠️ Scene {i + 1}: Duration {scene.Duration:F1}s → limited to {effectiveDuration:F1}s (MAX_LYRIC_SCENE_DURATION)");
                         scene.Duration = effectiveDuration;
                     }
 
                     // ── ZERO-FALLBACK: Multi-anchor za duge scene ─────────────────────────
-                    // Ako postoji više hard-coded mapa za ovaj stih → montaža.
+                    // If there are multiple hard-coded maps for this lyric → montage.
                     // Ako postoji samo jedna → jedini API poziv.
-                    // Ako nema mape (primaryQuery iz BuildLiteral) → jedan pokušaj pa crni ekran.
+                    // If there is no map (primaryQuery from BuildLiteral) → one attempt then black screen.
                     if (multiMatches.Count >= 2 && effectiveMediaType == "video" && scene.Duration > 4.0)
                     {
-                        LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded upita → montaža klipova");
+                        LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded queries → clip montage");
                         mediaPath = await BuildSubSceneVideo(multiMatches, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                         if (mediaPath != null)
-                            LogToMainWindow($"   ✅ Multi-anchor video kreiran");
+                            LogToMainWindow($"   ✅ Multi-anchor video created");
                     }
 
                     if (string.IsNullOrEmpty(mediaPath) && effectiveMediaType == "video" && scene.Duration > 6.0 && !string.IsNullOrEmpty(primaryQuery))
                     {
-                        // Duga scena → pokušaj multi-clip sa istim query
+                        // Long scene → try multi-clip with same query
                         mediaPath = await SearchAndDownloadMultipleMedia(
                             primaryQuery, primaryQuery, effectiveMediaType,
                             scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                     }
 
-                    // ── 3-POKUŠAJA SISTEM ─────────────────────────────────────────────────
-                    // Pokušaj 1: primaryQuery (Ollama/mapa)
-                    // Pokušaj 2: SmartFallback (kontekstualni)
-                    // Pokušaj 3: Apsolutni sigurni query
-                    // Qwen screening je ugrađen unutar SearchAndDownloadMedia —
-                    // on odbacuje loše klipove i traži bolji unutar iste pretrage.
-                    // Ovaj sistem menja SAM QUERY između pokušaja.
-                    // Nikad crni ekran — bar jedan pokušaj uvek daje rezultat.
+                    // ── 3-ATTEMPT SYSTEM ─────────────────────────────────────────────────
+                    // Attempt 1: primaryQuery (Ollama/map)
+                    // Attempt 2: SmartFallback (contextual)
+                    // Attempt 3: Absolute safe query
+                    // Qwen screening is built into SearchAndDownloadMedia —
+                    // it rejects bad clips and looks for better ones within the same search.
+                    // This system changes THE QUERY ITSELF between attempts.
+                    // Never black screen — at least one attempt always gives a result.
                     // ─────────────────────────────────────────────────────────────────────
                     var queryAttempts = new List<string>();
                     if (!string.IsNullOrEmpty(primaryQuery))
@@ -4516,14 +4516,14 @@ namespace UltraVideoEditor
                     for (int attempt = 0; attempt < queryAttempts.Count && string.IsNullOrEmpty(mediaPath); attempt++)
                     {
                         string attemptQuery = queryAttempts[attempt];
-                        string attemptLabel = attempt == 0 ? "Pokušaj 1 (primary)" :
-                                              attempt == 1 ? "Pokušaj 2 (SmartFallback)" :
-                                                            "Pokušaj 3 (safe)";
+                        string attemptLabel = attempt == 0 ? "Attempt 1 (primary)" :
+                                              attempt == 1 ? "Attempt 2 (SmartFallback)" :
+                                                            "Attempt 3 (safe)";
                         LogToMainWindow($"   🔍 {attemptLabel}: '{attemptQuery}'");
 
-                        // FIX-SEASON-OBJECT: Neki objekti postoje u svim sezonama (sladoled, čaj, igranje)
+                        // FIX-SEASON-OBJECT: Some objects exist in all seasons (ice cream, tea, playing)
                         // ali Pixabay klipovi za njih mogu imati winter/summer tag koji se mimoilazi.
-                        // Za object querije → isključi strictSeason filter da ne odbacuje validne klipove.
+                        // For object queries → disable strictSeason filter so it doesn't reject valid clips.
                         bool seasonNeutralQuery = new[] {
                             "ice cream", "eating", "drinking", "tea", "hot chocolate",
                             "playing indoor", "birthday", "cake", "food"
@@ -4534,7 +4534,7 @@ namespace UltraVideoEditor
                             _cts?.Token ?? CancellationToken.None, scene.Duration,
                             strictSeasonFilter: !seasonNeutralQuery);
                         if (!string.IsNullOrEmpty(mediaPath))
-                            LogToMainWindow($"   ✅ {attemptLabel} uspješan");
+                            LogToMainWindow($"   ✅ {attemptLabel} successful");
                         else
                             LogToMainWindow($"   ⚠️ {attemptLabel} nije vratio medij");
                     }
@@ -4557,7 +4557,7 @@ namespace UltraVideoEditor
                             }
                             else if (videoDuration < scene.Duration - 0.5)
                             {
-                                LogToMainWindow($"   🔁 Kratak video ({videoDuration:F1}s < {scene.Duration:F1}s) — RenderEngine će loopovati");
+                                LogToMainWindow($"   🔁 Short video ({videoDuration:F1}s < {scene.Duration:F1}s) — RenderEngine will loop");
                                 finalPath = mediaPath;
                             }
                         }
@@ -4575,7 +4575,7 @@ namespace UltraVideoEditor
                         scene.IsOutdoor = _lastDownloadedIsOutdoor;
 
                         if (scene.IsStaticClip)
-                            LogToMainWindow($"   🎬 Statičan klip — Ken Burns će se primijeniti u renderu");
+                            LogToMainWindow($"   🎬 Static clip — Ken Burns will be applied in render");
 
                         _segments.Add(new TimelineSegment
                         {
@@ -4600,7 +4600,7 @@ namespace UltraVideoEditor
                     }
                     else
                     {
-                        LogToMainWindow($"❌ Scena {i + 1}: nema medija - preskačem!");
+                        LogToMainWindow($"❌ Scene {i + 1}: no media - skipping!");
                     }
 
                     await Task.Delay(300, _cts?.Token ?? CancellationToken.None);
@@ -4655,9 +4655,9 @@ namespace UltraVideoEditor
 
                 int missingCount = _segments.Count(s => string.IsNullOrEmpty(s.Path) || !File.Exists(s.Path));
                 if (missingCount > 0)
-                    LogToMainWindow($"⚠ {missingCount} scena nema medija — biće preskočene u renderu");
+                    LogToMainWindow($"⚠ {missingCount} scenes have no media — will be skipped in render");
                 else
-                    LogToMainWindow($"✅ Sve scene imaju medij. Pokrećem render...");
+                    LogToMainWindow($"✅ All scenes have media. Starting render...");
 
                 GenerateValidationReport();
 
@@ -4675,12 +4675,12 @@ namespace UltraVideoEditor
 
                     if (string.IsNullOrEmpty(autoPath))
                     {
-                        LogToMainWindow("⚠️ Auto-Render: nije postavljena putanja za čuvanje");
+                        LogToMainWindow("⚠️ Auto-Render: save path not set");
                     }
                     else
                     {
                         AutoRenderOutputPath = autoPath;
-                        LogToMainWindow($"🚀 Auto-Render: pokrećem render → {autoPath}");
+                        LogToMainWindow($"🚀 Auto-Render: starting render → {autoPath}");
                         await TriggerAutoRender(autoPath);
                     }
                 }
@@ -4689,10 +4689,10 @@ namespace UltraVideoEditor
             finally
             {
                 btnGenerate.IsEnabled = true;
-                btnGenerate.Content = "🎬 KREIRAJ VIDEO";
+                btnGenerate.Content = "🎬 CREATE VIDEO";
 
-                // CLEANUP: Briši _tempVideoFolder sa svim preuzetim i procesiranim klipovima.
-                // Čekamo kratko da RenderEngine završi pisanje fajlova, pa provjeri da output postoji.
+                // CLEANUP: Delete _tempVideoFolder with all downloaded and processed clips.
+                // We wait briefly for RenderEngine to finish writing files, then verify output exists.
                 string folderToClean = _tempVideoFolder;
                 string outputForCheck = AutoRenderOutputPath;
                 if (!string.IsNullOrEmpty(folderToClean) && Directory.Exists(folderToClean))
@@ -4701,10 +4701,10 @@ namespace UltraVideoEditor
                     {
                         try
                         {
-                            // Sačekaj 3s da RenderEngine završi flush na disk
+                            // Wait 3s for RenderEngine to finish flushing to disk
                             await Task.Delay(3000);
 
-                            // Briši samo ako render output postoji i nije prazan (> 5 MB)
+                            // Delete only if render output exists and is not empty (> 5 MB)
                             bool outputOk = !string.IsNullOrEmpty(outputForCheck)
                                 && File.Exists(outputForCheck)
                                 && new FileInfo(outputForCheck).Length > 5_000_000;
@@ -4716,12 +4716,12 @@ namespace UltraVideoEditor
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Preskačem brisanje — output nije potvrđen: {outputForCheck}");
+                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Skipping deletion — output not confirmed: {outputForCheck}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"[Cleanup] Greška pri brisanju {folderToClean}: {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"[Cleanup] Error deleting {folderToClean}: {ex.Message}");
                         }
                     });
                 }
@@ -4756,7 +4756,7 @@ namespace UltraVideoEditor
                 Filter = "MP4 video|*.mp4",
                 DefaultExt = "mp4",
                 FileName = "iskra_video.mp4",
-                Title = "Odaberi gdje čuvati video"
+                Title = "Select where to save video"
             };
             if (dlg.ShowDialog() == true)
             {
@@ -4786,14 +4786,14 @@ namespace UltraVideoEditor
                     mainWindow.currentProjectFolder = folder ?? string.Empty;
 
                 LogToMainWindow($"🎬 Auto-Render: output → {outputPath}");
-                AnnounceToUser("Pokrećem render...", 99);
+                AnnounceToUser("Starting render...", 99);
 
                 // Direktno pokretanje rendera sa output putanjom
                 await mainWindow.StartRenderToPath(outputPath);
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ Auto-Render greška: {ex.Message}");
+                LogToMainWindow($"⚠️ Auto-Render error: {ex.Message}");
             }
         }
 
@@ -4808,11 +4808,11 @@ namespace UltraVideoEditor
             // FIX-VALIDATION: Koristi IsOutdoor flag koji se setuje pri downloadu (TagBoost + ONNX)
             int outdoorCount = segs.Count(s => s.IsOutdoor);
             // FIX-VALIDATION: Koristi HasChildren flag koji se setuje pri downloadu (TagBoost + ONNX)
-            // Prethodni kod je čitao s.Description (tekst stiha) — to uvijek vraća ~0%
+            // Previous code was reading s.Description (lyric text) — that always returned ~0%
             int childrenCount = segs.Count(s => s.HasChildren);
-            // BUG-4 FIX: Oduzmi crossfade overlap da prikaz bude tačan
+            // BUG-4 FIX: Subtract crossfade overlap so display is accurate
             // Crossfade oduzima (N-1) * avgFade od ukupnog trajanja
-            double avgFadeEst = 0.346; // prosječni fade iz pacing logike
+            double avgFadeEst = 0.346; // average fade from pacing logic
             double crossfadeOverlapEst = segs.Count > 1 ? (segs.Count - 1) * avgFadeEst : 0.0;
             double totalDur = Math.Max(0, segs.Sum(s => s.Duration) - crossfadeOverlapEst);
             int highEnergy = segs.Count(s => s.Energy >= 4);
@@ -4823,38 +4823,38 @@ namespace UltraVideoEditor
             LogToMainWindow("═══════════════════════════════════════");
             LogToMainWindow($"  ✅ Ukupno scena: {totalSegs}");
             LogToMainWindow($"  ⏱ Ukupno trajanje: {FormatTime(totalDur)}");
-            LogToMainWindow($"  ⭐ Prosječan Vision Score: {avgScore:F1}/10" +
+            LogToMainWindow($"  ⭐ Average Vision Score: {avgScore:F1}/10" +
                             (avgScore >= 6.5 ? " — Dobar" : avgScore >= 5.0 ? " — Prihvatljiv" : " — ⚠ Slab"));
             LogToMainWindow($"  🌿 Priroda/Outdoor kadrovi: {outdoorCount}/{totalSegs}" +
                             (outdoorCount >= totalSegs / 2 ? " ✅" : " ⚠ Malo outdoor"));
             double humanPresenceRatio = (double)childrenCount / totalSegs;
-            LogToMainWindow($"  👧 Dječiji/Porodični kadrovi: {childrenCount}/{totalSegs}" +
+            LogToMainWindow($"  👧 Children/Family shots: {childrenCount}/{totalSegs}" +
                 (childrenCount == 0 ? " ⚠️ Nema djece na snimcima!" :
                  humanPresenceRatio < 0.70 ? $" ⚠️ Samo {humanPresenceRatio:P0} — cilj je min. 70%!" :
                  $" ✅ ({humanPresenceRatio:P0})"));
-            LogToMainWindow($"  🎬 Statični kadrovi (Ken Burns primijenjen): {staticCount}/{totalSegs}");
+            LogToMainWindow($"  🎬 Static shots (Ken Burns applied): {staticCount}/{totalSegs}");
             LogToMainWindow($"  ⚡ Visoka energija (scena 4-5): {highEnergy} scena");
             LogToMainWindow($"  🌊 Niska energija (scena 1-2): {lowEnergy} scena");
 
             bool hasWarnings = false;
             if (avgScore < 5.0)
-            { LogToMainWindow("  ⚠ UPOZORENJE: Prosječni score je nizak. Razmotri ponovnu generaciju."); hasWarnings = true; }
+            { LogToMainWindow("  ⚠ WARNING: Average score is low. Consider regenerating."); hasWarnings = true; }
             if (outdoorCount < totalSegs / 3)
-            { LogToMainWindow("  ⚠ UPOZORENJE: Malo outdoor scena — moguće indoor/mračni kadrovi."); hasWarnings = true; }
+            { LogToMainWindow("  ⚠ WARNING: Few outdoor scenes — possible indoor/dark shots."); hasWarnings = true; }
             if (staticCount > totalSegs / 2)
-            { LogToMainWindow($"  ⚠ INFO: Više od polovine scena je statično ({staticCount}) — Ken Burns primijenjen na sve."); }
+            { LogToMainWindow($"  ⚠ INFO: More than half of scenes are static ({staticCount}) — Ken Burns applied to all."); }
 
             if (!hasWarnings)
-                LogToMainWindow("  🎉 Sve provjere prošle — video bi trebao biti bez 'gluposti'!");
+                LogToMainWindow("  🎉 All checks passed — video should be free of 'nonsense'!");
 
             LogToMainWindow($"  🎵 Kontekst: {_detectedContext} | Mood: {_detectedMood}");
-            LogToMainWindow("  📝 Opis: Snimci su pretežno " +
+            LogToMainWindow("  📝 Description: Shots are predominantly " +
                 (outdoorCount > childrenCount ? "priroda i vanjski prostori" : "djeca i porodica") +
                 $", ukupno {FormatTime(totalDur)} materijala.");
             LogToMainWindow("═══════════════════════════════════════");
 
-            AnnounceToUser($"Validation Report: {totalSegs} scena, prosječan score {avgScore:F1}, " +
-                $"{outdoorCount} outdoor, {childrenCount} dječijih kadrova.", 0);
+            AnnounceToUser($"Validation Report: {totalSegs} scenes, average score {avgScore:F1}, " +
+                $"{outdoorCount} outdoor, {childrenCount} children's shots.", 0);
         }
 
         private string _lastShotType = "";
@@ -4895,7 +4895,7 @@ namespace UltraVideoEditor
                 {
                     if (yavg < 40)
                     {
-                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — previše tamno (min=40)");
+                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — too dark (min=40)");
                         return false;
                     }
                     if (yavg > 235)
@@ -4915,7 +4915,7 @@ namespace UltraVideoEditor
 
                     if (pinkDiff > 18)
                     {
-                        LogToMainWindow($"   📊 Tint R-G={pinkDiff:F1} — pink sadržaj (max=18)");
+                        LogToMainWindow($"   📊 Tint R-G={pinkDiff:F1} — pink content (max=18)");
                         return false;
                     }
                 }
@@ -4945,7 +4945,7 @@ namespace UltraVideoEditor
                 if (actualDuration >= targetDuration - 0.5)
                 {
                     // Re-enkodujemo umjesto -c copy da normalizujemo FPS na 25 i izbjegnemo
-                    // koćenje na spojevima kad originalni klip ima drugačiji framerate.
+                    // stuttering at joins when the original clip has a different framerate.
                     bool nvencOk = false;
                     try
                     {
@@ -4983,7 +4983,7 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogToMainWindow($"   🔁 Kratak video ({actualDuration:F1}s < {targetDuration:F1}s) — RenderEngine će loopovati");
+                    LogToMainWindow($"   🔁 Short video ({actualDuration:F1}s < {targetDuration:F1}s) — RenderEngine will loop");
                     return inputPath;
                 }
 
@@ -5007,16 +5007,16 @@ namespace UltraVideoEditor
 
                 if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
                 {
-                    LogToMainWindow($"✅ Trim/Loop uspješan za {sw.ElapsedMilliseconds}ms");
+                    LogToMainWindow($"✅ Trim/Loop successful in {sw.ElapsedMilliseconds}ms");
                     return outputPath;
                 }
 
-                LogToMainWindow($"⚠️ Trim/Loop neuspješan — koristim original");
+                LogToMainWindow($"⚠️ Trim/Loop failed — using original");
                 return inputPath;
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Trim greška: {ex.Message}");
+                LogToMainWindow($"❌ Trim error: {ex.Message}");
                 return inputPath;
             }
         }
@@ -5067,7 +5067,7 @@ namespace UltraVideoEditor
 
         private async Task<string> SearchAndDownloadMedia(string keywords, int minWidth, string mediaType, CancellationToken ct, double minDurationSeconds = 0, bool strictSeasonFilter = true)
         {
-            // ZERO-FALLBACK guard: null keywords → odmah null (caller će GenerateBlackFrame)
+            // ZERO-FALLBACK guard: null keywords → immediately null (caller will GenerateBlackFrame)
             if (string.IsNullOrWhiteSpace(keywords)) return null;
             LogToMainWindow($"🔍 SearchAndDownloadMedia: '{keywords.Substring(0, Math.Min(60, keywords.Length))}...', type={mediaType}");
 
@@ -5082,7 +5082,7 @@ namespace UltraVideoEditor
                     byte[] encrypted = File.ReadAllBytes(keyFile);
                     byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
                     apiKey = Encoding.UTF8.GetString(decrypted).Trim();
-                    LogToMainWindow($"✅ API ključ učitan, dužina: {apiKey.Length}");
+                    LogToMainWindow($"✅ API key loaded, length: {apiKey.Length}");
                 }
                 else
                 {
@@ -5090,13 +5090,13 @@ namespace UltraVideoEditor
                     if (File.Exists(txtFile))
                     {
                         apiKey = File.ReadAllText(txtFile).Trim();
-                        LogToMainWindow($"✅ API ključ učitan iz TXT, dužina: {apiKey.Length}");
+                        LogToMainWindow($"✅ API key loaded from TXT, length: {apiKey.Length}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Greška pri čitanju API ključa: {ex.Message}");
+                LogToMainWindow($"❌ Error reading API key: {ex.Message}");
             }
 
             if (string.IsNullOrEmpty(apiKey))
@@ -5118,7 +5118,7 @@ namespace UltraVideoEditor
                             byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
                             File.WriteAllBytes(keyFile, encrypted);
                         }
-                        catch (Exception ex) { LogToMainWindow($"❌ Greška pri čuvanju: {ex.Message}"); }
+                        catch (Exception ex) { LogToMainWindow($"❌ Save error: {ex.Message}"); }
                         apiKey = newKey;
                     }
                 });
@@ -5141,8 +5141,8 @@ namespace UltraVideoEditor
                     try
                     {
                         ct.ThrowIfCancellationRequested();
-                        // FALLBACK FIX: attempt==1 ostaje semantički vezan za query
-                        // (ne vuče random iz _universalKeywords koji nema veze sa stihom)
+                        // FALLBACK FIX: attempt==1 stays semantically tied to the query
+                        // (does not pull random from _universalKeywords unrelated to the lyric)
                         string searchQ;
                         if (attempt == 0)
                         {
@@ -5150,14 +5150,14 @@ namespace UltraVideoEditor
                         }
                         else
                         {
-                            // Uzmi prvu smislenu riječ iz query-a + "children outdoor"
+                            // Take the first meaningful word from the query + "children outdoor"
                             var firstWord = keywords
                                 .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                 .FirstOrDefault(t => t.Length > 3) ?? keywords.Split(' ')[0];
                             searchQ = firstWord + " children outdoor";
                         }
 
-                        // Page rotation — kad svi rezultati budu viđeni, uzimamo sljedeću stranicu
+                        // Page rotation — when all results have been seen, we take the next page
                         string pageKey = searchQ.ToLowerInvariant().Trim();
                         if (!_queryPageMap.ContainsKey(pageKey)) _queryPageMap[pageKey] = 1;
                         int currentPage = _queryPageMap[pageKey];
@@ -5184,23 +5184,23 @@ namespace UltraVideoEditor
     "boy","girl","toddler","baby","kids","siblings",
     "mother","father","parent","teacher" };
 
-                            // LITERAL SYNC FIX: Izvuci query riječi za direktno poređenje sa tagovima.
-                            // Ovo rješava problem gdje "sladoled" vraća generičke kadrove djece umjesto
-                            // specifičnih (dijete jede sladoled) — jer sorting nije gledao sam query.
-                            // queryMatchScore * 3 daje 3x veći prioritet direktnom podudaranju nego whitelist.
+                            // LITERAL SYNC FIX: Extract query words for direct comparison with tags.
+                            // This solves the problem where "sladoled" returns generic children's shots instead of
+                            // specific ones (child eating ice cream) — because sorting was not looking at the query itself.
+                            // queryMatchScore * 3 gives 3x higher priority to direct match than whitelist.
                             var queryWords = searchQ.ToLowerInvariant()
                                 .Split(new[] { ' ', ',', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Where(w => w.Length > 2) // ignoriši kratke stop-words
+                                .Where(w => w.Length > 2) // ignore short stop-words
                                 .ToArray();
 
                             var sortedHits = hits.Cast<JToken>().OrderByDescending(h => {
                                 string tags = h["tags"]?.ToString()?.ToLower() ?? "";
                                 string title = h["user"]?.ToString()?.ToLower() ?? "";
 
-                                // Query match score — svaka query riječ nađena u tagovima = +1
+                                // Query match score — each query word found in tags = +1
                                 int queryMatchScore = queryWords.Count(w => tags.Contains(w));
 
-                                // Whitelist score — generički bonus za dječiji sadržaj
+                                // Whitelist score — generic bonus for children's content
                                 int whitelistScore = whitelistTags.Count(w => tags.Contains(w));
 
                                 // PATCH 7: Bonus za HD/4K snimke
@@ -5211,7 +5211,7 @@ namespace UltraVideoEditor
                                                  : (width >= 1280 || height >= 720) ? 1   // 720p
                                                  : 0;
 
-                                // queryMatchScore nosi 3x težinu — specifičnost beat-uje popularnost
+                                // queryMatchScore carries 3x weight — specificity beats popularity
                                 return (queryMatchScore * 3) + whitelistScore + qualityBonus;
                             }).ToList();
 
@@ -5226,11 +5226,11 @@ namespace UltraVideoEditor
                             {
                                 int hitIdx = (startIdx + hitOffset) % sortedHits.Count;
                                 var hit = sortedHits[hitIdx];
-                                // Asset Deduplication — preskači snimke koji su već korišćeni u ovom videu
+                                // Asset Deduplication — skip shots already used in this video
                                 string hitId = hit["id"]?.ToString() ?? "";
                                 if (!string.IsNullOrEmpty(hitId) && !_seenPixabayIds.Add(hitId))
                                 {
-                                    LogToMainWindow($"⏭ Deduplication: preskačem snimak ID {hitId} (već korišćen)");
+                                    LogToMainWindow($"⏭ Deduplication: skipping shot ID {hitId} (already used)");
                                     continue;
                                 }
                                 var videos = hit["videos"] as JObject;
@@ -5247,7 +5247,7 @@ namespace UltraVideoEditor
 
                                     if (_usedMediaUrls.Contains(dlUrl))
                                     {
-                                        LogToMainWindow($"   ⏭ Preskačem već korišćeni video URL (hit {hitIdx + 1})");
+                                        LogToMainWindow($"   ⏭ Skipping already used video URL (hit {hitIdx + 1})");
                                         continue;
                                     }
 
@@ -5337,7 +5337,7 @@ namespace UltraVideoEditor
     "dry branch", "bare tree branch", "dead branch", "bare tree",
     "bark tree closeup", "twig closeup",
     "stock photo woman", "model smiling", "model portrait",
-    // Lifestyle / tinejdžeri
+    // Lifestyle / teenagers
     "teenager", "teen", "teens", "teenage", "adolescent",
     "young adult", "young woman", "young man",
     "lifestyle", "influencer", "selfie", "ice cream woman",
@@ -5346,7 +5346,7 @@ namespace UltraVideoEditor
     // PATCH 7: Maske i pandemija
     "mask", "face mask", "medical mask", "surgical mask", "masked",
     "covid", "pandemic", "quarantine", "lockdown", "protective mask",
-    // PATCH 7: Sportovi koji ne odgovaraju porodičnoj šetnji
+    // PATCH 7: Sports incompatible with family walk
     "hockey", "ice hockey", "hockey stick", "hockey player",
     "rugby", "american football", "boxing", "wrestling", "martial arts",
     "extreme sport", "skateboard trick", "bmx trick",
@@ -5356,7 +5356,7 @@ namespace UltraVideoEditor
     "studio equipment", "recording studio", "music studio", "audio equipment",
     "synthesizer", "amplifier", "equalizer", "audio interface",
     "gramofon", "mixeta", "mikset",
-    // PATCH 8: Urban/city eliminacija — samo priroda, parkovi, šume
+    // PATCH 8: Urban/city elimination — nature, parks, forests only
     "city", "cities", "urban", "downtown", "traffic", "highway", "freeway",
     "intersection", "skyscraper", "skyline", "building exterior", "office building",
     "apartment building", "street traffic", "road traffic", "busy street",
@@ -5379,7 +5379,7 @@ namespace UltraVideoEditor
                                                   || adultWithoutChild;
                                     if (hasBadTag)
                                     {
-                                        LogToMainWindow($"   ⏭ Preskačem neprikladan sadrzaj (tags: {hitTags.Substring(0, Math.Min(60, hitTags.Length))})");
+                                        LogToMainWindow($"   ⏭ Skipping inappropriate content (tags: {hitTags.Substring(0, Math.Min(60, hitTags.Length))})");
                                         continue;
                                     }
 
@@ -5398,7 +5398,7 @@ namespace UltraVideoEditor
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegForBright, ct);
                                     if (!brightnessOk && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   ⏭ Odbačen zbog brightness/tint (previše tamno/svijetlo ili pink tint)");
+                                        LogToMainWindow($"   ⏭ Rejected due to brightness/tint (too dark/bright or pink tint)");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5418,7 +5418,7 @@ namespace UltraVideoEditor
 
                                     // TAG BOOST: Ako ONNX nije prepoznao dijete ali Pixabay tagovi jasno govore
                                     // da je kadar sa djecom — override HasChildren=true.
-                                    // ONNX MobileNetV2 ima loše labele za djecu; tagovi su pouzданiji signal.
+                                    // ONNX MobileNetV2 has poor labels for children; tags are a more reliable signal.
                                     if (!vision.HasChildren)
                                     {
                                         string[] childTagKeywords = {
@@ -5430,7 +5430,7 @@ namespace UltraVideoEditor
                                         if (tagsHaveChild)
                                         {
                                             vision.HasChildren = true;
-                                            LogToMainWindow($"   👶 TagBoost: Pixabay tagovi sadrže child keyword — HasChildren override=True");
+                                            LogToMainWindow($"   👶 TagBoost: Pixabay tags contain child keyword — HasChildren override=True");
                                         }
                                     }
 
@@ -5473,16 +5473,16 @@ namespace UltraVideoEditor
                                     // HasStrongMotion = Magnitude > 30 (threshold je u MotionResult)
                                     if (clipMotion.HasStrongMotion && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   🚫 KidsFilter: Preagresivan pokret kamere (mag:{clipMotion.Magnitude:F0}) — odbacujem za dečiji video...");
+                                        LogToMainWindow($"   🚫 KidsFilter: Camera motion too aggressive (mag:{clipMotion.Magnitude:F0}) — rejecting for children's video...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
                                     }
 
-                                    // FIX-FROZEN: Filter za "zamrznute" životinjske kadrove
-                                    // AI stock klipovi ptica, flaminga i sl. često imaju Magnitude≈0 (statična scena)
+                                    // FIX-FROZEN: Filter for "frozen" animal shots
+                                    // AI stock clips of birds, flamingos etc. often have Magnitude≈0 (static scene)
                                     // Iskusno oko to odmah primijeti (Gemini: 00:21 flamingo, 00:32 ptica).
-                                    // Ako je kadar životinje I gotovo statičan → tražimo dinamičniji klip.
+                                    // If the shot is an animal AND nearly static → we look for a more dynamic clip.
                                     bool isAnimalClip = hitTags.Contains("bird") || hitTags.Contains("flamingo") ||
                                                         hitTags.Contains("animal") || hitTags.Contains("wildlife") ||
                                                         hitTags.Contains("butterfly") || hitTags.Contains("cat") ||
@@ -5496,15 +5496,15 @@ namespace UltraVideoEditor
                                                         clipMotion.Magnitude < 3.0;
                                     if (isAnimalClip && isFrozenClip && hitOffset < sortedHits.Count - 3)
                                     {
-                                        LogToMainWindow($"   🐦 FrozenAnimal: životinjski kadar bez pokreta (mag:{clipMotion.Magnitude:F1}) — tražim animiran klip...");
+                                        LogToMainWindow($"   🐦 FrozenAnimal: animal shot with no motion (mag:{clipMotion.Magnitude:F1}) — looking for animated clip...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
                                     }
 
                                     // FIX-MOTION: Koristimo EndDirection prethodnog klipa (ne Direction)
-                                    // _lastClipEndMotion sadrži kretanje pri KRAJU prethodnog klipa
-                                    // Ovo rešava jump-cut: kraj-početak mora biti kompatibilan, ne početak-početak
+                                    // _lastClipEndMotion stores motion at the END of the previous clip
+                                    // This fixes jump-cut: end-start must be compatible, not start-start
                                     var prevForMatch = _lastClipEndMotion ?? _lastClipMotion;
                                     bool motionOk = MotionResult.IsCompatible(prevForMatch, clipMotion);
 
@@ -5526,14 +5526,14 @@ namespace UltraVideoEditor
                                     // PATCH 9: 30% Composition Rule — blokiraj wide landscape bez dece
                                     // Ako je "wide" shot I nema djece u kadru → odbaci (djeca su premala/nevidljiva)
                                     bool isTooWideWithoutChild = shotType == "wide" && !vision.HasChildren &&
-                                                                 !hitTagsForShot.Contains("nature") && // čista priroda OK kao B-roll
+                                                                 !hitTagsForShot.Contains("nature") && // pure nature OK as B-roll
                                                                  !hitTagsForShot.Contains("forest") &&
                                                                  !hitTagsForShot.Contains("flower") &&
                                                                  !hitTagsForShot.Contains("garden") &&
                                                                  !hitTagsForShot.Contains("park");
                                     if (isTooWideWithoutChild && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   📐 PATCH9 30%Rule: wide kadar bez djece — pretrajna za uzrast 2-6g, tražim medium/close plan...");
+                                        LogToMainWindow($"   📐 PATCH9 30%Rule: wide shot without children — too static for ages 2-6, looking for medium/close shot...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5563,7 +5563,7 @@ namespace UltraVideoEditor
 
                                     // ── Temporal Seasonal Grouping ────────────────────────────────
                                     // ── STRICT SEASONAL MATCHING ──────────────────────────────────
-                                    // Detektujemo sezonu klipa na osnovu tagova (prošireni set za bolju detekciju)
+                                    // Detect clip season based on tags (extended set for better detection)
                                     string clipSeasonTag = "none";
                                     if (hitTagsForShot.Contains("snow") || hitTagsForShot.Contains("winter") ||
                                         hitTagsForShot.Contains("frost") || hitTagsForShot.Contains("ice") ||
@@ -5586,7 +5586,7 @@ namespace UltraVideoEditor
                                     // STRICT FILTER: odbaci klip koji nije "none" i nije ciljana sezona pesme
                                     // IZNIMKA 1: B-roll klipovi (strictSeasonFilter=false) — ne filtriramo
                                     // IZNIMKA 2: Ako scena ima eksplicitnu sezonu (po stihu), prihvati klipove te sezone
-                                    //            npr. stih "kad je zima" → _currentSeason može biti "winter" čak i ako je globalna sezona "spring"
+                                    //            e.g. lyric "kad je zima" → _currentSeason may be "winter" even if global season is "spring"
                                     bool strictSeasonReject = false;
                                     if (strictSeasonFilter &&
                                         !string.IsNullOrEmpty(_currentSeason) && _currentSeason != "none" &&
@@ -5607,7 +5607,7 @@ namespace UltraVideoEditor
 
                                     if (strictSeasonReject)
                                     {
-                                        LogToMainWindow($"   🗓 StrictSeason: klip={clipSeasonTag}, pesma={_currentSeason} — nije kompatibilno, tražim konzistentniji klip...");
+                                        LogToMainWindow($"   🗓 StrictSeason: clip={clipSeasonTag}, song={_currentSeason} — not compatible, looking for consistent clip...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5632,7 +5632,7 @@ namespace UltraVideoEditor
 
                                     if (seasonClash && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   🗓 Seasonal clash ({_lastSeasonTag} → {clipSeasonTag}) — tražim konzistentniji klip...");
+                                        LogToMainWindow($"   🗓 Seasonal clash ({_lastSeasonTag} → {clipSeasonTag}) — looking for consistent clip...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5640,7 +5640,7 @@ namespace UltraVideoEditor
                                     // ─────────────────────────────────────────────────────────────
 
                                     // ── PATCH 10: Candid Only — strogi filter za "Stock Look" ──
-                                    // Odbacuje odrasle koji gledaju direktno u objektiv (klasičan stock osećaj)
+                                    // Rejects adults looking directly into the lens (classic stock feel)
                                     if (vision.Labels != null && vision.Labels.Length > 0)
                                     {
                                         bool adultLookingAtCamera = vision.Labels.Any(l =>
@@ -5657,7 +5657,7 @@ namespace UltraVideoEditor
                                                            && hitOffset < sortedHits.Count - 2;
                                         if (rejectStock)
                                         {
-                                            LogToMainWindow($"   📸 PATCH10 Candid: odbacujem 'commercial/stock' kadar (adult posing) — tražim autentičan moment...");
+                                            LogToMainWindow($"   📸 PATCH10 Candid: rejecting 'commercial/stock' shot (adult posing) — looking for authentic moment...");
                                             try { File.Delete(fullPath); } catch { }
                                             _usedMediaUrls.Remove(dlUrl);
                                             continue;
@@ -5673,9 +5673,9 @@ namespace UltraVideoEditor
                                     bool clipIsCold = hitTagsForShot.Contains("blue") || hitTagsForShot.Contains("cold") ||
                                                       hitTagsForShot.Contains("overcast") || hitTagsForShot.Contains("grey") ||
                                                       hitTagsForShot.Contains("gray");
-                                    // PATCH 11: Gym/Fitness Vision Label Check — treći sloj zaštite
-                                    // Kettlebell i slično prolazi ako Pixabay tag ne sadrži "gym" ali klip jeste fitness
-                                    // Ovdje hvatamo to na Qwen label nivou — direktna provjera šta Qwen VIDI u kadru
+                                    // PATCH 11: Gym/Fitness Vision Label Check — third layer of protection
+                                    // Kettlebell and similar pass if Pixabay tag doesn't contain "gym" but clip is fitness
+                                    // Here we catch this at Qwen label level — direct check of what Qwen SEES in the shot
                                     if (vision.Labels != null && vision.Labels.Length > 0)
                                     {
                                         var gymLabels = new[] {
@@ -5702,7 +5702,7 @@ namespace UltraVideoEditor
                                     }
 
                                     // PATCH 10 / FIX-D: Indoor/Outdoor Context Continuity
-                                    // Ako je prethodni klip bio outdoor I tekuća scena je outdoor pesma,
+                                    // If the previous clip was outdoor AND the current scene is an outdoor song,
                                     // ne dozvoljavamo indoor (kuhinja, soba) klipove osim ako tekst ne pominje to
                                     bool thisClipIsIndoor = hitTagsForShot.Contains("indoor") ||
                                                             hitTagsForShot.Contains("kitchen") ||
@@ -5715,9 +5715,9 @@ namespace UltraVideoEditor
                                                                 l.Contains("interior") || l.Contains("inside")));
                                     bool outdoorContext = _detectedContext is "fun" or "children" or "nature" or "adventure" or "sport";
                                     bool lyricAllowsIndoor = !string.IsNullOrEmpty(_currentLyric) && (
-                                        _currentLyric.ToLower().Contains("ruča") || _currentLyric.ToLower().Contains("večer") ||
-                                        _currentLyric.ToLower().Contains("užin") || _currentLyric.ToLower().Contains("kući") ||
-                                        _currentLyric.ToLower().Contains("kuća") || _currentLyric.ToLower().Contains("soba") ||
+                                        _currentLyric.ToLower().Contains("ruca") || _currentLyric.ToLower().Contains("vecer") ||
+                                        _currentLyric.ToLower().Contains("uzin") || _currentLyric.ToLower().Contains("kuci") ||
+                                        _currentLyric.ToLower().Contains("kuca") || _currentLyric.ToLower().Contains("soba") ||
                                         _currentLyric.ToLower().Contains("lunch") || _currentLyric.ToLower().Contains("home") ||
                                         _currentLyric.ToLower().Contains("dinner") || _currentLyric.ToLower().Contains("snack"));
                                     bool indoorClash = thisClipIsIndoor && outdoorContext &&
@@ -5725,41 +5725,41 @@ namespace UltraVideoEditor
                                                        hitOffset < sortedHits.Count - 2;
                                     if (indoorClash)
                                     {
-                                        LogToMainWindow($"   🏠 PATCH10 Indoor/Outdoor: outdoor pesma, indoor kadar ({hitTagsForShot.Substring(0, Math.Min(30, hitTagsForShot.Length))}) — tražim outdoor kadar...");
+                                        LogToMainWindow($"   🏠 PATCH10 Indoor/Outdoor: outdoor song, indoor shot ({hitTagsForShot.Substring(0, Math.Min(30, hitTagsForShot.Length))}) — lookim outdoor kadar...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
                                     }
 
-                                    // PATCH 9: Ojačana Warm Continuity provjera
-                                    // Blokiramo i cold klipove čak i ako prethodni nije bio warm — dječiji video mora biti topao
+                                    // PATCH 9: Enhanced Warm Continuity check
+                                    // We also block cold clips even if previous was not warm — children's video must be warm
                                     bool tempClash = clipIsCold && !clipIsWarm &&
                                                      !hitTagsForShot.Contains("snow") && !hitTagsForShot.Contains("winter") &&
                                                      !(_detectedContext == "winter" || _detectedSeason == "winter");
                                     if (tempClash && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   🌡 PATCH9 Warm Filter: hladna/plava paleta — nije OK za dječiji video, tražim topliji kadar...");
+                                        LogToMainWindow($"   🌡 PATCH9 Warm Filter: cold/blue palette — not OK for children's video, looking for warmer shot...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
                                     }
 
                                     // PATCH 10 / FIX-G: Tone Matching — rolling luminance check
-                                    // Ako je klip značajno tamniji od proseka prethodna 3, odbacimo ga
+                                    // If the clip is significantly darker than the average of the previous 3, reject it
                                     if (_recentLuminance.Count >= 3 && vision.Luminance > 0)
                                     {
                                         double avgLum = _recentLuminance.Average();
                                         double lumDrop = avgLum - vision.Luminance;
-                                        // Odbaci ako je više od 0.20 tamniji od prosjeka (značajan pad)
+                                        // Reject if more than 0.20 darker than average (significant drop)
                                         if (lumDrop > 0.20 && hitOffset < sortedHits.Count - 2)
                                         {
-                                            LogToMainWindow($"   ☀ PATCH10 ToneMatch: kadar previše taman (lum:{vision.Luminance:F2} vs avg:{avgLum:F2}) — tražim topliji kadar...");
+                                            LogToMainWindow($"   ☀ PATCH10 ToneMatch: shot too dark (lum:{vision.Luminance:F2} vs avg:{avgLum:F2}) — looking for warmer shot...");
                                             try { File.Delete(fullPath); } catch { }
                                             _usedMediaUrls.Remove(dlUrl);
                                             continue;
                                         }
                                     }
-                                    // Ažuriraj rolling luminance history
+                                    // Update rolling luminance history
                                     if (vision.Luminance > 0)
                                     {
                                         _recentLuminance.Enqueue(vision.Luminance);
@@ -5784,7 +5784,7 @@ namespace UltraVideoEditor
 
                                     // FIX-SMILE: Bonus score za osmeh kada je stih pozitivan
                                     // Gemini preporuka: "ako je muzika vesela, dozvoljeni su samo kadrovi gdje se vide osmesi"
-                                    // Implementacija: bonus na score (ne odbacivanje), da sistem preferira smiješne kadrove
+                                    // Implementation: score bonus (not rejection), so system prefers funny shots
                                     double finalScore = vision.Score;
                                     if (vision.HasSmile)
                                     {
@@ -5809,8 +5809,8 @@ namespace UltraVideoEditor
                                 }
                             }
 
-                            LogToMainWindow($"   ⚠ Svi {sortedHits.Count} video rezultati za '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' su već korišćeni");
-                            // Page rotation — povećaj stranicu za sljedeći poziv istog query-a
+                            LogToMainWindow($"   ⚠ All {sortedHits.Count} video results for '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' already used");
+                            // Page rotation — increment page for the next call of the same query
                             if (_queryPageMap.ContainsKey(pageKey) && _queryPageMap[pageKey] < 5)
                                 _queryPageMap[pageKey]++;
                         }
@@ -5832,7 +5832,7 @@ namespace UltraVideoEditor
                                 if (string.IsNullOrEmpty(dlUrl)) continue;
                                 if (_usedMediaUrls.Contains(dlUrl))
                                 {
-                                    LogToMainWindow($"   ⏭ Preskačem već korišćenu sliku (hit {hitIdx + 1})");
+                                    LogToMainWindow($"   ⏭ Skipping already used image (hit {hitIdx + 1})");
                                     continue;
                                 }
 
@@ -5845,7 +5845,7 @@ namespace UltraVideoEditor
                                 await dlStream.CopyToAsync(fileStream, ct);
                                 return fullPath;
                             }
-                            LogToMainWindow($"   ⚠ Sve slike za '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' su već korišćene");
+                            LogToMainWindow($"   ⚠ All images for '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' already used");
                         }
                     }
                     finally
@@ -5860,20 +5860,20 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"❌ Greška u attempt {attempt + 1}: {ex.Message}");
+                    LogToMainWindow($"❌ Error in attempt {attempt + 1}: {ex.Message}");
                 }
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // PEXELS FALLBACK — aktivira se kad Pixabay ne pronađe ništa
+            // PEXELS FALLBACK — activated when Pixabay finds nothing
             // Koristi MediaProviderRegistry waterfall (Pexels → Coverr → ...)
-            // Pexels: 200 req/sat, visoka HD kvaliteta, lifestyle/children sadržaj
+            // Pexels: 200 req/hour, high HD quality, lifestyle/children content
             // ══════════════════════════════════════════════════════════════════
             if (mediaType == "video")
             {
                 try
                 {
-                    LogToMainWindow($"   🔄 Pixabay iscrpljen — pokušavam Pexels fallback za '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+                    LogToMainWindow($"   🔄 Pixabay exhausted — trying Pexels fallback for '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
 
                     var registry = MediaProviderRegistry.Instance;
                     var fallbackProviders = registry.Configured
@@ -5882,7 +5882,7 @@ namespace UltraVideoEditor
 
                     if (fallbackProviders.Count == 0)
                     {
-                        LogToMainWindow("   ℹ Nema konfigurisanih fallback provajdera (Pexels/Coverr). Dodaj API ključ u Postavkama → Provajderi.");
+                        LogToMainWindow("   ℹ No fallback providers configured (Pexels/Coverr). Add API key in Settings → Providers.");
                     }
 
                     foreach (var provider in fallbackProviders)
@@ -5890,7 +5890,7 @@ namespace UltraVideoEditor
                         ct.ThrowIfCancellationRequested();
                         try
                         {
-                            LogToMainWindow($"   🌐 [{provider.Name}] Pretražujem: '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+                            LogToMainWindow($"   🌐 [{provider.Name}] Searching: '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
 
                             double minDur = minDurationSeconds > 0 ? minDurationSeconds : 4.0;
                             var results = await provider.SearchAsync(
@@ -5910,7 +5910,7 @@ namespace UltraVideoEditor
                             }
 
                             // LITERAL SYNC FIX: Isti query-match scoring kao Pixabay —
-                            // specifične query riječi nose 3x veći bonus od generalnog children taga.
+                            // specific query words carry 3x higher bonus than the generic children tag.
                             var pexelsQueryWords = keywords.ToLowerInvariant()
                                 .Split(new[] { ' ', ',', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
                                 .Where(w => w.Length > 2)
@@ -5933,14 +5933,14 @@ namespace UltraVideoEditor
                                 ct.ThrowIfCancellationRequested();
                                 if (_usedMediaUrls.Contains(result.DownloadUrl)) continue;
 
-                                // FIX-PEXELS-DEDUP: isti video može doći pod različitim URL-ovima (1080p vs 4K).
-                                // Ekstraktujemo numerički ID iz filename i čuvamo ga kao dodatni dedup ključ.
+                                // FIX-PEXELS-DEDUP: same video can arrive under different URLs (1080p vs 4K).
+                                // We extract the numeric ID from filename and store it as an additional dedup key.
                                 string pexelsDlFile = result.DownloadUrl.Substring(result.DownloadUrl.LastIndexOf('/') + 1);
                                 string pexelsVideoIdMatch = System.Text.RegularExpressions.Regex.Match(pexelsDlFile, @"^(\d+)").Value;
                                 string pexelsDedupeKey = !string.IsNullOrEmpty(pexelsVideoIdMatch) ? $"pexels_{pexelsVideoIdMatch}" : null;
                                 if (pexelsDedupeKey != null && _usedMediaUrls.Contains(pexelsDedupeKey))
                                 {
-                                    LogToMainWindow($"   ⏭ [Pexels] Preskačem ID {pexelsVideoIdMatch} (već korišćen)");
+                                    LogToMainWindow($"   ⏭ [Pexels] Skipping ID {pexelsVideoIdMatch} (already used)");
                                     continue;
                                 }
 
@@ -5979,7 +5979,7 @@ namespace UltraVideoEditor
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegPath, ct);
                                     if (!brightnessOk)
                                     {
-                                        LogToMainWindow($"   ⏭ [{provider.Name}] Odbačen — brightness/tint problem");
+                                        LogToMainWindow($"   ⏭ [{provider.Name}] Rejected — brightness/tint problem");
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6003,7 +6003,7 @@ namespace UltraVideoEditor
 
                                     if (vision.Score < 3.5)
                                     {
-                                        LogToMainWindow($"   ⚠ [{provider.Name}] VisionScore {vision.Score:F1}/10 — tražim bolji...");
+                                        LogToMainWindow($"   ⚠ [{provider.Name}] VisionScore {vision.Score:F1}/10 — looking for better...");
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6026,7 +6026,7 @@ namespace UltraVideoEditor
                                                     resultTagsLower.Contains("wildlife") || resultTagsLower.Contains("flamingo");
                                     if (isAnimal && clipMotion.Direction == MotionDirection.Static && clipMotion.Magnitude < 3.0)
                                     {
-                                        LogToMainWindow($"   🐦 [{provider.Name}] Frozen animal — tražim animiran...");
+                                        LogToMainWindow($"   🐦 [{provider.Name}] Frozen animal — looking for animated...");
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6053,26 +6053,26 @@ namespace UltraVideoEditor
                                 catch (OperationCanceledException) { throw; }
                                 catch (Exception ex)
                                 {
-                                    LogToMainWindow($"   ❌ [{provider.Name}] Greška pri preuzimanju: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
+                                    LogToMainWindow($"   ❌ [{provider.Name}] Download error: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
                                     _usedMediaUrls.Remove(result.DownloadUrl);
                                     if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                     try { File.Delete(fullPath); } catch { }
                                 }
                             }
 
-                            LogToMainWindow($"   ⚠ [{provider.Name}] Svi rezultati odbačeni ili iskorišćeni");
+                            LogToMainWindow($"   ⚠ [{provider.Name}] All results rejected or used");
                         }
                         catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
                         {
-                            LogToMainWindow($"   ❌ [{provider.Name}] Search greška: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                            LogToMainWindow($"   ❌ [{provider.Name}] Search error: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
                         }
                     }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"   ❌ Pexels fallback greška: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                    LogToMainWindow($"   ❌ Pexels fallback error: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
                 }
             }
             // ══════════════════════════════════════════════════════════════════
@@ -6122,7 +6122,7 @@ namespace UltraVideoEditor
 
             string songTitle = string.IsNullOrEmpty(txtIntroText.Text) ? "🎵 Nova pjesmica" : txtIntroText.Text;
             // DEAD-ZONE FIX: Naslov traje koliko instrumentalni uvod (max 4s).
-            // Ako muzika kreće odmah → samo 0.5s da ne "visi" dok audio svira.
+            // If music starts immediately → only 0.5s so it doesn't "hang" while audio plays.
             double introDuration;
             if (_beatInfo != null && _beatInfo.AudioStartSeconds > 0.5)
                 introDuration = Math.Min(4.0, Math.Round(_beatInfo.AudioStartSeconds, 1));
@@ -6259,7 +6259,7 @@ namespace UltraVideoEditor
             double totalDuration = maxEnd;
 
             string outroText = string.IsNullOrEmpty(txtOutroText.Text) ?
-                "Autor: Iskra Ajvazi. Muzika i tekst: Iskra Ajvazi. Za još predivnih pesmica, zapratite naš YouTube kanal: @Rastimo uz Iskru" :
+                "Author: Iskra Ajvazi. Music and lyrics: Iskra Ajvazi. For more wonderful songs, follow our YouTube channel: @Rastimo uz Iskru" :
                 txtOutroText.Text;
 
             double outroDuration = 7;
@@ -6311,9 +6311,9 @@ namespace UltraVideoEditor
                 int currentEnergy = i < _segments.Count ? _segments[i]?.Energy ?? 3 : 3;
                 int nextEnergy = i + 1 < _segments.Count ? _segments[i + 1]?.Energy ?? 3 : 3;
 
-                // FIX-ENERGY-RAMP: Ako energija skoči/padne za više od 2 stepena,
-                // ograničimo transEnergy na ±2 od prethodnog — sprečava nagli tempo udarac
-                // koji narušava fluidnost toka (primijećeno @ 00:49-00:53 u Gemini analizi).
+                // FIX-ENERGY-RAMP: If energy jumps/drops by more than 2 levels,
+                // limit transEnergy to ±2 from previous — prevents sudden tempo punch
+                // that disrupts flow fluidity (observed @ 00:49-00:53 in Gemini analysis).
                 int energyDelta = Math.Abs(nextEnergy - currentEnergy);
                 int transEnergy;
                 if (energyDelta > 2)
@@ -6328,7 +6328,7 @@ namespace UltraVideoEditor
                     transEnergy = (currentEnergy + nextEnergy) / 2;
                 }
 
-                // ── HYBRID CROSSFADE: 1000ms između različitih tipova medija ──────────
+                // ── HYBRID CROSSFADE: 1000ms between different media types ──────────
                 string currentContentTag = i < _segments.Count ? _segments[i]?.ContentTag : null;
                 string nextContentTag = i + 1 < _segments.Count ? _segments[i + 1]?.ContentTag : null;
                 bool isPhotoTag(string t) => t == "Emotional" || t == "Portrait";
@@ -6336,7 +6336,7 @@ namespace UltraVideoEditor
                 bool mediaTypeSwitches = (isPhotoTag(currentContentTag) && (isVideoTag(nextContentTag) || nextContentTag == null))
                                       || (isVideoTag(currentContentTag) && (isPhotoTag(nextContentTag) || nextContentTag == null))
                                       || (isPhotoTag(nextContentTag) && (isVideoTag(currentContentTag) || currentContentTag == null))
-                                      || (currentItem.Type != nextItem.Type);  // Video↔Image i u generičkom slučaju
+                                      || (currentItem.Type != nextItem.Type);  // Video↔Image and in generic case
                 double fadeDuration = mediaTypeSwitches ? 1.0 : (transEnergy >= 4 ? 0.3 : 0.4);
                 if (mediaTypeSwitches)
                     LogToMainWindow($"   🔄 Hybrid crossfade 1000ms: {currentItem.Type}({currentContentTag ?? "?"}) → {nextItem.Type}({nextContentTag ?? "?"})");
@@ -6404,9 +6404,9 @@ namespace UltraVideoEditor
                 }
             }
 
-            LogToMainWindow("🎬 Ažuriram timeline prikaz...");
+            LogToMainWindow("🎬 Updating timeline view...");
             await Dispatcher.InvokeAsync(() => mainWindow.UpdateTimelineDisplay());
-            LogToMainWindow("✅ Timeline prikaz ažuriran");
+            LogToMainWindow("✅ Timeline view updated");
 
             int segmentsCount = _segments?.Count ?? 0;
             double segmentsTotal = _segments?.Sum(s => s.Duration) ?? 0;
@@ -6436,8 +6436,8 @@ namespace UltraVideoEditor
             TransitionType transType = TransitionType.Fade)
         {
             // Spremi odabrani tip tranzicije na item kako bi ga RenderEngine mogao pokupit
-            // kroz AudioDescription field (koji se već koristi za prijenos metapodataka)
-            // Format: postojeći string + "|xfade=<type>"
+            // via the AudioDescription field (already used for metadata transport)
+            // Format: existing string + "|xfade=<type>"
             string xfadeTag = $"|xfade={TransitionTypeToFFmpeg(transType)}";
             if (!string.IsNullOrEmpty(currentItem.AudioDescription))
                 currentItem.AudioDescription += xfadeTag;
@@ -6626,7 +6626,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// ZERO-FALLBACK: Generiše crni ekran umjesto pogrešnog kadra.
+        /// ZERO-FALLBACK: Generates a black screen instead of a wrong shot.
         /// Svaki crni ekran u finalnom videu = jasna debug poruka:
         /// "dodaj ovu mapu u StrictQueryEngine".
         /// </summary>
@@ -6722,14 +6722,14 @@ namespace UltraVideoEditor
         /// <summary>
         /// Globalni Warm White Balance filter koji se primjenjuje na SVE medije
         /// (i video i fotografije) kako bi se vizuelno stopili.
-        /// Podiže crveni kanal i malo spušta plavi — efekt "zlatnog sata".
+        /// Boosts the red channel and slightly lowers blue — "golden hour" effect.
         /// </summary>
         public const string WARM_WHITE_BALANCE_FILTER =
             "curves=r='0/0 0.5/0.57 1/1':b='0/0 0.5/0.44 1/0.92'," +
             "eq=saturation=1.12:brightness=0.02:contrast=1.03";
 
         /// <summary>
-        /// Određuje ContentTag scene na osnovu Emotion, Keywords i Energy.
+        /// Determines the ContentTag of a scene based on Emotion, Keywords and Energy.
         /// "Emotional" | "Portrait" → fotografija + ZoomPan
         /// "Action"    | "Nature"   → video
         /// Null/ostalo → mediaType iz UI
@@ -6771,21 +6771,21 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(lyric)) return null;
             string lower = lyric.ToLower();
 
-            bool hasWinterClothing = (lower.Contains("čizme") || lower.Contains("izme")) &&
+            bool hasWinterClothing = (lower.Contains("cizme") || lower.Contains("izme")) &&
                                      (lower.Contains("rukavice") || lower.Contains("skafander") ||
-                                      lower.Contains("kapu") || lower.Contains("šal") || lower.Contains("kaput"));
+                                      lower.Contains("kapu") || lower.Contains("sal") || lower.Contains("kaput"));
             if (hasWinterClothing)
             {
                 var q = new List<string>();
-                if (lower.Contains("čizme") || lower.Contains("izme"))
+                if (lower.Contains("cizme") || lower.Contains("izme"))
                     q.Add(BuildLiteralSearchQuery("child winter boots snow outdoor", "", "", style));
                 if (lower.Contains("rukavice"))
                     q.Add(BuildLiteralSearchQuery("child winter gloves snow hands", "", "", style));
                 if (lower.Contains("skafander") || lower.Contains("kombinezon"))
                     q.Add(BuildLiteralSearchQuery("child winter snowsuit playing snow", "", "", style));
-                if (lower.Contains("kapu") || lower.Contains("kapi") || lower.Contains("šešir"))
+                if (lower.Contains("kapu") || lower.Contains("kapi") || lower.Contains("sesir"))
                     q.Add(BuildLiteralSearchQuery("child wearing winter hat snow smiling", "", "", style));
-                if (lower.Contains("šal") || lower.Contains("salom"))
+                if (lower.Contains("sal") || lower.Contains("salom"))
                     q.Add(BuildLiteralSearchQuery("child scarf winter cozy warm", "", "", style));
                 if (lower.Contains("kaput") || lower.Contains("jakna"))
                     q.Add(BuildLiteralSearchQuery("child winter coat dressed warm outdoor", "", "", style));
@@ -6793,7 +6793,7 @@ namespace UltraVideoEditor
             }
 
             int seasonCount = 0;
-            if (lower.Contains("proleć") || lower.Contains("proljeć") || lower.Contains("spring")) seasonCount++;
+            if (lower.Contains("prolec") || lower.Contains("proljec") || lower.Contains("spring")) seasonCount++;
             if (lower.Contains("jesen") || lower.Contains("autumn") || lower.Contains("fall")) seasonCount++;
             if (lower.Contains("zima") || lower.Contains("winter")) seasonCount++;
             if (lower.Contains("leto") || lower.Contains("ljeto") || lower.Contains("summer")) seasonCount++;
@@ -6801,7 +6801,7 @@ namespace UltraVideoEditor
             if (seasonCount >= 2)
             {
                 var q = new List<string>();
-                if (lower.Contains("proleć") || lower.Contains("proljeć"))
+                if (lower.Contains("prolec") || lower.Contains("proljec"))
                     q.Add(BuildLiteralSearchQuery("child spring flowers park playing", "", "", style));
                 if (lower.Contains("jesen") || lower.Contains("autumn") || lower.Contains("fall"))
                     q.Add(BuildLiteralSearchQuery("child autumn leaves park playing", "", "", style));
@@ -6836,12 +6836,12 @@ namespace UltraVideoEditor
             }
 
             int actionCount = 0;
-            bool hasRun = lower.Contains("trči") || lower.Contains("trčanje");
-            bool hasJump = lower.Contains("skače") || lower.Contains("skoči");
+            bool hasRun = lower.Contains("trci") || lower.Contains("trcanje");
+            bool hasJump = lower.Contains("skace") || lower.Contains("skoci");
             bool hasSing = lower.Contains("peva") || lower.Contains("pjeva");
-            bool hasDance = lower.Contains("pleše") || lower.Contains("plešeš") || lower.Contains("ples");
+            bool hasDance = lower.Contains("plese") || lower.Contains("pleses") || lower.Contains("ples");
             bool hasSmile = lower.Contains("smej") || lower.Contains("smije") || lower.Contains("blistaj");
-            bool hasWalk = lower.Contains("šeta") || lower.Contains("šetaj") || lower.Contains("hoda");
+            bool hasWalk = lower.Contains("seta") || lower.Contains("setaj") || lower.Contains("hoda");
 
             if (hasRun) actionCount++;
             if (hasJump) actionCount++;
@@ -6862,9 +6862,9 @@ namespace UltraVideoEditor
 
             var animalMap = new Dictionary<string, string>
             {
-                {"pas ",  "dog playing happy"}, {"psa ", "dog playing happy"}, {"psić", "puppy cute"},
-                {"mačka", "cat cute kitten"},   {"mace", "cat cute kitten"},
-                {"zec",   "rabbit cute bunny"}, {"kunić", "rabbit cute"},
+                {"pas ",  "dog playing happy"}, {"psa ", "dog playing happy"}, {"psic", "puppy cute"},
+                {"macka", "cat cute kitten"},   {"mace", "cat cute kitten"},
+                {"zec",   "rabbit cute bunny"}, {"kunic", "rabbit cute"},
                 {"ptica", "bird flying colorful"}, {"ptice", "birds flying"},
                 {"riba",  "fish aquarium colorful"}, {"ribica", "fish colorful water"},
                 {"konj",  "horse running field"}, {"medved", "bear forest nature"},
@@ -6943,7 +6943,7 @@ namespace UltraVideoEditor
 
         #endregion
 
-        #region MultiClip — više videa po sceni
+        #region MultiClip — multiple videos per scene
         private async Task<string> SearchAndDownloadMultipleMedia(
             string keywords, string fallbackKeywords, string mediaType,
             double targetDuration, string tempDir, CancellationToken ct)
@@ -7123,17 +7123,17 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Postavlja Whisper word-level timestamps koji se koriste za preciznu sinhronizaciju
-        /// teksta i videa na nivou pojedinačnih reči.
+        /// text and video at the level of individual words.
         /// </summary>
         public void SetWordTimings(List<AITranscription.WordTiming> wordTimings)
         {
             if (wordTimings == null) return;
             _wordTimings = wordTimings;
-            LogToMainWindow($"🔤 Word timings postavljeni: {_wordTimings.Count} reči");
+            LogToMainWindow($"🔤 Word timings set: {_wordTimings.Count} words");
         }
 
         /// <summary>
-        /// Čuva API ključ za zadatog media provajdera (šifrovano na disku).
+        /// Saves API key for the given media provider (encrypted on disk).
         /// </summary>
         public void SaveMediaProviderKey(string providerName, string key)
         {
@@ -7143,16 +7143,16 @@ namespace UltraVideoEditor
                 MediaProviderSettings.SaveKey(providerName, key);
                 if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
                     _pixabayApiKey = key;
-                LogToMainWindow($"✅ API ključ za {providerName} sačuvan.");
+                LogToMainWindow($"✅ API key for {providerName} saved.");
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Greška pri čuvanju ključa za {providerName}: {ex.Message}");
+                LogToMainWindow($"❌ Error saving key for {providerName}: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Briše API ključ za zadatog media provajdera.
+        /// Deletes API key for the given media provider.
         /// </summary>
         public void DeleteMediaProviderKey(string providerName)
         {
@@ -7162,11 +7162,11 @@ namespace UltraVideoEditor
                 MediaProviderSettings.DeleteKey(providerName);
                 if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
                     _pixabayApiKey = null;
-                LogToMainWindow($"🗑 API ključ za {providerName} obrisan.");
+                LogToMainWindow($"🗑 API key for {providerName} deleted.");
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Greška pri brisanju ključa za {providerName}: {ex.Message}");
+                LogToMainWindow($"❌ Error deleting key for {providerName}: {ex.Message}");
             }
         }
     }
@@ -7177,7 +7177,7 @@ namespace UltraVideoEditor
     {
         public int SceneNumber { get; set; }
         public string Description { get; set; }
-        /// <summary>Originalni, neskraćeni tekst stiha — koristi se za StrictQueryEngine matching.</summary>
+        /// <summary>Original, untruncated lyric text — used for StrictQueryEngine matching.</summary>
         public string FullLyric { get; set; }
         public string Emotion { get; set; }
         public int Energy { get; set; }
@@ -7197,7 +7197,7 @@ namespace UltraVideoEditor
         public bool IsOutdoor { get; set; } = false;
         public string ContentTag { get; set; }
 
-        /// <summary>Wide / Medium / Close — tip kadra, utiče na pacing i crossfade dužinu.</summary>
+        /// <summary>Wide / Medium / Close — shot type, affects pacing and crossfade length.</summary>
         public string ShotType { get; set; } = "medium";
 
         /// <summary>Fast(1.5-2s) / Standard(2.8-3.2s) / Slow(5-6s) — Rhythmic Variation kategorija.</summary>

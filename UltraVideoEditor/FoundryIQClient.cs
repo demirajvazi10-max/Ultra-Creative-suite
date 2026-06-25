@@ -6,8 +6,8 @@
 //
 //  SLOJ 0 — Azure AI Foundry (accessibility hints via chat completions)
 //    Koristi tvoj Azure AI Foundry project endpoint i API key.
-//    Za svaki stih šalje upit Azure modelu koji vraća accessibility-aware
-//    vizuelni kontekst (WCAG-based) koji se prosleđuje Ollami kao hint.
+//    For each lyric line, sends a query to Azure model returning accessibility-aware
+//    visual context (WCAG-based) that is passed to Ollama as a hint.
 //
 //  SLOJ 1 — Ollama (GLAVNI) — prima Azure hint kao kontekst
 //  SLOJ 2 — StrictQueryEngine (FALLBACK)
@@ -47,7 +47,7 @@ namespace UltraVideoEditor
             Timeout = TimeSpan.FromSeconds(5)
         };
 
-        // Cache — isti stih+sentiment ne šalje se dva puta
+        // Cache — same lyric+sentiment is not sent twice
         private readonly Dictionary<string, string> _hintCache
             = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -92,7 +92,7 @@ namespace UltraVideoEditor
         //  GetAccessibilityHintAsync
         //
         //  Pita Azure AI za accessibility hint za dati stih.
-        //  Vraća null ako Azure nije dostupan — sistem nastavlja normalno.
+        //  Returns null if Azure is unavailable — system continues normally.
         // ══════════════════════════════════════════════════════════════════════
         public async Task<string> GetAccessibilityHintAsync(
             string lyric,

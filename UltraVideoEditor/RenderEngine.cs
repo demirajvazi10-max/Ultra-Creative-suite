@@ -146,16 +146,16 @@ namespace UltraVideoEditor
                     if (isAudio) continue;
 
                     string tempVideo = Path.Combine(tempDir, $"clip_{fileIdx++:D4}.mp4");
-                    // PATCH 11: Frame Freeze Fix — skraćujemo video klipove za 0.15s
+                    // PATCH 11: Frame Freeze Fix — trim video clips by 0.15s
                     // (0.15s umjesto 0.1s — agresivniji trim koji garantuje rez dok je subjekat u pokretu)
                     // (samo za video, ne za slike i tekst — slike nemaju EOF frame problem)
                     double effectiveDuration = item.Duration;
                     bool isVideoItem = item.Type == "Video";
                     if (isVideoItem && effectiveDuration > 0.5)
                     {
-                        // BEAT-SYNC REZ: Snap kraj klipa na najbliži DownBeat
-                        // Umjesto fiksnog -0.15s, nalazimo beat koji je najbliži kraju klipa
-                        // i rezamo tamo (uz -80ms cut-advance da oko vidi promjenu = uho čuje beat).
+                        // BEAT-SYNC TRIM: Snap clip end to the nearest DownBeat
+                        // Instead of a fixed -0.15s, find the beat closest to the clip end
+                        // and cut there (with -80ms cut-advance so the eye sees change = ear hears beat).
                         if (beatInfo != null && beatInfo.IsValid)
                         {
                             double clipAbsEnd    = item.Start + item.Duration;
@@ -209,9 +209,9 @@ namespace UltraVideoEditor
 
                         if (isOdjavniTekst)
                         {
-                            // OUTRO FIX (isTextItem grana) — generišemo direktno crno platno.
+                            // OUTRO FIX (isTextItem branch) — generate black canvas directly.
                             // Outro uvijek ulazi ovdje jer isTextItem=true (Name.Contains("Odjavni")).
-                            // Bypass Magick/pad pipeline koji može unijeti žuti padding artefakt.
+                            // Bypass Magick/pad pipeline which can introduce a yellow padding artifact.
                             string outroRaw = !string.IsNullOrEmpty(item.Path) && File.Exists(item.Path)
                                 ? ExtractTextFromName(item.Name)
                                 : item.Name;
@@ -294,10 +294,10 @@ namespace UltraVideoEditor
 
                         if (isOdjava)
                         {
-                            // OUTRO FIX: Direktno generišemo crno platno sa FFmpeg color source.
-                            // Razlog: PrepareImageWithMagick + pad filter može unijeti žuti/default
-                            // padding kada PNG dimenzije ne odgovaraju tačno ciljnoj rezoluciji.
-                            // FFmpeg 'color=c=black' garantuje čistu crnu pozadinu bez artefakata.
+                            // OUTRO FIX: Directly generate black canvas using FFmpeg color source.
+                            // Reason: PrepareImageWithMagick + pad filter can introduce yellow/default
+                            // padding when PNG dimensions do not exactly match the target resolution.
+                            // FFmpeg 'color=c=black' guarantees a clean black background with no artifacts.
                             //
                             // Tekst: multi-line drawtext centriran po visini platna.
                             // Fade-in : 0.8s — tekst se lagano pojavljuje
@@ -375,7 +375,7 @@ namespace UltraVideoEditor
                         if (!File.Exists(item.Path)) continue;
 
                         // Aspect ratio: scale-to-fill + center crop — nema crnih rubova, nema stretch-a.
-                        // Višak se odsjeca od ivica (uvijek centar kadra), što je standardni TV/cinema pristup.
+                        // Excess is cropped from the edges (always center frame), which is the standard TV/cinema approach.
                         string scaleFilter =
                             $"scale={targetWidth}:{targetHeight}:force_original_aspect_ratio=increase:flags=lanczos," +
                             $"crop={targetWidth}:{targetHeight}:(iw-{targetWidth})/2:(ih-{targetHeight})/2";
@@ -423,22 +423,22 @@ namespace UltraVideoEditor
                             : "";
 
                         // FIX-SEASONAL: Per-kadar sezonski color grading na osnovu season taga iz stiha
-                        // "Kad je zima nosi čizme" → hladni plavi toni na TOM kadru
+                        // "When it's winter wear boots" → cool blue tones on THAT frame
                         // "Leti kupite sladoled"   → topli zlatni toni na TOM kadru
                         // season tag se upisuje u MoodTag od AIVideoCreator po stihu
                         string lyricSeasonTag = ExtractTag(audioDesc2, "season");
                         string seasonalGradeFilter = lyricSeasonTag switch
                         {
-                            "winter" => // Hladni plavi toni — sneg, čizme, skafander
+                            "winter" => // Cool blue tones — snow, boots, spacesuit
                                 ",curves=r='0/0 0.5/0.46 1/0.92':g='0/0 0.5/0.50 1/0.96':b='0/0 0.5/0.57 1/1.08'" +
                                 ",eq=saturation=0.88:contrast=1.05",
                             "summer" => // Topli zlatni toni — sladoled, sunce, leto
                                 ",curves=r='0/0 0.5/0.57 1/1':g='0/0 0.5/0.54 1/1':b='0/0 0.5/0.44 1/0.88'" +
                                 ",eq=saturation=1.18:contrast=1.02",
-                            "spring" => // Svježi zeleno-žuti toni — proleće, cvetovi
+                            "spring" => // Fresh green-yellow tones — spring, blossoms
                                 ",curves=r='0/0 0.5/0.53 1/1':g='0/0 0.5/0.56 1/1.02':b='0/0 0.5/0.48 1/0.94'" +
                                 ",eq=saturation=1.12:contrast=1.01",
-                            "autumn" => // Topli narandžasto-smeđi toni — jesen, lišće
+                            "autumn" => // Warm orange-brown tones — autumn, leaves
                                 ",curves=r='0/0 0.5/0.58 1/1.02':g='0/0 0.5/0.52 1/0.97':b='0/0 0.5/0.43 1/0.86'" +
                                 ",eq=saturation=1.10:contrast=1.03",
                             _ => "" // Bez sezonskog filtera ako sezona nije detektovana
@@ -452,8 +452,8 @@ namespace UltraVideoEditor
                         // ── GLOBALNA COLOR NORMALIZACIJA ─────────────────────────────────────
                         // Svaki klip se normalizuje na ISTI target (ne relativno na anchor klip)
                         // Target: brightness=0.54, contrast=1.04, saturation=1.12
-                        // Ovo eliminira "TV kanal" skokove između klipova različitog osvetljenja
-                        // Dodatno: LUT-style warm tint za dečiji video (lagana toplina)
+                        // This eliminates "TV channel" jumps between clips with different exposure
+                        // Additional: LUT-style warm tint for children's video (subtle warmth)
                         // ─────────────────────────────────────────────────────────────────────
                         const double TARGET_BRIGHTNESS = 0.54;
                         string colorMatchFilter = "";
@@ -464,18 +464,18 @@ namespace UltraVideoEditor
                             if (Math.Abs(delta) > 0.02)
                                 colorMatchFilter = $",eq=brightness={delta.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)}";
                         }
-                        // Globalni "dječiji video" LUT: topli kontrast, žive ali ne neon boje
-                        // eq: contrast=1.04 (malo kontrasta), saturation=1.12 (žive boje)
+                        // Global "children's video" LUT: warm contrast, vivid but not neon colors
+                        // eq: contrast=1.04 (slight contrast), saturation=1.12 (vivid colors)
                         // curves: blagi warm tint (R+, G+, B-)
                         string satClampFilter = ",eq=saturation=1.12:contrast=1.04" +
                                                 ",curves=r='0/0 0.5/0.54 1/1':b='0/0 0.5/0.47 1/1'";
                         colorMatchFilter = colorMatchFilter + satClampFilter;
 
-                        // FIX-DENOISE: Ujednačavanje teksture između klipova različite kamere/kvaliteta
-                        // hqdn3d=1.5:1.5:6:6 — blagi temporal+spatial denoise (ne mrvi detalje, samo šum)
-                        // unsharp=3:3:0.4:3:3:0.0 — blago oštri luminancu (Y), ne boje (ne dodaje artefakte)
-                        // Rezultat: klipovi sa šumom (telefon, noć, kompresija) izgledaju kao ostatak videa
-                        // Vrednosti su konzervativne — za dečiji video veće vrednosti izgledaju artificijelno
+                        // FIX-DENOISE: Texture normalization between clips from different cameras/quality
+                        // hqdn3d=1.5:1.5:6:6 — gentle temporal+spatial denoise (preserves detail, removes noise only)
+                        // unsharp=3:3:0.4:3:3:0.0 — slightly sharpens luminance (Y), not colors (no artifacts added)
+                        // Result: clips with noise (phone, night, compression) look like the rest of the video
+                        // Values are conservative — for children's video, larger values look artificial
                         const string DENOISE_FILTER = ",hqdn3d=1.5:1.5:6:6,unsharp=3:3:0.4:3:3:0.0";
 
                         // PATCH-HASCHILDREN: Contrast boost za playground scene sa djecom
@@ -485,7 +485,7 @@ namespace UltraVideoEditor
 
                         baseNormalize = $"{baseNormalize},{warmthBoost}";
 
-                        // COLOR GRADING ENGINE (Faza 4C): čitaj [grade:...] tag iz ContentTag
+                        // COLOR GRADING ENGINE (Phase 4C): read [grade:...] tag from ContentTag
                         string gradeFilter = "";
                         {
                             string ctag = item.ContentTag ?? "";
@@ -505,7 +505,7 @@ namespace UltraVideoEditor
                             {
                                 if (isStaticClip && item.Duration >= 2.0)
                                 {
-                                    // Statički klip (foto) — Ken Burns sa 6 tipova pokreta
+                                    // Static clip (photo) — Ken Burns with 6 motion types
                                     int staticFrames = Math.Max(1, (int)(item.Duration * 30.0));
                                     int overWs = (int)(targetWidth * 1.15);  // malo agresivniji overscan za foto
                                     int overHs = (int)(targetHeight * 1.15);
@@ -546,13 +546,13 @@ namespace UltraVideoEditor
                                     int maxY = overH - targetHeight;
 
                                     // ── Ken Burns: 6 tipova pokreta, rotiramo po index-u ──────
-                                    // Svaki klip dobija drugačiji smer — ne repetitivno
+                                    // Each clip gets a different direction — not repetitive
                                     // n = frame broj (0..frames), raste linearno
                                     int kbType = fileIdx % 6;
                                     string xExpr, yExpr;
                                     switch (kbType)
                                     {
-                                        case 0: // zoom-in iz centra (klasični KB)
+                                        case 0: // zoom-in from center (classic KB)
                                             xExpr = $"{maxX/2}*n/{frames}";
                                             yExpr = $"{maxY/2}*n/{frames}";
                                             break;
@@ -605,8 +605,8 @@ namespace UltraVideoEditor
                             // ISKRA PATCH — Pravilo 2: fps=round=near garantuje uniformni FPS
                             // bez preskakanja frejmova (za razliku od starih metoda).
                             // stream_loop + fade=in sakriva loop-point trganje.
-                            // round=near: zaokrugljava PTS umjesto da preskače frejmove —
-                            // eliminišo zelene/crne međufrejmove na spojevima klipova.
+                            // round=near: rounds PTS instead of skipping frames —
+                            // eliminates green/black inter-frames at clip junctions.
                             string loopFadeIn = $",fade=t=in:st=0:d=0.3";
                             // OUTRO-FIX: Dodaj fade=t=out za zadnje kadrove outro sekcije
                             // Tag fadeout=1 se upisuje u Description od AIVideoCreator za zadnja 3 kadra.
@@ -632,7 +632,7 @@ namespace UltraVideoEditor
                         videoFiles.Add(tempVideo);
                         itemToFile[item] = tempVideo;
                         // ── Pacing-aware fade: fast→0.25s, slow→0.70s, standard→0.50s ──
-                        // FIX-FADE: povećano na 0.50s za standard (Gemini: min 0.5s za fluidnost)
+                        // FIX-FADE: increased to 0.50s for standard (Gemini: min 0.5s for fluidity)
                         // fast ostaje kratak da ne ubije energiju refrena
                         string pacingTag = ExtractTag(item.AudioDescription ?? "", "pacing");
                         double clipFade = pacingTag switch
@@ -675,10 +675,10 @@ namespace UltraVideoEditor
                             }
 
                             double brightnessDelta = Math.Abs(clipBrightness - prevBrightness);
-                            // FIX-DISSOLVE: dissolve čini "provlačenje" (ghosting) elemenata prethodne scene.
-                            // Gemini @ 01:06: siluete plaže vidljive iznad trave = dissolve na sličnoj svjetlini.
-                            // Threshold spušten na 0.03 — praktično samo identični kadrovi (npr. isti ambijent).
-                            // Sve ostalo ide kao čist fade bez ghostinga.
+                            // FIX-DISSOLVE: dissolve causes "bleeding" (ghosting) of previous scene elements.
+                            // Gemini @ 01:06: beach silhouettes visible over grass = dissolve at similar brightness.
+                            // Threshold lowered to 0.03 — practically only identical frames (e.g. same ambient).
+                            // Everything else goes as a clean fade without ghosting.
                             xfadeType = brightnessDelta < 0.03 ? "dissolve" : "fade";
                         }
 
@@ -692,36 +692,36 @@ namespace UltraVideoEditor
                 if (videoFiles.Count == 0)
                     throw new Exception(L("re_no_media"));
 
-                // ── ISKRA PATCH — Pravilo 1: Matematička sinhronizacija trajanja ─────────────
-                // Mjeri ukupno video trajanje i produžava zadnji klip loopom ako postoji deficit.
+                // ── ISKRA PATCH — Rule 1: Mathematical duration synchronization ─────────────
+                // Measures total video duration and extends the last clip by looping if there is a deficit.
                 // Nikad crna pozadina — loop zadnjeg klipa je vizuelno nevidljiv.
                 //
                 // BUG-3 FIX: Crossfade oduzima (N-1)*avgFade sekundi od ukupnog trajanja.
-                // IskraSync mora to uzeti u obzir — inače produžava premalo i video ostaje kraći od audija.
+                // IskraSync must account for this — otherwise it extends too little and video stays shorter than audio.
                 // Formula: effectiveVideoDur = sum(clipDurs) - crossfadeOverlap
                 // gdje crossfadeOverlap = (N-1) * avgFade (N = broj video klipova)
                 // ══════════════════════════════════════════════════════════════════════════
                 // ISKRASYNC v3 — Kompletan rewrite svih poznatih bugova
                 //
                 // Fix 1: timelineSpan kao primarna mjera (ne videoSum)
-                //         videoSum ne uzima u obzir rupe između stihova (lyric-sync raspored).
+                //         videoSum does not account for gaps between lyric lines (lyric-sync layout).
                 //         timelineSpan = max(End) - cursorOffset = stvarni vremenski raspon videa.
                 //
                 // Fix 2: Beat-Lock offset se oduzima od audioDurForSync
-                //         -ss AudioStartSeconds skraćuje efektivni audio stream za tu vrijednost.
+                //         -ss AudioStartSeconds trims the effective audio stream by that value.
                 //         Video treba trajati rawAudioDur - ssOffset, ne rawAudioDur.
                 //
                 // Fix 3: Cap na ponavljanje u SmartOutroPool
-                //         Ako deficit > poolUkupno, pool bi kružio beskonačno.
-                //         Ograničavamo na max 1 krug (svaki klip iz poola max 1x).
-                //         Ako ni to ne pokriva deficit, SmartOutroPool završava — -shortest presjeca višak.
+                //         If deficit > poolTotal, the pool would loop infinitely.
+                //         Capped at max 1 loop (each clip from pool used max 1x).
+                //         If that still does not cover the deficit, SmartOutroPool ends — -shortest trims the excess.
                 //
-                // Fix 4: outroSegPath naming koristi dedicirani brojač, ne videoFiles.Count
-                //         videoFiles.Count se mijenja unutar petlje — mogući imenski konflikti.
+                // Fix 4: outroSegPath naming uses a dedicated counter, not videoFiles.Count
+                //         videoFiles.Count changes inside the loop — potential naming conflicts.
                 //
                 // Fix 5: Buffer smanjen sa +1.0s na +0.5s (preciznije poklapanje s crossfade-om)
                 //
-                // Fix 6: Log upozorenje kad timelineSpan > audioDur (outro segmenti biće odrezani)
+                // Fix 6: Log warning when timelineSpan > audioDur (outro segments will be trimmed)
                 //
                 // Fix 7: Outro crossfade overlap se dodaje u efectiveVideoDur za preciznost
                 // ══════════════════════════════════════════════════════════════════════════
@@ -730,7 +730,7 @@ namespace UltraVideoEditor
                 {
                     double rawAudioDur = await GetVideoDuration(audio.Path, cancellationToken);
 
-                    // FIX 2: Beat-Lock offset (-ss) skraćuje efektivni audio stream.
+                    // FIX 2: Beat-Lock offset (-ss) trims the effective audio stream.
                     // audioDurForSync = rawAudioDur - ssOffset = koliko sekundi audio zaista svira.
                     double audioSsOffset = (beatInfo != null && beatInfo.AudioStartSeconds > 0.05)
                         ? beatInfo.AudioStartSeconds : 0.0;
@@ -754,8 +754,8 @@ namespace UltraVideoEditor
                         double crossfadeOverlap = nClips > 1 ? (nClips - 1) * avgFadeForSync : 0.0;
 
                         // FIX 1: effectiveVideoDur = timelineSpan (ne videoSum).
-                        // timelineSpan = max(End) - cursorOffset odražava stvarni vremenski raspon
-                        // uključujući rupe između stihova u lyric-sync rasporedu.
+                        // timelineSpan = max(End) - cursorOffset reflects the actual time span
+                        // including gaps between lyric lines in the lyric-sync layout.
                         // cursorOffset = min(Start) svih timeline stavki = Naslov + Logo trajanje.
                         // Ako itemToFile nije dostupan, fallback na videoSum - crossfadeOverlap.
                         double effectiveVideoDur;
@@ -765,8 +765,8 @@ namespace UltraVideoEditor
                             double timelineEnd    = itemToFile.Keys.Max(it => it.End);
                             double timelineStart  = itemToFile.Keys.Min(it => it.Start);
                             timelineSpan          = timelineEnd - timelineStart;
-                            // Koristimo timelineSpan kao primarnu mjeru ako je veća od videoSum-crossfade.
-                            // Ako je videoSum-crossfade veća (sekvencijalni video bez rupa), koristimo nju.
+                            // Use timelineSpan as the primary measure if it is greater than videoSum-crossfade.
+                            // If videoSum-crossfade is greater (sequential video without gaps), use that.
                             effectiveVideoDur = Math.Max(timelineSpan, Math.Max(totalVidDur - crossfadeOverlap, 0));
                         }
                         else
@@ -779,17 +779,17 @@ namespace UltraVideoEditor
 
                         // FIX 6: Upozorenje kad timeline prelazi audio trajanje
                         if (timelineSpan > audioDurForSync + 2.0)
-                            LogToMainWindow($"[IskraSync] ⚠ Timeline ({timelineSpan:F1}s) prelazi audio ({audioDurForSync:F1}s) za {timelineSpan - audioDurForSync:F1}s — outro segmenti biće odrezani od -shortest");
+                            LogToMainWindow($"[IskraSync] ⚠ Timeline ({timelineSpan:F1}s) exceeds audio ({audioDurForSync:F1}s) by {timelineSpan - audioDurForSync:F1}s — outro segments will be trimmed by -shortest");
 
                         if (deficit > 0.15 && videoFiles.Count > 0)
                         {
                             // ── ISKRASYNC v3 — SmartOutroPool ────────────────────────────────────────
                             // Puni deficit klipovima iz druge polovine videa (vizuelno raznovrsno).
-                            // FIX 3: Svaki klip iz poola se koristi max 1x (nema kruženja).
-                            // FIX 4: outroSegIdx je dedicirani brojač, neovisan o videoFiles.Count.
+                            // FIX 3: Each clip from pool used max 1x (no looping).
+                            // FIX 4: outroSegIdx is a dedicated counter, independent of videoFiles.Count.
                             // ─────────────────────────────────────────────────────────────────────────    
 
-                            // Pool: klipovi iz druge polovine videoFiles (ne intro/početak)
+                            // Pool: clips from the second half of videoFiles (not intro/start)
                             int halfPoint = videoFiles.Count / 2;
                             int poolSize  = Math.Min(12, videoFiles.Count - halfPoint);
                             if (poolSize < 3) poolSize = Math.Min(12, videoFiles.Count);
@@ -803,7 +803,7 @@ namespace UltraVideoEditor
 
                             // FIX 5: Buffer +0.5s (umjesto +1.0s) — preciznije poklapanje s xfade-om
                             double remaining    = deficit + 0.5;
-                            int    outroSegIdx  = 0;  // FIX 4: dedicirani brojač za naming
+                            int    outroSegIdx  = 0;  // FIX 4: dedicated counter for naming
                             int    poolIdx      = 0;
                             int    maxIter      = outroPool.Count + 2; // FIX 3: max 1 prolaz kroz pool
                             bool   anySegOk     = false;
@@ -863,16 +863,16 @@ namespace UltraVideoEditor
                             }
 
                             if (anySegOk)
-                                LogToMainWindow($"[IskraSync] ✅ SmartOutroPool završen: {videoFiles.Count} klipova ukupno, preostalo={remaining:F2}s");
+                                LogToMainWindow($"[IskraSync] ✅ SmartOutroPool complete: {videoFiles.Count} clips total, remaining={remaining:F2}s");
                             else
-                                LogToMainWindow($"[IskraSync] ⚠ SmartOutroPool nije uspio — video može biti kraći od audija");
+                                LogToMainWindow($"[IskraSync] ⚠ SmartOutroPool failed — video may be shorter than audio");
 
                             if (remaining > 1.0)
-                                LogToMainWindow($"[IskraSync] ℹ Pool iscrpljen ({outroPool.Count} klipova), {remaining:F1}s deficit ostaje — -shortest će pokriti");
+                                LogToMainWindow($"[IskraSync] ℹ Pool exhausted ({outroPool.Count} clips), {remaining:F1}s deficit remains — -shortest will cover it");
                         }
                         else if (deficit <= 0)
                         {
-                            LogToMainWindow($"[IskraSync] ✅ Trajanje OK (video duži od audija za {-deficit:F2}s — -shortest ce porezati)");
+                            LogToMainWindow($"[IskraSync] ✅ Duration OK (video longer than audio by {-deficit:F2}s — -shortest will trim)");
                         }
                     }
                 }
@@ -888,7 +888,7 @@ namespace UltraVideoEditor
                 // ── CROSS-DISSOLVE: single-pass FFmpeg xfade ─────────────────────────
                 // Pacing-aware: fast klipovi 0.15s, slow 0.60s, standard 0.35s fade.
                 // ─────────────────────────────────────────────────────────────────────
-                const double CROSSFADE_DURATION = 0.45; // FIX-FADE: povećano 0.35→0.45 za glatkiji blend
+                const double CROSSFADE_DURATION = 0.45; // FIX-FADE: increased 0.35→0.45 for smoother blend
                 double avgFade = fadeDurations.Count > 0
                     ? Math.Round(fadeDurations.Average(), 3) : CROSSFADE_DURATION;
                 string crossfadedVideo = null;
@@ -958,28 +958,28 @@ namespace UltraVideoEditor
                     // concat + -c:v copy = najbrzi i najpouzdaniji put do finalnog fajla.
                     // Drawtext se dodaje u post-pass koji takodje radi fade-in/fade-out.
                     // ── BEAT-LOCK: AudioStartSeconds snap ────────────────────────────────
-                    // Ako BeatDetection otkrije tišinu na početku audio fajla,
-                    // audio se pomiče nazad za AudioStartSeconds pomoću -ss parametra.
-                    // Ovo eliminira "mrtav hod" — zeleni/statični uvodni kadrovi koji
-                    // nastaju jer audio kasni za videom (tišina na početku MP3/WAV).
+                    // If BeatDetection detects silence at the beginning of the audio file,
+                    // audio is shifted back by AudioStartSeconds using the -ss parameter.
+                    // This eliminates "dead time" — green/static intro frames that
+                    // occur because audio lags behind video (silence at the start of MP3/WAV).
                     //
                     // PRINCIP: audio -ss (input seeking) je lossless i milisekundno precizan.
-                    // Video ostaje nepromijenjen — audio se samo "pomiče" da počne u beat 0.
+                    // Video stays unchanged — audio is simply "shifted" to start at beat 0.
                     //
-                    // UVJET: AudioStartSeconds > 50ms (ispod toga je noise, ne tišina)
+                    // CONDITION: AudioStartSeconds > 50ms (below that it is noise, not silence)
                     // ─────────────────────────────────────────────────────────────────────
                     string audioSsArg = "";
                     if (beatInfo != null && beatInfo.AudioStartSeconds > 0.05)
                     {
                         string ssVal = beatInfo.AudioStartSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
                         audioSsArg = $"-ss {ssVal} ";
-                        LogToMainWindow($"🥁 Beat-Lock AudioStart: audio -ss {ssVal}s → video i audio sada kreću zajedno");
+                        LogToMainWindow($"🥁 Beat-Lock AudioStart: audio -ss {ssVal}s → video and audio now start together");
                     }
 
                     // DURATION FIX: Koristimo -shortest ali SAMO ako je video dovoljno dug.
                     // Ako video nije popunjen (SmartOutroPool nije pokrio deficit), dodajemo
-                    // eksplicitni -t na audio stream da sprečimo prerano rezanje.
-                    // Primarno rješenje ostaje SmartOutroPool — -t je backup.
+                    // explicit -t on audio stream to prevent premature cutting.
+                    // Primary solution remains SmartOutroPool — -t is a backup.
                     string shortestArg = "-shortest ";
 
                     if (crossfadedVideo != null && File.Exists(crossfadedVideo))
@@ -987,8 +987,8 @@ namespace UltraVideoEditor
                         double crossfadedDur = await GetVideoDuration(crossfadedVideo, cancellationToken);
                         if (crossfadedDur < audioDurForSync - 2.0)
                         {
-                            // Video je i dalje kraći od audija — ograniči audio na video trajanje
-                            // da izbjegnemo tišinu na kraju
+                            // Video is still shorter than audio — limit audio to video duration
+                            // to avoid silence at the end
                             string tVal = crossfadedDur.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
                             shortestArg = $"-t {tVal} ";
                             LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → -t {tVal} (SmartOutroPool nije potpuno popunio deficit)");
@@ -1018,7 +1018,7 @@ namespace UltraVideoEditor
                         double finalDur = await GetVideoDuration(finalOutput, cancellationToken);
                         if (finalDur > 4.0)
                         {
-                            // Fade-out: PATCH 11 — Final Polish, tačno 2.5s
+                            // Fade-out: PATCH 11 — Final Polish, exactly 2.5s
                             // Slika I titlovi nestaju zajedno sa muzikom (sinhronizovano)
                             // (2.5s = mekan, siguran kraj za djecu 2-6g — nema naglog prekida)
                             double fadeOutDuration = 2.5;
@@ -1033,9 +1033,9 @@ namespace UltraVideoEditor
 
                             // ISKRA PATCH — Pravilo 4: Whisper Hard-Sync drawtext
                             // Titlovi se renderuju direktno u post-processing prolazu.
-                            // Svaki titl je aktivan ISKLJUČIVO između svog Whisper start i end.
-                            // enable='between(t,START,END)' — čist ekran u instrumentalnim pauzama.
-                            // enableSubtitles=false: globalni prekidač — nema drawtext filtera.
+                            // Each subtitle is active EXCLUSIVELY between its Whisper start and end.
+                            // enable='between(t,START,END)' — clean screen during instrumental breaks.
+                            // enableSubtitles=false: global switch — no drawtext filters.
                             string drawtextVf = "";
                             if (enableSubtitles && subtitles != null && subtitles.Count > 0)
                             {
@@ -1069,9 +1069,9 @@ namespace UltraVideoEditor
                                         double ly2 = dtBaseY + sli * dtLineH;
                                         string sStr = subS.ToString("F3", CultureInfo.InvariantCulture);
                                         string eStr = subE.ToString("F3", CultureInfo.InvariantCulture);
-                                        // PRAVILO 4 — KLJUČNA LINIJA:
+                                        // RULE 4 — KEY LINE:
                                         // between(t,START,END) = titl vidljiv SAMO u Whisper prozoru
-                                        // Čim Whisper kaže "kraj" — tekst nestaje. Čist ekran u pauzama.
+                                        // As soon as Whisper says "end" — text disappears. Clean screen during breaks.
                                         dtParts2.Add(
                                             $"drawtext=enable='between(t,{sStr},{eStr})'" +
                                             $":text='{esc}':fontsize={dtFontSize}:fontcolor=white@0.95" +
@@ -1180,7 +1180,7 @@ namespace UltraVideoEditor
         {
             // CLEANUP FIX: Koristimo dedicirani temp folder umjesto Path.GetDirectoryName(outputPath).
             // Stari kod je pisao mix_batch_*.aac direktno u output folder (D:\Iskra kompozicije\)
-            // i nikad ih nije brisao — uzrokovalo gigabajte smeća uz svaki render.
+            // and never deleted them — caused gigabytes of garbage with each render.
             string mixTempDir = Path.Combine(Path.GetTempPath(), $"UVE_MixAudio_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
             Directory.CreateDirectory(mixTempDir);
             try
@@ -1199,7 +1199,7 @@ namespace UltraVideoEditor
                 {
                     batchNum++;
                     bool isLast = batchNum == batches.Count;
-                    // CLEANUP FIX: Sve međufaze idu u mixTempDir (temp), finalnt output u outputPath
+                    // CLEANUP FIX: All intermediate stages go into mixTempDir (temp), final output into outputPath
                     string batchOutput = isLast
                         ? outputPath
                         : Path.Combine(mixTempDir, $"mix_batch_{batchNum}_{Guid.NewGuid().ToString().Substring(0, 6)}.aac");
@@ -1261,7 +1261,7 @@ namespace UltraVideoEditor
             }
             finally
             {
-                // CLEANUP FIX: Briši temp folder sa batch fajlovima
+                // CLEANUP FIX: Delete temp folder with batch files
                 try { if (Directory.Exists(mixTempDir)) Directory.Delete(mixTempDir, true); } catch { }
             }
         }
@@ -1311,13 +1311,13 @@ namespace UltraVideoEditor
 
                 // DRIFT KOMPENZACIJA:
                 // subtitleOffsetSeconds kompenzira fade-in i svaki drugi globalni pomak
-                // koji FFmpeg unosi između audio i video trake.
-                // Ako video počinje s fade-in-om (npr. 1.2s), titlovi moraju biti
+                // that FFmpeg introduces between the audio and video tracks.
+                // If video starts with a fade-in (e.g. 1.2s), subtitles must be
                 // pomereni za istu vrednost da ostanu "hard-synced" sa glasom.
                 //
-                // Dodatno: seamless text flow — razmak između titlova max 50ms.
-                // Ako titl završava više od 50ms pre nego što sledeći počinje,
-                // produžimo End prethodnog do Start sledećeg (bez praznine).
+                // Additional: seamless text flow — gap between subtitles max 50ms.
+                // If a subtitle ends more than 50ms before the next one starts,
+                // extend End of the previous one to Start of the next (no gap).
 
                 var sortedSubs = subtitles
                     .OrderBy(s => s.Start)
@@ -1329,27 +1329,27 @@ namespace UltraVideoEditor
                     })
                     .ToList();
 
-                // FREEZE FIX: Ograniči maksimalno trajanje jednog titla.
+                // FREEZE FIX: Cap the maximum duration of a single subtitle.
                 // Whisper ponekad vrati End=start+40s ako ne detektuje kraj segmenta.
-                // Max = 8 sekundi po liniji (dovoljno i za najdužu strofu dječije pjesme).
-                // Ako je sljedeći titl počinje ranije — koristimo taj granični marker.
+                // Max = 8 seconds per line (enough for the longest children's song verse).
+                // If the next subtitle starts earlier — use that as the boundary marker.
                 const double MAX_SUBTITLE_DURATION = 8.0;
                 for (int i = 0; i < sortedSubs.Count; i++)
                 {
                     double maxEnd = sortedSubs[i].Start + MAX_SUBTITLE_DURATION;
-                    // Ako postoji sljedeći titl koji počinje ranije od maxEnd — to je prirodni kraj
+                    // If there is a next subtitle that starts before maxEnd — that is the natural end
                     if (i < sortedSubs.Count - 1)
                         maxEnd = Math.Min(maxEnd, sortedSubs[i + 1].Start - 0.050);
                     if (sortedSubs[i].End > maxEnd)
                         sortedSubs[i].End = maxEnd;
                 }
 
-                // WHISPER HARD-SYNC: Seamless-flow je ONEMOGUĆEN.
-                // Svaki titl živi tačno između svog Whisper Start i End.
-                // Tišina ili instrumentalni prijelaz = čist ekran (bez starog teksta).
+                // WHISPER HARD-SYNC: Seamless-flow is DISABLED.
+                // Each subtitle lives exactly between its Whisper Start and End.
+                // Silence or instrumental transition = clean screen (no old text).
                 // Stari seamless-flow uzrokovao je "frozen text" problem:
-                // tekst ostajao vidljiv dugo nakon što glas prestane,
-                // a posebno između 01:21 i kraja videa u instrumentalnim dijelovima.
+                // text remained visible long after the voice stopped,
+                // especially between 01:21 and the end of the video in instrumental sections.
 
                 string srtFile = Path.Combine(tempDir, "subtitles.srt");
                 using (var sw = new StreamWriter(srtFile, false, Encoding.UTF8))
@@ -1357,7 +1357,7 @@ namespace UltraVideoEditor
                     int index = 1;
                     foreach (var sub in sortedSubs)
                     {
-                        if (sub.Start >= sub.End) continue; // preskoci nevažeće
+                        if (sub.Start >= sub.End) continue; // skip invalid entries
                         sw.WriteLine(index);
                         sw.WriteLine($"{FormatTime(sub.Start)} --> {FormatTime(sub.End)}");
                         sw.WriteLine(sub.Text);
@@ -1496,12 +1496,12 @@ namespace UltraVideoEditor
         // ══════════════════════════════════════════════════════════════════════════
         //  ApplyCrossfadePairwise — robustni crossfade, par-po-par
         //
-        //  Zašto je ovo bolje od starog ApplyCrossfade:
+        //  Why this is better than the old ApplyCrossfade:
         //  Stari: jedan filter_complex za N klipova → offset akumulacija → zeleni frejmovi
         //  Novi: klip[0]+klip[1] → temp1, temp1+klip[2] → temp2, ...
-        //         Svaki korak koristi izmjereno trajanje → nema kumulativne greške
+        //         Each step uses measured duration → no cumulative error
         //
-        //  Crossfade = overlap: kraj klipa[i] i početak klipa[i+1] se preklapaju.
+        //  Crossfade = overlap: end of clip[i] and start of clip[i+1] overlap.
         //  Efektivno trajanje klipa se smanjuje za fadeDuration (overlap).
         //  Ukupno trajanje videa = sum(dur) - (n-1)*fadeDuration
         // ══════════════════════════════════════════════════════════════════════════
@@ -1511,14 +1511,14 @@ namespace UltraVideoEditor
         //  Algoritam:
         //  1. Normalizuj sve klipove na isti FPS i format (brzo, bez re-enc kvaliteta)
         //  2. Izmjeri stvarna trajanja normalizovanih klipova
-        //  3. Izgradi filter_complex sa xfade filterima i tačnim offset-ima
+        //  3. Build filter_complex with xfade filters and precise offsets
         //  4. Jedan FFmpeg poziv spaja sve klipove sa cross-dissolve tranzicijama
         //
-        //  Zašto je brže od pairwise:
+        //  Why it is faster than pairwise:
         //  pairwise: N-1 FFmpeg re-enkodiranja sekvencijalno
         //  single-pass: 1 normalizacija (copyts, brzo) + 1 xfade (re-enc jednom)
         //
-        //  Limit: FFmpeg filter_complex ima ograničenje na ~60 ulaza.
+        //  Limit: FFmpeg filter_complex has a limit of ~60 inputs.
         //  Ako ima >55 klipova, dijelimo u grupe i spajamo.
         private async Task<string> ApplyCrossfadeSinglePass(
     List<string> videoFiles,
@@ -1688,7 +1688,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"   ⚠️ CrossfadeSinglePass greška: {ex.Message}");
+                LogToMainWindow($"   ⚠️ CrossfadeSinglePass error: {ex.Message}");
                 return null;
             }
         }
@@ -2079,7 +2079,7 @@ namespace UltraVideoEditor
 
             filterParts.Add(baseNormalize);
             filterParts.Add("fade=t=in:st=0:d=0.3");
-            // FIX-DENOISE: isti filter kao i u glavnom render loopu — ujednačava teksturu klipova
+            // FIX-DENOISE: same filter as in main render loop — normalizes clip texture
             filterParts.Add("hqdn3d=1.5:1.5:6:6,unsharp=3:3:0.4:3:3:0.0");
 
             return string.Join(",", filterParts.Where(f => !string.IsNullOrWhiteSpace(f)));

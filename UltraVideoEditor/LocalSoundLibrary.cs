@@ -9,10 +9,10 @@ using System.Threading.Tasks;
 namespace UltraVideoEditor
 {
     /// <summary>
-    /// Lokalna zvučna biblioteka — zamjena za FreesoundClient.
+    /// Local sound library — replacement for FreesoundClient.
     /// Auto-skenira Assets/Sounds/ i Assets/SFX/, gradi indeks iz naziva fajlova,
-    /// opcionalno koristi LLaMA za semantičko mapiranje nepoznatih tipova zvukova.
-    /// Nema potrebe za internetom ili API ključem.
+    /// optionally uses LLaMA for semantic mapping of unknown sound types.
+    /// No internet or API key required.
     /// </summary>
     public static class LocalSoundLibrary
     {
@@ -29,7 +29,7 @@ namespace UltraVideoEditor
         private static Dictionary<string, List<string>> _sfxIndex;
         private static readonly object _lock = new();
 
-        // Korišćeni fajlovi u jednoj sesiji — sprečava ponavljanje istog zvuka
+        // Files used in one session — prevents repeating the same sound
         private static readonly HashSet<string> _usedAmbient = new();
         private static readonly HashSet<string> _usedSfx     = new();
 
@@ -46,7 +46,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća ukupan broj zvukova u biblioteci (za UI info).
+        /// Returns the total number of sounds in the library (for UI info).
         /// </summary>
         public static int GetSoundCount()
         {
@@ -72,7 +72,7 @@ namespace UltraVideoEditor
         // ── Javni API ─────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Vraća putanju ambijentalnog zvuka koji odgovara traženom tipu.
+        /// Returns the path of the ambient sound matching the requested type.
         /// soundType: slobodan string, npr. "birds", "rain", "snow", "joy playground", "forest"
         /// </summary>
         public static string GetAmbientSound(string soundType)
@@ -81,7 +81,7 @@ namespace UltraVideoEditor
             if (_ambientIndex.Count == 0) return null;
 
             var tags = TokenizeQuery(soundType);
-            tags.AddRange(ExpandSoundType(soundType)); // semantičke sinonime
+            tags.AddRange(ExpandSoundType(soundType)); // semantic synonyms
 
             string match = FindBestMatch(_ambientIndex, tags, _usedAmbient);
             if (match != null) _usedAmbient.Add(match);
@@ -89,13 +89,13 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Vraća putanju tranzicionog zvuka (pop, whoosh, click...).
+        /// Returns the path of a transition sound (pop, whoosh, click...).
         /// </summary>
         public static string GetTransitionSound(string type = "pop")
         {
             EnsureIndexed();
 
-            // Pokušaj iz SFX foldera prvo
+            // Try from SFX folder first
             if (_sfxIndex.Count > 0)
             {
                 var sfxTags = TokenizeQuery(type);
@@ -124,7 +124,7 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Asinhronski: koristi LLaMA (ako je dostupna) da mapira slobodan opis
-        /// na najodgovarajući zvuk u biblioteci. Korisno za nepoznate tipove.
+        /// to the most appropriate sound in the library. Useful for unknown types.
         /// </summary>
         public static async Task<string> GetAmbientSoundWithAiAsync(
             string description,
@@ -133,7 +133,7 @@ namespace UltraVideoEditor
             EnsureIndexed();
             if (_ambientIndex.Count == 0) return null;
 
-            // Pokušaj direktno prvo (brže, bez LLaMA)
+            // Try directly first (faster, without LLaMA)
             string direct = GetAmbientSound(description);
             if (direct != null) return direct;
 
@@ -143,7 +143,7 @@ namespace UltraVideoEditor
                 var ollama = new OllamaClient();
                 if (!await ollama.IsOllamaRunning()) return null;
 
-                // Šaljemo listu dostupnih tagova i tražimo koji odgovara
+                // We send a list of available tags and look for a match
                 var sampleTags = CollectTopTags(_ambientIndex, 60);
                 string prompt =
                     $"You are a sound librarian. The user needs an ambient sound for this scene: \"{description}\".\n\n" +
@@ -199,7 +199,7 @@ namespace UltraVideoEditor
                 if (!string.IsNullOrEmpty(parentFolder) && parentFolder.Length > 1)
                     tags.Add(parentFolder.ToLower());
 
-                // Dodaj semantičke sinonime za sve tokene
+                // Add semantic synonyms for all tokens
                 foreach (var tag in tags.ToList())
                     tags.AddRange(GetSynonyms(tag));
 
@@ -233,9 +233,9 @@ namespace UltraVideoEditor
                 int score = 0;
                 foreach (string q in queryList)
                 {
-                    if (tags.Any(t => t == q))                          score += 4; // tačno poklapanje
+                    if (tags.Any(t => t == q))                          score += 4; // exact match
                     else if (tags.Any(t => t.StartsWith(q) || q.StartsWith(t))) score += 2; // prefiks
-                    else if (tags.Any(t => t.Contains(q) || q.Contains(t)))     score += 1; // sadrži
+                    else if (tags.Any(t => t.Contains(q) || q.Contains(t)))     score += 1; // contains
                 }
 
                 if (score > bestScore)
@@ -245,7 +245,7 @@ namespace UltraVideoEditor
                 }
             }
 
-            // Ako ništa nije nađeno, vrati slučajan fajl (bolje od tišine)
+            // If nothing found, return a random file (better than silence)
             if (bestFile == null && index.Count > 0 && (usedFiles == null || usedFiles.Count < index.Count))
             {
                 var available = index.Keys.Where(k => usedFiles == null || !usedFiles.Contains(k)).ToList();
@@ -259,11 +259,11 @@ namespace UltraVideoEditor
             return bestFile;
         }
 
-        // ── Semantička proširenja ──────────────────────────────────────────────
+        // ── Semantic expansions ──────────────────────────────────────────────
 
         /// <summary>
         /// Expanduje soundType string u sinonime za bolje poklapanje s imenima fajlova.
-        /// Ovo je heuristički dictionary koji nadopunjuje AI analizu.
+        /// This is a heuristic dictionary that supplements AI analysis.
         /// </summary>
         private static List<string> ExpandSoundType(string soundType)
         {
@@ -275,13 +275,13 @@ namespace UltraVideoEditor
             // Priroda / outdoor
             if (lower.Contains("bird") || lower.Contains("ptic") || lower.Contains("cvrkut"))
                 result.AddRange(new[] { "bird", "birds", "chirp", "tweeting", "nature", "outdoor" });
-            if (lower.Contains("rain") || lower.Contains("kiša") || lower.Contains("kisa"))
+            if (lower.Contains("rain") || lower.Contains("kisa") || lower.Contains("kisa"))
                 result.AddRange(new[] { "rain", "rainfall", "drizzle", "drops", "weather" });
             if (lower.Contains("thunder") || lower.Contains("grmlj") || lower.Contains("storm"))
                 result.AddRange(new[] { "thunder", "thunderstorm", "storm", "lightning" });
             if (lower.Contains("wind") || lower.Contains("vetar") || lower.Contains("vjetar"))
                 result.AddRange(new[] { "wind", "breeze", "gusty", "outdoor" });
-            if (lower.Contains("forest") || lower.Contains("šuma") || lower.Contains("suma"))
+            if (lower.Contains("forest") || lower.Contains("suma") || lower.Contains("suma"))
                 result.AddRange(new[] { "forest", "woodland", "trees", "nature", "birds" });
             if (lower.Contains("ocean") || lower.Contains("more") || lower.Contains("sea") || lower.Contains("wave"))
                 result.AddRange(new[] { "ocean", "sea", "waves", "shore", "beach", "water" });
@@ -291,19 +291,19 @@ namespace UltraVideoEditor
                 result.AddRange(new[] { "snow", "winter", "blizzard", "cold", "freeze" });
             if (lower.Contains("summer") || lower.Contains("ljeto") || lower.Contains("leto"))
                 result.AddRange(new[] { "summer", "crickets", "hot", "cicada", "outdoor" });
-            if (lower.Contains("night") || lower.Contains("noć") || lower.Contains("noc"))
+            if (lower.Contains("night") || lower.Contains("noc") || lower.Contains("noc"))
                 result.AddRange(new[] { "night", "crickets", "dark", "evening", "owl" });
             if (lower.Contains("morning") || lower.Contains("jutro"))
                 result.AddRange(new[] { "morning", "birds", "dawn", "sunrise", "nature" });
 
-            // Životinje
+            // Animals
             if (lower.Contains("dog") || lower.Contains("pas") || lower.Contains("bark"))
                 result.AddRange(new[] { "dog", "bark", "barking", "canine" });
-            if (lower.Contains("cat") || lower.Contains("mačka") || lower.Contains("maca"))
+            if (lower.Contains("cat") || lower.Contains("macka") || lower.Contains("maca"))
                 result.AddRange(new[] { "cat", "meow", "purr", "feline" });
             if (lower.Contains("horse") || lower.Contains("konj") || lower.Contains("hoof"))
                 result.AddRange(new[] { "horse", "gallop", "hooves", "neigh" });
-            if (lower.Contains("frog") || lower.Contains("žaba") || lower.Contains("zaba"))
+            if (lower.Contains("frog") || lower.Contains("zaba") || lower.Contains("zaba"))
                 result.AddRange(new[] { "frog", "amphibian", "pond", "croak" });
 
             // Urbano / indoor
@@ -344,26 +344,26 @@ namespace UltraVideoEditor
 
         private static IEnumerable<string> GetSynonyms(string tag)
         {
-            // Srpsko-engleski i česti sinonimi — poboljšava matching s imenima fajlova na engleskom
+            // Serbian-English and common synonyms — improves matching with English filenames
             return tag.ToLower() switch
             {
                 "ptica" or "ptice" or "cvrkut" => new[] { "bird", "birds", "chirp" },
-                "kiša" or "kisa"               => new[] { "rain", "rainfall" },
+                "kisa"                          => new[] { "rain", "rainfall" },
                 "more" or "okean"              => new[] { "ocean", "sea", "waves" },
                 "snijeg" or "sneg"             => new[] { "snow", "winter" },
-                "šuma" or "suma"               => new[] { "forest", "woodland" },
+                "suma"                          => new[] { "forest", "woodland" },
                 "vjetar" or "vetar"            => new[] { "wind", "breeze" },
                 "djeca" or "djete" or "deca"   => new[] { "children", "kids" },
-                "noć" or "noc"                 => new[] { "night", "evening" },
+                "noc"                           => new[] { "night", "evening" },
                 "jutro"                        => new[] { "morning", "dawn" },
                 "grad"                         => new[] { "city", "urban" },
                 "rijeka" or "reka"             => new[] { "river", "stream" },
                 "potok"                        => new[] { "creek", "stream" },
-                "plaža" or "plaza"             => new[] { "beach", "shore" },
+                "plaza"                         => new[] { "beach", "shore" },
                 "pas"                          => new[] { "dog", "bark" },
-                "mačka" or "maca"              => new[] { "cat", "meow" },
+                "maca"                          => new[] { "cat", "meow" },
                 "konj"                         => new[] { "horse", "gallop" },
-                "žaba" or "zaba"               => new[] { "frog", "croak" },
+                "zaba"                          => new[] { "frog", "croak" },
                 _                              => Array.Empty<string>()
             };
         }

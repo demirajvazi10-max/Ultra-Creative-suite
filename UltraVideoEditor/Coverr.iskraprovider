@@ -1,0 +1,23 @@
+{
+  "name": "Coverr",
+  "description": "Besplatan lifestyle i djeciji video. Demo: 50 zahtjeva/sat. Registracija na coverr.co/developers. NAPOMENA: Aplikacija mora prikazati Coverr logo.",
+  "apiKeyUrl": "https://coverr.co/developers",
+  "searchVideoUrl": "https://api.coverr.co/videos",
+  "searchImageUrl": "",
+  "authType": "queryParam",
+  "authParamName": "api_key",
+  "queryParam": "query",
+  "extraParams": {
+    "page_size": "20"
+  },
+  "responseMap": {
+    "hitsArray": "hits",
+    "downloadUrl": "mp4.url",
+    "tags": "description",
+    "duration": "duration",
+    "width": "resolution.width",
+    "height": "resolution.height",
+    "pageUrl": "slug",
+    "author": "Coverr"
+  }
+}

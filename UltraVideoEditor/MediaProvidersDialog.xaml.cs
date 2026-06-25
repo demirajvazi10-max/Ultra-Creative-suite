@@ -4,7 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Navigation;
 
-// Eksplicitni aliasi — rješava ambiguity između WPF i WinForms
+// Explicit aliases — resolves ambiguity between WPF and WinForms
 using WpfApp        = System.Windows.Application;
 using WpfMessageBox = System.Windows.MessageBox;
 using WpfTextBox    = System.Windows.Controls.TextBox;
@@ -99,7 +99,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            // Maskirani prikaz — korisnik nije ništa mijenjao
+            // Masked display — user has not changed anything
             if (!input.Contains('*'))
             {
                 bool ok = MediaProviderSettings.SaveKey(providerName, input);

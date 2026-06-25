@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Smart Scene Detection dijalog">
+        AutomationProperties.Name="Smart Scene Detection dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#00BCD4"/>
@@ -88,7 +88,7 @@
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="Automatska detekcija scena · FFmpeg analiza promena · Direktan export na timeline"
+            <TextBlock Text="Automatic scene detection · FFmpeg change analysis · Direct export to timeline"
                        FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
         </StackPanel>
 
@@ -96,19 +96,19 @@
         <Border Grid.Row="1" Background="{StaticResource CardBrush}"
                 CornerRadius="10" Padding="16" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="📹  Video fajl"
+                <TextBlock Text="📹  Video file"
                            Foreground="{StaticResource TextMutedBrush}"
                            FontSize="12" Margin="0,0,0,6"/>
                 <DockPanel>
                     <Button x:Name="BtnPickVideo" DockPanel.Dock="Right"
-                            Content="Odaberi" Style="{StaticResource SecBtn}"
+                            Content="Browse" Style="{StaticResource SecBtn}"
                             Padding="14,8" Margin="8,0,0,0"
                             Click="BtnPickVideo_Click"
-                            AutomationProperties.Name="Odaberi video fajl"/>
+                            AutomationProperties.Name="Select video file"/>
                     <TextBox x:Name="TxtVideoPath" Style="{StaticResource InputBox}"
-                             IsReadOnly="True" Text="Nije odabran…"
+                             IsReadOnly="True" Text="Not selected…"
                              Foreground="{StaticResource TextMutedBrush}"
-                             AutomationProperties.Name="Putanja do video fajla"/>
+                             AutomationProperties.Name="Video file path"/>
                 </DockPanel>
             </StackPanel>
         </Border>
@@ -123,7 +123,7 @@
                                DockPanel.Dock="Right"
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
-                    <TextBlock x:Name="TxtProgressMsg" Text="Čekam…"
+                    <TextBlock x:Name="TxtProgressMsg" Text="Waiting…"
                                Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
@@ -135,7 +135,7 @@
             </StackPanel>
         </Border>
 
-        <!-- TabControl: scene + izveštaj -->
+        <!-- TabControl: scenes + report -->
         <TabControl Grid.Row="3" Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                     Margin="0,0,0,10">
@@ -164,30 +164,30 @@
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
-                            <Button x:Name="BtnSelectAll" Content="Sve"
+                            <Button x:Name="BtnSelectAll" Content="All"
                                     Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
                                     Margin="0,0,6,0" IsEnabled="False"
                                     Click="BtnSelectAll_Click"
-                                    AutomationProperties.Name="Uključi sve scene"/>
-                            <Button x:Name="BtnDeselectAll" Content="Ništa"
+                                    AutomationProperties.Name="Select all scenes"/>
+                            <Button x:Name="BtnDeselectAll" Content="None"
                                     Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
                                     IsEnabled="False" Click="BtnDeselectAll_Click"
-                                    AutomationProperties.Name="Isključi sve scene"/>
+                                    AutomationProperties.Name="Deselect all scenes"/>
                         </StackPanel>
-                        <TextBlock x:Name="TxtSceneCount" Text="Nema scena"
+                        <TextBlock x:Name="TxtSceneCount" Text="No scenes"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" VerticalAlignment="Center" Margin="12,8"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </DockPanel>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
                         <StackPanel x:Name="ScenesPanel"
-                                    AutomationProperties.Name="Lista scena"/>
+                                    AutomationProperties.Name="Scene list"/>
                     </ScrollViewer>
                 </Grid>
             </TabItem>
 
-            <!-- Tab 2: Izveštaj -->
-            <TabItem Header="📋  Izveštaj" AutomationProperties.Name="Tekstualni izveštaj detekcije">
+            <!-- Tab 2: Report -->
+            <TabItem Header="📋  Report" AutomationProperties.Name="Text detection report">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -195,13 +195,13 @@
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
-                            <Button x:Name="BtnCopyReport" Content="Kopiraj"
+                            <Button x:Name="BtnCopyReport" Content="Copy"
                                     Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
                                     Margin="0,0,6,0" Visibility="Collapsed"
                                     Click="BtnCopyReport_Click"
-                                    AutomationProperties.Name="Kopiraj izveštaj"/>
+                                    AutomationProperties.Name="Copy report"/>
                         </StackPanel>
-                        <TextBlock Text="Izveštaj detekcije scena"
+                        <TextBlock Text="Scene detection report"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" Margin="12,8" VerticalAlignment="Center"/>
                     </DockPanel>
@@ -212,8 +212,8 @@
                              FontFamily="Consolas, Courier New" FontSize="12"
                              IsReadOnly="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
-                             Text="Ovde će se pojaviti izveštaj nakon analize."
-                             AutomationProperties.Name="Tekstualni izveštaj"/>
+                             Text="The report will appear here after analysis."
+                             AutomationProperties.Name="Text report"/>
                 </Grid>
             </TabItem>
         </TabControl>
@@ -221,21 +221,21 @@
         <!-- Dugmici -->
         <DockPanel Grid.Row="4" LastChildFill="False">
             <Button x:Name="BtnDetect" DockPanel.Dock="Left"
-                    Content="🔍 Detektuj scene"
+                    Content="🔍 Detect scenes"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" IsEnabled="False"
                     Click="BtnDetect_Click"
-                    AutomationProperties.Name="Pokreni detekciju scena"/>
+                    AutomationProperties.Name="Start scene detection"/>
             <Button x:Name="BtnClose" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
             <Button x:Name="BtnAddToTimeline" DockPanel.Dock="Right"
-                    Content="✅ Dodaj na timeline"
+                    Content="✅ Add to timeline"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" Margin="0,0,8,0" IsEnabled="False"
                     Click="BtnAddToTimeline_Click"
-                    AutomationProperties.Name="Dodaj selektovane scene na timeline"/>
+                    AutomationProperties.Name="Add selected scenes to timeline"/>
         </DockPanel>
     </Grid>
 </Window>

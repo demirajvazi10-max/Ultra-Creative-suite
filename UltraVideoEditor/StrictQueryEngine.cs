@@ -5,18 +5,18 @@
 //  ARHITEKTURA (3 sloja):
 //
 //  SLOJ 1 — Ollama (GLAVNI)
-//    Za svaki stih, Ollama dobija: stih + kontekst pesme + uzrast + dinamički prompt
-//    Vraća: precizni EN vizuelni query
+//    For each lyric line, Ollama receives: line + song context + age group + dynamic prompt
+//    Returns: precise EN visual query
 //    Prolazi kroz: ContentFilter (blacklist/whitelist po uzrastu)
 //
 //  SLOJ 2 — StrictQueryEngine (FALLBACK)
 //    Ako Ollama nije dostupna, vrati glupost, ili filter odbije query:
-//    Traži direktan match u _actionMap (~600 unosa, sve teme)
+//    Searches for a direct match in _actionMap (~600 entries, all topics)
 //
 //  SLOJ 3 — SmartFallback (NIKAD NULL)
 //    Ako ni mapa nema match:
 //    Kontekstualni fallback na osnovu teme pesme i uzrasta
-//    UVEK vraća nešto smisleno — crni ekran ne postoji u videu
+//    ALWAYS returns something meaningful — black screen does not exist in the video
 //
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -35,13 +35,13 @@ namespace UltraVideoEditor
     public enum AgeGroup
     {
         Toddler,    // 0–3 godine
-        Kids,       // 3–7 godina  (default za dečije pesme)
+        Kids,       // ages 3–7 (default for children's songs)
         Tween,      // 7–12 godina
         Adult       // 12+
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  SongContext — kontekst cele pesme, prosleđuje se po stihu
+    //  SongContext — context of the entire song, passed per lyric line
     // ══════════════════════════════════════════════════════════════════════════
     public class SongContext
     {
@@ -55,9 +55,9 @@ namespace UltraVideoEditor
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  LyricTagType — klasifikacija stiha za semantički matching
-    //  Action      = vidljiva fizička radnja  ("trči", "skači", "pleše")
-    //  Atmospheric = osećaj / stanje / sećanje ("tišina", "čežnja", "davno")
+    //  LyricTagType — lyric line classification for semantic matching
+    //  Action      = visible physical action  ("runs", "jumps", "dances")
+    //  Atmospheric = feeling / state / memory ("silence", "longing", "long ago")
     //  Object      = konkretan predmet / priroda ("sunce", "oblak", "cvet")
     //  Narrative   = pripovedanje / generalna slika  (default)
     // ══════════════════════════════════════════════════════════════════════════
@@ -66,14 +66,14 @@ namespace UltraVideoEditor
     // ══════════════════════════════════════════════════════════════════════════
     //  SentimentPolarity — emocionalni polaritet stiha
     //  Positive  = radost, euforija, toplina, nada
-    //  Negative  = tuga, čežnja, bol, melanholija, strah
+    //  Negative  = sadness, longing, pain, melancholy, fear
     //  Neutral   = opis, pripovedanje, neutralna radnja
     //
     //  Kombinuje se sa LyricTagType:
-    //  Action+Positive  → dete trči radosno na suncu
-    //  Action+Negative  → dete bježi od nečega, dramatično
-    //  Atmospheric+Neg  → kišni prozor, usamljenost, zimska magla
-    //  Atmospheric+Pos  → mekoća, spokojstvo, topla svetlost
+    //  Action+Positive  → child running joyfully in the sun
+    //  Action+Negative  → child running away from something, dramatic
+    //  Atmospheric+Neg  → rainy window, loneliness, winter fog
+    //  Atmospheric+Pos  → softness, tranquility, warm light
     // ══════════════════════════════════════════════════════════════════════════
     public enum SentimentPolarity { Positive, Negative, Neutral }
 
@@ -82,7 +82,7 @@ namespace UltraVideoEditor
     // ══════════════════════════════════════════════════════════════════════════
     public static class StrictQueryEngine
     {
-        // ── Content filter — reči koje NIKAD ne smeju biti u queryju za decu ──
+        // ── Content filter — words that must NEVER appear in a query for children ──
         private static readonly HashSet<string> _childBlacklist =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -97,7 +97,7 @@ namespace UltraVideoEditor
             "black and white","monochrome","silhouette dark",
         };
 
-        // ── Za odrasle — samo eksplicitni sadržaj se blokira ─────────────────
+        // ── For adults — only explicit content is blocked ─────────────────
         private static readonly HashSet<string> _adultBlacklist =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -116,9 +116,9 @@ namespace UltraVideoEditor
         };
 
         // ══════════════════════════════════════════════════════════════════════
-        //  ClassifyLyric — semantička klasifikacija stiha
+        //  ClassifyLyric — semantic classification of a lyric line
         //  Redosled provere: Action > Atmospheric > Object > Narrative
-        //  Action: koristi postojeći _actionMap (isti rečnik, nema duplikacije)
+        //  Action: uses the existing _actionMap (same dictionary, no duplication)
         // ══════════════════════════════════════════════════════════════════════
         public static LyricTagType ClassifyLyric(string lyric)
         {
@@ -135,7 +135,7 @@ namespace UltraVideoEditor
                 if (leftOk && rightOk) return LyricTagType.Action;
             }
 
-            // Atmospheric — osećaji, sećanja, stanja
+            // Atmospheric — feelings, memories, states
             var atmosphericSignals = new[]
             {
                 "sećanje","sjećanje","sećam","sjećam","pamtim","pamćenje",
@@ -173,14 +173,14 @@ namespace UltraVideoEditor
 
         // ══════════════════════════════════════════════════════════════════════
         //  ClassifySentiment — per-stih emocionalni polaritet
-        //  Negativni signali imaju prednost (tuga je jača od neutralnog)
+        //  Negative signals take priority (sadness is stronger than neutral)
         // ══════════════════════════════════════════════════════════════════════
         public static SentimentPolarity ClassifySentiment(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return SentimentPolarity.Neutral;
             string lower = lyric.ToLower();
 
-            // Negativni signali — tuga, bol, strah, čežnja, usamljenost
+            // Negative signals — sadness, pain, fear, longing, loneliness
             var negativeSignals = new[]
             {
                 "tuga","tugom","tužan","tužna","tuguje","tugujemo",
@@ -222,14 +222,14 @@ namespace UltraVideoEditor
 
             return SentimentPolarity.Neutral;
         }
-        //  Sada prima LyricTagType za semantički hint Ollami
+        //  Now receives LyricTagType for a semantic hint to Ollama
         // ══════════════════════════════════════════════════════════════════════
         public static string BuildOllamaPrompt(string lyric, SongContext ctx,
             LyricTagType tagType = LyricTagType.Narrative,
             SentimentPolarity sentiment = SentimentPolarity.Neutral,
             bool needsCloseUp = false)
         {
-            // Qwen 2.5 14B stil: kratak i direktan — Qwen odlično prati precizne instrukcije
+            // Qwen 2.5 14B style: short and direct — Qwen follows precise instructions very well
 
             string agePrefix = ctx.AgeGroup switch
             {
@@ -255,8 +255,8 @@ namespace UltraVideoEditor
 
             string queryStart = string.IsNullOrEmpty(agePrefix) ? "person or scene" : agePrefix;
 
-            // Semantički hint za Ollamu — najvažniji novi deo
-            // Govori Ollami KOJI TIP klipa da traži, čime se rešava Tag-Semantic Gap
+            // Semantic hint for Ollama — the most important new addition
+            // Tells Ollama WHICH TYPE of clip to look for, resolving the Tag-Semantic Gap
             string tagHint = tagType switch
             {
                 LyricTagType.Atmospheric =>
@@ -278,7 +278,7 @@ namespace UltraVideoEditor
             };
 
             // Sentiment hint — govori Ollami da li je stih pozitivan ili negativan
-            // Ovo rešava "tuga = leto" problem: negativan sentiment → tamni/hladni vizuali
+            // This resolves the "sadness = summer" problem: negative sentiment → dark/cool visuals
             string sentimentHint = sentiment switch
             {
                 SentimentPolarity.Positive =>
@@ -292,7 +292,7 @@ namespace UltraVideoEditor
                     "SENTIMENT: NEUTRAL. Match the visual to the lyric's theme without strong emotional bias.\n"
             };
 
-            // FIX-CLOSEUP: Forsiraj close-up shot kad stih pominje lice/ruke/oči/osmeh/dete
+            // FIX-CLOSEUP: Force close-up shot when the lyric mentions face/hands/eyes/smile/child
             string closeUpHint = needsCloseUp
                 ? "SHOT TYPE: CLOSE-UP required. This lyric mentions a child's face, hands, eyes or smile.\n" +
                   "IMPORTANT: Use close-up or medium-close shots only. NO wide landscape shots.\n" +
@@ -324,16 +324,16 @@ namespace UltraVideoEditor
 
 
         // ══════════════════════════════════════════════════════════════════════
-        //  SLOJ 1: Filter — čisti i validira Ollama output
+        //  LAYER 1: Filter — cleans and validates Ollama output
         // ══════════════════════════════════════════════════════════════════════
         public static string FilterOllamaQuery(string raw, SongContext ctx)
         {
             if (string.IsNullOrWhiteSpace(raw)) return null;
 
-            // Uzmi samo prvi red — Ollama ponekad doda objašnjenje ispod
+            // Take only the first line — Ollama sometimes adds an explanation below
             string query = raw.Split('\n')[0].Trim().Trim('"', '\'', '.', ',');
 
-            // Ako je previše dugačak, pokušaj da skratiš na prvih 6 reči umesto da odbacuješ
+            // If too long, try to shorten to first 6 words instead of discarding
             if (query.Length > 80)
             {
                 var tokens80 = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -341,29 +341,29 @@ namespace UltraVideoEditor
                 if (string.IsNullOrWhiteSpace(query)) return null;
             }
 
-            // Odbaci ako sadrži BHS dijakritike ILI bilo koji non-ASCII non-Latin znak
-            // Ovo pokriva: srpski (šđčćž), kineski, japanski, arapski, ćirilica itd.
+            // Discard if it contains BHS diacritics OR any non-ASCII non-Latin character
+            // This covers: Serbian (šđčćž), Chinese, Japanese, Arabic, Cyrillic, etc.
             // Qwen ponekad halucinira i vrati kineski tekst + exception stack trace — ovo to hvata
             if (query.Any(c => "šđčćžŠĐČĆŽ".Contains(c))) return null;
             if (query.Any(c => c > 0x024F && !char.IsWhiteSpace(c) && !char.IsPunctuation(c))) return null;
-            // Odbaci ako sadrži tipične znakove stack trace-a (Qwen halucinacija)
+            // Discard if it contains typical stack trace characters (Qwen hallucination)
             if (query.Contains("Exception") || query.Contains("处理") || query.Contains("\n") ||
                 query.Contains("ValueHandling") || query.Contains("Recognition")) return null;
 
-            // Odbaci ako sadrži blacklist reči (bezbednost sadržaja)
+            // Discard if it contains blacklist words (content safety)
             var blacklist = ctx.AgeGroup == AgeGroup.Adult ? _adultBlacklist : _childBlacklist;
             if (blacklist.Any(b => query.ToLower().Contains(b.ToLower()))) return null;
 
-            // Odbaci SAMO ako je bukvalno jedna od ovih generičkih fraza (exact match)
-            // Ranije: sadržavao je bilo koji od njih — previše agresivno, odbacivalo dobre queryje
+            // Discard ONLY if it is literally one of these generic phrases (exact match)
+            // Previously: contained any of them — too aggressive, discarded good queries
             var tooGenericExact = new[] { "happy child", "children playing", "happy children",
                                           "child playing", "kids playing", "people" };
             if (tooGenericExact.Any(g => query.ToLower().Trim() == g)) return null;
 
-            // Odbaci ako je samo 1 reč (nije pravi query)
+            // Discard if only 1 word (not a real query)
             if (query.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 2) return null;
 
-            // Dodaj uzrasni prefix ako nema ni jedne uzrasne reči
+            // Add age prefix if no age-related words are present
             string prefix = AgePrefix(ctx.AgeGroup);
             bool hasAgeWord = new[] { "child","children","kid","kids","toddler","baby",
                                       "youth","adult","person","people","family","girl","boy" }
@@ -375,15 +375,15 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  SLOJ 2: _actionMap — ~600 unosa, pokriva sve uobičajene teme
+        //  LAYER 2: _actionMap — ~600 entries, covers all common topics
         //
-        //  Format: srpska_reč → EN vizuelni query
-        //  Sve vrednosti su već filtrirane i bezbedne za decu
+        //  Format: serbian_word → EN visual query
+        //  All values are already filtered and safe for children
         // ══════════════════════════════════════════════════════════════════════
         private static readonly Dictionary<string, string> _actionMap =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            // ── ŠETNJA / HODANJE ──────────────────────────────────────────────
+            // ── WALKING / STROLLING ──────────────────────────────────────────────
             { "šeta",        "child walking park path" },
             { "šetaj",       "child walking park path" },
             { "šetajte",     "children walking park path" },
@@ -404,7 +404,7 @@ namespace UltraVideoEditor
             { "šetalistu",   "family walking promenade" },
             { "prošetaj",    "child walking park path" },
 
-            // ── TRČANJE ───────────────────────────────────────────────────────
+            // ── RUNNING ───────────────────────────────────────────────────────
             { "trči",        "child running park" },
             { "trčite",      "children running park" },
             { "trčim",       "child running park" },
@@ -470,7 +470,7 @@ namespace UltraVideoEditor
             { "nasmejani",   "children laughing happy" },
             { "nasmešena",   "child smiling happy outdoor" },
 
-            // ── BLISTANJE / SJAJ / UŽIVANJE ───────────────────────────────────
+            // ── SHINING / GLEAMING / ENJOYMENT ───────────────────────────────────
             { "blistaj",     "child face sunshine glowing" },
             { "blistajte",   "children sunshine glowing" },
             { "blista",      "child face sunshine glowing" },
@@ -502,7 +502,7 @@ namespace UltraVideoEditor
             { "vetru",       "child wind outdoor laughing" },
             { "mraz",        "frost winter outdoor cold" },
 
-            // ── GODIŠNJA DOBA ──────────────────────────────────────────────────
+            // ── SEASONS ──────────────────────────────────────────────────────
             { "proleće",     "spring flowers children park" },
             { "proljeće",    "spring flowers children park" },
             { "proleća",     "spring flowers children park" },
@@ -561,7 +561,7 @@ namespace UltraVideoEditor
             { "kišobran",    "child umbrella rain colorful" },
             { "kišobranom",  "child umbrella rain colorful" },
 
-            // ── HRANA I PIĆE ───────────────────────────────────────────────────
+            // ── FOOD AND DRINK ───────────────────────────────────────────────────
             { "sladoled",    "child eating ice cream" },
             { "sladoleda",   "child eating ice cream" },
             { "sladoledom",  "child eating ice cream" },
@@ -665,7 +665,7 @@ namespace UltraVideoEditor
             { "lokvi",       "child jumping puddle boots" },
             { "blato",       "child playing mud outdoor" },
 
-            // ── BILJKE / CVEĆE ─────────────────────────────────────────────────
+            // ── PLANTS / FLOWERS ─────────────────────────────────────────────────
             { "cvet",        "child flower garden colorful" },
             { "cvjet",       "child flower garden colorful" },
             { "cvijet",      "child flower garden colorful" },
@@ -823,7 +823,7 @@ namespace UltraVideoEditor
             { "vatromet",    "fireworks colorful night sky" },
             { "svira",       "child playing instrument music" },
 
-            // ── ŽIVOTINJE ──────────────────────────────────────────────────────
+            // ── ANIMALS ──────────────────────────────────────────────────────
             { "pas",         "dog playing child outdoor" },
             { "psa",         "dog playing child outdoor" },
             { "psu",         "dog playing child outdoor" },
@@ -874,7 +874,7 @@ namespace UltraVideoEditor
             { "sova",        "owl nature outdoor child" },
             { "jagnje",      "lamb cute outdoor child" },
 
-            // ── PREDMETI / IGRAČKE ─────────────────────────────────────────────
+            // ── OBJECTS / TOYS ─────────────────────────────────────────────────
             { "balon",       "child balloon colorful outdoor" },
             { "balone",      "children balloons colorful" },
             { "balonom",     "child balloon colorful outdoor" },
@@ -935,7 +935,7 @@ namespace UltraVideoEditor
             { "energija",    "children active outdoor energetic" },
             { "snaga",       "child strong healthy outdoor" },
 
-            // ── OPŠTE RADNJE ───────────────────────────────────────────────────
+            // ── GENERAL ACTIONS ───────────────────────────────────────────────────
             { "gledam",      "child looking outdoor curious" },
             { "gledaj",      "child looking outdoor curious" },
             { "gledamo",     "children looking outdoor" },
@@ -1012,7 +1012,7 @@ namespace UltraVideoEditor
             string key = ctx?.Context ?? "fun";
             if (_contextFallbacks.TryGetValue(key, out var options))
             {
-                // Rotirajuće — svaki poziv vraća drugačiji kadar
+                // Rotating — each call returns a different frame
                 int idx = Math.Abs(DateTime.Now.Millisecond % options.Length);
                 string query = options[idx];
 
@@ -1027,35 +1027,35 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  GetHardCodedQuery — traženje u _actionMap sa prioritetnim scoringom
-        //  Prioritet: konkretni objekti (hrana/odeća/igračke) > radnje > stanja
-        //  Rešava problem "šetaj+trči+smej" — uzima najrelevantniji keyword
+        //  GetHardCodedQuery — search in _actionMap with priority scoring
+        //  Priority: concrete objects (food/clothing/toys) > actions > states
+        //  Resolves the "walk+run+smile" problem — picks the most relevant keyword
         // ══════════════════════════════════════════════════════════════════════
         public static string GetHardCodedQuery(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return null;
             string lower = lyric.ToLower();
 
-            // Bonus po kategoriji — konkretniji objekt = veći bonus
+            // Bonus by category — more concrete object = higher bonus
             // Ovo osigurava da "sladoled" pobedi "leti" u istom stihu
             var categoryBonus = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
             {
-                // Hrana i piće (najkonkretnije, direktno vizuelno)
+                // Food and drink (most concrete, directly visual)
                 {"sladoled",50},{"čokolada",50},{"čaj",45},{"torta",50},{"jabuka",45},
                 {"banana",45},{"sendvič",45},{"sokić",45},{"mleko",40},{"voće",40},
-                // Odeća i zimska oprema
+                // Clothing and winter gear
                 {"skafander",50},{"rukavice",45},{"čizme",45},{"kapu",40},{"šal",40},
                 {"šešir",40},{"cipele",40},{"jakna",40},{"šorce",35},
-                // Igračke i vozila
+                // Toys and vehicles
                 {"autić",50},{"autic",50},{"bicikl",50},{"romobil",50},{"lopta",45},
                 {"balon",45},{"tobogan",45},{"ljuljaška",45},{"peskara",45},{"zmaj",40},
-                // Životinje
+                // Animals
                 {"leptir",45},{"ptica",40},{"patka",40},{"zec",40},{"pas",35},
                 {"mačka",35},{"konj",40},{"riba",35},
-                // Konkretna radnja (jača od opisa stanja)
+                // Concrete action (stronger than state description)
                 {"trči",30},{"skače",30},{"pleše",30},{"peva",30},{"vozi",30},
                 {"pliva",30},{"crta",30},{"gradi",30},{"kopa",30},{"baca",30},
-                // Porodica — specifično
+                // Family — specific
                 {"baka",35},{"deka",35},
             };
 
@@ -1070,7 +1070,7 @@ namespace UltraVideoEditor
                                !char.IsLetter(lower[idx + kv.Key.Length]);
                 if (!leftOk || !rightOk) continue;
 
-                // Baza score = dužina ključne reči × 2 (duža = specifičnija)
+                // Base score = keyword length × 2 (longer = more specific)
                 int score = kv.Key.Length * 2;
 
                 // Bonus za konkretnu kategoriju
@@ -1083,7 +1083,7 @@ namespace UltraVideoEditor
 
             if (results.Count == 0) return null;
 
-            // Uzmi najveći score; kod izjednačenja uzmi duži keyword
+            // Take the highest score; on tie take the longer keyword
             return results
                 .OrderByDescending(r => r.score)
                 .ThenByDescending(r => r.len)
@@ -1110,7 +1110,7 @@ namespace UltraVideoEditor
                     results.Add((idx, kv.Key.Length, kv.Value));
             }
 
-            // Deduplikacija — ukloni overlap, ostavi najduži na svakoj poziciji
+            // Deduplication — remove overlap, keep the longest at each position
             var sorted = results.OrderBy(r => r.pos).ThenByDescending(r => r.len).ToList();
             var clean = new List<(int pos, int len, string query)>();
             foreach (var r in sorted)
@@ -1121,7 +1121,7 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  GetBestMatchForLyric — jedan najduži match + pozicija
+        //  GetBestMatchForLyric — one longest match + position
         // ══════════════════════════════════════════════════════════════════════
         public static (string query, int position) GetBestMatchForLyric(string lyric)
         {
@@ -1162,7 +1162,7 @@ namespace UltraVideoEditor
             int adultScore = adultSignals.Count(s => lower.Contains(s));
             if (adultScore >= 2) return AgeGroup.Adult;
 
-            // Dečiji konteksti
+            // Children's contexts
             var kidsContexts = new[] { "outdoor","seasons","health","fun","school",
                                         "animal","music","dance","lullaby","adventure" };
             if (kidsContexts.Contains(detectedContext?.ToLower())) return AgeGroup.Kids;
@@ -1180,8 +1180,8 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(lyric)) return null;
             string lower = lyric.ToLower();
 
-            // Ako stih pominje više sezona odjednom → ne prepisujemo globalnu
-            // "Tokom proleća i jeseni, hladne zime i toplog leta" → null (sve sezone, zadržavamo global)
+            // If the lyric mentions multiple seasons at once → do not override the global
+            // "During spring and autumn, cold winters and warm summers" → null (all seasons, keep global)
             int seasonMentions = 0;
             var allSeasonWords = new[] { "zima","zime","zimi","sneg","snijeg","snegu","leto","ljeto","leti","ljeti","leta","proleće","proljeće","proleća","proljeća","jesen","jeseni" };
             foreach (var w in allSeasonWords) {
@@ -1190,9 +1190,9 @@ namespace UltraVideoEditor
                     (idx + w.Length >= lower.Length || !char.IsLetter(lower[idx+w.Length])))
                     seasonMentions++;
             }
-            if (seasonMentions >= 2) return null; // multi-sezona stih, zadržavamo global
+            if (seasonMentions >= 2) return null; // multi-season line, keep global
 
-            // Zimski signali — specifični, ne ambiguousni
+            // Winter signals — specific, not ambiguous
             var winterWords = new[] {
                 "zima","zime","zimi","zimski","zimskog","zimskom",
                 "sneg","snegu","snehu","snijeg","snijegu","snežno","snežan",
@@ -1210,7 +1210,7 @@ namespace UltraVideoEditor
             if (summerWords.Any(w => { int i = lower.IndexOf(w); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
                 return "summer";
 
-            // Prolećni signali
+            // Spring signals
             var springWords = new[] {
                 "proleće","proljeće","proleća","proljeća","prolećem",
                 "cvet","cvijet","cveće","cvijeće","livada","trava"
@@ -1230,7 +1230,7 @@ namespace UltraVideoEditor
 
         // ══════════════════════════════════════════════════════════════════════
         //  ValidateAndFilter — finalna sanitizacija pre slanja na API
-        //  Ovo je jedina tačka kroz koju query MORA proći
+        //  This is the only point through which a query MUST pass
         // ══════════════════════════════════════════════════════════════════════
         public static string ValidateAndFilter(string query, SongContext ctx)
         {
@@ -1239,7 +1239,7 @@ namespace UltraVideoEditor
             var blacklist = ctx?.AgeGroup == AgeGroup.Adult ? _adultBlacklist : _childBlacklist;
             if (blacklist.Any(b => query.ToLower().Contains(b.ToLower()))) return null;
 
-            // Max 8 reči
+            // Max 8 words
             var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length > 8)
                 query = string.Join(" ", tokens.Take(8));

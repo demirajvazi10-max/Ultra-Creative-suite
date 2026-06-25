@@ -40,16 +40,16 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Jedna izgovorena riječ sa tačnom sekundom početka.
+        /// A single spoken word with its exact start second.
         /// Ovo je osnova za word-level video sync:
-        /// kad pjevačica kaže "sladoled" → API query "ice cream" startuje tačno tada.
+        /// when the singer says "sladoled" → API query "ice cream" starts exactly then.
         /// </summary>
         public class WordTiming
         {
             public string Word        { get; set; } = "";
             public double StartSecond { get; set; }
             public double EndSecond   { get; set; }
-            /// <summary>Whisper confidence 0.0–1.0 za ovu riječ</summary>
+            /// <summary>Whisper confidence 0.0–1.0 for this word</summary>
             public double Probability { get; set; } = 1.0;
         }
 
@@ -231,21 +231,21 @@ namespace UltraVideoEditor
                       $"--beam_size 5 " +
                       $"--best_of 5 " +
                       $"--temperature 0 " +
-                      // VAD filter: preskace segmente bez ljudskog glasa (instrument, tišina).
+                      // VAD filter: skips segments without human voice (instruments, silence).
                       // threshold=0.6 znaci da segment mora biti 60%+ siguran da ima glas.
-                      // min_silence_duration_ms=500 = pauza kraca od 0.5s se ne tretira kao tišina.
+                      // min_silence_duration_ms=500 = pause shorter than 0.5s is not treated as silence.
                       // BEZ OVOGA: Whisper halucinira tekst tokom 10s instrumentalnog uvoda
                       // i gura prvi titl na 00:06 umjesto na 00:12 kada glas stvarno pocinje.
                       $"--vad_filter True " +
                       $"--vad_parameters \"threshold=0.6,min_silence_duration_ms=500\" " +
                       // condition_on_previous_text=False: svaki segment se dekodira nezavisno.
-                      // Bez ovoga model "prepisuje" kontekst prethodnog segmenta u tišinu
-                      // i izmišlja tekst koji jos nije izgovoren — early-start bug.
+                      // Without this the model "copies" context from previous segment into silence
+                      // and invents text not yet spoken — early-start bug.
                       $"--condition_on_previous_text False"
                     : $"\"{audioPath}\" --model {modelSize} --language {language} " +
                       $"--output_format srt --output_dir \"{tempDir}\" " +
                       // no_speech_threshold=0.6: openai-whisper ekvivalent VAD-a.
-                      // Segmenti ispod praga se oznacavaju kao tišina i preskacu.
+                      // Segments below threshold are marked as silence and skipped.
                       $"--no_speech_threshold 0.6 " +
                       // condition_on_previous_text=False: ista logika kao kod faster-whisper.
                       $"--condition_on_previous_text False " +
@@ -319,18 +319,18 @@ namespace UltraVideoEditor
                 // ── POST-PROCESSING VAD KOREKCIJA ─────────────────────────────────────
                 // Problem: Whisper ponekad i pored --vad_filter halu­cinira timestamp
                 // prvog segmenta — smijesti ga u instrumentalni uvod (npr. 00:06)
-                // umjesto kad glas stvarno počinje (npr. 00:12).
+                // instead of when the voice actually starts (e.g. 00:12).
                 //
-                // Detekcija halucinacije: ako je razmak između prvog i drugog segmenta
-                // neuobičajeno velik (> 4s), to znači da Whisper nije detektovao pravi
-                // početak glasa i gura tekst prerano.
+                // Hallucination detection: if the gap between first and second segment
+                // is unusually large (> 4s), it means Whisper did not detect the real
+                // start of the voice and is pushing text too early.
                 //
-                // Korekcija: pomijeri prvi segment na poziciju drugog minus prosječno
+                // Correction: shift the first segment to the position of the second minus average
                 // trajanje segmenta. Ovo je konzervativna korekcija — bolje da tekst
-                // kasni 0.5s nego da istrči 6s ispred glasa pred djetetom.
+                // 0.5s late rather than running 6s ahead of the voice for the child.
                 //
-                // Garancija bez padding-a: StartSeconds se NE zaokružava —
-                // koristi se tačna vrijednost do milisekunde iz Whisper izlaza.
+                // No-padding guarantee: StartSeconds is NOT rounded —
+                // the exact value to the millisecond from Whisper output is used.
                 // ─────────────────────────────────────────────────────────────────────
                 if (timedLines.Count >= 2)
                 {
@@ -340,7 +340,7 @@ namespace UltraVideoEditor
 
                     // Sumnjiv gap: prvi segment je ≥ 4s ranije od drugog,
                     // a ukupna duracija prvog segmenta je kratka (< 3s).
-                    // To je klasičan znak halucinacije na instrumentalu.
+                    // That is a classic sign of hallucination on an instrumental.
                     bool isHallucination = gap >= 4.0
                         && (timedLines[0].EndSeconds - timedLines[0].StartSeconds) < 3.0;
 
@@ -398,13 +398,13 @@ namespace UltraVideoEditor
 
         // ── Forced Alignment ─────────────────────────────────────────────────
         // Korisnik daje tekst, Whisper samo mjeri GDJE u audio-u je svaka linija.
-        // Ne transkribuje — samo poravnava. Rezultat: milisekunda-tačni timestamps
+        // Does not transcribe — only aligns. Result: millisecond-accurate timestamps
         // bez obzira na dijalekt, akcenat ili kvalitet snimka.
         //
-        // Metoda: Whisper se pokreće sa --initial_prompt koji sadrži cijeli tekst
-        // pjesme. Time Whisper "zna" šta treba čuti i fokusira se na alignment
-        // umjesto na pogađanje teksta. Vraćeni segmenti se mapiraju na korisnikove
-        // linije po redoslijedu (ne po tekstu — tekst može varirati u izgovoru).
+        // Method: Whisper is run with --initial_prompt containing the full text
+        // of the song. This way Whisper "knows" what to hear and focuses on alignment
+        // instead of guessing the text. Returned segments are mapped to the user's
+        // lines by order (not by text — text may vary in pronunciation).
         public static async Task<TranscriptionResult> ForcedAlignAsync(
             string audioPath,
             List<string> userLines,
@@ -425,7 +425,7 @@ namespace UltraVideoEditor
             string whisperExe = FindWhisperExecutable();
             if (whisperExe == null)
             {
-                result.ErrorMessage = "Whisper nije pronađen.";
+                result.ErrorMessage = "Whisper not found.";
                 return result;
             }
 
@@ -444,11 +444,11 @@ namespace UltraVideoEditor
                 if (ext != ".wav")
                 {
                     wavPath = await ExtractAudioAsync(audioPath, tempDir, ffmpegPath);
-                    if (wavPath == null) { result.ErrorMessage = "Greška pri ekstrakciji audia."; return result; }
+                    if (wavPath == null) { result.ErrorMessage = "Error during audio extraction."; return result; }
                 }
 
                 // initial_prompt = cijeli tekst pjesme (max 224 tokena = ~900 znakova)
-                // Ako je tekst duži, uzimamo prvih N linija koje stanu
+                // If text is longer, we take the first N lines that fit
                 string fullText = string.Join(" / ", userLines);
                 if (fullText.Length > 880)
                     fullText = fullText.Substring(0, 880);
@@ -461,7 +461,7 @@ namespace UltraVideoEditor
                 string whisperArgs;
                 if (isFasterWhisper)
                 {
-                    // faster-whisper: tražimo i SRT i JSON da dobijemo word-level timestamps
+                    // faster-whisper: we look for both SRT and JSON to get word-level timestamps
                     whisperArgs = $"\"{wavPath}\" --model {modelSize} --language {language} " +
                                   $"--output_format json --output_dir \"{tempDir}\" " +
                                   $"--initial_prompt \"{promptEscaped}\" " +
@@ -477,7 +477,7 @@ namespace UltraVideoEditor
                                   $"--word_timestamps True --verbose False";
                 }
 
-                progress?.Report($"Whisper alignment ({modelSize} model, slušam glas...)");
+                progress?.Report($"Whisper alignment ({modelSize} model, listening to voice...)");
 
                 var proc = new Process
                 {
@@ -508,14 +508,14 @@ namespace UltraVideoEditor
                 ct.ThrowIfCancellationRequested();
                 progress?.Report("Mapiranje teksta na timestamps...");
 
-                // Pokušaj JSON (word-level) prvo, SRT kao fallback
+                // Try JSON (word-level) first, SRT as fallback
                 string jsonPath = Directory.GetFiles(tempDir, "*.json").FirstOrDefault();
                 string srtPath  = Directory.GetFiles(tempDir, "*.srt").FirstOrDefault();
 
-                // Ako JSON nije dostupan (starija verzija Whispera), pokušaj SRT fallback
+                // If JSON is not available (older Whisper version), try SRT fallback
                 if (jsonPath == null && srtPath == null)
                 {
-                    // Pokušaj ponovo sa SRT formatom
+                    // Try again with SRT format
                     whisperArgs = whisperArgs.Replace("--output_format json", "--output_format srt");
                     using var proc2 = new Process
                     {
@@ -538,7 +538,7 @@ namespace UltraVideoEditor
                     if (wordTimings.Count > 0)
                     {
                         result.WordTimings = wordTimings;
-                        progress?.Report($"Word-level sync: {wordTimings.Count} riječi sa timestamps.");
+                        progress?.Report($"Word-level sync: {wordTimings.Count} words with timestamps.");
                     }
 
                     // Izvuci segmente iz JSON-a za liniju-po-liniju mapiranje
@@ -548,7 +548,7 @@ namespace UltraVideoEditor
 
                     if (whisperSegments.Count == 0)
                     {
-                        result.ErrorMessage = "Whisper JSON/SRT ne sadrži segmente.";
+                        result.ErrorMessage = "Whisper JSON/SRT contains no segments.";
                         return result;
                     }
 
@@ -559,7 +559,7 @@ namespace UltraVideoEditor
                     var whisperSegments = ParseWhisperSrt(srtPath);
                     if (whisperSegments.Count == 0)
                     {
-                        result.ErrorMessage = "Whisper nije pronašao nijedno vremensko poravnanje u audio fajlu.";
+                        result.ErrorMessage = "Whisper found no time alignment in the audio file.";
                         return result;
                     }
                     BuildAlignedLines(userLines, whisperSegments, result);
@@ -575,7 +575,7 @@ namespace UltraVideoEditor
                 progress?.Report($"Alignment gotov — {result.Lines.Count} linija, {result.WordTimings.Count} word timestamps.");
             }
             catch (OperationCanceledException) { result.ErrorMessage = "Alignment otkazan."; }
-            catch (Exception ex) { result.ErrorMessage = $"Alignment greška: {ex.Message}"; }
+            catch (Exception ex) { result.ErrorMessage = $"Alignment error: {ex.Message}"; }
             finally { try { Directory.Delete(tempDir, true); } catch { } }
 
             return result;
@@ -654,7 +654,7 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  ParseWhisperJsonWords — izvlači word-level timestamps iz Whisper JSON
+        //  ParseWhisperJsonWords — extracts word-level timestamps from Whisper JSON
         //
         //  Whisper JSON struktura:
         //  { "segments": [ { "words": [ {"word":"sladoled","start":2.1,"end":2.6,"probability":0.99} ] } ] }
@@ -667,7 +667,7 @@ namespace UltraVideoEditor
                 string json = File.ReadAllText(jsonPath, Encoding.UTF8);
 
                 // Parsiraj bez System.Text.Json da ne zavisimo od verzije
-                // Tražimo sve "words" array-e i vadimo word/start/end/probability
+                // We look for all "words" arrays and extract word/start/end/probability
                 var wordMatches = Regex.Matches(json,
                     @"\{[^}]*""word""\s*:\s*""([^""]+)""\s*,\s*""start""\s*:\s*([\d.]+)\s*,\s*""end""\s*:\s*([\d.]+)(?:\s*,\s*""probability""\s*:\s*([\d.]+))?[^}]*\}");
 
@@ -690,8 +690,8 @@ namespace UltraVideoEditor
                     result.Add(new WordTiming { Word = word, StartSecond = start, EndSecond = end, Probability = prob });
                 }
 
-                // Fallback: ako gornji regex ne pali, pokušaj alternativni format
-                // (faster-whisper može imati drugačiji redoslijed ključeva)
+                // Fallback: if the above regex does not fire, try an alternative format
+                // (faster-whisper may have a different key order)
                 if (result.Count == 0)
                 {
                     var altMatches = Regex.Matches(json,
@@ -713,7 +713,7 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  ParseWhisperJsonSegments — izvlači segment-level timestamps iz JSON
+        //  ParseWhisperJsonSegments — extracts segment-level timestamps from JSON
         //  (za liniju-po-liniju mapiranje, kao zamjena za SRT)
         // ══════════════════════════════════════════════════════════════════════
         private static List<TimedLine> ParseWhisperJsonSegments(string jsonPath)
@@ -741,11 +741,11 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        //  DetectAudioStart — pronađi prvu sekundu gdje muzika/glas počinje
-        //  Rješava "mrtav hod": video počinje tačno kad krene prva nota.
+        //  DetectAudioStart — find the first second where music/voice starts
+        //  Solves "dead start": video starts exactly when the first note begins.
         //
         //  Koristi FFmpeg silencedetect filter.
-        //  Vraća broj sekundi tišine na početku audio fajla.
+        //  Returns the number of silence seconds at the start of the audio file.
         // ══════════════════════════════════════════════════════════════════════
         public static async Task<double> DetectAudioStartAsync(
             string audioPath,
@@ -757,7 +757,7 @@ namespace UltraVideoEditor
             try
             {
                 string threshStr = silenceThresholdDb.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
-                // silencedetect: noise = threshold u dB, duration = minimalno trajanje tišine
+                // silencedetect: noise = threshold in dB, duration = minimum silence duration
                 string args = $"-nostdin -i \"{audioPath}\" " +
                               $"-af \"silencedetect=noise={threshStr}dB:duration=0.1\" " +
                               $"-f null -";
@@ -775,13 +775,13 @@ namespace UltraVideoEditor
                 await proc.WaitForExitAsync(ct);
 
                 // FFmpeg ispisuje: "silence_end: 1.234 | silence_duration: 1.234"
-                // Prva silence_end = kraj početne tišine = početak muzike
+                // First silence_end = end of initial silence = start of music
                 var m = Regex.Match(stderr, @"silence_end:\s*([\d.]+)");
                 if (m.Success && double.TryParse(m.Groups[1].Value,
                     System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out double silenceEnd))
                 {
-                    // Oduzmi 50ms buffer da ne odsječemo napad note
+                    // Subtract 50ms buffer to not cut off the note attack
                     return Math.Max(0.0, silenceEnd - 0.05);
                 }
             }

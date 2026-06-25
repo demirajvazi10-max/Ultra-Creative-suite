@@ -18,7 +18,7 @@ namespace UltraVideoEditor
     //   1. SegmentsToTimelineItems  — konverzija segmenata u TimelineItem listu
     //   2. AddMusicTrack            — muzika kao audio TimelineItem na track 2
     //   3. RenderEngine.RenderSimpleAsync — render sa beatInfo za beat-lock
-    //   4. Cleanup                  — briše privremene thumbnail fajlove
+    //   4. Cleanup                  — deletes temporary thumbnail files
     // ═══════════════════════════════════════════════════════════════
     public static class HighlightRenderer
     {
@@ -27,9 +27,9 @@ namespace UltraVideoEditor
         /// </summary>
         /// <param name="result">Rezultat AIHighlightEngine.AnalyzeAsync — segmenti + beats.</param>
         /// <param name="musicPath">Putanja do audio fajla pesme.</param>
-        /// <param name="outputPath">Gde da sačuva MP4.</param>
+        /// <param name="outputPath">Where to save the MP4.</param>
         /// <param name="resolution">Rezolucija izlaza, npr. "1920x1080".</param>
-        /// <param name="useGPU">Da li da pokuša NVENC hardware encoding.</param>
+        /// <param name="useGPU">Whether to attempt NVENC hardware encoding.</param>
         /// <param name="progress">Callback za napredak renderovanja (0–100).</param>
         /// <param name="ct">Cancellation token.</param>
         public static async Task RenderAsync(
@@ -46,7 +46,7 @@ namespace UltraVideoEditor
             if (result.Segments.Count == 0)
                 throw new InvalidOperationException("Nema segmenata za renderovanje.");
             if (!File.Exists(musicPath))
-                throw new FileNotFoundException($"Muzički fajl nije pronađen: {musicPath}");
+                throw new FileNotFoundException($"Music file not found: {musicPath}");
 
             // Osiguravamo output folder
             string outputDir = Path.GetDirectoryName(outputPath);
@@ -65,7 +65,7 @@ namespace UltraVideoEditor
                 progress?.Report((mapped, $"Renderujem… {pct}%"));
             });
 
-            progress?.Report((8, "Pokrećem RenderEngine…"));
+            progress?.Report((8, "Starting RenderEngine…"));
 
             // 3 — Render
             var engine = new RenderEngine(useHardwareAcceleration: useGPU);
@@ -86,7 +86,7 @@ namespace UltraVideoEditor
             // 4 — Cleanup thumbnailova
             CleanupThumbnails(result.Segments);
 
-            progress?.Report((100, $"Video sačuvan: {Path.GetFileName(outputPath)}"));
+            progress?.Report((100, $"Video saved: {Path.GetFileName(outputPath)}"));
         }
 
         // ── Konverzija ───────────────────────────────────────────────
@@ -103,7 +103,7 @@ namespace UltraVideoEditor
 
             foreach (var seg in segments.OrderBy(s => s.Order))
             {
-                // Svaki segment je TimelineItem koji kaže RenderEnginu:
+                // Each segment is a TimelineItem that tells RenderEngine:
                 //   - koji video fajl (Path)
                 //   - koji deo da uzme (Start → End u izvornom fajlu)
                 //   - gde da ga postavi na timeline (FixedPosition)
@@ -123,7 +123,7 @@ namespace UltraVideoEditor
                     ContentTag       = DetermineContentTag(seg),
                 };
 
-                // Keyframeovi: ako segment ima arc (dinamičan razvoj), dodajemo blagi zoom
+                // Keyframes: if the segment has an arc (dynamic development), add a subtle zoom
                 if (seg.ArcBonus > 8.0)
                     item.Keyframes = BuildArcKeyframes(seg.Duration);
 
@@ -151,7 +151,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Blagi Ken Burns zoom za segmente sa izraženim arc-om.
+        /// Subtle Ken Burns zoom for segments with a distinct arc.
         /// Ulaz: static → lagani zoom in → static
         /// </summary>
         private static List<AnimationKeyframe> BuildArcKeyframes(double duration)
@@ -181,23 +181,23 @@ namespace UltraVideoEditor
                       $"trajanje {seg.Duration:F1} sekundi. ");
 
             if (!string.IsNullOrEmpty(seg.ContentDescription))
-                sb.Append($"Sadržaj: {seg.ContentDescription}. ");
+                sb.Append($"Content: {seg.ContentDescription}. ");
 
-            if (!string.IsNullOrEmpty(seg.ArcDescription) && seg.ArcDescription != "bez izraženog arc-a")
+            if (!string.IsNullOrEmpty(seg.ArcDescription) && seg.ArcDescription != "no distinct arc")
                 sb.Append($"Razvoj kadra: {seg.ArcDescription}. ");
 
             if (seg.Motion != null && seg.Motion.HasStrongMotion)
-                sb.Append($"Dinamičan kadar sa pokretom kamere {seg.Motion.Direction}. ");
+                sb.Append($"Dynamic shot with camera movement {seg.Motion.Direction}. ");
             else if (seg.Motion != null && seg.Motion.IsStatic)
-                sb.Append("Statičan kadar. ");
+                sb.Append("Static shot. ");
 
-            sb.Append($"Skor važnosti: {seg.ImportanceScore:F0} od 100.");
+            sb.Append($"Importance score: {seg.ImportanceScore:F0} out of 100.");
             return sb.ToString();
         }
 
         /// <summary>
-        /// Mapira sadržaj segmenta na ContentTag koji RenderEngine koristi
-        /// za primenu odgovarajućeg color grading filtera.
+        /// Maps segment content to the ContentTag used by RenderEngine
+        /// to apply the appropriate color grading filter.
         /// </summary>
         private static string DetermineContentTag(HighlightSegment seg)
         {

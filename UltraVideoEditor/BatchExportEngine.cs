@@ -10,7 +10,7 @@ namespace UltraVideoEditor
 {
     // ═══════════════════════════════════════════════════════════════
     // BATCH EXPORT ENGINE
-    // Sekvencijalni render više .iskra projekata.
+    // Sequential render of multiple .iskra projects.
     // ═══════════════════════════════════════════════════════════════
 
     public static class BatchExportEngine
@@ -30,24 +30,24 @@ namespace UltraVideoEditor
 
                 job.Status      = BatchJobStatus.Running;
                 job.ProgressPct = 0;
-                progress?.Report((i, job, $"Učitavam projekat: {job.ProjectName}…"));
+                progress?.Report((i, job, $"Loading project: {job.ProjectName}…"));
 
                 try
                 {
-                    // 1 — Učitaj projekat
+                    // 1 — Load project
                     if (!File.Exists(job.ProjectPath))
-                        throw new FileNotFoundException($"Projekat nije pronađen: {job.ProjectPath}");
+                        throw new FileNotFoundException($"Project not found: {job.ProjectPath}");
 
                     string json    = await File.ReadAllTextAsync(job.ProjectPath, ct);
                     var projectData = JsonConvert.DeserializeObject<ProjectData>(json);
                     if (projectData == null)
-                        throw new InvalidDataException("Projekat je nečitljiv.");
+                        throw new InvalidDataException("Project is unreadable.");
 
                     var items = projectData.TimelineItems ?? new List<TimelineItem>();
                     if (items.Count == 0)
                         throw new InvalidOperationException("Projekat nema klipoiva.");
 
-                    // Rekonstruiši timeline pozicije
+                    // Reconstruct timeline positions
                     double t = 0;
                     foreach (var item in items) { item.Start = t; item.End = t + item.Duration; t += item.Duration; }
 
@@ -98,13 +98,13 @@ namespace UltraVideoEditor
                 catch (OperationCanceledException)
                 {
                     job.Status = BatchJobStatus.Skipped;
-                    progress?.Report((i, job, $"⏭ {job.ProjectName} — preskočen."));
+                    progress?.Report((i, job, $"⏭ {job.ProjectName} — skipped."));
                 }
                 catch (Exception ex)
                 {
                     job.Status       = BatchJobStatus.Error;
                     job.ErrorMessage = ex.Message;
-                    progress?.Report((i, job, $"❌ {job.ProjectName} — greška: {ex.Message}"));
+                    progress?.Report((i, job, $"❌ {job.ProjectName} — error: {ex.Message}"));
                 }
             }
         }

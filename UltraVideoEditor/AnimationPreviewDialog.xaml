@@ -1,7 +1,7 @@
 ﻿<Window x:Class="UltraVideoEditor.AnimationPreviewDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Pregled scenarija animacije" Height="500" Width="700"
+        Title="Animation scenario preview" Height="500" Width="700"
         WindowStartupLocation="CenterOwner" Background="#2D2D2D">
 
     <Grid Margin="10">
@@ -25,16 +25,16 @@
                         <StackPanel>
                             <TextBlock Text="{Binding Description}" Foreground="#00E676" FontWeight="Bold"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                <TextBlock Text="Slika:" Foreground="White" Width="50" VerticalAlignment="Center"/>
+                                <TextBlock Text="Image:" Foreground="White" Width="50" VerticalAlignment="Center"/>
                                 <ComboBox ItemsSource="{Binding AvailableImages}" SelectedItem="{Binding ImageName}" 
                                           Width="150" Margin="0,0,10,0"
-                                          AutomationProperties.Name="Izbor slike za scenu"/>
+                                          AutomationProperties.Name="Image selection for scene"/>
                                 <TextBlock Text="Trajanje (s):" Foreground="White" Width="80" VerticalAlignment="Center"/>
                                 <TextBox Text="{Binding Duration}" Width="50" Margin="0,0,10,0"
-                                         AutomationProperties.Name="Trajanje scene u sekundama"/>
-                                <TextBlock Text="Efekat:" Foreground="White" Width="50" VerticalAlignment="Center"/>
+                                         AutomationProperties.Name="Scene duration in seconds"/>
+                                <TextBlock Text="Effect:" Foreground="White" Width="50" VerticalAlignment="Center"/>
                                 <ComboBox ItemsSource="{Binding AvailableEffects}" SelectedItem="{Binding Effect}" 
-                                          Width="100" AutomationProperties.Name="Izbor efekta za scenu"/>
+                                          Width="100" AutomationProperties.Name="Effect selection for scene"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -43,7 +43,7 @@
         </ListBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15">
-            <Button x:Name="btnConfirm" Content="✅ POTVRDI I NAPRAVI ANIMACIJU" Click="Confirm_Click" 
+            <Button x:Name="btnConfirm" Content="✅ CONFIRM AND CREATE ANIMATION" Click="Confirm_Click" 
                     Width="220" Height="40" Background="#2E7D32" Foreground="White" FontWeight="Bold" Margin="0,0,10,0"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" 
                     Width="100" Height="40" Background="#B71C1C" Foreground="White"/>

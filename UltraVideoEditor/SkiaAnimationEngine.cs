@@ -6,7 +6,7 @@ using SkiaSharp;
 namespace UltraVideoEditor
 {
     /// <summary>
-    /// Kreira animirani video iz teksta koristeći SkiaSharp + FFmpeg.
+    /// Creates an animated video from text using SkiaSharp + FFmpeg.
     /// Sve je tekstualno konfigurisano - nema vizuelnog alata.
     /// </summary>
     public static class SkiaAnimationEngine
@@ -43,7 +43,7 @@ namespace UltraVideoEditor
 
                     RenderFrame(canvas, text, style, txt, bg, t, frame, totalFrames);
 
-                    // Sačuvaj frame kao PNG
+                    // Save frame as PNG
                     using var image = surface.Snapshot();
                     using var data  = image.Encode(SKEncodedImageFormat.Png, 95);
                     string framePath = Path.Combine(tempDir, $"frame_{frame:D6}.png");

@@ -42,9 +42,9 @@ namespace UltraVideoEditor
     }
 
     /// <summary>
-    /// Detektuje kretanje kamere u video klipu koristeći pouzdanu frame-diff metodu.
-    /// Izvlači 6 frejmova (3 na početku, 3 na kraju), mjeri pixel shift između uzastopnih
-    /// frejmova koristeći FFmpeg ssim/psnr output, i klasifikuje smjer kretanja.
+    /// Detects camera motion in a video clip using a reliable frame-diff method.
+    /// Extracts 6 frames (3 at the start, 3 at the end), measures pixel shift between consecutive
+    /// frames using FFmpeg ssim/psnr output, and classifies direction of motion.
     /// Ova metoda radi sa svim FFmpeg build-ovima bez eksperimentalnih filtera.
     /// </summary>
     public static class MotionAnalyzer
@@ -116,9 +116,9 @@ namespace UltraVideoEditor
         }
 
         // ── Pouzdana frame-diff implementacija ───────────────────────────────────
-        // Izvlači 3 para frejmova na intervalima od 0.3s i mjeri optički tok
-        // koristeći standardni FFmpeg scale+format pipeline bez eksperimentalnih filtera.
-        // Svaki par daje dx/dy pomak; prosječavamo sve parove za stabilniji rezultat.
+        // Extracts 3 frame pairs at 0.3s intervals and measures optical flow
+        // using the standard FFmpeg scale+format pipeline without experimental filters.
+        // Each pair gives dx/dy shift; we average all pairs for a more stable result.
         private static async Task<MotionResult> DoFrameDiffAnalysis(
             string videoPath, string ffmpegPath, CancellationToken ct,
             double seekTo = 0.0)
@@ -145,7 +145,7 @@ namespace UltraVideoEditor
 
                 if (framePaths.Count < 2) return MakeUnknown();
 
-                // Mjeri pomak između uzastopnih parova frejmova
+                // Measures shift between consecutive frame pairs
                 var dxList = new List<double>();
                 var dyList = new List<double>();
 
@@ -164,7 +164,7 @@ namespace UltraVideoEditor
                 double avgDx = dxList.Average();
                 double avgDy = dyList.Average();
                 double magnitude = Math.Sqrt(avgDx * avgDx + avgDy * avgDy);
-                // Skaliraj na 0-100 raspon (160px širina → pomak 8px = 5% ekrana = magnitude ~20)
+                // Scale to 0-100 range (160px width → shift 8px = 5% of screen = magnitude ~20)
                 double normalizedMag = Math.Min(100, magnitude * 12.5);
 
                 if (normalizedMag < 4.0)
@@ -218,7 +218,7 @@ namespace UltraVideoEditor
             }
         }
 
-        // Mjeri pixel shift između dva PNG frejma koristeći FFmpeg blend+metadata
+        // Measures pixel shift between two PNG frames using FFmpeg blend+metadata
         // Koristi standardni signalstats filter koji je dostupan u svim FFmpeg build-ovima
         private static async Task<(double dx, double dy)> MeasureFrameShift(
             string frameA, string frameB, string ffmpegPath, CancellationToken ct)
@@ -226,7 +226,7 @@ namespace UltraVideoEditor
             try
             {
                 // Koristimo blend diff + signalstats za mjerenje ukupne promjene pixela
-                // Posebno: uspoređujemo lijevu/desnu i gornju/donju polovinu da dobijemo smjer
+                // Specifically: comparing left/right and top/bottom halves to determine direction
                 string args = $"-nostdin -i \"{frameA}\" -i \"{frameB}\"" +
                     " -filter_complex" +
                     " \"[0:v]crop=80:90:0:0[left0];[1:v]crop=80:90:0:0[left1];" +
@@ -264,8 +264,8 @@ namespace UltraVideoEditor
                 double meanTop   = double.Parse(means[2].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
                 double meanBot   = double.Parse(means[3].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
 
-                // dx pozitivan = pokret u desno (više promjene na lijevoj strani)
-                // dy pozitivan = pokret prema dolje (više promjene na gornjoj strani)
+                // dx positive = motion to the right (more changes on the left side)
+                // dy positive = motion downward (more changes on the top side)
                 double dx = meanLeft - meanRight;
                 double dy = meanTop - meanBot;
 

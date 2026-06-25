@@ -1,7 +1,7 @@
 ﻿<Window x:Class="UltraVideoEditor.ExportOptions"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Opcije izvoza" Height="350" Width="450"
+        Title="Export options" Height="350" Width="450"
         WindowStartupLocation="CenterOwner" Background="#2D2D2D">
 
     <Grid Margin="20">
@@ -14,7 +14,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="🎬 Opcije izvoza" FontSize="20" FontWeight="Bold" 
+        <TextBlock Text="🎬 Export options" FontSize="20" FontWeight="Bold" 
                    Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,20"/>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5">
@@ -27,19 +27,19 @@
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
-            <TextBlock Text="Kvalitet:" Foreground="White" Width="100" VerticalAlignment="Center"/>
+            <TextBlock Text="Quality:" Foreground="White" Width="100" VerticalAlignment="Center"/>
             <ComboBox x:Name="cmbQuality" Width="200" SelectedIndex="1">
-                <ComboBoxItem Content="Nizak"/>
-                <ComboBoxItem Content="Srednji"/>
-                <ComboBoxItem Content="Visok"/>
+                <ComboBoxItem Content="Low"/>
+                <ComboBoxItem Content="Medium"/>
+                <ComboBoxItem Content="High"/>
             </ComboBox>
         </StackPanel>
 
-        <CheckBox x:Name="chkAudioOnly" Grid.Row="3" Content="Izvezi samo audio" 
+        <CheckBox x:Name="chkAudioOnly" Grid.Row="3" Content="Export audio only" 
                   Foreground="White" Margin="0,15"/>
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20">
-            <Button x:Name="btnExport" Content="✅ IZVEZI" Click="Export_Click" Width="100" Height="35" 
+            <Button x:Name="btnExport" Content="✅ EXPORT" Click="Export_Click" Width="100" Height="35" 
                     Background="#2E7D32" Foreground="White" Margin="0,0,10,0"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" 
                     Background="#B71C1C" Foreground="White"/>

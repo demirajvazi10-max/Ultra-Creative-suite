@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="#1A1A2E"
-        AutomationProperties.Name="Color Grading Engine dijalog">
+        AutomationProperties.Name="Color Grading Engine dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#F59E0B"/>
@@ -101,7 +101,7 @@
                        FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextPrimaryBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="AI automatski grade po sadržaju klipa · 10 preseta · Preview thumbnailovi"
+            <TextBlock Text="AI automatically grades by clip content · 10 presets · Preview thumbnails"
                        FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
         </StackPanel>
 
@@ -109,12 +109,12 @@
         <Border Grid.Row="1" Background="{StaticResource CardBrush}"
                 CornerRadius="10" Padding="14,12" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="🎬  Izaberi preset"
+                <TextBlock Text="🎬  Select preset"
                            Foreground="{StaticResource TextMutedBrush}"
                            FontSize="12" Margin="0,0,0,10"/>
                 <WrapPanel x:Name="PresetPanel"/>
                 <TextBlock x:Name="TxtPresetDesc"
-                           Text="Izaberi preset ili ostavi Auto da AI bira po sadržaju."
+                           Text="Choose a preset or leave Auto for AI to select by content."
                            Foreground="{StaticResource TextMutedBrush}"
                            FontSize="11" Margin="0,8,0,0" FontStyle="Italic"
                            AutomationProperties.LiveSetting="Polite"/>
@@ -131,7 +131,7 @@
                                DockPanel.Dock="Right"
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
-                    <TextBlock x:Name="TxtProgressMsg" Text="Čekam…"
+                    <TextBlock x:Name="TxtProgressMsg" Text="Waiting…"
                                Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
@@ -155,18 +155,18 @@
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,0,0">
-                            <Button x:Name="BtnSelectAll" Content="Sve"
+                            <Button x:Name="BtnSelectAll" Content="All"
                                     Style="{StaticResource SecBtn}" FontSize="11"
                                     Padding="10,4" Margin="0,0,6,0" IsEnabled="False"
                                     Click="BtnSelectAll_Click"
-                                    AutomationProperties.Name="Selektuj sve klipoive"/>
-                            <Button x:Name="BtnDeselectAll" Content="Ništa"
+                                    AutomationProperties.Name="Select all clips"/>
+                            <Button x:Name="BtnDeselectAll" Content="None"
                                     Style="{StaticResource SecBtn}" FontSize="11"
                                     Padding="10,4" IsEnabled="False"
                                     Click="BtnDeselectAll_Click"
-                                    AutomationProperties.Name="Deselektuj sve klipoive"/>
+                                    AutomationProperties.Name="Deselect all clips"/>
                         </StackPanel>
-                        <TextBlock x:Name="TxtClipCount" Text="Nema klipoiva"
+                        <TextBlock x:Name="TxtClipCount" Text="No clips"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="12" VerticalAlignment="Center"
                                    AutomationProperties.LiveSetting="Polite"/>
@@ -174,28 +174,28 @@
                 </Border>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8">
                     <WrapPanel x:Name="ClipsPanel" Orientation="Horizontal"
-                               AutomationProperties.Name="Lista klipoiva sa grade previewom"/>
+                               AutomationProperties.Name="Clip list with grade preview"/>
                 </ScrollViewer>
             </Grid>
         </Border>
 
-        <!-- Dugmići -->
+        <!-- Buttons -->
         <DockPanel Grid.Row="4" LastChildFill="False">
             <Button x:Name="BtnAnalyze" DockPanel.Dock="Left"
-                    Content="🎨 Analiziraj i grade-uj"
+                    Content="🎨 Analyze and grade"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" Click="BtnAnalyze_Click"
-                    AutomationProperties.Name="Pokreni analizu i color grading"/>
+                    AutomationProperties.Name="Start analysis and color grading"/>
             <Button x:Name="BtnClose" DockPanel.Dock="Right"
-                    Content="Zatvori" Style="{StaticResource SecBtn}"
+                    Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
-                    AutomationProperties.Name="Zatvori dijalog"/>
+                    AutomationProperties.Name="Close dialog"/>
             <Button x:Name="BtnApply" DockPanel.Dock="Right"
-                    Content="✅ Primeni na timeline"
+                    Content="✅ Apply to timeline"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" Margin="0,0,8,0"
                     IsEnabled="False" Click="BtnApply_Click"
-                    AutomationProperties.Name="Primeni color grade na selektovane klipoive"/>
+                    AutomationProperties.Name="Apply color grade to selected clips"/>
         </DockPanel>
     </Grid>
 </Window>

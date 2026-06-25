@@ -19,7 +19,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0" Margin="0,0,0,5" Background="#1E1E1E" Foreground="White" AutomationProperties.Name="Glavni meni">
+        <Menu Grid.Row="0" Margin="0,0,0,5" Background="#1E1E1E" Foreground="White" AutomationProperties.Name="Main menu">
             <MenuItem x:Name="mnuFile" Tag="mw_file_menu">
                 <MenuItem x:Name="mnuNew" Tag="mw_new" InputGestureText="Ctrl+N" Click="NewProject_Click"/>
                 <MenuItem x:Name="mnuOpen" Tag="mw_open" InputGestureText="Ctrl+O" Click="LoadProject_Click"/>
@@ -73,6 +73,11 @@
             <MenuItem x:Name="mnuTimeline" Tag="mw_timeline_menu">
                 <MenuItem x:Name="mnuAddVideo" Tag="mnu_add_video" InputGestureText="Ctrl+I" Click="AddVideoImage_Click"/>
                 <MenuItem x:Name="mnuAddAudio" Tag="mnu_add_audio" InputGestureText="Ctrl+Shift+I" Click="AddAudioOnly_Click"/>
+                <MenuItem x:Name="mnuImportYouTube"
+                          Header="▶ Import from YouTube"
+                          InputGestureText="Ctrl+Y"
+                          Click="ImportFromYouTube_Click"
+                          AutomationProperties.Name="Import video or audio from YouTube directly to timeline"/>
                 <Separator/>
                 <MenuItem x:Name="mnuAddVideoTrack" Tag="add_video_track" Click="AddVideoTrack_Click"/>
                 <MenuItem x:Name="mnuAddAudioTrack" Tag="add_audio_track" Click="AddAudioTrack_Click"/>
@@ -94,7 +99,7 @@
                 <MenuItem x:Name="mnuVideoEngine" Tag="🎬|mnu_video_engine" Click="OpenVideoEngine_Click" FontWeight="Bold"/>
                 <MenuItem x:Name="mnuVideoReview" Tag="🔍|mnu_video_review" Click="OpenVideoReview_Click" FontWeight="Bold"
                           Header="🔍 AI Pregled Videa"
-                          AutomationProperties.Name="Otvori AI pregled videa — Qwen2-VL analizira gotov video"/>
+                          AutomationProperties.Name="Open AI Video Review — Qwen2-VL analyzes the finished video"/>
                 <MenuItem x:Name="mnuClipDescriptions" Tag="👁|mnu_clip_desc" Click="DescribeAllClips_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuGenerateVoice" Tag="mw_generate_voice" Click="GenerateVoice_Click"/>
@@ -108,45 +113,45 @@
                           InputGestureText="Ctrl+Shift+H"
                           Click="OpenHighlightEngine_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Otvori AI Highlight Engine — automatski izvlači najzanimljivije momente i sinhronizuje rezove na beat"/>
+                          AutomationProperties.Name="Open AI Highlight Engine — automatically extracts the most interesting moments and syncs cuts to beat"/>
                 <MenuItem x:Name="mnuPhase3"
                           Header="🚀 AI Suite Faza 3"
                           InputGestureText="Ctrl+Shift+3"
                           Click="OpenPhase3_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Otvori Fazu 3 — Tranzicije, Audio Miks, Accessibility i Multi-format Export"/>
+                          AutomationProperties.Name="Open Phase 3 — Transitions, Audio Mix, Accessibility and Multi-format Export"/>
                 <Separator/>
                 <MenuItem x:Name="mnuSceneDetection"
                           Header="🔍 Smart Scene Detection"
                           InputGestureText="Ctrl+Shift+D"
                           Click="OpenSceneDetection_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Otvori Smart Scene Detection — automatska detekcija scena iz videa"/>
+                          AutomationProperties.Name="Open Smart Scene Detection — automatic scene detection from video"/>
                 <MenuItem x:Name="mnuTimelineAI"
                           Header="🤖 Timeline AI Asistent"
                           InputGestureText="Ctrl+Shift+T"
                           Click="OpenTimelineAI_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Otvori Timeline AI Asistent — AI komande nad timeline-om"/>
+                          AutomationProperties.Name="Open Timeline AI Assistant — AI commands on the timeline"/>
                 <MenuItem x:Name="mnuColorGrading"
                           Header="🎨 Color Grading Engine"
                           InputGestureText="Ctrl+Shift+G"
                           Click="OpenColorGrading_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Otvori Color Grading Engine — AI automatski color grade po sadržaju klipa"/>
+                          AutomationProperties.Name="Open Color Grading Engine — AI automatically color grades by clip content"/>
                 <Separator/>
                 <MenuItem x:Name="mnuBatchExport"
                           Header="📦 Batch Export"
                           InputGestureText="Ctrl+Shift+B"
                           Click="OpenBatchExport_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Batch Export — render više projekata odjednom"/>
+                          AutomationProperties.Name="Batch Export — render multiple projects at once"/>
                 <MenuItem x:Name="mnuProjectTemplates"
                           Header="📋 Project Templates"
                           InputGestureText="Ctrl+Shift+P"
                           Click="OpenProjectTemplates_Click"
                           FontWeight="Bold"
-                          AutomationProperties.Name="Project Templates — sačuvaj i učitaj podešavanja projekta"/>
+                          AutomationProperties.Name="Project Templates — save and load project settings"/>
             </MenuItem>
             <MenuItem x:Name="mnuEffects" Tag="mnu_effects_menu">
                 <MenuItem x:Name="mnuVideoEffects" Tag="mnu_video_effects" Click="ShowVideoEffectsTab_Click"/>
@@ -163,10 +168,10 @@
                 <Separator/>
                 <MenuItem x:Name="mnuGPU" Tag="gpu_acceleration" IsCheckable="True" IsChecked="True" Click="ToggleGPUAcceleration_Click"/>
                 <MenuItem x:Name="mnuMediaProviders"
-                          Header="🌐 Media Provajderi (API ključevi)"
+                          Header="🌐 Media Providers (API keys)"
                           Click="MnuMediaProviders_Click"
                           InputGestureText="Ctrl+M"
-                          AutomationProperties.Name="Podešavanja media provajdera — Pixabay, Pexels, Coverr"/>
+                          AutomationProperties.Name="Media provider settings — Pixabay, Pexels, Coverr"/>
                 <Separator/>
                 <MenuItem x:Name="mnuSettings" Tag="mw_settings" Click="ShowPreferences_Click"/>
             </MenuItem>
@@ -193,7 +198,7 @@
             <Button x:Name="btnVideoReview" Content="🔍 AI PREGLED" Click="OpenVideoReview_Click"
         Background="#1565C0" Foreground="White" FontWeight="Bold"
         ToolTip="AI Pregled Videa — Qwen2-VL analizira gotov video"
-        AutomationProperties.Name="Otvori AI pregled videa"/>
+        AutomationProperties.Name="Open AI Video Review"/>
             <Separator/>
             <Button x:Name="btnUndoTool" Tag="↩|undo|Ctrl+Z" Click="Undo_Click"/>
             <Button x:Name="btnRedoTool" Tag="↪|mnu_redo|Ctrl+Y" Click="Redo_Click"/>
@@ -317,10 +322,10 @@
                                 <TextBlock x:Name="txtAIFrames" Text="🎨 AI KADROVI" FontSize="16" FontWeight="Bold" Foreground="#AA00FF"/>
                                 <TextBlock x:Name="txtAIPromptLabel" Text="Opis slike (odvoji zarezom):" Foreground="White" Margin="0,10,0,5"/>
                                 <TextBox x:Name="txtAIPrompt" Height="60" TextWrapping="Wrap" Padding="10" Background="#2D2D2D" Foreground="White" AcceptsReturn="True" Width="400" AutomationProperties.Name="Polje za unos opisa slike" AutomationProperties.HelpText="Unesite opis slike odvojen zarezom. Koristite Ctrl+V za lepljenje."/>
-                                <Button x:Name="btnPastePrompt" Content="📋 Zalepi" Click="PastePrompt_Click" Width="80" Height="35" Margin="10,0,0,0" Background="#4A148C" Foreground="White" AutomationProperties.Name="Zalepi prompt iz klipborda" AutomationProperties.HelpText="Kliknite da nalepite tekst iz klipborda u polje za opis"/>
+                                <Button x:Name="btnPastePrompt" Content="📋 Paste" Click="PastePrompt_Click" Width="80" Height="35" Margin="10,0,0,0" Background="#4A148C" Foreground="White" AutomationProperties.Name="Zalepi prompt iz klipborda" AutomationProperties.HelpText="Kliknite da nalepite tekst iz klipborda u polje za opis"/>
                                 <Button x:Name="btnGenerate" Content="🎨 GENERATE AI FRAMES" Click="GenerateAI_Click" Height="40" Margin="0,10" Background="#AA00FF" Foreground="White" FontWeight="Bold" AutomationProperties.Name="Generate AI frames" AutomationProperties.HelpText="Click to generate images based on the entered description"/>
                                 <Button x:Name="btnPollinations" Content="🌸 POLLINATIONS.AI (free, no API)" Click="GenerateWithPollinations_Click" Height="40" Margin="0,0,0,10" Background="#006064" Foreground="White" FontWeight="Bold" AutomationProperties.Name="Generate images using Pollinations.ai, free, no API key" AutomationProperties.HelpText="Alternative for image generation. No API key required."/>
-                                <Button x:Name="btnSkiaAnimation" Content="✨ SKIA ANIMACIJA TEKSTA" Click="GenerateSkiaAnimation_Click" Height="40" Margin="0,0,0,10" Background="#1A237E" Foreground="White" FontWeight="Bold" AutomationProperties.Name="Napravi animaciju teksta pomocu SkiaSharp. Odaberi tekst, stil, boje i trajanje." AutomationProperties.HelpText="Kreira animirani video klip sa tvojim tekstom. FadeIn, SlideLeft, Bounce, Stars, Rainbow i drugi stilovi."/>
+                                <Button x:Name="btnSkiaAnimation" Content="✨ SKIA TEXT ANIMATION" Click="GenerateSkiaAnimation_Click" Height="40" Margin="0,0,0,10" Background="#1A237E" Foreground="White" FontWeight="Bold" AutomationProperties.Name="Napravi animaciju teksta pomocu SkiaSharp. Odaberi tekst, stil, boje i trajanje." AutomationProperties.HelpText="Kreira animirani video klip sa tvojim tekstom. FadeIn, SlideLeft, Bounce, Stars, Rainbow i drugi stilovi."/>
                                 <ProgressBar x:Name="prgAI" Height="6" Visibility="Collapsed"/>
                                 <TextBlock x:Name="txtAIStatus" Foreground="Yellow"/>
                             </StackPanel>
@@ -339,7 +344,7 @@
                         <Border Background="#1E1E1E" CornerRadius="8" Padding="15">
                             <StackPanel>
                                 <TextBlock x:Name="txtAILyrics" Text="🎤 AI SINHRONIZACIJA TEKSTA" FontSize="16" FontWeight="Bold" Foreground="#FF9800"/>
-                                <TextBlock x:Name="txtLyricsLabel" Text="Tekst pesme (stih po redu):" Foreground="White" Margin="0,10,0,5"/>
+                                <TextBlock x:Name="txtLyricsLabel" Text="Song lyrics (one line per row):" Foreground="White" Margin="0,10,0,5"/>
                                 <TextBox x:Name="txtLyrics" Height="80" TextWrapping="Wrap" Padding="10" Background="#2D2D2D" Foreground="White" AcceptsReturn="True"/>
                                 <TextBlock x:Name="txtSelectAudioLabel" Text="Selektuj audio klip:" Foreground="White" Margin="0,10,0,5"/>
                                 <ComboBox x:Name="cmbAudioClips" Height="30" Background="#2D2D2D" Foreground="White" SelectionChanged="AudioClip_Selected"/>
@@ -377,7 +382,7 @@
                             <Button x:Name="btnPreviewTreble" Content="👂 PREVIEW" Click="PreviewTreble_Click" Width="100" Height="25" Margin="10,0" Background="#FF9800" Foreground="White"/>
                         </StackPanel>
                         <CheckBox x:Name="chkGPUAcceleration" Content="🎮 GPU ubrzanje" Foreground="White" Margin="0,15" IsChecked="True" Checked="GPUAcceleration_Checked" Unchecked="GPUAcceleration_Checked"/>
-                        <CheckBox x:Name="chkEnableSubtitles" Content="📝 Titlovi u videu" Foreground="White" Margin="0,5" IsChecked="True" ToolTip="Uključi/isključi prikaz titlova u finalnom renderu. Isključi za čist video bez teksta."/>
+                        <CheckBox x:Name="chkEnableSubtitles" Content="📝 Subtitles in video" Foreground="White" Margin="0,5" IsChecked="True" ToolTip="Enable/disable subtitle display in the final render. Disable for a clean video without text."/>
                         <TextBlock x:Name="txtReverb" Text="Reverb:" Foreground="White"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="sldReverb" Minimum="0" Maximum="100" Value="0" Width="200" ValueChanged="AudioEffect_ValueChanged"/>
@@ -533,7 +538,7 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                             <StackPanel Orientation="Horizontal" Margin="0,10">
-                                <Button x:Name="btnAddScene" Content="➕ Dodaj scenu" Click="AddScene_Click" Width="100" Margin="0,0,5,0"/>
+                                <Button x:Name="btnAddScene" Content="➕ Add scene" Click="AddScene_Click" Width="100" Margin="0,0,5,0"/>
                                 <Button x:Name="btnRemoveScene" Content="🗑 Delete scene" Click="RemoveScene_Click" Width="100" Margin="5,0"/>
                                 <Button x:Name="btnMoveSceneUp" Content="🔼 Gore" Click="MoveSceneUp_Click" Width="80" Margin="5,0"/>
                                 <Button x:Name="btnMoveSceneDown" Content="🔽 Down" Click="MoveSceneDown_Click" Width="80" Margin="5,0"/>
@@ -587,7 +592,7 @@
         </StackPanel>
 
         <!-- ════════════════════════════════════════════════════════════════
-             STATUS BAR — uvijek vidljiv, JAWS/NVDA čita automatski (Assertive)
+             STATUS BAR — always visible, JAWS/NVDA reads automatically (Assertive)
              Korisnik NIKAD ne treba otvarati Ctrl+Shift+L da bi dobio info.
              ════════════════════════════════════════════════════════════════ -->
         <Border x:Name="statusBarBorder" Grid.Row="4" Background="#111111" BorderBrush="#333333" BorderThickness="0,1,0,0"

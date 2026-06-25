@@ -57,7 +57,7 @@ namespace UltraVideoEditor
             CmbGradePreset.SelectedIndex = 0;
         }
 
-        // ── Učitaj/čuvaj templatee ────────────────────────────────────
+        // ── Load/save templates ────────────────────────────────────
 
         private void LoadTemplates()
         {
@@ -212,7 +212,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            // Ažuriraj postojeći ili dodaj novi
+            // Update existing or add new
             var existing = _templates.FirstOrDefault(t => t.Name == name);
             if (existing != null)
             {
@@ -230,7 +230,7 @@ namespace UltraVideoEditor
             RefreshList();
             int idx = _templates.FindIndex(t => t.Name == name);
             if (idx >= 0) TemplateList.SelectedIndex = idx;
-            MessageBox.Show($"Template \"{name}\" sačuvan.", "Template",
+            MessageBox.Show($"Template \"{name}\" saved.", "Template",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -263,7 +263,7 @@ namespace UltraVideoEditor
             {
                 var t = JsonConvert.DeserializeObject<ProjectTemplate>(
                     File.ReadAllText(dlg.FileName));
-                if (t == null) throw new Exception("Nečitljiv fajl.");
+                if (t == null) throw new Exception("Unreadable file.");
                 // Izbjegni duplikat naziva
                 if (_templates.Any(x => x.Name == t.Name))
                     t.Name = t.Name + " (uvezeno)";
@@ -274,7 +274,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greška uvoza: {ex.Message}", "Greška",
+                MessageBox.Show($"Import error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -299,7 +299,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greška izvoza: {ex.Message}", "Greška",
+                MessageBox.Show($"Export error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

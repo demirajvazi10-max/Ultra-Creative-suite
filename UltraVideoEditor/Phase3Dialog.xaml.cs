@@ -84,7 +84,7 @@ namespace UltraVideoEditor
             {
                 MessageBox.Show("Nema validnog HighlightResult-a.\n" +
                                 "Pokrenite Fazu 1 i 2 pre Faze 3.",
-                    "Greška", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -92,14 +92,14 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(outputFolder))
             {
                 MessageBox.Show("Odaberite output folder.",
-                    "Greška", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             _running          = true;
             _cts              = new CancellationTokenSource();
             BtnRun.IsEnabled  = false;
-            BtnClose.Content  = "⏹ Otkaži";
+            BtnClose.Content  = "⏹ Cancel";
             BtnClose.Click   -= BtnClose_Click;
             BtnClose.Click   += BtnCancelRun_Click;
             ProgressPanel.Visibility = Visibility.Visible;
@@ -124,7 +124,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greška: {ex.Message}", "Faza 3 — Greška",
+                MessageBox.Show($"Error: {ex.Message}", "Phase 3 — Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -193,7 +193,7 @@ namespace UltraVideoEditor
             }
 
             // ── C: Accessibility Report ───────────────────────────────
-            progress.Report((42, "C — Generišem accessibility report…"));
+            progress.Report((42, "C — Generating accessibility report…"));
             string reportPath = Path.Combine(outputFolder, $"{baseName}_accessibility.txt");
 
             if (ChkGenReport.IsChecked == true)
@@ -259,9 +259,9 @@ namespace UltraVideoEditor
                 var exportResult = await ExportPipeline.ExportAllAsync(
                     job, exportProgress, ct);
 
-                progress.Report((100, $"Export završen: {exportResult.SuccessCount}/{formats.Count} formata."));
+                progress.Report((100, $"Export complete: {exportResult.SuccessCount}/{formats.Count} formats."));
 
-                // Prikaži rezultat
+                // Show result
                 ShowExportSummary(exportResult, outputFolder);
             }
         }
@@ -288,8 +288,8 @@ namespace UltraVideoEditor
             }
 
             string icon = result.AllSucceeded ? "✅" : "⚠️";
-            string msg  = $"{icon} Export završen!\n\n" +
-                          $"Uspešno: {result.SuccessCount}/{result.Results.Count} formata\n" +
+            string msg  = $"{icon} Export complete!\n\n" +
+                          $"Successful: {result.SuccessCount}/{result.Results.Count} formats\n" +
                           $"Folder: {folder}\n\n";
 
             foreach (var r in result.Results)
@@ -300,7 +300,7 @@ namespace UltraVideoEditor
                 msg += $"{(r.Success ? "✅" : "❌")} {r.FormatId}{sz}\n";
             }
 
-            MessageBox.Show(msg, "Faza 3 — Export završen",
+            MessageBox.Show(msg, "Phase 3 — Export complete",
                 MessageBoxButton.OK,
                 result.AllSucceeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
@@ -320,7 +320,7 @@ namespace UltraVideoEditor
             if (_running)
             {
                 var c = MessageBox.Show(
-                    "Operacija je u toku. Otkaži i zatvori?",
+                    "Operation in progress. Cancel and close?",
                     "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (c != MessageBoxResult.Yes) return;
                 _cts?.Cancel();

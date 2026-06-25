@@ -75,7 +75,7 @@ namespace UltraVideoEditor
                 chkUseOllama.IsEnabled      = false;
             }
 
-            // Provjeri lokalnu zvučnu biblioteku
+            // Check the local sound library
             int soundCount = LocalSoundLibrary.GetSoundCount();
             if (soundCount > 0)
             {
@@ -204,7 +204,7 @@ namespace UltraVideoEditor
                 bool   showTitles = chkTitles.IsChecked == true;
                 bool   useOllama  = chkUseOllama.IsChecked == true && _ollamaAvailable;
 
-                // ── Korak 1: Generiši shot listu ──────────────────────
+                // ── Step 1: Generate shot list ──────────────────────
                 Announce("Generisujem shot listu...", 5);
 
                 if (useOllama)
@@ -242,7 +242,7 @@ namespace UltraVideoEditor
                         mediaType,
                         _cts.Token);
 
-                    // Fallback: pokušaj samo shot type + vibe deskriptor
+                    // Fallback: try only shot type + vibe descriptor
                     if (string.IsNullOrEmpty(path))
                     {
                         string fallback = shot.IsChorus
@@ -287,7 +287,7 @@ namespace UltraVideoEditor
                 Announce("Dodajem na timeline...", 97);
                 mainWin.SaveState();
 
-                // Ukloni postojeće video/image klipove
+                // Remove existing video/image clips
                 var existing = mainWin.timelineItems
                     .Where(i => (i.IsImage || i.IsVideo) && !i.IsAudio)
                     .ToList();

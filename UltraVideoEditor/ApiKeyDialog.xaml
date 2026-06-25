@@ -32,7 +32,7 @@
         <TextBox x:Name="txtApiKey" Grid.Row="2" Height="30" Padding="5"
                  Background="#2D2D2D" Foreground="White" FontSize="12"
                  AutomationProperties.Name="Pixabay API key"
-                 AutomationProperties.HelpText="Unesi Pixabay API key za preuzimanje video klipova"/>
+                 AutomationProperties.HelpText="Enter your Pixabay API key for downloading video clips"/>
 
         <!-- Razdjelnik -->
         <Separator Grid.Row="3" Margin="0,15,0,5" Background="#444"/>
@@ -41,36 +41,36 @@
         <TextBlock Grid.Row="4"
                    Text="☁ Microsoft Azure AI Foundry (Accessibility IQ layer — opciono)"
                    Foreground="#64B5F6" FontWeight="Bold" Margin="0,5,0,8"
-                   AutomationProperties.Name="Microsoft Azure AI Foundry sekcija — opciono"/>
+                   AutomationProperties.Name="Microsoft Azure AI Foundry section — optional"/>
 
         <TextBlock Grid.Row="5" Text="Project endpoint:" Foreground="#CCC" Margin="0,0,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureEndpoint" Grid.Row="6" Height="30" Padding="5"
                  Background="#2D2D2D" Foreground="White" FontSize="11"
                  AutomationProperties.Name="Azure AI Foundry project endpoint"
-                 AutomationProperties.HelpText="Endpoint URL iz Azure AI Foundry projekta, npr. https://ime-resursa.services.ai.azure.com"/>
+                 AutomationProperties.HelpText="Endpoint URL from Azure AI Foundry project, e.g. https://resource-name.services.ai.azure.com"/>
 
         <TextBlock Grid.Row="7" Text="API key:" Foreground="#CCC" Margin="0,8,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureApiKey" Grid.Row="8" Height="30" Padding="5"
                  Background="#2D2D2D" Foreground="White" FontSize="11"
                  AutomationProperties.Name="Azure AI Foundry API key"
-                 AutomationProperties.HelpText="API key iz Azure AI Foundry projekta"/>
+                 AutomationProperties.HelpText="API key from Azure AI Foundry project"/>
 
         <TextBlock Grid.Row="9" Text="Model deployment (default: gpt-4o-mini):" Foreground="#CCC" Margin="0,8,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureDeployment" Grid.Row="10" Height="30" Padding="5"
                  Background="#2D2D2D" Foreground="White" FontSize="11"
                  Text="gpt-4o-mini"
                  AutomationProperties.Name="Azure AI model deployment name"
-                 AutomationProperties.HelpText="Naziv deployovanog modela, npr. gpt-4o-mini ili gpt-4o"/>
+                 AutomationProperties.HelpText="Name of deployed model, e.g. gpt-4o-mini or gpt-4o"/>
 
         <!-- Dugmad -->
         <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button x:Name="btnCancel" Content="Cancel" Width="80" Height="30"
                     Click="BtnCancel_Click" Background="#B71C1C" Foreground="White"
                     Margin="0,0,10,0"
-                    AutomationProperties.Name="Cancel — zatvori bez snimanja"/>
+                    AutomationProperties.Name="Cancel — close without saving"/>
             <Button x:Name="btnSave" Content="Save" Width="80" Height="30"
                     Click="BtnSave_Click" Background="#2E7D32" Foreground="White"
-                    AutomationProperties.Name="Save — snimi API ključeve"/>
+                    AutomationProperties.Name="Save — save API keys"/>
         </StackPanel>
     </Grid>
     </ScrollViewer>

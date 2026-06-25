@@ -7,19 +7,19 @@ namespace UltraVideoEditor
     // ═══════════════════════════════════════════════════════════════
     // TRANSITION ENGINE  —  Faza 3 / B
     //
-    // Automatski bira i primenjuje prelaze između highlight segmenata.
+    // Automatically selects and applies transitions between highlight segments.
     // Prelazi su sinhronizovani na beat, a tip prelaza se bira na osnovu
-    // sadržaja susednih kadrova (ContentTag, ArcBonus, Motion).
+    // based on content of adjacent clips (ContentTag, ArcBonus, Motion).
     //
     // Integracija: pozovi ApplyTransitions() na listi segmenata
-    // odmah pre prosleđivanja RenderEnginu — metoda upisuje
+    // immediately before passing to RenderEngine — the method writes
     // xfade tag u AudioDescription svakog TimelineItem-a.
     // ═══════════════════════════════════════════════════════════════
 
-    /// <summary>Tip xfade prelaza podržan od strane ffmpeg xfade filtera.</summary>
+    /// <summary>Type of xfade transition supported by the ffmpeg xfade filter.</summary>
     public enum XfadeType
     {
-        Fade,        // klasičan cross-dissolve
+        Fade,        // classic cross-dissolve
         Dissolve,    // teksturalni dissolve
         WipeLeft,    // brisanje s desna na lijevo
         WipeRight,
@@ -28,14 +28,14 @@ namespace UltraVideoEditor
         SlideLeft,   // klizanje
         SlideRight,
         ZoomIn,      // zoom punch
-        FadeBlack,   // crni frame između
-        FadeWhite,   // bijeli frame između (flash)
-        Pixelize,    // pixelizacija — energičan prelaz
+        FadeBlack,   // black frame between
+        FadeWhite,   // white frame between (flash)
+        Pixelize,    // pixelization — energetic transition
         Diagtl,      // dijagonalni wipe
         Diagtr,
     }
 
-    /// <summary>Jedan odlučen prelaz između dva segmenta.</summary>
+    /// <summary>A single decided transition between two segments.</summary>
     public class TransitionDecision
     {
         /// <summary>Redni broj segmenta POSLE kojeg ide ovaj prelaz (0-based).</summary>
@@ -47,21 +47,21 @@ namespace UltraVideoEditor
         /// <summary>Trajanje prelaza u sekundama (0.2–0.8s).</summary>
         public double  Duration          { get; set; }
 
-        /// <summary>Zašto je odabran ovaj prelaz (za debug / report).</summary>
+        /// <summary>Why this transition was selected (for debug / report).</summary>
         public string  Reason            { get; set; }
     }
 
     public static class TransitionEngine
     {
         // ── Tuning ──────────────────────────────────────────────────
-        private const double FastCutDuration  = 0.20;   // energičan rez
+        private const double FastCutDuration  = 0.20;   // energetic cut
         private const double NormalDuration   = 0.40;   // standardni prelaz
         private const double SlowDuration     = 0.65;   // emotivni prelaz
 
         // ── Javni API ────────────────────────────────────────────────
 
         /// <summary>
-        /// Analizira listu segmenata i vraća odluke o prelazima.
+        /// Analyzes a list of segments and returns transition decisions.
         /// </summary>
         public static List<TransitionDecision> Decide(
             List<HighlightSegment> segments,
@@ -81,7 +81,7 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Primenjuje odluke o prelazima na TimelineItem listu upisivanjem
-        /// xfade taga u AudioDescription — RenderEngine ga čita automatski.
+        /// xfade tag in AudioDescription — RenderEngine reads it automatically.
         /// </summary>
         public static void ApplyToTimeline(
             List<TimelineItem>       items,
@@ -104,7 +104,7 @@ namespace UltraVideoEditor
             }
         }
 
-        // ── Logika odlučivanja ───────────────────────────────────────
+        // ── Decision logic ───────────────────────────────────────
 
         private static TransitionDecision DecideOne(
             int index,
@@ -112,7 +112,7 @@ namespace UltraVideoEditor
             HighlightSegment next,
             BeatInfo beats)
         {
-            // Određujemo trajanje prelaza na osnovu BPM-a
+            // Determine transition duration based on BPM
             double duration = NormalDuration;
             if (beats != null && beats.IsValid)
             {
@@ -120,7 +120,7 @@ namespace UltraVideoEditor
                 else if (beats.BPM < 80)  duration = SlowDuration;
             }
 
-            // Biramo tip na osnovu sadržaja
+            // Select type based on content
             var type   = ChooseType(current, next);
             string reason = BuildReason(current, next, type);
 
@@ -147,7 +147,7 @@ namespace UltraVideoEditor
             bool arcTransition  = current.ArcBonus > 8.0 || next.ArcBonus > 8.0;
             bool sameContent    = tagA == tagB && !string.IsNullOrEmpty(tagA);
 
-            // Action → Action: energičan flash cut
+            // Action → Action: energetic flash cut
             if (currentAction && nextAction)
                 return XfadeType.FadeWhite;
 
@@ -159,7 +159,7 @@ namespace UltraVideoEditor
             if (currentPortrait && nextPortrait)
                 return XfadeType.Dissolve;
 
-            // Arc prelaz (dinamičan razvoj kadra): wipe u smeru kretanja
+            // Arc transition (dynamic shot development): wipe in direction of motion
             if (arcTransition)
             {
                 if (current.Motion != null && current.Motion.Direction == MotionDirection.Left)   return XfadeType.WipeLeft;
@@ -168,7 +168,7 @@ namespace UltraVideoEditor
                 return XfadeType.WipeDown;
             }
 
-            // Isti sadržaj zaredom: dijagonalni wipe da ne bude monotono
+            // Same content in a row: diagonal wipe to avoid monotony
             if (sameContent)
                 return (current.Order % 2 == 0) ? XfadeType.Diagtl : XfadeType.Diagtr;
 
@@ -176,7 +176,7 @@ namespace UltraVideoEditor
             if (Math.Abs(current.ImportanceScore - next.ImportanceScore) > 30)
                 return XfadeType.SlideLeft;
 
-            // Default: klasičan cross-dissolve
+            // Default: classic cross-dissolve
             return XfadeType.Fade;
         }
 
@@ -215,7 +215,7 @@ namespace UltraVideoEditor
         private static string AppendTag(string existing, string tag)
         {
             if (string.IsNullOrEmpty(existing)) return tag;
-            if (existing.Contains(tag.Split('=')[0])) return existing; // već postoji
+            if (existing.Contains(tag.Split('=')[0])) return existing; // already exists
             return existing + ";" + tag;
         }
     }

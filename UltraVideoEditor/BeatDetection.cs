@@ -33,27 +33,27 @@ namespace UltraVideoEditor
 
         /// <summary>
         /// Phrase boundary timestampovi za piano mode.
-        /// Ovo su tačke promene melodijske fraze (spectral flux promene), 
+        /// These are change points of the melodic phrase (spectral flux changes), 
         /// idealna mesta za rez u klavirskoj muzici.
         /// </summary>
         public List<double> PhraseBeats { get; set; } = new List<double>();
 
         /// <summary>
-        /// Prosječna gustoća nota (0-1). Visoka gustoća = brzi pasaž → kraći kadrovi.
-        /// Niska gustoća = tihe/spore fraze → duži kadrovi.
+        /// Average note density (0-1). High density = fast passage → shorter shots.
+        /// Low density = quiet/slow phrases → longer shots.
         /// </summary>
         public double NoteDensity { get; set; } = 0.5;
 
         /// <summary>
-        /// Sekunde tišine na početku audio fajla prije prve note.
+        /// Seconds of silence at the start of the audio file before the first note.
         /// Video timeline pomjera se za ovaj iznos da nema "mrtvog hoda".
         /// </summary>
         public double AudioStartSeconds { get; set; } = 0.0;
 
         /// <summary>
         /// Preemptivni offset za rezove: koliko ms RANIJE treba napraviti rez
-        /// u odnosu na audio peak, da oko i uho dožive promjenu istovremeno.
-        /// Vrijednost: 100–150ms za tipičnu dječiju pjesmu (vokal napad dolazi
+        /// relative to the audio peak, so eye and ear experience the change simultaneously.
+        /// Value: 100–150ms for a typical children's song (vocal attack comes
         /// prije RMS peaka jer bas/perkusija dolaze nakon vokala).
         /// </summary>
         public double CutAdvanceMs { get; set; } = 120.0;
@@ -88,11 +88,11 @@ namespace UltraVideoEditor
                 double bpm = CalculateBPM(beatTimes);
                 var downBeats = GetDownBeats(beatTimes, bpm);
 
-                // Detekcija početka audija: koliko tišine ima na početku
+                // Audio start detection: how much silence is at the beginning
                 double audioStart = await AITranscription.DetectAudioStartAsync(audioPath, ffmpegPath, -40.0, ct);
 
-                // Cut-advance: brže pjesme imaju manji offset (vokal ataci su bliži peaku)
-                // Sporije i vokalne pjesme imaju veći offset (vokal dolazi dosta ranije od basa)
+                // Cut-advance: faster songs have smaller offset (vocal attacks are closer to peak)
+                // Slower and vocal songs have larger offset (vocal comes well before the bass)
                 double cutAdvanceMs = bpm > 140 ? 80.0 : bpm > 100 ? 120.0 : 150.0;
 
                 try { if (File.Exists(tempWav)) File.Delete(tempWav); } catch { }
@@ -128,7 +128,7 @@ namespace UltraVideoEditor
 
                     if (lowConf || irregular || !beatInfo.IsValid)
                     {
-                        // Učitaj energy profile ponovo za phrase detection
+                        // Reload energy profile for phrase detection
                         var epForPiano = await GetEnergyProfile(
                             File.Exists(tempWav) ? tempWav : audioPath, ffmpegPath, ct);
                         if (epForPiano.Count > 20)
@@ -163,7 +163,7 @@ namespace UltraVideoEditor
                         }
                     }
                 }
-                catch { /* Piano mode je bonus — ne smije srušiti render */ }
+                catch { /* Piano mode is a bonus — must not crash render */ }
 
                 return beatInfo;
             }
@@ -235,18 +235,18 @@ namespace UltraVideoEditor
         {
             if (!beats.IsValid || shots == null || shots.Count == 0) return;
 
-            // Zajednički offseti za piano i standardni blok — deklarisani jednom ovdje
+            // Shared offsets for piano and standard block — declared once here
             double advanceSec = beats.CutAdvanceMs / 1000.0;
             double audioOffset = beats.AudioStartSeconds;
 
             // ── PIANO MODE: Dynamic pacing baziran na melodijskim frazama ────
-            // Gemini preporuka: klavir tih/spor → duži kadrovi, brz/intenzivan → kraći kadrovi.
-            // PianoMode=true znači da nemamo perkusivne beatove, koristimo phrase boundaries.
+            // Gemini recommendation: piano quiet/slow → longer shots, fast/intense → shorter shots.
+            // PianoMode=true means we have no percussive beats, we use phrase boundaries.
             if (beats.PianoMode && beats.PhraseBeats?.Count >= 2)
             {
 
                 // NoteDensity: 0=tiho/sporo, 1=brzo/gusto
-                // Mapiramo na clip duration: tiho→4.5s, prosječno→3.0s, brzo→1.8s
+                // Map to clip duration: quiet→4.5s, average→3.0s, fast→1.8s
                 double baseDuration = 4.5 - beats.NoteDensity * 2.7; // range: 1.8-4.5s
 
                 for (int i = 0; i < shots.Count; i++)
@@ -266,7 +266,7 @@ namespace UltraVideoEditor
 
                     double startTime = Math.Max(0, idealStart - advanceSec);
 
-                    // End: sljedeći phrase boundary ili baseDuration
+                    // End: next phrase boundary or baseDuration
                     double endTime;
                     if (i + 1 < beats.PhraseBeats.Count)
                         endTime = beats.PhraseBeats[i + 1] + audioOffset - advanceSec;
@@ -275,9 +275,9 @@ namespace UltraVideoEditor
                     else
                         endTime = startTime + baseDuration;
 
-                    // Dinamički pacing: ako je stih high-energy, skrati kadar
+                    // Dynamic pacing: if lyric is high-energy, shorten the shot
                     double energyMultiplier = 1.0;
-                    if (shot.Data?.VibeScore >= 7) energyMultiplier = 0.75; // brz pasaž
+                    if (shot.Data?.VibeScore >= 7) energyMultiplier = 0.75; // fast passage
                     if (shot.Data?.VibeScore <= 2) energyMultiplier = 1.30; // tiha fraza
 
                     double duration = Math.Min(8.0, Math.Max(1.0,
@@ -293,19 +293,19 @@ namespace UltraVideoEditor
                             $"[piano phrase {i+1}/{beats.PhraseBeats.Count} " +
                             $"density={beats.NoteDensity:F2} dur={duration:F1}s]";
                 }
-                return; // Piano mode završen — ne ulazi u standardni beat sync ispod
+                return; // Piano mode complete — does not enter standard beat sync below
             }
 
             // ── STANDARDNI BEAT SYNC (perkusivna muzika) ─────────────────────
-            // FIX-BEATSYNC: Koristimo stvarne beat timestamps umesto izračunatog interval × n
-            // DownBeats su preferirani snap-tačke (downbeat = 1. udarac u taktu)
+            // FIX-BEATSYNC: Using real beat timestamps instead of calculated interval × n
+            // DownBeats are preferred snap points (downbeat = 1st beat in measure)
             // Ako nema dovoljno downbeats-a, fallback na sve BeatTimes
             var snapPoints = (beats.DownBeats?.Count >= shots.Count)
                 ? beats.DownBeats
                 : beats.BeatTimes;
 
 
-            // advanceSec i audioOffset deklarisani gore (zajednički za oba bloka)
+            // advanceSec and audioOffset declared above (shared for both blocks)
 
             for (int i = 0; i < shots.Count; i++)
             {
@@ -316,7 +316,7 @@ namespace UltraVideoEditor
                     i == 0 ? "intro" :
                     i == shots.Count - 1 ? "outro" : "verse";
 
-                // Nađi idealan snap point: najbliži downbeat za ovaj shot index
+                // Find ideal snap point: nearest downbeat for this shot index
                 double idealStart;
                 if (i < snapPoints.Count)
                 {
@@ -333,7 +333,7 @@ namespace UltraVideoEditor
                 // Preemptivni offset: rez 100-150ms RANIJE od audio peaka
                 double startTime = Math.Max(0, idealStart - advanceSec);
 
-                // End = snap point sledećeg shot-a (minus advance) ili kraj pesme
+                // End = snap point of next shot (minus advance) or end of song
                 double endTime;
                 if (i + 1 < snapPoints.Count)
                 {
@@ -350,7 +350,7 @@ namespace UltraVideoEditor
                     endTime = startTime + beats.BeatInterval * (shot.Data?.VibeScore >= 7 ? 2 : 4);
                 }
 
-                // Zaštita: minimalno 0.5s, maksimalno 10s po klipcu
+                // Guard: minimum 0.5s, maximum 10s per clip
                 double duration = Math.Min(10.0, Math.Max(0.5, endTime - startTime));
                 endTime = startTime + duration;
 
@@ -437,9 +437,9 @@ namespace UltraVideoEditor
         }
 
         // ── PHRASE BEAT DETECTION — za klavirsku/melodijsku muziku ───────────
-        // Umjesto peroksuzivnih spikeva, tražimo granice melodijskih fraza:
-        // tačke gdje se energija nagli mijenja (spectral flux / energy flux).
-        // Ovo daje prirodne točke reza za klavir, violinu, melodiju bez bubnja.
+        // Instead of percussive spikes, we look for melodic phrase boundaries:
+        // points where energy changes abruptly (spectral flux / energy flux).
+        // This gives natural cut points for piano, violin, melody without drums.
         private static List<double> DetectPhraseBeats(List<(double time, double energy)> profile)
         {
             if (profile.Count < 20) return new List<double>();
@@ -456,7 +456,7 @@ namespace UltraVideoEditor
                 smoothed[i] = profile.Skip(start).Take(end - start + 1).Average(p => p.energy);
             }
 
-            // Računaj energy flux = promjena energije između susjednih prozora
+            // Calculate energy flux = change in energy between adjacent windows
             var flux = new double[profile.Count];
             for (int i = 1; i < profile.Count; i++)
                 flux[i] = Math.Abs(smoothed[i] - smoothed[i - 1]);
@@ -466,7 +466,7 @@ namespace UltraVideoEditor
             double stdFlux = Math.Sqrt(flux.Average(f => Math.Pow(f - avgFlux, 2)));
             double threshold = avgFlux + stdFlux * 1.2;
 
-            // Minimalni razmak između fraza: 1.5s (kratka fraza) do 8s (duga fraza)
+            // Minimum gap between phrases: 1.5s (short phrase) to 8s (long phrase)
             double minPhraseGap = 1.5;
             double lastPhrase = -10.0;
 
@@ -487,13 +487,13 @@ namespace UltraVideoEditor
                 }
             }
 
-            // Ako nema dovoljno phrase boundariesa, generiši ravnomjerne rezove
-            // Koristimo 4s kao tipičnu muzičku frazu (1 takt @ 60 BPM = 4s)
+            // If there are not enough phrase boundaries, generate uniform cuts
+            // Using 4s as a typical musical phrase (1 measure @ 60 BPM = 4s)
             if (phrases.Count < 3 && profile.Count > 0)
             {
                 double start = profile.First().time;
                 double end   = profile.Last().time;
-                double interval = 4.0; // 4 sekunde ≈ 1 muzički takt
+                double interval = 4.0; // 4 seconds ≈ 1 musical measure
                 for (double t = start + interval; t < end - 1.0; t += interval)
                     phrases.Add(Math.Round(t, 3));
             }
@@ -596,19 +596,19 @@ namespace UltraVideoEditor
         private static string FmtTs(double s) => TimeSpan.FromSeconds(s).ToString(@"m\:ss\.ff");
 
         // ══════════════════════════════════════════════════════════════════════
-        //  GetClipSpeedFactor — izračunaj faktor ubrzanja/usporavanja klipa
-        //  da vizuelni pokret prati BPM (rješava problem tramboline).
+        //  GetClipSpeedFactor — calculate clip speed-up/slow-down factor
+        //  so that visual motion follows BPM (solves the trampoline problem).
         //
         //  Logika:
-        //  - Uzmemo prosječan tempo vizuelnog pokreta u klipu (MotionMagnitude)
+        //  - We take the average visual motion tempo in the clip (MotionMagnitude)
         //  - Poredimo sa audio BPM konvertovanim u "pokrete po sekundi"
-        //  - Vraćamo setpts faktor za FFmpeg: < 1.0 = ubrzaj, > 1.0 = uspori
+        //  - We return the setpts factor for FFmpeg: < 1.0 = speed up, > 1.0 = slow down
         //
-        //  Primjer: BPM=120, klip 25fps, prosječna magnituda 15px/frame
+        //  Example: BPM=120, clip 25fps, average magnitude 15px/frame
         //  → 2 udarca/s, klip ima ~15 pokreta/s → faktor ≈ 1.0 (OK)
         //  → BPM=80 → 1.33 udarca/s, klip je brz → faktor = 1.5 (uspori)
         //
-        //  VAŽNO: faktor je ograničen na [0.5, 2.0] — drastičnije promjene
+        //  IMPORTANT: factor is clamped to [0.5, 2.0] — more drastic changes
         //  izgledaju artificijelno na djeci 3-7g.
         // ══════════════════════════════════════════════════════════════════════
         public static double GetClipSpeedFactor(BeatInfo beats, double clipMotionMagnitude, string sceneType)
@@ -620,24 +620,24 @@ namespace UltraVideoEditor
             // Konvertuj BPM u "udaraca po sekundi"
             double beatsPerSec = beats.BPM / 60.0;
 
-            // Prosječni vizuelni pokret koji "prati" jedan udarac
+            // Average visual motion that "follows" one beat
             // Pretpostavka: klip je sniman na 25fps, "normalan" pokret = 8px/frame
             const double NORMAL_MOTION_PER_SEC = 8.0 * 25.0; // = 200 px/s
             double clipMotionPerSec = clipMotionMagnitude * 25.0;
 
-            // Željeni pokret po sekundi = beatsPerSec × NORMAL_MOTION_PER_SEC
+            // Desired motion per second = beatsPerSec × NORMAL_MOTION_PER_SEC
             double targetMotion = beatsPerSec * NORMAL_MOTION_PER_SEC / 2.0;
 
             if (targetMotion <= 0 || clipMotionPerSec <= 0) return 1.0;
 
-            // setpts faktor: > 1.0 = sporiji video (pts se množi = duže)
-            //                < 1.0 = brži video
+            // setpts factor: > 1.0 = slower video (pts is multiplied = longer)
+            //                < 1.0 = faster video
             double factor = clipMotionPerSec / targetMotion;
 
-            // Ograniči na razumne granice
+            // Clamp to reasonable limits
             factor = Math.Max(0.6, Math.Min(1.8, factor));
 
-            // Zaokruži na 2 decimale
+            // Round to 2 decimal places
             return Math.Round(factor, 2);
         }
     }

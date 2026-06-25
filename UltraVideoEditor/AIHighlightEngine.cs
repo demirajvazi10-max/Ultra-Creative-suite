@@ -14,7 +14,7 @@ namespace UltraVideoEditor
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Jedan highlight segment izvučen iz originalnog videa.
+    /// A single highlight segment extracted from the original video.
     /// </summary>
     public class HighlightSegment
     {
@@ -25,15 +25,15 @@ namespace UltraVideoEditor
         public int    Order              { get; set; }
         public double BeatTimestamp      { get; set; }
 
-        /// <summary>Skor važnosti 0–100 (viši = bolji).</summary>
+        /// <summary>Importance score 0–100 (higher = better).</summary>
         public double ImportanceScore    { get; set; }
 
-        /// <summary>Kratak opis sadržaja iz VisionAnalyzer.</summary>
+        /// <summary>Short content description from VisionAnalyzer.</summary>
         public string ContentDescription { get; set; } = "";
 
         /// <summary>
         /// [Faza 2 / C] Detaljan opis arc-a kadra:
-        /// npr. "Statičan početak → brzo kretanje ulevo → završava zamrznutom kompozicijom"
+        /// e.g. "Static opening → fast movement to the left → ends in frozen composition"
         /// </summary>
         public string ArcDescription     { get; set; } = "";
 
@@ -43,7 +43,7 @@ namespace UltraVideoEditor
         /// <summary>[Faza 2 / B] Putanja do thumbnail slike za preview (temp file).</summary>
         public string ThumbnailPath      { get; set; }
 
-        /// <summary>[Faza 2 / C] Skrovi po pojedinačnim frejmovima (za debug/preview).</summary>
+        /// <summary>[Phase 2 / C] Scores per individual frame (for debug/preview).</summary>
         public List<double> FrameScores  { get; set; } = new();
 
         /// <summary>[Faza 2 / C] Bonus iz arc analize (0–25).</summary>
@@ -97,17 +97,17 @@ namespace UltraVideoEditor
             string ffmpegPath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 
-            if (!File.Exists(videoPath))  return Fail($"Video fajl nije pronađen: {videoPath}");
-            if (!videoOnly && !File.Exists(musicPath)) return Fail($"Audio fajl nije pronađen: {musicPath}");
-            if (!File.Exists(ffmpegPath)) return Fail("FFmpeg nije pronađen. Proverite instalaciju.");
+            if (!File.Exists(videoPath))  return Fail($"Video file not found: {videoPath}");
+            if (!videoOnly && !File.Exists(musicPath)) return Fail($"Audio file not found: {musicPath}");
+            if (!File.Exists(ffmpegPath)) return Fail("FFmpeg not found. Check installation.");
 
             var result = new HighlightResult();
             try
             {
                 // 1 — trajanja
-                Report(progress, 5, videoOnly ? "Čitam trajanje videa…" : "Čitam trajanje videa i muzike…");
+                Report(progress, 5, videoOnly ? "Reading video duration…" : "Reading video and music duration…");
                 double videoDuration = await GetDurationAsync(videoPath, ffmpegPath, ct);
-                if (videoDuration < 1.0) return Fail("Video je previše kratak za analizu.");
+                if (videoDuration < 1.0) return Fail("Video is too short for analysis.");
 
                 double musicDuration;
                 BeatInfo beats;
@@ -120,7 +120,7 @@ namespace UltraVideoEditor
                 else
                 {
                     musicDuration = await GetDurationAsync(musicPath, ffmpegPath, ct);
-                    if (musicDuration < 1.0) return Fail("Audio fajl je previše kratak.");
+                    if (musicDuration < 1.0) return Fail("Audio file is too short.");
                     // beat detekcija
                     Report(progress, 12, $"Analiziram ritam pesme ({Path.GetFileName(musicPath)})…");
                     beats = await BeatDetection.AnalyzeAudio(musicPath, ffmpegPath, ct);
@@ -140,10 +140,10 @@ namespace UltraVideoEditor
                 // 5 — selekcija
                 Report(progress, 72, "Biram najzanimljivije momente…");
                 var selected = SelectSegments(candidates, musicDuration);
-                if (selected.Count == 0) return Fail("Nije pronađen nijedan upotrebljiv segment.");
+                if (selected.Count == 0) return Fail("No usable segment found.");
 
                 // 6 — thumbnail generisanje (Faza 2 / B)
-                Report(progress, 80, "Generišem thumbnailove za preview…");
+                Report(progress, 80, "Generating thumbnails for preview…");
                 await GenerateThumbnailsAsync(selected, ffmpegPath, ct);
 
                 // 7 — beat alijacija (samo ako ima muzike)
@@ -158,15 +158,15 @@ namespace UltraVideoEditor
 
                 result.Segments = selected;
 
-                // 8 — izveštaj
-                Report(progress, 95, "Generišem izveštaj…");
+                // 8 — report
+                Report(progress, 95, "Generating report…");
                 result.Report = BuildReport(result, videoPath, videoOnly ? null : musicPath);
 
                 Report(progress, 100, "Gotovo!");
                 return result;
             }
             catch (OperationCanceledException) { return Fail("Analiza je otkazana."); }
-            catch (Exception ex)               { return Fail($"Greška: {ex.Message}"); }
+            catch (Exception ex)               { return Fail($"Error: {ex.Message}"); }
         }
 
         // ── Sampleovanje ─────────────────────────────────────────────
@@ -199,9 +199,9 @@ namespace UltraVideoEditor
         // ── Faza 2 / C: Multi-frame arc scoring ─────────────────────
 
         /// <summary>
-        /// Za svaki kandidat uzimamo ARC_FRAMES frejmova raspoređenih kroz segment.
-        /// Računamo per-frame skor, detektujemo arc (statično→dinamično, tamno→svetlo itd.)
-        /// i dodajemo ArcBonus ako segment ima zanimljivu "priču".
+        /// For each candidate we take ARC_FRAMES frames distributed across the segment.
+        /// We compute per-frame score, detect arc (static→dynamic, dark→bright, etc.)
+        /// and add ArcBonus if the segment has an interesting "story".
         /// </summary>
         private static async Task ScoreSegmentsMultiFrameAsync(
             List<HighlightSegment> candidates,
@@ -219,7 +219,7 @@ namespace UltraVideoEditor
                 try
                 {
                     ct.ThrowIfCancellationRequested();
-                    // PERF: timeout po segmentu — max 30s, inače preskoči
+                    // PERF: timeout per segment — max 30s, otherwise skip
                     using var segCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     segCts.CancelAfter(TimeSpan.FromSeconds(30));
                     try
@@ -269,8 +269,8 @@ namespace UltraVideoEditor
 
                     if (ok)
                     {
-                        // Proslijeđujemo već ekstrahovan frejm (ne cijeli video!)
-                        // AnalyzeClipAsync sa .jpg → preskače ekstrakciju, ide direktno na analizu
+                        // We pass the already-extracted frame (not the entire video!)
+                        // AnalyzeClipAsync with .jpg → skips extraction, goes directly to analysis
                         frameResults[fi] = await VisionAnalyzer.AnalyzeClipAsync(
                             tempFrame, ffmpegPath, ct);
                     }
@@ -281,7 +281,7 @@ namespace UltraVideoEditor
                 }
             }
 
-            // Analiza pokreta za tačnu poziciju segmenta (seekTo = SourceStart)
+            // Motion analysis for the exact segment position (seekTo = SourceStart)
             seg.Motion = await MotionAnalyzer.AnalyzeEndAsync(
                 seg.SourcePath, ffmpegPath,
                 clipDuration: seg.SourceStart + 2.0,    // seekTo = SourceStart
@@ -293,7 +293,7 @@ namespace UltraVideoEditor
                 .Select(v => ComputeFrameScore(v, seg.Motion))
                 .ToList();
 
-            // Prosečni skor
+            // Average score
             double avgScore = seg.FrameScores.Any(s => s > 0)
                 ? seg.FrameScores.Where(s => s > 0).Average()
                 : 0.0;
@@ -330,9 +330,9 @@ namespace UltraVideoEditor
         }
 
         /// <summary>
-        /// Detekcija "arc-a" segmenta — nagrađuje kadrove koji imaju razvoj:
-        /// statično→dinamično, tamno→svetlo, bez lica→lice, itd.
-        /// Vraća bonus (0–25) i tekstualni opis arc-a.
+        /// Detection of segment "arc" — rewards frames that have development:
+        /// static→dynamic, dark→bright, no face→face, etc.
+        /// Returns bonus (0–25) and a textual arc description.
         /// </summary>
         private static (double bonus, string description) ComputeArcBonus(
             VisionResult[] frames, MotionResult motion)
@@ -352,18 +352,18 @@ namespace UltraVideoEditor
                 arc.Add(lastLum > firstLum ? "tamno → svetlo" : "svetlo → tamno");
             }
 
-            // Arc 2: Statičan → dinamičan (na osnovu sharness varijacije)
+            // Arc 2: Static → dynamic (based on sharpness variation)
             double sharpFirst = valid.First().Sharpness;
             double sharpLast  = valid.Last().Sharpness;
             if (motion != null && motion.HasStrongMotion && sharpFirst > 0.5 && sharpLast < 0.4)
             {
                 bonus += 7.0;
-                arc.Add("oštro → zamućeno kretanje");
+                arc.Add("sharp → blurred motion");
             }
             else if (motion != null && !motion.IsStatic && sharpFirst < 0.4 && sharpLast > 0.5)
             {
                 bonus += 7.0;
-                arc.Add("kretanje → oštar završetak");
+                arc.Add("motion → sharp ending");
             }
 
             // Arc 3: Pojava lica (postaje emotivniji kadar)
@@ -375,13 +375,13 @@ namespace UltraVideoEditor
                 arc.Add("otkrivanje lica");
             }
 
-            // Arc 4: Saturacija raste (kadar postaje živopisniji)
+            // Arc 4: Saturation increases (frame becomes more vivid)
             double satFirst = valid.First().Saturation;
             double satLast  = valid.Last().Saturation;
             if (satLast - satFirst > 0.2)
             {
                 bonus += 5.0;
-                arc.Add("boje jačaju");
+                arc.Add("colors intensify");
             }
 
             // Arc 5: Konstantno visoki skrovi = pouzdan kadar
@@ -394,7 +394,7 @@ namespace UltraVideoEditor
 
             string desc = arc.Count > 0
                 ? string.Join(" → ", arc)
-                : "bez izraženog arc-a";
+                : "no distinct arc";
 
             return (Math.Min(bonus, 25.0), desc);
         }
@@ -402,8 +402,8 @@ namespace UltraVideoEditor
         // ── Thumbnail generisanje (Faza 2 / B) ──────────────────────
 
         /// <summary>
-        /// Generiše thumbnail 160×90 iz sredine svakog selektovanog segmenta.
-        /// Thumbnailovi se čuvaju u %TEMP% i prikazuju u preview panelu.
+        /// Generates a 160×90 thumbnail from the middle of each selected segment.
+        /// Thumbnails are saved to %TEMP% and displayed in the preview panel.
         /// </summary>
         private static async Task GenerateThumbnailsAsync(
             List<HighlightSegment> segments, string ffmpegPath, CancellationToken ct)
@@ -539,14 +539,14 @@ namespace UltraVideoEditor
             return minDst <= BeatSnapWindow ? best : targetTime;
         }
 
-        // ── Izveštaj ─────────────────────────────────────────────────
+        // ── Report ────────────────────────────────────────────────
 
         private static string BuildReport(
             HighlightResult result, string videoPath, string musicPath)
         {
             var sb = new StringBuilder();
             sb.AppendLine("╔══════════════════════════════════════════════════════╗");
-            sb.AppendLine("║      AI HIGHLIGHT ENGINE v2 — IZVEŠTAJ               ║");
+            sb.AppendLine("║      AI HIGHLIGHT ENGINE v2 — REPORT                  ║");
             sb.AppendLine("╚══════════════════════════════════════════════════════╝");
             sb.AppendLine();
             sb.AppendLine("📹 ULAZNI PODACI");
@@ -575,12 +575,12 @@ namespace UltraVideoEditor
             foreach (var seg in result.Segments)
             {
                 string motionDesc = seg.Motion == null ? "nepoznato"
-                    : seg.Motion.IsStatic ? "statičan"
+                    : seg.Motion.IsStatic ? "static"
                     : $"{seg.Motion.Direction} (mag {seg.Motion.Magnitude:F0})";
 
                 sb.AppendLine($"  [{seg.Order:D2}]  {FormatTime(seg.SourceStart)} → {FormatTime(seg.SourceEnd)}  ({seg.Duration:F2}s)");
                 sb.AppendLine($"        Skor:    {seg.ImportanceScore:F0}/100  (arc bonus: +{seg.ArcBonus:F0})");
-                sb.AppendLine($"        Sadržaj: {seg.ContentDescription}");
+                sb.AppendLine($"        Content: {seg.ContentDescription}");
                 sb.AppendLine($"        Arc:     {seg.ArcDescription}");
                 sb.AppendLine($"        Kamera:  {motionDesc}");
                 if (seg.FrameScores.Count > 0)
@@ -603,8 +603,8 @@ namespace UltraVideoEditor
                     s.ContentDescription.Contains("person", StringComparison.OrdinalIgnoreCase));
                 double coverage  = result.TotalDuration / result.TargetDuration * 100.0;
 
-                sb.AppendLine($"   Prosečni skor:       {avgScore:F1}/100");
-                sb.AppendLine($"   Prosečni arc bonus:  +{avgArc:F1}");
+                sb.AppendLine($"   Average score:       {avgScore:F1}/100");
+                sb.AppendLine($"   Average arc bonus:   +{avgArc:F1}");
                 sb.AppendLine($"   Segmenata sa arc-om: {withArc}/{result.Segments.Count}");
                 sb.AppendLine($"   Sa licima:           {withFaces}/{result.Segments.Count}");
                 sb.AppendLine($"   Pokrivenost targeta: {coverage:F1}%");
