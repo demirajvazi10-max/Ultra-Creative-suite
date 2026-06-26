@@ -163,7 +163,7 @@ Press Shift+F10 for the clip context menu.
 ### Track context menu
 
 - Import audio / Import at playhead position / Import at custom position
-- **Vocal and Instrumental separation** (Demucs, local AI)
+- **Vocal and instrumental separation** (Demucs, local AI)
 - Mute / Solo toggle
 - Volume dialog / Pan dialog
 - **Effects submenu** — each effect shows current state (on/off), opens dedicated parameter dialog
@@ -192,7 +192,7 @@ Uses [Demucs](https://github.com/facebookresearch/demucs) by Meta AI Research. R
 pip install demucs
 ```
 
-Then: track context menu → **Vocal and Instrumental separation...**
+Then: track context menu → **Vocal and instrumental separation...**
 
 - **2 stems** — Vocals + Instrumental (faster, ~2–5 min per song)
 - **4 stems** — Vocals + Drums + Bass + Other (more detailed)
