@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Backgrounds -->
+    <SolidColorBrush x:Key="MainWindowBg" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="WindowBg" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="PanelBg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="PanelBg2" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="ControlBg" Color="#FFFFFF"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#000000"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#444444"/>
+    <!-- Text used ON TOP of colored action buttons (Apply/Cancel/Warning/Purple) -->
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#FFFFFF"/>
+
+    <!-- Accents / actions -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#1565C0"/>
+    <SolidColorBrush x:Key="ApplyBrush" Color="#2E7D32"/>
+    <SolidColorBrush x:Key="CancelBrush" Color="#C62828"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#EF6C00"/>
+    <SolidColorBrush x:Key="PurpleBrush" Color="#6A1B9A"/>
+
+    <!-- Structure -->
+    <SolidColorBrush x:Key="ThemeBorderBrush" Color="#CCCCCC"/>
+
+</ResourceDictionary>

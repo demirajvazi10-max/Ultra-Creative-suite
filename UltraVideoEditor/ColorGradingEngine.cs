@@ -97,14 +97,14 @@ namespace UltraVideoEditor
             new Dictionary<GradePreset, string>
         {
             [GradePreset.Auto]      = "AI automatically selects based on clip content",
-            [GradePreset.Cinematic] = "Kinematografski — visok kontrast, teal-orange",
-            [GradePreset.Warm]      = "Topao ton — orange/yellow boost",
-            [GradePreset.Cool]      = "Hladan ton — blue/cyan boost",
-            [GradePreset.Vintage]   = "Vintage — fade, grain, topli tonovi",
+            [GradePreset.Cinematic] = "Cinematic — high contrast, teal-orange",
+            [GradePreset.Warm]      = "Warm tone — orange/yellow boost",
+            [GradePreset.Cool]      = "Cool tone — blue/cyan boost",
+            [GradePreset.Vintage]   = "Vintage — fade, grain, warm tones",
             [GradePreset.Vivid]     = "Vivid — color and contrast boost",
-            [GradePreset.Noir]      = "Noir — crno-belo, visok kontrast",
+            [GradePreset.Noir]      = "Noir — black&white, high contrast",
             [GradePreset.Golden]    = "Golden hour — warm, soft light",
-            [GradePreset.Morning]   = "Jutro — hladno plavo, brightness",
+            [GradePreset.Morning]   = "Morning — cool blue, brightness",
             [GradePreset.Moody]     = "Moody — crush blacks, desaturate",
             [GradePreset.Natural]   = "Prirodno — samo normalizacija",
         };

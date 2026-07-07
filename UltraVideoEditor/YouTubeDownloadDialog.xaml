@@ -5,33 +5,33 @@
         Width="560" Height="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#1E1E1E"
-        Foreground="White"
+        Background="{DynamicResource PanelBg}"
+        Foreground="{DynamicResource TextPrimary}"
         AutomationProperties.Name="Dialog for importing video or audio from YouTube">
 
     <Window.Resources>
         <Style TargetType="Label">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="FontSize" Value="13"/>
         </Style>
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#2D2D2D"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#2D2D2D"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="6,4"/>
         </Style>
         <Style TargetType="RadioButton">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Margin" Value="0,0,20,0"/>
         </Style>
@@ -70,7 +70,7 @@
         <!-- Naslov -->
         <TextBlock Grid.Row="0"
                    Text="Import from YouTube"
-                   FontSize="18" FontWeight="Bold" Foreground="White"
+                   FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"
                    AutomationProperties.HeadingLevel="Level1"/>
 
         <!-- URL -->
@@ -85,7 +85,7 @@
         <!-- Tip fajla -->
         <GroupBox Grid.Row="4"
                   Header="File type"
-                  Foreground="White" BorderBrush="#555"
+                  Foreground="{DynamicResource TextPrimary}" BorderBrush="#555"
                   AutomationProperties.Name="File type selection">
             <StackPanel Orientation="Horizontal" Margin="8,6">
                 <RadioButton x:Name="rbVideo" Content="Video (MP4)" IsChecked="True"
@@ -114,12 +114,12 @@
         <!-- Info panel (pojavljuje se nakon fetch-a) -->
         <Border Grid.Row="8"
                 x:Name="pnlInfo"
-                Background="#2D2D2D" BorderBrush="#444" BorderThickness="1"
+                Background="{DynamicResource ControlBg}" BorderBrush="#444" BorderThickness="1"
                 CornerRadius="4" Padding="12,10"
                 Visibility="Collapsed">
             <StackPanel>
                 <TextBlock x:Name="txbInfoTitle"
-                           Foreground="White" FontWeight="Bold" FontSize="13"
+                           Foreground="{DynamicResource TextPrimary}" FontWeight="Bold" FontSize="13"
                            TextWrapping="Wrap"
                            AutomationProperties.LiveSetting="Polite"/>
                 <TextBlock x:Name="txbInfoMeta"
@@ -132,7 +132,7 @@
         <StackPanel Grid.Row="10" x:Name="pnlProgress" Visibility="Collapsed">
             <ProgressBar x:Name="prgDownload"
                          Height="10" Minimum="0" Maximum="100" Value="0"
-                         Background="#333" Foreground="#0078D4"
+                         Background="{DynamicResource ControlBg}" Foreground="#0078D4"
                          AutomationProperties.Name="Download progress"/>
             <TextBlock x:Name="txbProgress"
                        Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
@@ -166,9 +166,9 @@
                     Click="BtnDownload_Click"/>
 
             <Button x:Name="btnCancel"
-                    Grid.Column="4"
+                    Grid.Column="4" IsCancel="True"
                     Content="Cancel"
-                    Background="#3D3D3D" Foreground="White" BorderThickness="0"
+                    Background="#3D3D3D" Foreground="{DynamicResource ButtonTextBrush}" BorderThickness="0"
                     AutomationProperties.Name="Cancel and close dialog"
                     Click="BtnCancel_Click"/>
         </Grid>

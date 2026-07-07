@@ -76,8 +76,8 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Odaberite izvorni video",
-                Filter = "Video fajlovi|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|Svi fajlovi|*.*",
+                Title  = "Select source video",
+                Filter = "Video files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
             {
@@ -91,8 +91,8 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Odaberite pesmu",
-                Filter = "Audio fajlovi|*.mp3;*.wav;*.m4a;*.flac;*.ogg;*.aac|Svi fajlovi|*.*",
+                Title  = "Select a song",
+                Filter = "Audio files|*.mp3;*.wav;*.m4a;*.flac;*.ogg;*.aac|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
             {
@@ -145,7 +145,7 @@ namespace UltraVideoEditor
 
             if (!File.Exists(videoPath))
             {
-                ShowError("Proverite putanju do video fajla.");
+                ShowError("Check the video file path.");
                 return;
             }
             if (useMusic && !File.Exists(musicPath))
@@ -160,7 +160,7 @@ namespace UltraVideoEditor
             _result    = null;
             _activeSegments.Clear();
             SegmentsPanel.Children.Clear();
-            TxtSegmentCount.Text         = "Analizira se…";
+            TxtSegmentCount.Text         = "Analyzing…";
             TxtReport.Text               = "";
             BtnApplyToTimeline.IsEnabled = false;
             BtnRender.IsEnabled          = false;
@@ -199,20 +199,20 @@ namespace UltraVideoEditor
                     // Accessibility: najavi rezultat
                     AutomationProperties.SetName(TxtReport,
                         $"Analysis complete. Selected {_result.Segments.Count} segments, " +
-                        $"ukupno {AIHighlightEngine.FormatTime(_result.TotalDuration)}. " +
-                        "Proverite Preview tab za detalje.");
+                        $"total {AIHighlightEngine.FormatTime(_result.TotalDuration)}. " +
+                        "Check the Preview tab for details.");
                 }
                 else
                 {
-                    ShowError(_result.Error ?? "Analiza nije uspela.");
+                    ShowError(_result.Error ?? "Analysis failed.");
                     TxtSegmentCount.Text = "Analysis failed.";
                 }
             }
             catch (OperationCanceledException)
             {
-                TxtReport.Text       = "Analiza je otkazana.";
-                TxtSegmentCount.Text = "Otkazano.";
-                SetProgress(0, "Otkazano.");
+                TxtReport.Text       = "Analysis was cancelled.";
+                TxtSegmentCount.Text = "Cancelled.";
+                SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
@@ -301,7 +301,7 @@ namespace UltraVideoEditor
                 Width           = 88,
                 Height          = 50,
                 CornerRadius    = new CornerRadius(5),
-                Background      = new SolidColorBrush(Color.FromRgb(15, 52, 96)),
+                Background      = ThemeBrushes.PanelBg2,
                 Margin          = new Thickness(0, 0, 10, 0),
                 VerticalAlignment = System.Windows.VerticalAlignment.Top,
                 ClipToBounds    = true,
@@ -396,7 +396,7 @@ namespace UltraVideoEditor
             chk.Unchecked += (_, _) => onToggle(false);
             AutomationProperties.SetName(chk,
                 $"Include segment {seg.Order}, " +
-                $"trajanje {seg.Duration:F1} sekundi");
+                $"duration {seg.Duration:F1} seconds");
 
             // Skor badge
             string scoreColor = seg.ImportanceScore >= 70 ? "#10B981"
@@ -521,7 +521,7 @@ namespace UltraVideoEditor
             int active  = _activeSegments.Count;
             double dur  = _activeSegments.Sum(s => s.Duration);
             TxtSegmentCount.Text = total == 0
-                ? "Nema segmenata"
+                ? "No segments"
                 : $"{active}/{total} segments included  ·  {AIHighlightEngine.FormatTime(dur)}";
         }
 
@@ -636,17 +636,17 @@ namespace UltraVideoEditor
 
                 MessageBox.Show(
                     $"✅ Video successfully rendered!\n\n{outputPath}\n\n" +
-                    $"Trajanje: {AIHighlightEngine.FormatTime(renderResult.TotalDuration)}\n" +
-                    $"Segmenata: {renderResult.Segments.Count}\n" +
-                    $"Rezolucija: {resolution}",
+                    $"Duration: {AIHighlightEngine.FormatTime(renderResult.TotalDuration)}\n" +
+                    $"Segments: {renderResult.Segments.Count}\n" +
+                    $"Resolution: {resolution}",
                     "Render complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (OperationCanceledException)
             {
-                SetProgress(0, "Render otkazan.");
-                MessageBox.Show("Render je otkazan.", "Otkazano",
+                SetProgress(0, "Render cancelled.");
+                MessageBox.Show("Render was cancelled.", "Cancelled",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             catch (Exception ex)
@@ -669,7 +669,7 @@ namespace UltraVideoEditor
         {
             if (_activeSegments.Count == 0)
             {
-                ShowError("Nema selektovanih segmenata.");
+                ShowError("No segments selected.");
                 return;
             }
 
@@ -703,7 +703,7 @@ namespace UltraVideoEditor
                 if (added > 0)
                 {
                     MessageBox.Show(
-                        $"Dodato {added} segmenata na timeline.",
+                        $"Added {added} segments to the timeline.",
                         "Timeline", MessageBoxButton.OK, MessageBoxImage.Information);
                     Close();
                     return;
@@ -734,7 +734,7 @@ namespace UltraVideoEditor
             var dlg = new SaveFileDialog
             {
                 Title    = "Save report",
-                Filter   = "Tekstualni fajl|*.txt",
+                Filter   = "Text file|*.txt",
                 FileName = $"highlight_report_{DateTime.Now:yyyyMMdd_HHmm}.txt",
             };
             if (dlg.ShowDialog() == true)
@@ -803,7 +803,7 @@ namespace UltraVideoEditor
 
         private void SetAnalyzeButtonToAnalyze()
         {
-            BtnAnalyze.Content =  "🔍 Analiziraj video";
+            BtnAnalyze.Content =  "🔍 Analyze video";
             BtnAnalyze.Click  -= BtnCancelAnalysis_Click;
             BtnAnalyze.Click  += BtnAnalyze_Click;
         }
@@ -823,7 +823,19 @@ namespace UltraVideoEditor
 
         private Brush FindBrush(string key)
         {
+            // The window used to define these brushes locally; they now live in the
+            // global theme dictionaries under different names, so map old -> new.
+            key = key switch
+            {
+                "SurfaceBrush" => "PanelBg",
+                "CardBrush" => "PanelBg2",
+                "TextPrimaryBrush" => "TextPrimary",
+                "TextMutedBrush" => "TextSecondary",
+                "BorderBrush" => "ThemeBorderBrush",
+                _ => key
+            };
             return TryFindResource(key) as Brush
+                ?? System.Windows.Application.Current?.Resources[key] as Brush
                 ?? Brushes.White;
         }
     }

@@ -6,17 +6,12 @@
         MinWidth="620" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Smart Scene Detection dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#00BCD4"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#26C6DA"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
 
         <Style x:Key="PrimaryBtn" TargetType="Button">
             <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
@@ -46,12 +41,13 @@
             </Setter>
         </Style>
         <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style x:Key="InputBox" TargetType="TextBox">
-            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource PanelBg}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding"         Value="10,8"/>
             <Setter Property="FontSize"        Value="13"/>
@@ -86,18 +82,18 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="🎬  Smart Scene Detection"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="Automatic scene detection · FFmpeg change analysis · Direct export to timeline"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,3,0,0"/>
         </StackPanel>
 
         <!-- Unos video fajla -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}"
                 CornerRadius="10" Padding="16" Margin="0,0,0,10">
             <StackPanel>
                 <TextBlock Text="📹  Video file"
-                           Foreground="{StaticResource TextMutedBrush}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="12" Margin="0,0,0,6"/>
                 <DockPanel>
                     <Button x:Name="BtnPickVideo" DockPanel.Dock="Right"
@@ -107,7 +103,7 @@
                             AutomationProperties.Name="Select video file"/>
                     <TextBox x:Name="TxtVideoPath" Style="{StaticResource InputBox}"
                              IsReadOnly="True" Text="Not selected…"
-                             Foreground="{StaticResource TextMutedBrush}"
+                             Foreground="{DynamicResource TextSecondary}"
                              AutomationProperties.Name="Video file path"/>
                 </DockPanel>
             </StackPanel>
@@ -115,7 +111,7 @@
 
         <!-- Progress -->
         <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed"
-                Background="{StaticResource SurfaceBrush}"
+                Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
             <StackPanel>
                 <DockPanel Margin="0,0,0,5">
@@ -124,32 +120,32 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg" Text="Waiting…"
-                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                               Foreground="{DynamicResource TextPrimary}" FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
                 <ProgressBar x:Name="ProgressBar" Height="6"
                              Minimum="0" Maximum="100"
                              Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BorderBrush}"
+                             Background="{DynamicResource ThemeBorderBrush}"
                              BorderThickness="0"/>
             </StackPanel>
         </Border>
 
         <!-- TabControl: scenes + report -->
-        <TabControl Grid.Row="3" Background="{StaticResource SurfaceBrush}"
-                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+        <TabControl Grid.Row="3" Background="{DynamicResource PanelBg}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     Margin="0,0,0,10">
             <TabControl.Resources>
                 <Style TargetType="TabItem">
-                    <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
-                    <Setter Property="Foreground"      Value="{StaticResource TextMutedBrush}"/>
+                    <Setter Property="Background"      Value="{DynamicResource PanelBg2}"/>
+                    <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
                     <Setter Property="FontSize"        Value="13"/>
                     <Setter Property="Padding"         Value="14,8"/>
                     <Setter Property="BorderThickness" Value="0"/>
                     <Style.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-                            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                            <Setter Property="Background" Value="{DynamicResource PanelBg}"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -162,7 +158,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
+                    <DockPanel Grid.Row="0" Background="{DynamicResource PanelBg2}" LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
                             <Button x:Name="BtnSelectAll" Content="All"
                                     Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
@@ -175,7 +171,7 @@
                                     AutomationProperties.Name="Deselect all scenes"/>
                         </StackPanel>
                         <TextBlock x:Name="TxtSceneCount" Text="No scenes"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" VerticalAlignment="Center" Margin="12,8"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </DockPanel>
@@ -193,7 +189,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}" LastChildFill="True">
+                    <DockPanel Grid.Row="0" Background="{DynamicResource PanelBg2}" LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,4">
                             <Button x:Name="BtnCopyReport" Content="Copy"
                                     Style="{StaticResource SecBtn}" FontSize="11" Padding="10,4"
@@ -202,12 +198,12 @@
                                     AutomationProperties.Name="Copy report"/>
                         </StackPanel>
                         <TextBlock Text="Scene detection report"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" Margin="12,8" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TextBox x:Name="TxtReport" Grid.Row="1"
                              Background="Transparent"
-                             Foreground="{StaticResource TextPrimaryBrush}"
+                             Foreground="{DynamicResource TextPrimary}"
                              BorderThickness="0" Padding="12"
                              FontFamily="Consolas, Courier New" FontSize="12"
                              IsReadOnly="True" TextWrapping="Wrap"
@@ -226,7 +222,7 @@
                     Padding="16,9" IsEnabled="False"
                     Click="BtnDetect_Click"
                     AutomationProperties.Name="Start scene detection"/>
-            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+            <Button x:Name="BtnClose" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
                     AutomationProperties.Name="Close dialog"/>

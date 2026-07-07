@@ -6,17 +6,12 @@
         MinWidth="520" MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Timeline AI Assistant dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#8B5CF6"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
         <SolidColorBrush x:Key="GreenBrush"       Color="#10B981"/>
         <SolidColorBrush x:Key="RedBrush"         Color="#EF4444"/>
 
@@ -48,12 +43,13 @@
             </Setter>
         </Style>
         <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style x:Key="InputBox" TargetType="TextBox">
-            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource PanelBg}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding"         Value="10,8"/>
             <Setter Property="FontSize"        Value="13"/>
@@ -89,19 +85,19 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="🤖  Timeline AI Assistant"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock x:Name="TxtSubtitle"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,3,0,0"
                        AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
 
         <!-- Primeri komandi -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}"
                 CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
             <StackPanel>
                 <TextBlock Text="💡 Command examples:"
-                           Foreground="{StaticResource TextMutedBrush}" FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}" FontSize="11"
                            Margin="0,0,0,6"/>
                 <WrapPanel>
                     <Button x:Name="BtnEx1" Content="remove shorter than 2s"
@@ -139,7 +135,7 @@
         </Border>
 
         <!-- Input -->
-        <Border Grid.Row="2" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg2}"
                 CornerRadius="8" Padding="12" Margin="0,0,0,10">
             <DockPanel>
                 <Button x:Name="BtnExecute" DockPanel.Dock="Right"
@@ -191,24 +187,24 @@
                 CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
             <StackPanel>
                 <TextBlock x:Name="TxtStatusMsg"
-                           Foreground="White" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}" FontSize="13" FontWeight="SemiBold"
                            TextWrapping="Wrap"
                            AutomationProperties.LiveSetting="Assertive"/>
                 <TextBlock x:Name="TxtCommandExplanation"
-                           Foreground="{StaticResource TextMutedBrush}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
 
         <!-- Istorija komandi -->
-        <Border Grid.Row="4" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.Row="4" Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                <Border Grid.Row="0" Background="{DynamicResource PanelBg2}"
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <Button x:Name="BtnUndoLast" DockPanel.Dock="Right"
@@ -222,7 +218,7 @@
                                 IsEnabled="False" Click="BtnApplyAll_Click"
                                 AutomationProperties.Name="Apply changes to timeline"/>
                         <TextBlock Text="📜  Command history"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" VerticalAlignment="Center"/>
                     </DockPanel>
                 </Border>
@@ -235,7 +231,7 @@
 
         <!-- Footer -->
         <DockPanel Grid.Row="5" LastChildFill="False">
-            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+            <Button x:Name="BtnClose" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
                     AutomationProperties.Name="Close dialog"/>

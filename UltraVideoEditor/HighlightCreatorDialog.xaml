@@ -6,17 +6,12 @@
         MinWidth="600" MinHeight="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="AI Highlight Engine dialog v2">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#9D5FFF"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
@@ -49,13 +44,14 @@
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
         <Style x:Key="InputBox" TargetType="TextBox">
-            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource PanelBg}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding"         Value="10,8"/>
             <Setter Property="FontSize"        Value="13"/>
@@ -91,15 +87,15 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="🎬  AI Highlight Engine v2"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
-            <TextBlock Text="Multi-frame arc scoring · Beat-sync rezovi · Preview · Render"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+            <TextBlock Text="Multi-frame arc scoring · Beat-sync cuts · Preview · Render"
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}"
                        Margin="0,3,0,0"/>
         </StackPanel>
 
         <!-- Unos fajlova -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}"
                 CornerRadius="10" Padding="16" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -109,7 +105,7 @@
 
                 <StackPanel Grid.Column="0" Margin="0,0,8,0">
                     <TextBlock Text="📹  Video file"
-                               Foreground="{StaticResource TextMutedBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <DockPanel>
                         <Button x:Name="BtnPickVideo" DockPanel.Dock="Right"
@@ -119,7 +115,7 @@
                                 AutomationProperties.Name="Select video file"/>
                         <TextBox x:Name="TxtVideoPath" Style="{StaticResource InputBox}"
                                  IsReadOnly="True" Text="Not selected…"
-                                 Foreground="{StaticResource TextMutedBrush}"
+                                 Foreground="{DynamicResource TextSecondary}"
                                  AutomationProperties.Name="Video file path"/>
                     </DockPanel>
                 </StackPanel>
@@ -128,7 +124,7 @@
                     <DockPanel Margin="0,0,0,4">
                         <CheckBox x:Name="ChkUseMusic" DockPanel.Dock="Left"
                                   Content="🎵  Audio file (song)"
-                                  Foreground="{StaticResource TextMutedBrush}"
+                                  Foreground="{DynamicResource TextSecondary}"
                                   FontSize="12" VerticalAlignment="Center"
                                   IsChecked="True"
                                   Checked="ChkUseMusic_Changed"
@@ -143,7 +139,7 @@
                                 AutomationProperties.Name="Select audio file"/>
                         <TextBox x:Name="TxtMusicPath" Style="{StaticResource InputBox}"
                                  IsReadOnly="True" Text="Not selected…"
-                                 Foreground="{StaticResource TextMutedBrush}"
+                                 Foreground="{DynamicResource TextSecondary}"
                                  AutomationProperties.Name="Audio file path"/>
                     </DockPanel>
                 </StackPanel>
@@ -151,9 +147,9 @@
         </Border>
 
         <!-- Export opcije -->
-        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,12"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -164,7 +160,7 @@
 
                 <StackPanel Grid.Column="0" Margin="0,0,10,0">
                     <TextBlock Text="💾  Output video"
-                               Foreground="{StaticResource TextMutedBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <DockPanel>
                         <Button x:Name="BtnPickOutput" DockPanel.Dock="Right"
@@ -180,12 +176,12 @@
 
                 <StackPanel Grid.Column="1" Margin="0,0,10,0">
                     <TextBlock Text="📐  Resolution"
-                               Foreground="{StaticResource TextMutedBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <ComboBox x:Name="CmbResolution"
-                              Background="{StaticResource SurfaceBrush}"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              BorderBrush="{StaticResource BorderBrush}"
+                              Background="{DynamicResource PanelBg}"
+                              Foreground="{DynamicResource TextPrimary}"
+                              BorderBrush="{DynamicResource ThemeBorderBrush}"
                               Padding="10,7" Width="130"
                               AutomationProperties.Name="Output video resolution">
                         <ComboBoxItem Content="1920x1080 (FHD)" Tag="1920x1080" IsSelected="True"/>
@@ -197,10 +193,10 @@
 
                 <StackPanel Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Bottom">
                     <TextBlock Text="⚡  Encoding"
-                               Foreground="{StaticResource TextMutedBrush}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12" Margin="0,0,0,4"/>
                     <CheckBox x:Name="ChkUseGPU" Content="GPU (NVENC)" IsChecked="True"
-                              Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                              Foreground="{DynamicResource TextPrimary}" FontSize="13"
                               AutomationProperties.Name="Use GPU NVENC encoding"/>
                 </StackPanel>
 
@@ -215,7 +211,7 @@
 
         <!-- Progress -->
         <Border Grid.Row="3" x:Name="ProgressPanel" Visibility="Collapsed"
-                Background="{StaticResource SurfaceBrush}"
+                Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
             <StackPanel>
                 <DockPanel Margin="0,0,0,5">
@@ -224,33 +220,33 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg" Text="Starting…"
-                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Foreground="{DynamicResource TextPrimary}"
                                FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
                 <ProgressBar x:Name="ProgressBar" Height="6"
                              Minimum="0" Maximum="100"
                              Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BorderBrush}"
+                             Background="{DynamicResource ThemeBorderBrush}"
                              BorderThickness="0"/>
             </StackPanel>
         </Border>
 
         <!-- TabControl -->
-        <TabControl Grid.Row="4" Background="{StaticResource SurfaceBrush}"
-                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+        <TabControl Grid.Row="4" Background="{DynamicResource PanelBg}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     Margin="0,0,0,12">
             <TabControl.Resources>
                 <Style TargetType="TabItem">
-                    <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
-                    <Setter Property="Foreground"      Value="{StaticResource TextMutedBrush}"/>
+                    <Setter Property="Background"      Value="{DynamicResource PanelBg2}"/>
+                    <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
                     <Setter Property="FontSize"        Value="13"/>
                     <Setter Property="Padding"         Value="14,8"/>
                     <Setter Property="BorderThickness" Value="0"/>
                     <Style.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-                            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                            <Setter Property="Background" Value="{DynamicResource PanelBg}"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -265,7 +261,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}"
+                    <DockPanel Grid.Row="0" Background="{DynamicResource PanelBg2}"
                                LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                     Margin="8,4">
@@ -281,7 +277,7 @@
                                     AutomationProperties.Name="Deselect all segments"/>
                         </StackPanel>
                         <TextBlock x:Name="TxtSegmentCount" Text="No segments"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" VerticalAlignment="Center" Margin="12,8"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </DockPanel>
@@ -303,11 +299,11 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <DockPanel Grid.Row="0" Background="{StaticResource CardBrush}"
+                    <DockPanel Grid.Row="0" Background="{DynamicResource PanelBg2}"
                                LastChildFill="True">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                     Margin="8,4">
-                            <Button x:Name="BtnCopyReport" Content="Kopiraj"
+                            <Button x:Name="BtnCopyReport" Content="Copy"
                                     Style="{StaticResource SecondaryButton}"
                                     FontSize="11" Padding="10,4" Margin="0,0,6,0"
                                     Visibility="Collapsed" Click="BtnCopyReport_Click"
@@ -319,13 +315,13 @@
                                     AutomationProperties.Name="Save report"/>
                         </StackPanel>
                         <TextBlock Text="Complete analysis report"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" Margin="12,8" VerticalAlignment="Center"/>
                     </DockPanel>
 
                     <TextBox x:Name="TxtReport" Grid.Row="1"
                              Background="Transparent"
-                             Foreground="{StaticResource TextPrimaryBrush}"
+                             Foreground="{DynamicResource TextPrimary}"
                              BorderThickness="0" Padding="12"
                              FontFamily="Consolas, Courier New" FontSize="12"
                              IsReadOnly="True" TextWrapping="Wrap"
@@ -338,7 +334,7 @@
 
         <!-- Dugmici -->
         <DockPanel Grid.Row="5" LastChildFill="False">
-            <Button x:Name="BtnCancel" DockPanel.Dock="Right"
+            <Button x:Name="BtnCancel" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecondaryButton}"
                     Padding="16,9" Click="BtnCancel_Click"
                     AutomationProperties.Name="Close dialog"/>
@@ -349,7 +345,7 @@
                     Click="BtnApplyToTimeline_Click"
                     AutomationProperties.Name="Add segments to timeline"/>
             <Button x:Name="BtnAnalyze" DockPanel.Dock="Left"
-                    Content="🔍 Analiziraj video"
+                    Content="🔍 Analyze video"
                     Style="{StaticResource PrimaryButton}"
                     Padding="16,9" IsEnabled="False"
                     Click="BtnAnalyze_Click"

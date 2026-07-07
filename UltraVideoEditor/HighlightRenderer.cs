@@ -42,9 +42,9 @@ namespace UltraVideoEditor
             CancellationToken ct = default)
         {
             if (result == null || !result.Success)
-                throw new InvalidOperationException("HighlightResult nije validan.");
+                throw new InvalidOperationException("HighlightResult is not valid.");
             if (result.Segments.Count == 0)
-                throw new InvalidOperationException("Nema segmenata za renderovanje.");
+                throw new InvalidOperationException("No segments to render.");
             if (!File.Exists(musicPath))
                 throw new FileNotFoundException($"Music file not found: {musicPath}");
 
@@ -178,7 +178,7 @@ namespace UltraVideoEditor
             sb.Append($"Highlight segment {seg.Order}. ");
             sb.Append($"Preuzeto iz videa {AIHighlightEngine.FormatTime(seg.SourceStart)} " +
                       $"do {AIHighlightEngine.FormatTime(seg.SourceEnd)}, " +
-                      $"trajanje {seg.Duration:F1} sekundi. ");
+                      $"duration {seg.Duration:F1} seconds. ");
 
             if (!string.IsNullOrEmpty(seg.ContentDescription))
                 sb.Append($"Content: {seg.ContentDescription}. ");

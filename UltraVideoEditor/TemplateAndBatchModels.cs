@@ -9,7 +9,7 @@ namespace UltraVideoEditor
 
     public class ProjectTemplate
     {
-        public string  Name            { get; set; } = "Novi template";
+        public string  Name            { get; set; } = "New template";
         public string  Description     { get; set; } = "";
         public string  Version         { get; set; } = "1.0";
         public DateTime CreatedAt      { get; set; } = DateTime.Now;

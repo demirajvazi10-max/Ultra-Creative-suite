@@ -156,7 +156,7 @@ namespace UltraVideoEditor
             t ??= new ProjectTemplate();
             t.Name             = TxtTemplateName.Text.Trim();
             t.Description      = TxtTemplateDesc.Text.Trim();
-            t.Language         = (CmbLanguage.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "sr";
+            t.Language         = (CmbLanguage.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "en";
             t.ColorGradePreset = (CmbGradePreset.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Auto";
             t.ExportYouTube    = ChkYouTube.IsChecked  == true;
             t.ExportReels      = ChkReels.IsChecked    == true;
@@ -207,7 +207,7 @@ namespace UltraVideoEditor
             string name = TxtTemplateName.Text.Trim();
             if (string.IsNullOrEmpty(name))
             {
-                MessageBox.Show("Unesite naziv templatea.", "Template",
+                MessageBox.Show("Enter a template name.", "Template",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -256,7 +256,7 @@ namespace UltraVideoEditor
             var dlg = new OpenFileDialog
             {
                 Title  = "Uvezi template",
-                Filter = "Iskra Template|*.iskrat|Svi fajlovi|*.*",
+                Filter = "Iskra Template|*.iskrat|All files|*.*",
             };
             if (dlg.ShowDialog() != true) return;
             try
@@ -311,7 +311,7 @@ namespace UltraVideoEditor
             if (_current == null) return;
             OnApply?.Invoke(_current);
             MessageBox.Show(
-                $"Template \"{_current.Name}\" primenjen na trenutni projekat.\n\n" +
+                $"Template \"{_current.Name}\" applied to the current project.\n\n" +
                 $"Color grade: {_current.ColorGradePreset}\n" +
                 $"Jezik: {_current.Language}\n" +
                 $"YouTube: {(_current.ExportYouTube ? "✅" : "❌")}  " +

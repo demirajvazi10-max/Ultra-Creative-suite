@@ -19,7 +19,7 @@ namespace UltraVideoEditor
     public partial class PixabaySearchDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -110,7 +110,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrWhiteSpace(txtSearch.Text))
             {
-                WpfMessageBox.Show("Unesite pojam za pretragu", "Pretraga", MessageBoxButton.OK, MessageBoxImage.Warning);
+                WpfMessageBox.Show("Enter a search term", "Search", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -221,7 +221,7 @@ namespace UltraVideoEditor
                     else
                     {
                         lstResults.Items.Add(L("psd_no_results_msg"));
-                        txtSelectedInfo.Text = "Nema rezultata za ovu pretragu.";
+                        txtSelectedInfo.Text = "No results for this search.";
                     }
                 }
             }
@@ -246,24 +246,24 @@ namespace UltraVideoEditor
             if (selectedCount > 0)
             {
                 btnDownload.IsEnabled = true;
-                btnDownload.Content = _isVideoMode ? $"📥 PREUZMI VIDEO ({selectedCount})" : $"📥 PREUZMI SLIKE ({selectedCount})";
+                btnDownload.Content = _isVideoMode ? $"📥 DOWNLOAD VIDEO ({selectedCount})" : $"📥 DOWNLOAD IMAGES ({selectedCount})";
 
                 if (selectedCount == 1 && lstResults.SelectedItem is PixabayMediaItem item)
                 {
-                    string type = _isVideoMode ? "🎥 Video" : "📷 Slika";
-                    txtSelectedInfo.Text = $"{type}: {item.Title}\n👍 {item.Likes} lajkova | 👁️ {item.Views} pregleda | 📥 {item.Downloads} preuzimanja\n👤 Autor: {item.User}\n📏 {item.Dimensions}";
+                    string type = _isVideoMode ? "🎥 Video" : "📷 Image";
+                    txtSelectedInfo.Text = $"{type}: {item.Title}\n👍 {item.Likes} likes | 👁️ {item.Views} views | 📥 {item.Downloads} downloads\n👤 Author: {item.User}\n📏 {item.Dimensions}";
                     if (!string.IsNullOrEmpty(item.Duration))
-                        txtSelectedInfo.Text += $"\n⏱️ Trajanje: {item.Duration}";
+                        txtSelectedInfo.Text += $"\n⏱️ Duration: {item.Duration}";
                 }
                 else
                 {
-                    txtSelectedInfo.Text = $"✅ Odabrano {selectedCount} stavki. Pritisnite dugme za preuzimanje.";
+                    txtSelectedInfo.Text = $"✅ Selected {selectedCount} items. Press the download button.";
                 }
             }
             else
             {
                 btnDownload.IsEnabled = false;
-                btnDownload.Content = _isVideoMode ? "📥 PREUZMI VIDEO" : "📥 PREUZMI SLIKE";
+                btnDownload.Content = _isVideoMode ? "📥 DOWNLOAD VIDEO" : "📥 DOWNLOAD IMAGES";
                 txtSelectedInfo.Text = L("psd_select_hint");
             }
         }
@@ -312,7 +312,7 @@ namespace UltraVideoEditor
                 WpfMessageBox.Show(LF("psd_download_error2", ex.Message), L("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 btnDownload.IsEnabled = true;
-                btnDownload.Content = _isVideoMode ? "📥 PREUZMI VIDEO" : "📥 PREUZMI SLIKE";
+                btnDownload.Content = _isVideoMode ? "📥 DOWNLOAD VIDEO" : "📥 DOWNLOAD IMAGES";
             }
         }
 

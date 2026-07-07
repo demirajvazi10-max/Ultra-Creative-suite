@@ -5,27 +5,27 @@
         Height="520" Width="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Media Providers Settings Dialog">
 
     <Window.Resources>
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#00E676"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Margin" Value="0,12,0,4"/>
         </Style>
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="#B0BEC5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="Margin" Value="0,0,0,3"/>
         </Style>
         <Style x:Key="ApiTextBox" TargetType="TextBox">
             <Setter Property="Height" Value="30"/>
             <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="Background" Value="#2D2D44"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#444466"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
@@ -55,7 +55,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock Text="🌐 Media Providers"
                        FontSize="18" FontWeight="Bold"
-                       Foreground="#00E676"
+                       Foreground="{DynamicResource AccentBrush}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="System searches providers in order: Pixabay → Pexels → Coverr"
                        FontSize="11" Foreground="#78909C" Margin="0,3,0,0"/>
@@ -66,7 +66,7 @@
             <StackPanel>
 
                 <!-- ══ PIXABAY ══ -->
-                <Border Background="#1E1E30" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                <Border Background="{DynamicResource PanelBg2}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource SectionHeader}"
@@ -95,14 +95,14 @@
                                 <Button x:Name="btnPixabaySave"
                                         Style="{StaticResource ActionBtn}"
                                         Content="💾 Save"
-                                        Background="#2E7D32" Foreground="White"
+                                        Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnPixabaySave_Click"
                                         AutomationProperties.Name="Save Pixabay key"
                                         Margin="0,0,4,0"/>
                                 <Button x:Name="btnPixabayDelete"
                                         Style="{StaticResource ActionBtn}"
                                         Content="🗑"
-                                        Background="#5D2D2D" Foreground="White"
+                                        Background="#5D2D2D" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnPixabayDelete_Click"
                                         AutomationProperties.Name="Delete Pixabay key"
                                         ToolTip="Delete key — deactivates Pixabay"/>
@@ -120,7 +120,7 @@
                 </Border>
 
                 <!-- ══ PEXELS ══ -->
-                <Border Background="#1E1E30" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                <Border Background="{DynamicResource PanelBg2}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource SectionHeader}"
@@ -149,14 +149,14 @@
                                 <Button x:Name="btnPexelsSave"
                                         Style="{StaticResource ActionBtn}"
                                         Content="💾 Save"
-                                        Background="#2E7D32" Foreground="White"
+                                        Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnPexelsSave_Click"
                                         AutomationProperties.Name="Save Pexels key"
                                         Margin="0,0,4,0"/>
                                 <Button x:Name="btnPexelsDelete"
                                         Style="{StaticResource ActionBtn}"
                                         Content="🗑"
-                                        Background="#5D2D2D" Foreground="White"
+                                        Background="#5D2D2D" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnPexelsDelete_Click"
                                         AutomationProperties.Name="Delete Pexels key"
                                         ToolTip="Delete key — deactivates Pexels"/>
@@ -207,14 +207,14 @@
                                 <Button x:Name="btnCoverrSave"
                                         Style="{StaticResource ActionBtn}"
                                         Content="💾 Save"
-                                        Background="#2E7D32" Foreground="White"
+                                        Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnCoverrSave_Click"
                                         AutomationProperties.Name="Save Coverr key"
                                         Margin="0,0,4,0"/>
                                 <Button x:Name="btnCoverrDelete"
                                         Style="{StaticResource ActionBtn}"
                                         Content="🗑"
-                                        Background="#5D2D2D" Foreground="White"
+                                        Background="#5D2D2D" Foreground="{DynamicResource ButtonTextBrush}"
                                         Click="BtnCoverrDelete_Click"
                                         AutomationProperties.Name="Delete Coverr key"/>
                             </StackPanel>
@@ -247,7 +247,7 @@
                     <Button x:Name="btnOpenFolder"
                             Content="📁 Open providers folder"
                             Height="30" Padding="12,0"
-                            Background="#37474F" Foreground="White"
+                            Background="#37474F" Foreground="{DynamicResource ButtonTextBrush}"
                             BorderThickness="0" FontSize="11"
                             Click="BtnOpenFolder_Click"
                             AutomationProperties.Name="Open folder where provider files are placed"
@@ -255,7 +255,7 @@
                     <Button x:Name="btnReload"
                             Content="🔄 Refresh"
                             Height="30" Padding="12,0"
-                            Background="#1B5E20" Foreground="White"
+                            Background="#1B5E20" Foreground="{DynamicResource ButtonTextBrush}"
                             BorderThickness="0" FontSize="11"
                             Click="BtnReload_Click"
                             AutomationProperties.Name="Refresh provider list without restart"
@@ -273,11 +273,11 @@
                        FontSize="11" Foreground="#78909C"
                        TextWrapping="Wrap" Margin="0,0,0,10"
                        Text="Keys are stored encrypted on this computer. The system automatically switches to the next provider if the current one has no results."/>
-            <Button x:Name="btnClose"
+            <Button x:Name="btnClose" IsCancel="True"
                     Content="✓ Close"
                     Height="34" Width="120"
                     HorizontalAlignment="Right"
-                    Background="#1565C0" Foreground="White"
+                    Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}"
                     FontSize="12" FontWeight="Bold"
                     BorderThickness="0"
                     Click="BtnClose_Click"

@@ -115,41 +115,41 @@ namespace UltraVideoEditor
                 {
                     musicDuration = videoDuration * 0.30;
                     beats = new BeatInfo(); // BPM=0 => IsValid=false (computed property)
-                    Report(progress, 12, $"Video-only mod — target: {FormatTime(musicDuration)} (30% videa)");
+                    Report(progress, 12, $"Video-only mode — target: {FormatTime(musicDuration)} (30% of video)");
                 }
                 else
                 {
                     musicDuration = await GetDurationAsync(musicPath, ffmpegPath, ct);
                     if (musicDuration < 1.0) return Fail("Audio file is too short.");
-                    // beat detekcija
-                    Report(progress, 12, $"Analiziram ritam pesme ({Path.GetFileName(musicPath)})…");
+                    // beat detection
+                    Report(progress, 12, $"Analyzing song rhythm ({Path.GetFileName(musicPath)})…");
                     beats = await BeatDetection.AnalyzeAudio(musicPath, ffmpegPath, ct);
                 }
                 result.TargetDuration = musicDuration;
                 result.Beats = beats;
                 result.BPM   = beats.BPM;
 
-                // 3 — uzorkovanje
-                Report(progress, 20, "Uzorkujem kandidate iz videa…");
+                // 3 — sampling
+                Report(progress, 20, "Sampling candidates from video…");
                 var candidates = SampleCandidates(videoPath, videoDuration, musicDuration);
 
-                // 4 — multi-frame scoring (Faza 2 / C)
-                Report(progress, 30, $"Analiziram {candidates.Count} kandidata — multi-frame arc scoring…");
+                // 4 — multi-frame scoring (Phase 2 / C)
+                Report(progress, 30, $"Analyzing {candidates.Count} candidates — multi-frame arc scoring…");
                 await ScoreSegmentsMultiFrameAsync(candidates, ffmpegPath, progress, ct);
 
-                // 5 — selekcija
-                Report(progress, 72, "Biram najzanimljivije momente…");
+                // 5 — selection
+                Report(progress, 72, "Choosing the most interesting moments…");
                 var selected = SelectSegments(candidates, musicDuration);
                 if (selected.Count == 0) return Fail("No usable segment found.");
 
-                // 6 — thumbnail generisanje (Faza 2 / B)
+                // 6 — thumbnail generation (Phase 2 / B)
                 Report(progress, 80, "Generating thumbnails for preview…");
                 await GenerateThumbnailsAsync(selected, ffmpegPath, ct);
 
-                // 7 — beat alijacija (samo ako ima muzike)
+                // 7 — beat alignment (only if there's music)
                 if (!videoOnly)
                 {
-                    Report(progress, 88, "Sinhronizujem rezove na beat…");
+                    Report(progress, 88, "Syncing cuts to the beat…");
                     AlignToBeats(selected, beats);
                 }
 
@@ -162,14 +162,14 @@ namespace UltraVideoEditor
                 Report(progress, 95, "Generating report…");
                 result.Report = BuildReport(result, videoPath, videoOnly ? null : musicPath);
 
-                Report(progress, 100, "Gotovo!");
+                Report(progress, 100, "Done!");
                 return result;
             }
-            catch (OperationCanceledException) { return Fail("Analiza je otkazana."); }
+            catch (OperationCanceledException) { return Fail("Analysis was cancelled."); }
             catch (Exception ex)               { return Fail($"Error: {ex.Message}"); }
         }
 
-        // ── Sampleovanje ─────────────────────────────────────────────
+        // ── Sampling ─────────────────────────────────────────────
 
         private static List<HighlightSegment> SampleCandidates(
             string videoPath, double videoDuration, double targetDuration)
@@ -389,7 +389,7 @@ namespace UltraVideoEditor
             if (minScore > 6.0)
             {
                 bonus += 5.0;
-                arc.Add("konstantno visok kvalitet");
+                arc.Add("consistently high quality");
             }
 
             string desc = arc.Count > 0
@@ -564,17 +564,17 @@ namespace UltraVideoEditor
                 sb.AppendLine($"   Mod:          {(result.Beats.PianoMode ? "Piano/melodijski" : "Perkusivni")}");
                 sb.AppendLine($"   Cut advance:  {result.Beats.CutAdvanceMs:F0}ms");
             }
-            else sb.AppendLine("   Beat detekcija nije bila dostupna.");
+            else sb.AppendLine("   Beat detection was not available.");
             sb.AppendLine();
 
-            sb.AppendLine("✂️  SELEKTOVANI HIGHLIGHTS");
+            sb.AppendLine("✂️  SELECTED HIGHLIGHTS");
             sb.AppendLine($"   Segmenata:  {result.Segments.Count}");
-            sb.AppendLine($"   Trajanje:   {FormatTime(result.TotalDuration)} / {FormatTime(result.TargetDuration)}");
+            sb.AppendLine($"   Duration:   {FormatTime(result.TotalDuration)} / {FormatTime(result.TargetDuration)}");
             sb.AppendLine();
 
             foreach (var seg in result.Segments)
             {
-                string motionDesc = seg.Motion == null ? "nepoznato"
+                string motionDesc = seg.Motion == null ? "unknown"
                     : seg.Motion.IsStatic ? "static"
                     : $"{seg.Motion.Direction} (mag {seg.Motion.Magnitude:F0})";
 

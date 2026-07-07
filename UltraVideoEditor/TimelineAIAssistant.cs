@@ -42,7 +42,7 @@ namespace UltraVideoEditor
             CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(userText))
-                return Fail("Unesite komandu.");
+                return Fail("Enter a command.");
             if (items == null || items.Count == 0)
                 return Fail("Timeline is empty. Add clips before using the assistant.");
 
@@ -167,7 +167,7 @@ namespace UltraVideoEditor
 
             // "vrati original / reset / originalni redosled"
             if (text.Contains("original") || text.Contains("reset") || text.Contains("vrati"))
-            { cmd.Action = "sort_original"; cmd.Explanation = "Vrati originalni redosled"; return cmd; }
+            { cmd.Action = "sort_original"; cmd.Explanation = "Restore original order"; return cmd; }
 
             // "keep first N / top N"
             var mTop = System.Text.RegularExpressions.Regex.Match(
@@ -189,7 +189,7 @@ namespace UltraVideoEditor
             { cmd.Action = "keep_motion"; cmd.Explanation = "Keep only clips with motion"; return cmd; }
 
             cmd.Action      = "unknown";
-            cmd.Explanation = "Komanda nije prepoznata.";
+            cmd.Explanation = "Command not recognized.";
             return cmd;
         }
 

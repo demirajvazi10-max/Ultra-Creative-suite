@@ -41,7 +41,7 @@ namespace UltraVideoEditor
             InitializeComponent();
             _originalItems = new List<TimelineItem>(timelineItems);
             _workingItems  = new List<TimelineItem>(timelineItems);
-            TxtSubtitle.Text = $"Timeline: {timelineItems.Count} klipoiva  ·  Ollama (lokalni AI) + rule-based fallback";
+            TxtSubtitle.Text = $"Timeline: {timelineItems.Count} clips  ·  Ollama (local AI) + rule-based fallback";
         }
 
         // ── Primeri ───────────────────────────────────────────────────
@@ -199,11 +199,11 @@ namespace UltraVideoEditor
                     _hasChanges    = true;
 
                     ShowStatus($"✅  {result.Summary}",
-                               $"Razumeo: {result.Command?.Explanation ?? cmd}  |  " +
-                               $"{result.OriginalCount} → {result.ResultCount} klipoiva", true);
+                               $"Understood: {result.Command?.Explanation ?? cmd}  |  " +
+                               $"{result.OriginalCount} → {result.ResultCount} clips", true);
 
                     AddHistory(cmd, result);
-                    TxtSubtitle.Text = $"Timeline: {_workingItems.Count} klipoiva (preview — nije primenjeno)";
+                    TxtSubtitle.Text = $"Timeline: {_workingItems.Count} clips (preview — not applied)";
                     BtnUndoLast.IsEnabled = true;
                     BtnApplyAll.IsEnabled = true;
                     TxtCommand.Clear();
@@ -215,7 +215,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                ShowStatus("Otkazano.", null, false);
+                ShowStatus("Cancelled.", null, false);
             }
             catch (Exception ex)
             {
@@ -254,10 +254,10 @@ namespace UltraVideoEditor
             if (!_hasChanges) return;
 
             var confirm = MessageBox.Show(
-                $"Primeniti promene na timeline?\n\n" +
-                $"Originalno: {_originalItems.Count} klipoiva\n" +
-                $"Novo stanje: {_workingItems.Count} klipoiva",
-                "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                $"Apply changes to the timeline?\n\n" +
+                $"Original: {_originalItems.Count} clips\n" +
+                $"New state: {_workingItems.Count} clips",
+                "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -278,7 +278,7 @@ namespace UltraVideoEditor
         {
             var entry = new Border
             {
-                Background   = new SolidColorBrush(Color.FromRgb(15, 52, 96)),
+                Background   = ThemeBrushes.PanelBg2,
                 CornerRadius = new CornerRadius(6),
                 Margin       = new Thickness(0, 0, 0, 6),
                 Padding      = new Thickness(10, 8, 10, 8),
@@ -308,7 +308,7 @@ namespace UltraVideoEditor
             var timeText = new TextBlock
             {
                 Text       = DateTime.Now.ToString("HH:mm:ss"),
-                Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+                Foreground = ThemeBrushes.TextSecondary,
                 FontSize   = 11,
                 VerticalAlignment = VerticalAlignment.Center,
             };
@@ -318,7 +318,7 @@ namespace UltraVideoEditor
             row.Children.Add(new TextBlock
             {
                 Text       = $"\"{cmd}\"",
-                Foreground = System.Windows.Media.Brushes.White,
+                Foreground = ThemeBrushes.TextPrimary,
                 FontSize   = 12,
                 FontWeight = FontWeights.SemiBold,
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -328,8 +328,8 @@ namespace UltraVideoEditor
             sp.Children.Add(row);
             sp.Children.Add(new TextBlock
             {
-                Text       = $"{result.OriginalCount} → {result.ResultCount} klipoiva  ·  {result.Summary}",
-                Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                Text       = $"{result.OriginalCount} → {result.ResultCount} clips  ·  {result.Summary}",
+                Foreground = ThemeBrushes.TextSecondary,
                 FontSize   = 11,
                 TextWrapping = TextWrapping.Wrap,
                 Margin     = new Thickness(0, 4, 0, 0),
@@ -337,7 +337,7 @@ namespace UltraVideoEditor
 
             entry.Child = sp;
             AutomationProperties.SetName(entry,
-                $"Komanda {cmd}, {result.OriginalCount} do {result.ResultCount} klipoiva");
+                $"Command {cmd}, {result.OriginalCount} to {result.ResultCount} clips");
             HistoryPanel.Children.Add(entry);
         }
 
@@ -376,8 +376,8 @@ namespace UltraVideoEditor
             if (_hasChanges)
             {
                 var r = MessageBox.Show(
-                    "Imate neprimenjene promene. Primeniti pre zatvaranja?",
-                    "Neprimenjene promene",
+                    "You have unapplied changes. Apply them before closing?",
+                    "Unapplied changes",
                     MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (r == MessageBoxResult.Cancel) return;
                 if (r == MessageBoxResult.Yes) { BtnApplyAll_Click(sender, e); return; }

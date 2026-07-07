@@ -15,7 +15,7 @@ namespace UltraVideoEditor
     public partial class AutoArrangeDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -66,7 +66,7 @@ namespace UltraVideoEditor
             _imageCount = imageCount;
 
             string dur = TimeSpan.FromSeconds(_audioDuration).ToString(@"mm\:ss");
-            txtAudioInfo.Text = $"Audio trajanje: {dur} ({_audioDuration:F1} sekundi) | Slika: {_imageCount}";
+            txtAudioInfo.Text = $"Audio duration: {dur} ({_audioDuration:F1} seconds) | Images: {_imageCount}";
 
             EffectSequence = new List<string> { "ZoomIn", "SlideLeft", "FadeIn", "ZoomOut", "SlideRight" };
 
@@ -75,12 +75,12 @@ namespace UltraVideoEditor
 
             _isInitializing = false;
 
-            AutomationProperties.SetName(this, "Auto rasporedi slike");
+            AutomationProperties.SetName(this, "Auto arrange images");
         }
 
         private void btnBrowseLogo_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new WpfOpenFileDialog { Filter = "Slike|*.png;*.jpg;*.jpeg;*.bmp" };
+            var dialog = new WpfOpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp" };
             if (dialog.ShowDialog() == true)
             {
                 txtLogoPath.Text = dialog.FileName;
@@ -95,9 +95,9 @@ namespace UltraVideoEditor
                 : 0;
             WpfMessageBox.Show(
                 $"Local sound library: {soundsDir}\n\nNumber of files: {count}\n\n" +
-                "Stavi MP3/WAV fajlove u Assets/Sounds/ i podfolderima.\n" +
+                "Place MP3/WAV files in Assets/Sounds/ and its subfolders.\n" +
                 "AI automatically analyzes file names and selects the appropriate sound.",
-                "Lokalna biblioteka zvukova", MessageBoxButton.OK, MessageBoxImage.Information);
+                "Local sound library", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void EffectMode_Changed(object sender, SelectionChangedEventArgs e)
@@ -109,7 +109,7 @@ namespace UltraVideoEditor
             if (selected != null && selected.Content != null)
             {
                 string mode = selected.Content.ToString();
-                if (mode.Contains("Automatski"))
+                if (mode.Contains("Automatic"))
                 {
                     EffectMode = "auto";
                     txtEffectSequence.IsEnabled = false;

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="🎬 AI Video Creator" Height="950" Width="950"
-        WindowStartupLocation="CenterOwner" Background="#1E1E1E"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource PanelBg}"
         AutomationProperties.Name="AI Video Creator - automatic video creation">
 
     <Grid Margin="15">
@@ -25,51 +25,51 @@
         </Grid.RowDefinitions>
 
         <TextBlock Text="🎬 AI VIDEO CREATOR" FontSize="18" FontWeight="Bold"
-                   Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                   Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
         <!-- Status Ollama -->
-        <Border Grid.Row="1" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
-            <TextBlock x:Name="txtOllamaStatus" Foreground="#FF9800" TextWrapping="Wrap"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+            <TextBlock x:Name="txtOllamaStatus" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"
                        Text="🔍 Checking Ollama..."/>
         </Border>
 
         <!-- Song lyrics -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,5,0,3">
-            <TextBlock Text="📝 Song lyrics (one line per row):" Foreground="White"
+            <TextBlock Text="📝 Song lyrics (one line per row):" Foreground="{DynamicResource TextPrimary}"
                        VerticalAlignment="Center" Margin="0,0,10,0"/>
             <!-- Dugme za automatsku transkripciju -->
             <Button x:Name="btnAutoTranscribe" Content="🎤 Transcribe from audio"
                     Height="26" Padding="8,0"
-                    Background="#1565C0" Foreground="White" BorderThickness="0"
+                    Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}" BorderThickness="0"
                     FontSize="11" Cursor="Hand"
                     Click="btnAutoTranscribe_Click"
                     AutomationProperties.Name="Automatically transcribe text from audio file using Whisper AI"
                     ToolTip="Whisper AI automatically recognizes song lyrics from the loaded audio file"/>
-            <TextBlock x:Name="txtTranscribeStatus" Foreground="#FF9800" FontSize="10"
+            <TextBlock x:Name="txtTranscribeStatus" Foreground="{DynamicResource WarningBrush}" FontSize="10"
                        VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
         </StackPanel>
         <TextBox x:Name="txtLyrics" Grid.Row="3" Height="100" TextWrapping="Wrap" AcceptsReturn="True"
-                 Background="#2D2D2D" Foreground="White" FontSize="12" Padding="5"
+                 Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Padding="5"
                  AutomationProperties.Name="Song lyrics input field. Press Tab for the Transcribe button which auto-fills text from the audio file."
                  AutomationProperties.HelpText="Enter song lyrics, each line on a new row. Or use the Transcribe button for automatic recognition."
                  TextChanged="txtLyrics_TextChanged"/>
 
         <!-- Filteri -->
-        <Border Grid.Row="4" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,10,0,10">
+        <Border Grid.Row="4" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,10,0,10">
             <StackPanel>
-                <TextBlock Text="🎛️ Filteri pretrage" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Text="🎛️ Filteri pretrage" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Media type:" Foreground="White" Width="100" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cmbMediaType" Width="120" Height="25" Background="#2D2D2D" Foreground="White">
+                    <TextBlock Text="Media type:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="cmbMediaType" Width="120" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" AutomationProperties.Name="Media type">
                         <ComboBoxItem Content="Videos" Tag="video" IsSelected="True"/>
                         <ComboBoxItem Content="Images" Tag="photo"/>
                     </ComboBox>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Min. resolution:" Foreground="White" Width="100" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cmbMinResolution" Width="120" Height="25" Background="#2D2D2D" Foreground="White">
+                    <TextBlock Text="Min. resolution:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="cmbMinResolution" Width="120" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" AutomationProperties.Name="Minimum resolution">
                         <ComboBoxItem Content="HD (720p)" Tag="720" IsSelected="True"/>
                         <ComboBoxItem Content="Full HD (1080p)" Tag="1080"/>
                         <ComboBoxItem Content="2K" Tag="1440"/>
@@ -80,98 +80,98 @@
         </Border>
 
         <!-- Table for keyword preview -->
-        <Border Grid.Row="5" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+        <Border Grid.Row="5" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="🔑 AI keyword suggestions (automatic)" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
-                <ListBox x:Name="lstKeywords" Height="120" Background="#1A1A1A" Foreground="White"
+                <TextBlock Text="🔑 AI keyword suggestions (automatic)" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,8"/>
+                <ListBox x:Name="lstKeywords" Height="120" Background="#1A1A1A" Foreground="{DynamicResource ButtonTextBrush}"
                          AutomationProperties.Name="Keyword list by lyric lines"/>
             </StackPanel>
         </Border>
 
         <!-- Logo -->
-        <Border Grid.Row="6" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+        <Border Grid.Row="6" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="🏷️ Logo kanala" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Text="🏷️ Channel logo" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Logo path:" Foreground="White" Width="100" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtLogoPath" Width="250" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"/>
-                    <Button x:Name="btnBrowseLogo" Content="📂" Click="btnBrowseLogo_Click" Width="40" Height="25" Background="#FF9800" Foreground="White"/>
+                    <TextBlock Text="Logo path:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtLogoPath" Width="250" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Padding="3" AutomationProperties.Name="Logo path"/>
+                    <Button x:Name="btnBrowseLogo" Content="📂" Click="btnBrowseLogo_Click" Width="40" Height="25" Background="{DynamicResource WarningBrush}" Foreground="{DynamicResource ButtonTextBrush}" AutomationProperties.Name="Browse for logo file"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <CheckBox x:Name="chkShowLogo" Content="Show logo at start" Foreground="White" IsChecked="False" Margin="0,0,20,0"/>
-                    <TextBlock Text="Logo duration (s):" Foreground="White" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtLogoDuration" Width="50" Height="25" Text="5" Background="#2D2D2D" Foreground="White" Margin="5,0,0,0"/>
+                    <CheckBox x:Name="chkShowLogo" Content="Show logo at start" Foreground="{DynamicResource TextPrimary}" IsChecked="False" Margin="0,0,20,0"/>
+                    <TextBlock Text="Logo duration (s):" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtLogoDuration" Width="50" Height="25" Text="5" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="5,0,0,0" AutomationProperties.Name="Logo duration in seconds"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- Tekstovi -->
-        <Border Grid.Row="7" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+        <Border Grid.Row="7" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="📝 Texts" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Text="📝 Texts" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,8"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Intro text (song title):" Foreground="White" Width="140" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtIntroText" Width="260" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
-                             Text=""/>
+                    <TextBlock Text="Intro text (song title):" Foreground="{DynamicResource TextPrimary}" Width="140" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtIntroText" Width="260" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Padding="3"
+                             Text="" AutomationProperties.Name="Intro text, song title"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <TextBlock Text="Outro text:" Foreground="White" Width="140" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtOutroText" Width="260" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
-                             Text=""/>
+                    <TextBlock Text="Outro text:" Foreground="{DynamicResource TextPrimary}" Width="140" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtOutroText" Width="260" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Padding="3"
+                             Text="" AutomationProperties.Name="Outro text"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Channel name:" Foreground="White" Width="140" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtChannelName" Width="250" Height="25" Background="#2D2D2D" Foreground="White" Padding="3"
-                             Text="Rastimo uz Iskru"/>
+                    <TextBlock Text="Channel name:" Foreground="{DynamicResource TextPrimary}" Width="140" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtChannelName" Width="250" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Padding="3"
+                             Text="Rastimo uz Iskru" AutomationProperties.Name="Channel name"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- Opcije -->
-        <Border Grid.Row="8" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+        <Border Grid.Row="8" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
                 <CheckBox x:Name="chkShowLyrics" Content="🎤 Show lyrics on screen (as subtitles)" 
-                          Foreground="White" IsChecked="False" Margin="0,0,0,8"
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="False" Margin="0,0,0,8"
                           AutomationProperties.Name="Show lyrics on screen during video"/>
 
                 <CheckBox x:Name="chkTransitionSounds" Content="🔊 Sounds on scene change (pop/whoosh effects)" 
-                          Foreground="White" IsChecked="True" Margin="0,0,0,8"
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="True" Margin="0,0,0,8"
                           AutomationProperties.Name="Add sounds during scene transitions"/>
 
                 <CheckBox x:Name="chkAmbientSounds" Content="🌳 Ambient sounds (birds, sea, wind...)" 
-                          Foreground="White" IsChecked="True" Margin="0,0,0,8"
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="True" Margin="0,0,0,8"
                           AutomationProperties.Name="Add ambient sounds according to scenes"/>
 
                 <CheckBox x:Name="chkVoiceNarration" Content="🗣️ Voice scene narration (describes what is happening)" 
-                          Foreground="White" IsChecked="False" Margin="0,0,0,5"
-                          AutomationProperties.Name="Govorna najava za slijepe korisnike"/>
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="False" Margin="0,0,0,5"
+                          AutomationProperties.Name="Voice announcement for blind users"/>
 
                 <TextBlock Text="ℹ️ Recommended for audio description and better comprehension" 
-                           Foreground="#888888" FontSize="10" Margin="25,0,0,0"/>
+                           Foreground="{DynamicResource TextSecondary}" FontSize="10" Margin="25,0,0,0"/>
 
-                <CheckBox x:Name="chkFastRender" Content="⚡ Brzi render — bez Ken Burns efekta (za testiranje)" 
+                <CheckBox x:Name="chkFastRender" Content="⚡ Fast render — without Ken Burns effect (for testing)" 
                           Foreground="#FFD700" IsChecked="True" Margin="0,10,0,0"
                           AutomationProperties.Name="Fast render without Ken Burns zoom effect, recommended for testing"/>
             </StackPanel>
         </Border>
 
-        <!-- Tema videa -->
-        <Border Grid.Row="9" Background="#2A2A2A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+        <!-- Video theme -->
+        <Border Grid.Row="9" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
             <StackPanel>
-                <TextBlock Text="🎬 Tema videa:" Foreground="#00E676" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Text="🎬 Video theme:" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,8"/>
                 <StackPanel Orientation="Horizontal">
-                    <ComboBox x:Name="cmbVideoTheme" Width="220" Height="25" Background="#2D2D2D" Foreground="White">
-                        <ComboBoxItem Content="🎉 Zabava (brze scene, visoka energija)" Tag="fun" IsSelected="True"/>
-                        <ComboBoxItem Content="😴 Uspavljivanje (spori tempo, mirno)" Tag="calm"/>
+                    <ComboBox x:Name="cmbVideoTheme" Width="220" Height="25" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" AutomationProperties.Name="Video theme">
+                        <ComboBoxItem Content="🎉 Fun (fast scenes, high energy)" Tag="fun" IsSelected="True"/>
+                        <ComboBoxItem Content="😴 Calm (slow tempo, peaceful)" Tag="calm"/>
                         <ComboBoxItem Content="📚 Education (repetition, instructive)" Tag="educational"/>
-                        <ComboBoxItem Content="🏃 Akcija (vrlo brzo, uzbudljivo)" Tag="action"/>
+                        <ComboBoxItem Content="🏃 Action (very fast, exciting)" Tag="action"/>
                     </ComboBox>
-                    <TextBlock Text="ℹ️ Affects the tempo and style of the video" Foreground="#888888" FontSize="10" Margin="10,5,0,0"/>
+                    <TextBlock Text="ℹ️ Affects the tempo and style of the video" Foreground="{DynamicResource TextSecondary}" FontSize="10" Margin="10,5,0,0"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -179,8 +179,8 @@
         <!-- Progress bar -->
         <StackPanel Grid.Row="10" Margin="0,5,0,5">
             <ProgressBar x:Name="prgProgress" Height="8" Minimum="0" Maximum="100" Value="0"
-                         Visibility="Collapsed" Background="#333" Foreground="#00E676"/>
-            <TextBlock x:Name="txtProgress" Text="" Foreground="#AAAAAA" FontSize="10"
+                         Visibility="Collapsed" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock x:Name="txtProgress" Text="" Foreground="{DynamicResource TextSecondary}" FontSize="10"
                        Margin="0,3,0,0" TextWrapping="Wrap"
                        AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
@@ -189,31 +189,33 @@
         <Border Grid.Row="14" Background="#1A3A1A" CornerRadius="4" Padding="8" Margin="0,0,0,6"
                 BorderBrush="#2E7D32" BorderThickness="1">
             <StackPanel>
-                <CheckBox x:Name="chkAutoRender" Content="Auto-Render posle generisanja (pokreni i idi spavati)"
+                <CheckBox x:Name="chkAutoRender" Content="Auto-render after generation (start and go to sleep)"
                           Foreground="#90EE90" FontWeight="Bold" IsChecked="False"
                           Checked="chkAutoRender_Checked" Unchecked="chkAutoRender_Checked"/>
                 <StackPanel x:Name="pnlAutoRenderPath" Orientation="Horizontal" Margin="0,6,0,0"
                             Visibility="Collapsed">
                     <TextBox x:Name="txtAutoRenderPath" Width="320" Height="25"
-                             Background="#2D2D2D" Foreground="White" Padding="3"
+                             Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Padding="3"
                              VerticalContentAlignment="Center"
                              Text="C:\Videos\iskra_video.mp4"
-                             ToolTip="Full path where the final video is saved"/>
+                             ToolTip="Full path where the final video is saved"
+                             AutomationProperties.Name="Output file path for the final video"/>
                     <Button Content="📁" Width="28" Height="25" Margin="4,0,0,0"
-                            Background="#333" Foreground="White"
-                            Click="btnAutoRenderBrowse_Click" ToolTip="Select folder"/>
+                            Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
+                            Click="btnAutoRenderBrowse_Click" ToolTip="Select folder"
+                            AutomationProperties.Name="Select output folder"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- Dugmad -->
         <StackPanel Grid.Row="15" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-            <Button x:Name="btnGenerate" Content="🎬 KREIRAJ VIDEO" Click="btnGenerate_Click"
-                    Width="150" Height="40" Background="#2E7D32" Foreground="White"
+            <Button x:Name="btnGenerate" Content="🎬 CREATE VIDEO" Click="btnGenerate_Click"
+                    Width="150" Height="40" Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                     FontSize="13" FontWeight="Bold" Margin="0,0,10,0"
                     IsEnabled="False"/>
-            <Button x:Name="btnCancel" Content="❌ CANCEL" Click="btnCancel_Click"
-                    Width="100" Height="40" Background="#B71C1C" Foreground="White"
+            <Button x:Name="btnCancel" Content="❌ CANCEL" Click="btnCancel_Click" IsCancel="True"
+                    Width="100" Height="40" Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                     FontSize="13" FontWeight="Bold"/>
         </StackPanel>
     </Grid>

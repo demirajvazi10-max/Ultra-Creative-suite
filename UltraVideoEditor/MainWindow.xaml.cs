@@ -76,7 +76,15 @@ namespace UltraVideoEditor
         private string _tempVideoFolder = Path.GetTempPath();
         private List<double> markers = new List<double>();
         private List<TransitionEffect> transitions = new List<TransitionEffect>();
-        private bool accessibilityMode = true;
+
+        // ── Display mode (Sighted / Accessibility / Low Vision) ──────────────
+        // accessibilityMode is kept as a read-only computed property so the
+        // ~20 existing "if (accessibilityMode) ..." call sites throughout this
+        // file keep working unchanged; the actual state now lives in _uiMode.
+        private enum UIMode { Sighted, Accessibility, LowVision }
+        private UIMode _uiMode = UIMode.Sighted;
+        private bool accessibilityMode => _uiMode == UIMode.Accessibility;
+
         private System.Windows.Forms.Timer _selectionDebounceTimer;
         private bool _selectionProcessing = false;
         private TimelineItem _pendingPlaybackItem = null;
@@ -215,6 +223,7 @@ namespace UltraVideoEditor
                 {
                     ApplyLanguage();
                     LoadSavedTheme();
+                    DetectAndApplyInitialMode();
                     LogMessage("System ready...", true);
                 };
             }
@@ -322,6 +331,9 @@ namespace UltraVideoEditor
             if (fe is System.Windows.Controls.Button btn)
             {
                 btn.Content = content;
+                // Accessible name: clean text without emoji, so JAWS/NVDA don't announce
+                // confusing emoji glyph names (e.g. "page facing up") before the label.
+                System.Windows.Automation.AutomationProperties.SetName(btn, translated + shortcut);
                 // ToolTip = only translated text without shortcut, so JAWS reads clearly
                 if (btn.ToolTip is string || btn.ToolTip == null)
                     btn.ToolTip = translated + shortcut;
@@ -329,7 +341,10 @@ namespace UltraVideoEditor
             else if (fe is System.Windows.Controls.TextBlock tb)
                 tb.Text = content;
             else if (fe is System.Windows.Controls.Label lbl)
+            {
                 lbl.Content = content;
+                System.Windows.Automation.AutomationProperties.SetName(lbl, translated + shortcut);
+            }
         }
 
         /// <summary>
@@ -352,6 +367,9 @@ namespace UltraVideoEditor
                     string langKey = parts.Length >= 2 ? parts[1] : parts[0];
                     string translated = L(langKey);
                     mi.Header = string.IsNullOrEmpty(emoji) ? translated : emoji + " " + translated;
+                    // Accessible name: clean text without emoji, so JAWS/NVDA read the
+                    // menu label directly instead of an emoji glyph description first.
+                    System.Windows.Automation.AutomationProperties.SetName(mi, translated);
                 }
             }
         }
@@ -384,30 +402,29 @@ namespace UltraVideoEditor
 
         private void ApplyTheme()
         {
-            string bg, bgPanel, accent;
-            switch (_currentTheme)
+            string themeFile = _currentTheme switch
             {
-                case "contrast":
-                    bg = "#000000"; bgPanel = "#111111"; accent = "#FFFF00";
-                    break;
-                case "light":
-                    bg = "#F0F0F0"; bgPanel = "#FFFFFF"; accent = "#1565C0";
-                    break;
-                default: // dark
-                    bg = "#1A1A2E"; bgPanel = "#1E1E1E"; accent = "#00E676";
-                    break;
-            }
+                "contrast" => "Themes/Theme.Contrast.xaml",
+                "light"    => "Themes/Theme.Light.xaml",
+                _          => "Themes/Theme.Dark.xaml"
+            };
+
             try
             {
-                var conv = new System.Windows.Media.BrushConverter();
-                this.Background = (System.Windows.Media.Brush)conv.ConvertFrom(bg);
-                if (txtJawsLog != null)
+                var newDict = new ResourceDictionary
                 {
-                    txtJawsLog.Background = (System.Windows.Media.Brush)conv.ConvertFrom(bgPanel);
-                    txtJawsLog.Foreground = (System.Windows.Media.Brush)conv.ConvertFrom(accent);
-                }
-                if (txtStatus != null)
-                    txtStatus.Foreground = (System.Windows.Media.Brush)conv.ConvertFrom(accent);
+                    Source = new Uri(themeFile, UriKind.Relative)
+                };
+
+                // Replace the theme dictionary at the Application level. Every open
+                // window (MainWindow and any modeless dialogs like LogWindow or
+                // VideoReviewDialog) uses DynamicResource for its colors, so this one
+                // swap updates the whole app immediately — no need to touch each
+                // window individually.
+                var merged = System.Windows.Application.Current.Resources.MergedDictionaries;
+                merged.Clear();
+                merged.Add(newDict);
+
                 // Snimi temu
                 try
                 {
@@ -707,12 +724,12 @@ namespace UltraVideoEditor
             redoStack.Clear();
             UpdateTimelineDisplay();
             lstSubtitles.Items.Clear();
-            LogMessage("Napravljen novi projekat", true);
+            LogMessage("New project created", true);
         }
 
         private void SaveProject_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfSaveFileDialog { Filter = "Iskra Projekat|*.iskra", DefaultExt = "iskra", FileName = "projekat.iskra" };
+            var d = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
             if (d.ShowDialog() == true)
             {
                 try
@@ -742,7 +759,7 @@ namespace UltraVideoEditor
 
         private void SaveAsProject_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfSaveFileDialog { Filter = "Iskra Projekat|*.iskra", DefaultExt = "iskra", FileName = "projekat.iskra" };
+            var d = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
             if (d.ShowDialog() == true)
             {
                 try
@@ -772,7 +789,7 @@ namespace UltraVideoEditor
 
         private async void LoadProject_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfOpenFileDialog { Filter = "Iskra Projekat|*.iskra" };
+            var d = new WpfOpenFileDialog { Filter = "Iskra Project|*.iskra" };
             if (d.ShowDialog() == true)
             {
                 try
@@ -880,7 +897,7 @@ namespace UltraVideoEditor
                 undoStack.Push(currentCopy);
                 timelineItems = next;
                 UpdateTimelineDisplay();
-                LogMessage("Ponovljeno", true);
+                LogMessage("Redone", true);
                 PlayBeep();
             }
             else LogMessage(L("no_more_redo2"), true);
@@ -894,17 +911,17 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
                 _copiedClip = DeepCloneTimelineItem(item);
-                LogMessage($"Kopiran klip: {item.Name}", true);
+                LogMessage($"Copied clip: {item.Name}", true);
                 PlayBeep();
             }
-            else LogMessage("Nema selektovanog klipa za kopiranje", true);
+            else LogMessage("No clip selected to copy", true);
         }
 
         private void PasteClip_Click(object sender, RoutedEventArgs e)
         {
             if (_copiedClip == null)
             {
-                LogMessage("Nema kopiranog klipa za lepljenje", true);
+                LogMessage("No copied clip to paste", true);
                 return;
             }
             SaveState();
@@ -912,7 +929,7 @@ namespace UltraVideoEditor
             newClip.Name = _copiedClip.Name + " (kopija)";
             timelineItems.Add(newClip);
             UpdateTimelineDisplay();
-            LogMessage("Klip nalepljen", true);
+            LogMessage("Clip pasted", true);
             PlayBeep();
         }
 
@@ -926,12 +943,12 @@ namespace UltraVideoEditor
                     {
                         item.Selected = true;
                     }
-                    LogMessage($"Selektovano {nativeListView.Items.Count} klipova", true);
+                    LogMessage($"Selected {nativeListView.Items.Count} clips", true);
                     PlayBeep();
                 }
                 else
                 {
-                    LogMessage("Nema klipova za selektovanje", true);
+                    LogMessage("No clips to select", true);
                 }
             }
             catch (Exception ex)
@@ -944,7 +961,7 @@ namespace UltraVideoEditor
         {
             markers.Clear();
             UpdateMarkerDisplay();
-            LogMessage("Svi markeri obrisani", true);
+            LogMessage("All markers deleted", true);
             PlayBeep();
         }
 
@@ -961,7 +978,7 @@ namespace UltraVideoEditor
             {
                 _logWindow.Show();
                 _logWindow.Activate();
-                LogMessage("Log prozor otvoren", true);
+                LogMessage("Log window opened", true);
             }
         }
 
@@ -971,7 +988,7 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
             if (cmbTrackSelector != null)
                 cmbTrackSelector.SelectedIndex = 4;
-            LogMessage("Prikazane sve trake", true);
+            LogMessage("Showing all tracks", true);
         }
 
         private void ShowVideoTracksOnly_Click(object sender, RoutedEventArgs e)
@@ -999,7 +1016,7 @@ namespace UltraVideoEditor
                 SaveState();
                 item.TrackIndex--;
                 UpdateTimelineDisplay();
-                LogMessage($"Klip pomeren na traku {item.TrackIndex + 1}", true);
+                LogMessage($"Clip moved to track {item.TrackIndex + 1}", true);
                 PlayBeep();
             }
             else LogMessage(L("cant_move_higher"), true);
@@ -1012,7 +1029,7 @@ namespace UltraVideoEditor
                 SaveState();
                 item.TrackIndex++;
                 UpdateTimelineDisplay();
-                LogMessage($"Klip pomeren na traku {item.TrackIndex + 1}", true);
+                LogMessage($"Clip moved to track {item.TrackIndex + 1}", true);
                 PlayBeep();
             }
             else LogMessage(L("cant_move_lower"), true);
@@ -1029,10 +1046,10 @@ namespace UltraVideoEditor
                     item.VideoEffect.Contrast = 0;
                     item.VideoEffect.Blur = 0;
                 }
-                LogMessage($"Efekti resetovani na {item.Name}", true);
+                LogMessage($"Effects reset on {item.Name}", true);
                 PlayBeep();
             }
-            else LogMessage("Selektuj klip prvo", true);
+            else LogMessage("Select a clip first", true);
         }
 
         private void ShowVideoEffectsTab_Click(object sender, RoutedEventArgs e) => tabEffects.IsSelected = true;
@@ -1045,7 +1062,7 @@ namespace UltraVideoEditor
         {
             if (markers.Count == 0)
             {
-                LogMessage("Nema markera", true);
+                LogMessage("No markers", true);
                 return;
             }
             string markerList = string.Join(", ", markers.Select(m => FormatTime(m)));
@@ -1111,7 +1128,7 @@ namespace UltraVideoEditor
             if (e.Data.GetDataPresent(WpfDataFormats.FileDrop))
             {
                 e.Effects = WpfDragDropEffects.Copy;
-                if (accessibilityMode) LogMessage("Prevucite fajlove za dodavanje na timeline", true);
+                if (accessibilityMode) LogMessage("Drag files to add them to the timeline", true);
             }
             else
             {
@@ -1143,7 +1160,7 @@ namespace UltraVideoEditor
             string[] files = (string[])e.Data.GetData(WpfDataFormats.FileDrop);
             if (files == null || files.Length == 0)
             {
-                if (accessibilityMode) LogMessage("Nema fajlova", true);
+                if (accessibilityMode) LogMessage("No files", true);
                 return;
             }
             var supportedExtensions = new[] { ".mp4", ".avi", ".mov", ".mkv", ".mp3", ".wav", ".m4a", ".flac", ".ogg", ".jpg", ".jpeg", ".png", ".bmp" };
@@ -1153,7 +1170,7 @@ namespace UltraVideoEditor
                 if (accessibilityMode) LogMessage(L("unsupported_file"), true);
                 return;
             }
-            if (accessibilityMode) LogMessage($"Dodavanje {validFiles.Length} fajlova...", true);
+            if (accessibilityMode) LogMessage($"Adding {validFiles.Length} files...", true);
             SaveState();
             int videoCount = 0, audioCount = 0, imageCount = 0;
             foreach (string file in validFiles)
@@ -1204,7 +1221,7 @@ namespace UltraVideoEditor
                 }
             }
             UpdateTimelineDisplay();
-            if (accessibilityMode) LogMessage($"Dodato: {videoCount} video, {audioCount} audio, {imageCount} slika", true);
+            if (accessibilityMode) LogMessage($"Added: {videoCount} video, {audioCount} audio, {imageCount} images", true);
             PlayBeep();
             e.Handled = true;
         }
@@ -1259,14 +1276,14 @@ namespace UltraVideoEditor
                 markers.Add(currentPlaybackPosition);
                 markers.Sort();
                 UpdateMarkerDisplay();
-                LogMessage($"Marker dodat {FormatTime(currentPlaybackPosition)}", true);
+                LogMessage($"Marker added {FormatTime(currentPlaybackPosition)}", true);
                 PlayBeep();
             }
         }
 
         private void NextMarker_Click(object sender, RoutedEventArgs e)
         {
-            if (markers.Count == 0) { LogMessage("Nema markera", true); return; }
+            if (markers.Count == 0) { LogMessage("No markers", true); return; }
             var next = markers.FirstOrDefault(m => m > currentPlaybackPosition + 0.1);
             if (next > 0)
             {
@@ -1288,7 +1305,7 @@ namespace UltraVideoEditor
 
         private void PrevMarker_Click(object sender, RoutedEventArgs e)
         {
-            if (markers.Count == 0) { LogMessage("Nema markera", true); return; }
+            if (markers.Count == 0) { LogMessage("No markers", true); return; }
             var prev = markers.LastOrDefault(m => m < currentPlaybackPosition - 0.1);
             if (prev > 0)
             {
@@ -1312,7 +1329,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
                 return;
             }
 
@@ -1427,10 +1444,10 @@ namespace UltraVideoEditor
                     timelineItems.RemoveAt(oldIndex);
                     timelineItems.Insert(oldIndex - 1, item);
                     UpdateTimelineDisplay();
-                    LogMessage("Klip pomeren levo", true);
+                    LogMessage("Clip moved left", true);
                     PlayBeep();
                 }
-                else LogMessage("Nema klipa levo", true);
+                else LogMessage("No clip to the left", true);
             }
         }
 
@@ -1445,10 +1462,10 @@ namespace UltraVideoEditor
                     timelineItems.RemoveAt(oldIndex);
                     timelineItems.Insert(oldIndex + 1, item);
                     UpdateTimelineDisplay();
-                    LogMessage("Klip pomeren desno", true);
+                    LogMessage("Clip moved right", true);
                     PlayBeep();
                 }
-                else LogMessage("Nema klipa desno", true);
+                else LogMessage("No clip to the right", true);
             }
         }
 
@@ -1462,11 +1479,11 @@ namespace UltraVideoEditor
                 {
                     item.Duration = dialog.Duration;
                     UpdateTimelineDisplay();
-                    LogMessage($"Trajanje promenjeno na {FormatTime(item.Duration)}", true);
+                    LogMessage($"Duration changed to {FormatTime(item.Duration)}", true);
                     PlayBeep();
                 }
             }
-            else LogMessage("Selektuj klip prvo", true);
+            else LogMessage("Select a clip first", true);
         }
 
         private async void SetClipVolume_Click(object sender, RoutedEventArgs e)
@@ -1483,7 +1500,7 @@ namespace UltraVideoEditor
                     if (_mediaPlayer != null && _mediaPlayer.IsPlaying) _mediaPlayer.Volume = (int)item.Volume;
                 }
             }
-            else LogMessage("Selektuj klip prvo", true);
+            else LogMessage("Select a clip first", true);
         }
 
         private void RemoveFromTimeline_Click(object sender, RoutedEventArgs e)
@@ -1493,7 +1510,7 @@ namespace UltraVideoEditor
                 SaveState();
                 timelineItems.Remove(item);
                 UpdateTimelineDisplay();
-                LogMessage("Klip obrisan", true);
+                LogMessage("Clip deleted", true);
                 PlayBeep();
             }
         }
@@ -1516,7 +1533,7 @@ namespace UltraVideoEditor
             }
             if (_currentMedia == null)
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
                 return;
             }
             if (isPlaying)
@@ -1535,7 +1552,7 @@ namespace UltraVideoEditor
                 var selItem = nativeListView?.SelectedItems.Count > 0
                     ? nativeListView.SelectedItems[0].Tag as TimelineItem : null;
                 if (selItem != null)
-                    LogMessage($"Reprodukcija: {selItem.Name}, trajanje {FormatTime(selItem.Duration)}", true);
+                    LogMessage($"Playing: {selItem.Name}, duration {FormatTime(selItem.Duration)}", true);
                 else
                     LogMessage("Reprodukcija pokrenuta", true);
             }
@@ -1549,7 +1566,7 @@ namespace UltraVideoEditor
             _mediaPlayer.Time = newTime;
             currentPlaybackPosition = newTime / 1000.0;
             UpdatePositionDisplay();
-            if (accessibilityMode) LogMessage($"Premotano napred {FormatTime(currentPlaybackPosition)}", true);
+            if (accessibilityMode) LogMessage($"Fast-forwarded to {FormatTime(currentPlaybackPosition)}", true);
         }
 
         private void SeekBack_Click(object sender, RoutedEventArgs e)
@@ -1560,14 +1577,14 @@ namespace UltraVideoEditor
             _mediaPlayer.Time = newTime;
             currentPlaybackPosition = newTime / 1000.0;
             UpdatePositionDisplay();
-            if (accessibilityMode) LogMessage($"Premotano unazad {FormatTime(currentPlaybackPosition)}", true);
+            if (accessibilityMode) LogMessage($"Rewound to {FormatTime(currentPlaybackPosition)}", true);
         }
 
         private void AddVideoTrack_Click(object sender, RoutedEventArgs e)
         {
             int maxTrackIndex = timelineItems.Any() ? timelineItems.Max(x => x.TrackIndex) : 0;
             int newTrackIndex = maxTrackIndex + 1;
-            LogMessage($"Dodata nova video traka {newTrackIndex + 1}", true);
+            LogMessage($"Added new video track {newTrackIndex + 1}", true);
             PlayBeep();
         }
 
@@ -1575,7 +1592,7 @@ namespace UltraVideoEditor
         {
             int maxTrackIndex = timelineItems.Any() ? timelineItems.Max(x => x.TrackIndex) : 2;
             int newTrackIndex = maxTrackIndex + 1;
-            LogMessage($"Dodata nova audio traka {newTrackIndex + 1}", true);
+            LogMessage($"Added new audio track {newTrackIndex + 1}", true);
             PlayBeep();
         }
 
@@ -1585,7 +1602,7 @@ namespace UltraVideoEditor
             {
                 currentTrackFilter = int.Parse(item.Tag.ToString());
                 UpdateTimelineDisplay();
-                LogMessage($"Prikazana traka: {((ComboBoxItem)cmbTrackSelector.SelectedItem).Content}", true);
+                LogMessage($"Showing track: {((ComboBoxItem)cmbTrackSelector.SelectedItem).Content}", true);
             }
         }
 
@@ -1598,10 +1615,10 @@ namespace UltraVideoEditor
                 item.VideoEffect.Brightness = sldBrightness?.Value ?? 0;
                 item.VideoEffect.Contrast = sldContrast?.Value ?? 0;
                 item.VideoEffect.Blur = sldBlur?.Value ?? 0;
-                LogMessage($"Efekti primenjeni na {item.Name}", true);
+                LogMessage($"Effects applied to {item.Name}", true);
                 PlayBeep();
             }
-            else LogMessage("Selektuj klip prvo", true);
+            else LogMessage("Select a clip first", true);
         }
 
         private void UpdateAudioEffects()
@@ -1635,7 +1652,7 @@ namespace UltraVideoEditor
             }
             if (!File.Exists(item.Path))
             {
-                LogMessage("Audio fajl ne postoji", true);
+                LogMessage("Audio file does not exist", true);
                 return;
             }
             try
@@ -1753,7 +1770,7 @@ namespace UltraVideoEditor
         private void sldTransitionDuration_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             transitionDuration = sldTransitionDuration.Value;
-            if (accessibilityMode) LogMessage($"Trajanje tranzicije: {transitionDuration:F1} sekundi", true);
+            if (accessibilityMode) LogMessage($"Transition duration: {transitionDuration:F1} seconds", true);
         }
 
         private void Transition_Selected(object sender, SelectionChangedEventArgs e)
@@ -1776,7 +1793,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                LogMessage("Selektuj prvi klip od para za uklanjanje tranzicije", true);
+                LogMessage("Select the first clip of the pair to remove the transition", true);
             }
         }
 
@@ -1810,7 +1827,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
                 return;
             }
             double time = currentPlaybackPosition - item.Start;
@@ -1827,7 +1844,7 @@ namespace UltraVideoEditor
             };
             item.AddKeyframe(kf);
             UpdateKeyframeList(item);
-            LogMessage($"Keyframe dodat na {FormatTime(time)}", true);
+            LogMessage($"Keyframe added at {FormatTime(time)}", true);
             PlayBeep();
         }
         private void AddKenBurnsKeyframes(TimelineItem item, double duration)
@@ -1872,7 +1889,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Selektuj klip za pregled animacije", true);
+                LogMessage("Select a clip to preview the animation", true);
                 return;
             }
             LogMessage(L("animation_preview_note"), true);
@@ -1908,11 +1925,11 @@ namespace UltraVideoEditor
         private async void GenerateVoice_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) { WpfMessageBox.Show(L("save_project_first2")); return; }
-            if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage("Unesi tekst prvo", true); return; }
+            if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage("Enter text first", true); return; }
             btnGenerateVoice.IsEnabled = false;
             prgVoice.Visibility = Visibility.Visible;
             txtVoiceStatus.Text = "Generating...";
-            LogMessage("Generisanje AI glasa...", true);
+            LogMessage("Generating AI voice...", true);
             string lang = rbSrb.IsChecked == true ? "sr" : "en";
             string voiceoverPath = Path.Combine(currentProjectFolder, "AI_Voiceover.mp3");
             try
@@ -1926,9 +1943,9 @@ namespace UltraVideoEditor
                     File.WriteAllBytes(voiceoverPath, audioData);
                 }
                 SaveState();
-                timelineItems.Add(new TimelineItem { Path = voiceoverPath, Duration = GetAudioDuration(voiceoverPath), Name = "AI Glas", Type = "Audio", Volume = 100, TrackIndex = 2, VideoEffect = new VideoEffectData() });
+                timelineItems.Add(new TimelineItem { Path = voiceoverPath, Duration = GetAudioDuration(voiceoverPath), Name = "AI Voice", Type = "Audio", Volume = 100, TrackIndex = 2, VideoEffect = new VideoEffectData() });
                 UpdateTimelineDisplay();
-                LogMessage("AI glas generisan", true);
+                LogMessage("AI voice generated", true);
                 txtVoiceStatus.Text = L("voice_done");
                 PlayBeep();
             }
@@ -1938,7 +1955,7 @@ namespace UltraVideoEditor
         private async void GenerateAI_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) { WpfMessageBox.Show(L("save_project_first2")); return; }
-            if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text)) { LogMessage("Unesi opis slike", true); return; }
+            if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text)) { LogMessage("Enter an image description", true); return; }
             string apiToken = GetCloudflareApiKey();
             if (string.IsNullOrEmpty(apiToken))
             {
@@ -1988,7 +2005,7 @@ namespace UltraVideoEditor
                                 SaveState();
                                 var dialog = new DurationDialog(5.0);
                                 double duration = dialog.ShowDialog() == true ? dialog.Duration : 5.0;
-                                LogMessage("Generisem opis za: " + cleanP + "...", false);
+                                LogMessage("Generating description for: " + cleanP + "...", false);
                                 string imgDesc = await GenerateImageDescriptionAsync(img, cleanP);
                                 if (string.IsNullOrEmpty(imgDesc)) imgDesc = "AI generisana slika: " + cleanP;
 
@@ -2004,7 +2021,7 @@ namespace UltraVideoEditor
                                     VideoEffect = new VideoEffectData()
                                 });
                                 generated++;
-                                LogMessage("Slika " + (idx + 1) + " gotova. Opis: " + imgDesc, true);
+                                LogMessage("Image " + (idx + 1) + " ready. Description: " + imgDesc, true);
                             }
                             else
                             {
@@ -2026,7 +2043,7 @@ namespace UltraVideoEditor
             btnGenerate.IsEnabled = true;
             prgAI.Visibility = Visibility.Collapsed;
             txtAIStatus.Text = string.Format(L("frames_done"), generated, prompts.Length);
-            LogMessage($"AI kadrovi generisani: {generated}/{prompts.Length}", true);
+            LogMessage($"AI frames generated: {generated}/{prompts.Length}", true);
             PlayBeep();
         }
 
@@ -2035,7 +2052,7 @@ namespace UltraVideoEditor
             if (cmbAudioClips.SelectedItem is TimelineItem item && item.IsAudio)
             {
                 selectedAudioPath = item.Path;
-                LogMessage($"Selektovan audio klip: {item.Name}", true);
+                LogMessage($"Selected audio clip: {item.Name}", true);
             }
         }
 
@@ -2044,7 +2061,7 @@ namespace UltraVideoEditor
             if (cmbTranscribeAudio.SelectedItem is TimelineItem item && item.IsAudio)
             {
                 selectedTranscribeAudioPath = item.Path;
-                LogMessage($"Selektovan audio za transkripciju: {item.Name}", true);
+                LogMessage($"Selected audio for transcription: {item.Name}", true);
             }
         }
 
@@ -2052,7 +2069,7 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(selectedTranscribeAudioPath))
             {
-                LogMessage("Selektuj audio fajl za transkripciju", true);
+                LogMessage("Select an audio file to transcribe", true);
                 return;
             }
 
@@ -2063,7 +2080,7 @@ namespace UltraVideoEditor
                     "faster-whisper-xxl not found.\n\n" +
                     "Preuzmi faster-whisper-xxl.exe i postavi ga pored UltraVideoEditor.exe.\n\n" +
                     "Besplatno: https://github.com/Purfview/whisper-standalone-win/releases",
-                    "Whisper nije instaliran", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Whisper is not installed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -2099,7 +2116,7 @@ namespace UltraVideoEditor
                             lstSubtitles.Items.Add($"{FormatTime(i * timePerSentence)} -> {FormatTime((i + 1) * timePerSentence)}: {sentence}.");
                         }
                     }
-                    LogMessage($"Dodato {sentences.Length} titlova iz transkripta", true);
+                    LogMessage($"Added {sentences.Length} subtitles from the transcript", true);
                 }
             }
             catch (Exception ex)
@@ -2112,8 +2129,8 @@ namespace UltraVideoEditor
 
         private async void SyncLyrics_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(selectedAudioPath)) { LogMessage("Selektuj audio klip prvo", true); return; }
-            if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage("Unesi tekst pesme", true); return; }
+            if (string.IsNullOrEmpty(selectedAudioPath)) { LogMessage("Select an audio clip first", true); return; }
+            if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage("Enter the song lyrics", true); return; }
             btnSyncLyrics.IsEnabled = false;
             prgSync.Visibility = Visibility.Visible;
             txtSyncStatus.Text = "Synchronizing...";
@@ -2122,7 +2139,7 @@ namespace UltraVideoEditor
             {
                 string[] lines = txtLyrics.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 var lyrics = lines.Where(l => !string.IsNullOrWhiteSpace(l.Trim())).ToList();
-                if (lyrics.Count == 0) { LogMessage("Nema ispravnih stihova", true); return; }
+                if (lyrics.Count == 0) { LogMessage("No valid lyric lines", true); return; }
                 double duration = GetAudioDuration(selectedAudioPath);
                 syncedSubtitles.Clear();
 
@@ -2145,7 +2162,7 @@ namespace UltraVideoEditor
                         var alignResult = await AITranscription.ForcedAlignAsync(
                             audioPath:   selectedAudioPath,
                             userLines:   lyrics,
-                            language:    _currentLanguage ?? "sr",
+                            language:    _currentLanguage ?? "en",
                             ffmpegPath:  ffmpegPath,
                             modelSize:   "small",
                             progress:    new Progress<string>(msg => Dispatcher.Invoke(() => txtSyncStatus.Text = msg)));
@@ -2160,7 +2177,7 @@ namespace UltraVideoEditor
                                     End   = line.EndSeconds
                                 });
                             usedAlignment = true;
-                            LogMessage($"✅ Forced alignment: {alignResult.Lines.Count} linija poravnano sa glasom", true);
+                            LogMessage($"✅ Forced alignment: {alignResult.Lines.Count} lines aligned with the voice", true);
 
                             // Proslijedi word-level timestamps AIVideoCreatoru
                             if (alignResult.WordTimings?.Count > 0)
@@ -2175,7 +2192,7 @@ namespace UltraVideoEditor
                         }
                         else
                         {
-                            LogMessage($"⚠ Alignment nije uspio ({alignResult.ErrorMessage}) — koristim ravnomjernu podjelu", true);
+                            LogMessage($"⚠ Alignment failed ({alignResult.ErrorMessage}) — using even distribution", true);
                         }
                     }
                     catch (Exception alignEx)
@@ -2207,14 +2224,14 @@ namespace UltraVideoEditor
 
         private void AddSyncedSubtitles_Click(object sender, RoutedEventArgs e)
         {
-            if (syncedSubtitles.Count == 0) { LogMessage("Nema titlova za dodavanje", true); return; }
+            if (syncedSubtitles.Count == 0) { LogMessage("No subtitles to add", true); return; }
             SaveState();
             foreach (var sub in syncedSubtitles)
             {
                 subtitles.Add(new SubtitleItem { Text = sub.Text, Start = sub.Start, End = sub.End });
                 lstSubtitles.Items.Add($"{FormatTime(sub.Start)} -> {FormatTime(sub.End)}: {sub.Text}");
             }
-            LogMessage($"Dodato {syncedSubtitles.Count} titlova", true);
+            LogMessage($"Added {syncedSubtitles.Count} subtitles", true);
             PlayBeep();
         }
 
@@ -2290,7 +2307,7 @@ namespace UltraVideoEditor
             if (videoItems.Count == 0)
             {
                 System.Windows.MessageBox.Show(
-                    "Nema video klipoiva na timeline-u.",
+                    "No video clips on the timeline.",
                     "Color Grading", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
                 return;
@@ -2300,7 +2317,7 @@ namespace UltraVideoEditor
             {
                 SaveState();
                 UpdateTimelineDisplay();
-                LogMessage("Color Grading: grade primenjen na timeline klipoive.", true);
+                LogMessage("Color Grading: grade applied to the timeline clips.", true);
             }
         }
 
@@ -2315,7 +2332,7 @@ namespace UltraVideoEditor
                 {
                     SaveState();
                     UpdateTimelineDisplay();
-                    LogMessage($"Smart Scene Detection: dodato {added.Count} scena na timeline.", true);
+                    LogMessage($"Smart Scene Detection: added {added.Count} scenes to the timeline.", true);
                 }
             }
         }
@@ -2340,7 +2357,7 @@ namespace UltraVideoEditor
                 foreach (var item in dlg.ResultItems)
                     timelineItems.Add(item);
                 UpdateTimelineDisplay();
-                LogMessage($"Timeline AI Asistent: primenjene promene. Klipoiva: {timelineItems.Count}", true);
+                LogMessage($"Timeline AI Assistant: changes applied. Clips: {timelineItems.Count}", true);
             }
         }
 
@@ -2373,7 +2390,7 @@ namespace UltraVideoEditor
                         cursor += seg.Duration;
                     }
                     UpdateTimelineDisplay();
-                    LogMessage($"Dodato {segments.Count} highlight segmenata na timeline.", true);
+                    LogMessage($"Added {segments.Count} highlight segments to the timeline.", true);
                     PlayBeep();
                     // Save for Phase 3
                     _lastHighlightResult      = dlg.PublicResult;
@@ -2385,12 +2402,12 @@ namespace UltraVideoEditor
 
         private void AddSubtitle_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage("Unesi tekst titla", true); return; }
+            if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage("Enter subtitle text", true); return; }
             if (!double.TryParse(txtSubStart?.Text, out double start) || !double.TryParse(txtSubEnd?.Text, out double end)) { LogMessage(L("time_format_error"), true); return; }
             subtitles.Add(new SubtitleItem { Text = txtSubtitleText.Text, Start = start, End = end });
             lstSubtitles.Items.Add($"{FormatTime(start)} -> {FormatTime(end)}: {txtSubtitleText.Text}");
             txtSubtitleText.Clear();
-            LogMessage("Titl dodat", true);
+            LogMessage("Subtitle added", true);
             PlayBeep();
         }
 
@@ -2398,7 +2415,7 @@ namespace UltraVideoEditor
         {
             subtitles.Clear();
             lstSubtitles.Items.Clear();
-            LogMessage("Titlovi obrisani", true);
+            LogMessage("Subtitles deleted", true);
             PlayBeep();
         }
 
@@ -2408,13 +2425,13 @@ namespace UltraVideoEditor
             if (dialog.ShowDialog() == true)
             {
                 currentExportSettings = dialog.Settings;
-                LogMessage($"Opcije izvoza: {currentExportSettings.Format}, {currentExportSettings.Quality}", true);
+                LogMessage($"Export options: {currentExportSettings.Format}, {currentExportSettings.Quality}", true);
             }
         }
 
         private async void AddVideoImage_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfOpenFileDialog { Multiselect = true, Filter = "Video i slike|*.mp4;*.avi;*.mov;*.mkv;*.jpg;*.png;*.jpeg;*.bmp" };
+            var d = new WpfOpenFileDialog { Multiselect = true, Filter = "Video and images|*.mp4;*.avi;*.mov;*.mkv;*.jpg;*.png;*.jpeg;*.bmp" };
             if (d.ShowDialog() == true)
             {
                 SaveState();
@@ -2432,7 +2449,7 @@ namespace UltraVideoEditor
                         string autoDesc = "";
                         if (type == "Image")
                         {
-                            LogMessage("Generisem opis za " + Path.GetFileName(f) + "...", false);
+                            LogMessage("Generating description for " + Path.GetFileName(f) + "...", false);
                             autoDesc = await GenerateImageDescriptionAsync(f);
                             if (string.IsNullOrEmpty(autoDesc))
                                 autoDesc = "Slika: " + Path.GetFileNameWithoutExtension(f);
@@ -2449,12 +2466,12 @@ namespace UltraVideoEditor
                             VideoEffect = new VideoEffectData()
                         });
                         if (!string.IsNullOrEmpty(autoDesc))
-                            LogMessage("Dodato: " + Path.GetFileName(f) + ". Opis: " + autoDesc, true);
+                            LogMessage("Added: " + Path.GetFileName(f) + ". Description: " + autoDesc, true);
                     }
                     catch (Exception ex) { LogMessage(string.Format(L("generic_error"), ex.Message), true); }
                 }
                 UpdateTimelineDisplay();
-                LogMessage($"Stavki dodato {d.FileNames.Length}", true);
+                LogMessage($"Items added: {d.FileNames.Length}", true);
                 PlayBeep();
             }
         }
@@ -2477,7 +2494,7 @@ namespace UltraVideoEditor
                     catch (Exception ex) { LogMessage(string.Format(L("generic_error"), ex.Message), true); }
                 }
                 UpdateTimelineDisplay();
-                LogMessage($"Stavki dodato {d.FileNames.Length}", true);
+                LogMessage($"Items added: {d.FileNames.Length}", true);
                 PlayBeep();
             }
         }
@@ -2535,7 +2552,7 @@ namespace UltraVideoEditor
             if (added > 0)
             {
                 UpdateTimelineDisplay();
-                LogMessage($"Sa YouTube-a dodato {added} fajl(ova) na timeline.", true);
+                LogMessage($"Added {added} file(s) from YouTube to the timeline.", true);
                 PlayBeep();
             }
         }
@@ -2548,7 +2565,7 @@ namespace UltraVideoEditor
         {
             if (timelineItems.Count == 0)
             {
-                LogMessage("Auto-Render: Nema klipova za render", true);
+                LogMessage("Auto-Render: No clips to render", true);
                 return;
             }
 
@@ -2565,9 +2582,9 @@ namespace UltraVideoEditor
             prgRender.Visibility = Visibility.Visible;
             prgRender.Value = 0;
             btnRenderTool.IsEnabled = false;
-            txtRenderStatus.Text = "Auto-Render u toku...";
+            txtRenderStatus.Text = "Auto-Render in progress...";
 
-            LogMessage($"🚀 Auto-Render: {timelineItems.Count} klipova → {outputPath}", true);
+            LogMessage($"🚀 Auto-Render: {timelineItems.Count} clips → {outputPath}", true);
 
             try
             {
@@ -2630,7 +2647,7 @@ namespace UltraVideoEditor
                                 Text = "Video sacuvan!" + Environment.NewLine +
                                        System.IO.Path.GetFileName(outputPath) + Environment.NewLine +
                                        "(" + (fileSize / 1024 / 1024) + " MB)" + Environment.NewLine +
-                                       "Prozor se zatvara za 8 sekundi...",
+                                       "The window will close in 8 seconds...",
                                 Foreground = System.Windows.Media.Brushes.LightGreen,
                                 FontSize = 13, TextAlignment = System.Windows.TextAlignment.Center,
                                 VerticalAlignment = System.Windows.VerticalAlignment.Center,
@@ -2650,8 +2667,8 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"Auto-Render: fajl nije kreiran: {outputPath}", true);
-                    txtRenderStatus.Text = "Auto-Render nije uspio";
+                    LogMessage($"Auto-Render: file was not created: {outputPath}", true);
+                    txtRenderStatus.Text = "Auto-Render failed";
                 }
             }
             catch (Exception ex)
@@ -2670,13 +2687,13 @@ namespace UltraVideoEditor
         {
             if (timelineItems.Count == 0)
             {
-                LogMessage("Nema klipova za render", true);
+                LogMessage("No clips to render", true);
                 return;
             }
 
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                var dlg = new WpfSaveFileDialog { Filter = "Iskra Projekat|*.iskra", DefaultExt = "iskra", FileName = "projekat.iskra" };
+                var dlg = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
                 if (dlg.ShowDialog() == true)
                 {
                     currentProjectFolder = Path.GetDirectoryName(dlg.FileName) ?? string.Empty;
@@ -2734,20 +2751,20 @@ namespace UltraVideoEditor
             prgRender.Visibility = Visibility.Visible;
             prgRender.Value = 0;
             btnRenderTool.IsEnabled = false;
-            txtRenderStatus.Text = "Renderovanje...";
+            txtRenderStatus.Text = "Rendering...";
 
-            LogMessage("Renderovanje pokrenuto...", true);
+            LogMessage("Rendering started...", true);
 
             try
             {
                 string ffmpegExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
-                LogMessage($"Proveravam FFmpeg na: {ffmpegExePath}", true);
+                LogMessage($"Checking FFmpeg at: {ffmpegExePath}", true);
 
                 if (!File.Exists(ffmpegExePath))
                 {
                     LogMessage(L("ffmpeg_not_found"), true);
                     WpfMessageBox.Show(string.Format(L("ffmpeg_missing_msg"), ffmpegExePath),
-                                    "FFmpeg nedostaje", MessageBoxButton.OK, MessageBoxImage.Error);
+                                    "FFmpeg is missing", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
                 LogMessage(L("ffmpeg_found"), true);
@@ -2759,7 +2776,7 @@ namespace UltraVideoEditor
                         prgRender.Value = percent;
                         if (accessibilityMode && percent % 10 == 0)
                         {
-                            LogMessage($"Render napredak: {percent}%", true);
+                            LogMessage($"Render progress: {percent}%", true);
                         }
                     });
                 });
@@ -2808,13 +2825,13 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                LogMessage("Renderovanje otkazano", true);
-                txtRenderStatus.Text = "Otkazano";
+                LogMessage("Rendering cancelled", true);
+                txtRenderStatus.Text = "Cancelled";
                 PlayBeep();
             }
             catch (Exception ex)
             {
-                LogMessage($"RENDER GRESKA: {ex.Message}", true);
+                LogMessage($"RENDER ERROR: {ex.Message}", true);
                 LogMessage($"Stack trace: {ex.StackTrace}", true);
                 txtRenderStatus.Text = L("render_failed_status");
                 WpfMessageBox.Show(string.Format(L("render_failed_msg"), ex.Message, ex.StackTrace), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
@@ -2827,39 +2844,85 @@ namespace UltraVideoEditor
             }
         }
 
-        private void TestButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Central place that applies a display mode: banner text/visibility,
+        /// position-announce timer, menu checkmarks, and the log/beep feedback.
+        /// Called both by the automatic startup detection and by the manual
+        /// menu items / Ctrl+Shift+A, so there's exactly one code path that can
+        /// get the banner out of sync with the actual mode.
+        /// </summary>
+        private void SetUIMode(UIMode mode, bool announce = true)
         {
-            WpfMessageBox.Show(L("test_click"));
-            LogMessage("Test dugme je kliknuto!", true);
+            _uiMode = mode;
+
+            switch (mode)
+            {
+                case UIMode.Accessibility:
+                    borderAccessibilityStatus.Visibility = Visibility.Visible;
+                    txtAccessibilityStatus.Text = "♿ ACCESSIBILITY MODE ON";
+                    try { positionAnnounceTimer?.Start(); } catch { }
+                    if (announce) LogMessage(L("accessibility_on"), true);
+                    break;
+
+                case UIMode.LowVision:
+                    borderAccessibilityStatus.Visibility = Visibility.Visible;
+                    txtAccessibilityStatus.Text = "🔍 LOW VISION MODE ON";
+                    try { positionAnnounceTimer?.Stop(); } catch { }
+                    // Low vision needs strong contrast as a baseline; font/control
+                    // scaling is planned separately and will hook in here too.
+                    _currentTheme = "contrast";
+                    ApplyTheme();
+                    if (announce) LogMessage("Low vision mode on", true);
+                    break;
+
+                case UIMode.Sighted:
+                default:
+                    borderAccessibilityStatus.Visibility = Visibility.Collapsed;
+                    try { positionAnnounceTimer?.Stop(); } catch { }
+                    if (announce) LogMessage(L("accessibility_off"), true);
+                    break;
+            }
+
+            if (mnuModeSighted != null)
+            {
+                mnuModeSighted.IsChecked = mode == UIMode.Sighted;
+                mnuModeAccessibility.IsChecked = mode == UIMode.Accessibility;
+                mnuModeLowVision.IsChecked = mode == UIMode.LowVision;
+            }
+
+            if (announce) PlayBeep();
         }
 
+        /// <summary>
+        /// Runs once at startup: picks Accessibility if a screen reader is
+        /// detected, otherwise Sighted. Never auto-selects Low Vision, since
+        /// low vision can't be inferred the same way — the user turns that on
+        /// manually from the View menu.
+        /// </summary>
+        private void DetectAndApplyInitialMode()
+        {
+            bool screenReaderDetected = false;
+            try { screenReaderDetected = ScreenReaderDetector.IsScreenReaderActive(); }
+            catch { }
+
+            SetUIMode(screenReaderDetected ? UIMode.Accessibility : UIMode.Sighted, announce: false);
+            LogMessage(screenReaderDetected
+                ? "Screen reader detected — starting in Accessibility mode."
+                : "No screen reader detected — starting in Sighted mode.", true);
+        }
+
+        private void SetModeSighted_Click(object sender, RoutedEventArgs e) => SetUIMode(UIMode.Sighted);
+        private void SetModeAccessibility_Click(object sender, RoutedEventArgs e) => SetUIMode(UIMode.Accessibility);
+        private void SetModeLowVision_Click(object sender, RoutedEventArgs e) => SetUIMode(UIMode.LowVision);
+
+        /// <summary>
+        /// Quick toggle for Ctrl+Shift+A and the toolbar button: flips between
+        /// Sighted and Accessibility. Low Vision is deliberately only reachable
+        /// from the View menu, since it's not what this shortcut has ever meant.
+        /// </summary>
         private void ToggleAccessibilityMode_Click(object sender, RoutedEventArgs e)
         {
-            accessibilityMode = !accessibilityMode;
-            if (accessibilityMode)
-            {
-                borderAccessibilityStatus.Visibility = Visibility.Visible;
-                txtAccessibilityStatus.Text = "♿ PRISTUPACNI MOD UKLJUCEN";
-                try
-                {
-                    if (positionAnnounceTimer != null)
-                        positionAnnounceTimer.Start();
-                }
-                catch { }
-                LogMessage(L("accessibility_on"), true);
-            }
-            else
-            {
-                borderAccessibilityStatus.Visibility = Visibility.Collapsed;
-                try
-                {
-                    if (positionAnnounceTimer != null)
-                        positionAnnounceTimer.Stop();
-                }
-                catch { }
-                LogMessage(L("accessibility_off"), true);
-            }
-            PlayBeep();
+            SetUIMode(_uiMode == UIMode.Accessibility ? UIMode.Sighted : UIMode.Accessibility);
         }
 
         private void SetupKeyboardCommands()
@@ -2908,7 +2971,7 @@ namespace UltraVideoEditor
                 else if (e.Key == Key.F3) { e.Handled = false; }
                 else if (e.Key == Key.L && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
-                    if (_logWindow != null) { _logWindow.Show(); _logWindow.Activate(); LogMessage("Log prozor otvoren", true); }
+                    if (_logWindow != null) { _logWindow.Show(); _logWindow.Activate(); LogMessage("Log window opened", true); }
                     e.Handled = true;
                 }
                 else if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control)
@@ -2916,7 +2979,7 @@ namespace UltraVideoEditor
                     nativeListView?.Focus();
                     if (nativeListView?.Items.Count > 0 && nativeListView.SelectedItems.Count == 0)
                         nativeListView.Items[0].Selected = true;
-                    LogMessage("Fokus na listi klipova. Koristite strelice gore/dole za navigaciju.", true);
+                    LogMessage("Focus on the clip list. Use the up/down arrows to navigate.", true);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -3075,7 +3138,7 @@ namespace UltraVideoEditor
                     int newIndex = Math.Max(0, (nativeListView.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Index : 0) - 5);
                     nativeListView.Items[newIndex].Selected = true;
                     nativeListView.Items[newIndex].EnsureVisible();
-                    LogMessage($"Klip {newIndex + 1} od {timelineItems.Count}", true);
+                    LogMessage($"Clip {newIndex + 1} of {timelineItems.Count}", true);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.PageDown && nativeListView?.Focused == true)
@@ -3083,7 +3146,7 @@ namespace UltraVideoEditor
                     int newIndex = Math.Min(timelineItems.Count - 1, (nativeListView.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Index : 0) + 5);
                     nativeListView.Items[newIndex].Selected = true;
                     nativeListView.Items[newIndex].EnsureVisible();
-                    LogMessage($"Klip {newIndex + 1} od {timelineItems.Count}", true);
+                    LogMessage($"Clip {newIndex + 1} of {timelineItems.Count}", true);
                     e.Handled = true;
                 }
             };
@@ -3100,39 +3163,39 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                var dialog = new TextOverlayDialog($"Dodaj titl na: {item.Name}");
+                var dialog = new TextOverlayDialog($"Add subtitle to: {item.Name}");
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = item.Start, End = item.End });
                     lstSubtitles.Items.Add($"{FormatTime(item.Start)} -> {FormatTime(item.End)}: {dialog.Text}");
-                    LogMessage($"Titl dodat na klip: {item.Name}", true);
+                    LogMessage($"Subtitle added to clip: {item.Name}", true);
                     PlayBeep();
                 }
             }
-            else LogMessage("Selektuj klip prvo", true);
+            else LogMessage("Select a clip first", true);
         }
 
         private void AddIntroText_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new TextOverlayDialog("Najavni tekst (naslov pesme)");
+            var dialog = new TextOverlayDialog("Intro text (song title)");
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
             {
                 subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = 0, End = 5 });
                 lstSubtitles.Items.Add($"0:00 -> 0:05: {dialog.Text}");
-                LogMessage($"Najavni tekst dodat: {dialog.Text}", true);
+                LogMessage($"Intro text added: {dialog.Text}", true);
                 PlayBeep();
             }
         }
 
         private void AddOutroText_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new TextOverlayDialog("Odjavni tekst (autor, kanal)");
+            var dialog = new TextOverlayDialog("Outro text (author, channel)");
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
             {
                 double totalDuration = GetTotalDuration();
                 subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = totalDuration - 5 > 0 ? totalDuration - 5 : 0, End = totalDuration });
                 lstSubtitles.Items.Add($"{FormatTime(totalDuration - 5)} -> {FormatTime(totalDuration)}: {dialog.Text}");
-                LogMessage($"Odjavni tekst dodat: {dialog.Text}", true);
+                LogMessage($"Outro text added: {dialog.Text}", true);
                 PlayBeep();
             }
         }
@@ -3153,16 +3216,16 @@ namespace UltraVideoEditor
                         LogMessage(string.Format(L("transition_added"), transition.Name, idx + 1, idx + 2), true);
                         PlayBeep();
                     }
-                    else LogMessage("Selektuj tranziciju prvo", true);
+                    else LogMessage("Select a transition first", true);
                 }
-                else LogMessage("Selektuj prvi klip od para (ne poslednji)", true);
+                else LogMessage("Select the first clip of the pair (not the last)", true);
             }
         }
 
         private void AddTransitionBetweenSpecific_Click(object sender, RoutedEventArgs e)
         {
-            if (timelineItems.Count < 2) { LogMessage("Nema dovoljno klipova za dodavanje tranzicije", true); return; }
-            if (lstTransitions.SelectedItem is not TransitionEffect transition) { LogMessage("Selektuj tranziciju prvo", true); return; }
+            if (timelineItems.Count < 2) { LogMessage("Not enough clips to add a transition", true); return; }
+            if (lstTransitions.SelectedItem is not TransitionEffect transition) { LogMessage("Select a transition first", true); return; }
             var dialog = new TransitionDialog(timelineItems.Count);
             if (dialog.ShowDialog() == true)
             {
@@ -3176,7 +3239,7 @@ namespace UltraVideoEditor
                     LogMessage(string.Format(L("transition_added"), transition.Name, clipIndex + 1, clipIndex + 2), true);
                     PlayBeep();
                 }
-                else LogMessage("Neispravan broj klipa", true);
+                else LogMessage("Invalid clip number", true);
             }
         }
 
@@ -3220,18 +3283,18 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage)
             {
-                var dialog = new TextOverlayDialog($"Audio opis za sliku: {item.Name}");
+                var dialog = new TextOverlayDialog($"Audio description for image: {item.Name}");
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     item.AudioDescription = dialog.Text;
-                    LogMessage($"Audio opis dodat za sliku {item.Index}: {dialog.Text}", true);
+                    LogMessage($"Audio description added for image {item.Index}: {dialog.Text}", true);
                     UpdateTimelineDisplay();
                     PlayBeep();
                 }
             }
             else
             {
-                LogMessage("Selektujte sliku prvo", true);
+                LogMessage("Select an image first", true);
             }
         }
 
@@ -3241,16 +3304,16 @@ namespace UltraVideoEditor
             {
                 if (!string.IsNullOrEmpty(item.AudioDescription))
                 {
-                    LogMessage($"Opis slike {item.Index}: {item.AudioDescription}", true);
+                    LogMessage($"Image {item.Index} description: {item.AudioDescription}", true);
                 }
                 else
                 {
-                    LogMessage($"Slika {item.Index} nema audio opis", true);
+                    LogMessage($"Image {item.Index} has no audio description", true);
                 }
             }
             else
             {
-                LogMessage("Selektujte sliku prvo", true);
+                LogMessage("Select an image first", true);
             }
         }
 
@@ -3284,30 +3347,30 @@ namespace UltraVideoEditor
             var availableImages = timelineItems.Where(i => i.IsImage).Select(i => i.Name).ToList();
             if (availableImages.Count == 0)
             {
-                LogMessage("Nema slika na timeline-u za kreiranje animacije", true);
+                LogMessage("No images on the timeline to create an animation", true);
                 return;
             }
 
             LogMessage(L("ai_generating_scenario"), true);
 
             string prompt =
-                "Kreiraj scenario za animaciju na osnovu sljedeceg zahtjeva: " + txtAnimationPrompt.Text + "\n" +
-                "Dostupne slike: " + string.Join(", ", availableImages) + "\n" +
-                "Rezultat vrati iskljucivo u JSON formatu bez dodatnog teksta. " +
-                "JSON treba da bude niz scena. Svaka scena treba da ima: " +
-                "imageName (ime slike), duration (sekunde 3-10), " +
+                "Create an animation scenario based on the following request: " + txtAnimationPrompt.Text + "\n" +
+                "Available images: " + string.Join(", ", availableImages) + "\n" +
+                "Return the result exclusively in JSON format with no extra text. " +
+                "The JSON should be an array of scenes. Each scene should have: " +
+                "imageName (image name), duration (seconds 3-10), " +
                 "effect (Fade In/Out, Zoom In/Out, Slide Left/Right, None), " +
-                "description (kratak opis na srpskom). " +
-                "Napravi izmedju 3 i 6 scena. Vrati SAMO JSON niz.";
+                "description (a short description in English). " +
+                "Create between 3 and 6 scenes. Return ONLY the JSON array.";
 
             try
             {
                 string result = await CallCloudflareAI(prompt, apiToken);
-                LogMessage($"AI odgovor (prvih 300 karaktera): {result?.Substring(0, Math.Min(300, result?.Length ?? 0))}", true);
+                LogMessage($"AI response (first 300 characters): {result?.Substring(0, Math.Min(300, result?.Length ?? 0))}", true);
 
                 if (string.IsNullOrEmpty(result))
                 {
-                    LogMessage("AI nije vratio odgovor", true);
+                    LogMessage("AI did not return a response", true);
                     return;
                 }
 
@@ -3323,7 +3386,7 @@ namespace UltraVideoEditor
 
                 if (jsonStart < 0 || jsonEnd <= jsonStart)
                 {
-                    LogMessage("AI nije vratio validan JSON niz", true);
+                    LogMessage("AI did not return a valid JSON array", true);
                     return;
                 }
 
@@ -3360,12 +3423,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage("Generisanje scenarija otkazano", true);
+                    LogMessage("Scenario generation cancelled", true);
                 }
                 lstAnimationScenes.ItemsSource = null;
                 lstAnimationScenes.ItemsSource = _animationScenes;
 
-                LogMessage($"Scenario generisan: {_animationScenes.Count} scena", true);
+                LogMessage($"Scenario generated: {_animationScenes.Count} scenes", true);
                 PlayBeep();
             }
             catch (Exception ex)
@@ -3376,7 +3439,7 @@ namespace UltraVideoEditor
 
         private async void AISuggestLayout_Click(object sender, RoutedEventArgs e)
         {
-            LogMessage("AISuggestLayout_Click pozvan", true);
+            LogMessage("AISuggestLayout_Click called", true);
 
             var animacije = timelineItems.Where(i => i.Type == "Animation" || i.Name.Contains("animacija")).ToList();
             if (animacije.Count == 0)
@@ -3395,18 +3458,18 @@ namespace UltraVideoEditor
                 return;
             }
 
-            var animacijeInfo = string.Join(", ", animacije.Select((a, i) => $"animacija{i + 1}: {a.Duration}s"));
+            var animacijeInfo = string.Join(", ", animacije.Select((a, i) => $"animation{i + 1}: {a.Duration}s"));
 
             string prompt =
-                "Imam audio zapis duzine " + audioDuration + " sekundi. " +
-                "Imam " + animacije.Count + " animacija: " + animacijeInfo + ". " +
-                "Predlozi mi optimalan redoslijed i pocetne pozicije ovih animacija na timeline-u " +
-                "tako da pokriju cijeli audio. " +
-                "Rezultat vrati iskljucivo u JSON formatu bez dodatnog teksta. " +
-                "JSON treba da sadrzi listu raspored gdje svaki element ima: " +
-                "animacija_index (broj od 1 do " + animacije.Count + "), " +
-                "pocetak (broj u sekundama), kraj (broj u sekundama), " +
-                "razlog (kratak opis na srpskom).";
+                "I have an audio track that is " + audioDuration + " seconds long. " +
+                "I have " + animacije.Count + " animations: " + animacijeInfo + ". " +
+                "Suggest an optimal order and starting positions for these animations on the timeline " +
+                "so that they cover the entire audio. " +
+                "Return the result exclusively in JSON format with no extra text. " +
+                "The JSON should contain a list called \"raspored\" where each element has: " +
+                "animacija_index (a number from 1 to " + animacije.Count + "), " +
+                "pocetak (number in seconds), kraj (number in seconds), " +
+                "razlog (a short description in English).";
 
             LogMessage(L("ai_analyzing_audio"), true);
 
@@ -3417,7 +3480,7 @@ namespace UltraVideoEditor
 
                 if (layout?.raspored == null || layout.raspored.Count == 0)
                 {
-                    LogMessage("AI nije vratio validan raspored", true);
+                    LogMessage("AI did not return a valid layout", true);
                     return;
                 }
 
@@ -3426,7 +3489,7 @@ namespace UltraVideoEditor
                 foreach (var item in layout.raspored)
                 {
                     var anim = animacije[item.animacija_index - 1];
-                    message.AppendLine($"Animacija {item.animacija_index}: '{anim.Name}' od {FormatTime(item.pocetak)} do {FormatTime(item.kraj)}. Razlog: {item.razlog}");
+                    message.AppendLine($"Animation {item.animacija_index}: '{anim.Name}' from {FormatTime(item.pocetak)} to {FormatTime(item.kraj)}. Reason: {item.razlog}");
                 }
                 message.AppendLine(L("arrangement_accept"));
 
@@ -3474,7 +3537,7 @@ namespace UltraVideoEditor
             _animationScenes.Add(newScene);
             lstAnimationScenes.ItemsSource = null;
             lstAnimationScenes.ItemsSource = _animationScenes;
-            LogMessage("Dodata nova scena", true);
+            LogMessage("New scene added", true);
         }
 
         private void RemoveScene_Click(object sender, RoutedEventArgs e)
@@ -3489,7 +3552,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                LogMessage("Selektujte scenu za brisanje", true);
+                LogMessage("Select a scene to delete", true);
             }
         }
 
@@ -3505,7 +3568,7 @@ namespace UltraVideoEditor
                     lstAnimationScenes.ItemsSource = null;
                     lstAnimationScenes.ItemsSource = _animationScenes;
                     lstAnimationScenes.SelectedItem = scene;
-                    LogMessage("Scena pomjerena gore", true);
+                    LogMessage("Scene moved up", true);
                     PlayBeep();
                 }
             }
@@ -3535,7 +3598,7 @@ namespace UltraVideoEditor
             {
                 if (!double.TryParse(txtAnimationStartTime.Text, out double startTime))
                 {
-                    LogMessage("Unesite ispravan broj sekundi", true);
+                    LogMessage("Enter a valid number of seconds", true);
                     return;
                 }
                 SaveState();
@@ -3546,7 +3609,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                LogMessage("Selektujte animaciju na timeline-u prvo", true);
+                LogMessage("Select an animation on the timeline first", true);
             }
         }
 
@@ -3554,11 +3617,11 @@ namespace UltraVideoEditor
         {
             if (_animationScenes.Count == 0)
             {
-                LogMessage("Nema scena za kreiranje animacije", true);
+                LogMessage("No scenes to create an animation", true);
                 return;
             }
 
-            LogMessage("Kreiram animaciju iz scena...", true);
+            LogMessage("Creating animation from scenes...", true);
             SaveState();
 
             foreach (var scene in _animationScenes)
@@ -3646,7 +3709,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                LogMessage("Selektuj tranziciju prvo", true);
+                LogMessage("Select a transition first", true);
             }
         }
 
@@ -3668,12 +3731,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"Nema keyframe-a na {FormatTime(time)}. Prvo dodajte keyframe (Ctrl+K)", true);
+                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
                 }
             }
             else
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
             }
         }
 
@@ -3695,12 +3758,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"Nema keyframe-a na {FormatTime(time)}. Prvo dodajte keyframe (Ctrl+K)", true);
+                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
                 }
             }
             else
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
             }
         }
 
@@ -3723,12 +3786,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"Nema keyframe-a na {FormatTime(time)}. Prvo dodajte keyframe (Ctrl+K)", true);
+                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
                 }
             }
             else
             {
-                LogMessage("Selektuj klip prvo", true);
+                LogMessage("Select a clip first", true);
             }
         }
 
@@ -3752,8 +3815,8 @@ namespace UltraVideoEditor
                 byte[] bytes = await File.ReadAllBytesAsync(imagePath);
                 string b64 = Convert.ToBase64String(bytes);
                 string prompt = string.IsNullOrWhiteSpace(contextPrompt)
-                    ? "Opisi sliku kratko i jasno na srpskom jeziku, maksimalno dve recenice. Opis je namenjen slepim osobama."
-                    : "Opisi sliku kratko na srpskom. Kontekst: " + contextPrompt + ". Maksimalno dve recenice.";
+                    ? "Describe the image briefly and clearly in English, in at most two sentences. The description is intended for blind users."
+                    : "Describe the image briefly in English. Context: " + contextPrompt + ". At most two sentences.";
 
                 var body = new
                 {
@@ -3782,7 +3845,7 @@ namespace UltraVideoEditor
                     return obj?.choices?[0]?.message?.content?.ToString()?.Trim() ?? "";
                 }
             }
-            catch (Exception ex) { LogMessage("GPT-4 Vision greska: " + ex.Message, false); }
+            catch (Exception ex) { LogMessage("GPT-4 Vision error: " + ex.Message, false); }
             return "";
         }
 
@@ -3795,8 +3858,8 @@ namespace UltraVideoEditor
                 string accountId = "9b8004123c153014d851b6056d2da4fe";
                 string url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/@cf/llava-hf/llava-1.5-7b-hf";
                 string prompt = string.IsNullOrWhiteSpace(contextPrompt)
-                    ? "Opisi sliku kratko i jasno na srpskom jeziku, maksimalno dve recenice. Opis je namenjen slepim osobama."
-                    : "Opisi sliku kratko na srpskom. Kontekst: " + contextPrompt + ". Maksimalno dve recenice.";
+                    ? "Describe the image briefly and clearly in English, in at most two sentences. The description is intended for blind users."
+                    : "Describe the image briefly in English. Context: " + contextPrompt + ". At most two sentences.";
 
                 var requestBody = new
                 {
@@ -3822,14 +3885,14 @@ namespace UltraVideoEditor
                     return obj?.result?.response?.Trim() ?? "";
                 }
             }
-            catch (Exception ex) { LogMessage("Cloudflare llava greska: " + ex.Message, false); }
+            catch (Exception ex) { LogMessage("Cloudflare llava error: " + ex.Message, false); }
             return "";
         }
         private void SetImagePosition_Click(object sender, RoutedEventArgs e)
         {
             if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item) || (!item.IsImage && !item.IsVideo))
             {
-                LogMessage("Selektuj sliku ili video klip na timeline-u.", true);
+                LogMessage("Select an image or video clip on the timeline.", true);
                 return;
             }
 
@@ -3855,11 +3918,11 @@ namespace UltraVideoEditor
                             images[i].UseFixedPosition = true;
                         }
                     }
-                    LogMessage("Ravnomerni raspored primenjen na sve slike.", true);
+                    LogMessage("Even distribution applied to all images.", true);
                 }
                 else if (dlg.SelectedPosition >= 0)
                 {
-                    LogMessage($"DEBUG: Postavljam '{item.Name}' na poziciju {dlg.SelectedPosition:F2}s, trajanje {dlg.SelectedDuration:F2}s", true);
+                    LogMessage($"DEBUG: Setting '{item.Name}' to position {dlg.SelectedPosition:F2}s, duration {dlg.SelectedDuration:F2}s", true);
 
                     item.FixedPosition = dlg.SelectedPosition;
                     item.Duration = dlg.SelectedDuration;
@@ -4000,11 +4063,11 @@ namespace UltraVideoEditor
         private void ApplyTransitionToSelectedClip()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect tpl))
-            { LogMessage("Selektuj tranziciju u listi tranzicija.", true); return; }
+            { LogMessage("Select a transition in the transitions list.", true); return; }
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("Selektuj klip koji nije prvi — tranzicija ide izmedju prethodnog i selektovanog klipa.", true); return; }
+            { LogMessage("Select a clip that is not the first — the transition goes between the previous clip and the selected one.", true); return; }
             int idx = timelineItems.IndexOf(item);
-            if (idx <= 0) { LogMessage("Selektuj klip koji nije prvi", true); return; }
+            if (idx <= 0) { LogMessage("Select a clip that is not the first", true); return; }
             var t = new TransitionEffect
             {
                 Name = tpl.Name,
@@ -4026,9 +4089,9 @@ namespace UltraVideoEditor
         private void ApplyTransitionToAll()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect tpl))
-            { LogMessage("Selektuj tranziciju u listi.", true); return; }
+            { LogMessage("Select a transition in the list.", true); return; }
             var vids = timelineItems.Where(i => i.IsVideo || i.IsImage).ToList();
-            if (vids.Count < 2) { LogMessage("Potrebna su najmanje 2 video/slika klipa.", true); return; }
+            if (vids.Count < 2) { LogMessage("At least 2 video/image clips are required.", true); return; }
             SaveState();
             transitions.Clear();
             for (int i = 1; i < vids.Count; i++)
@@ -4045,44 +4108,44 @@ namespace UltraVideoEditor
         private void DescribeSelectedTransition()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect t))
-            { LogMessage("Nije selektovana tranzicija.", true); return; }
+            { LogMessage("No transition selected.", true); return; }
             string desc;
             if (t.Type == TransitionType.Fade) desc = "Fade: slika postepeno nestaje u crno, pa se pojavljuje sledeca.";
-            else if (t.Type == TransitionType.Crossfade) desc = "Crossfade: dva klipa se postepeno mesaju jedno u drugo.";
-            else if (t.Type == TransitionType.SlideLeft) desc = "Slide Left: novi klip ulazi s desne strane i gura stari ulevo.";
-            else if (t.Type == TransitionType.SlideRight) desc = "Slide Right: novi klip ulazi s leve strane i gura stari udesno.";
-            else if (t.Type == TransitionType.SlideUp) desc = "Slide Up: novi klip ulazi odozdo i gura stari nagore.";
-            else if (t.Type == TransitionType.SlideDown) desc = "Slide Down: novi klip ulazi odozgo i gura stari nadole.";
-            else if (t.Type == TransitionType.WipeLeft) desc = "Wipe Left: novi klip se otkriva poput zavese s desna na levo.";
-            else if (t.Type == TransitionType.WipeRight) desc = "Wipe Right: novi klip se otkriva poput zavese s leva na desno.";
-            else if (t.Type == TransitionType.ZoomIn) desc = "Zoom In: sledeci klip se uvecava iz centra i prekriva prethodni.";
-            else if (t.Type == TransitionType.ZoomOut) desc = "Zoom Out: prethodni klip se suzava i otkriva sledeci.";
+            else if (t.Type == TransitionType.Crossfade) desc = "Crossfade: the two clips gradually blend into each other.";
+            else if (t.Type == TransitionType.SlideLeft) desc = "Slide Left: the new clip enters from the right and pushes the old one left.";
+            else if (t.Type == TransitionType.SlideRight) desc = "Slide Right: the new clip enters from the left and pushes the old one right.";
+            else if (t.Type == TransitionType.SlideUp) desc = "Slide Up: the new clip enters from below and pushes the old one up.";
+            else if (t.Type == TransitionType.SlideDown) desc = "Slide Down: the new clip enters from above and pushes the old one down.";
+            else if (t.Type == TransitionType.WipeLeft) desc = "Wipe Left: the new clip is revealed like a curtain from right to left.";
+            else if (t.Type == TransitionType.WipeRight) desc = "Wipe Right: the new clip is revealed like a curtain from left to right.";
+            else if (t.Type == TransitionType.ZoomIn) desc = "Zoom In: the next clip zooms in from the center and covers the previous one.";
+            else if (t.Type == TransitionType.ZoomOut) desc = "Zoom Out: the previous clip shrinks and reveals the next one.";
             else desc = t.Name;
-            LogMessage("Efekat: " + t.Name + ". " + desc, true);
+            LogMessage("Effect: " + t.Name + ". " + desc, true);
         }
 
         private void ShowTransitionOnSelectedClip()
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("Nije selektovan klip.", true); return; }
+            { LogMessage("No clip selected.", true); return; }
             int idx = timelineItems.IndexOf(item);
             var before = transitions.FirstOrDefault(t => t.ClipIndex2 == idx);
             var after = transitions.FirstOrDefault(t => t.ClipIndex1 == idx);
             string msg = "";
-            if (before != null) msg += "Ispred klipa: '" + before.Name + "' (" + before.Duration.ToString("F1") + "s). ";
-            if (after != null) msg += "Iza klipa: '" + after.Name + "' (" + after.Duration.ToString("F1") + "s). ";
-            if (msg == "") msg = "Nema tranzicija na ovom klipu.";
+            if (before != null) msg += "Before clip: '" + before.Name + "' (" + before.Duration.ToString("F1") + "s). ";
+            if (after != null) msg += "After clip: '" + after.Name + "' (" + after.Duration.ToString("F1") + "s). ";
+            if (msg == "") msg = "No transitions on this clip.";
             LogMessage(msg, true);
         }
 
         private void RemoveTransitionFromSelectedClip()
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("Nije selektovan klip.", true); return; }
+            { LogMessage("No clip selected.", true); return; }
             int idx = timelineItems.IndexOf(item);
             int removed = transitions.RemoveAll(t => t.ClipIndex1 == idx || t.ClipIndex2 == idx);
-            if (removed > 0) { SaveState(); LogMessage("Uklonjeno " + removed + " tranzicija sa klipa " + (idx + 1) + ".", true); PlayBeep(); UpdateTransitionIndicators(); }
-            else LogMessage("Nema tranzicija na ovom klipu.", true);
+            if (removed > 0) { SaveState(); LogMessage("Removed " + removed + " transition(s) from clip " + (idx + 1) + ".", true); PlayBeep(); UpdateTransitionIndicators(); }
+            else LogMessage("No transitions on this clip.", true);
         }
 
         private void UpdateTransitionIndicators()
@@ -4153,7 +4216,7 @@ namespace UltraVideoEditor
                     contextMenu.Items.Add(new WinForms.ToolStripSeparator());
                     contextMenu.Items.Add("🎨 " + L("ctx_add_text_to_image"), null, (s, e) => AddTextToImage_Click(null, null));
                     nativeListView.ContextMenuStrip = contextMenu;
-                    nativeListView.AccessibleName = "Lista klipova na vremenskoj traci. Koristite strelice za navigaciju. Ctrl+Space za play/pause. Page Up/Down za brzo listanje.";
+                    nativeListView.AccessibleName = "List of clips on the timeline. Use the arrow keys to navigate. Ctrl+Space for play/pause. Page Up/Down for quick scrolling.";
 
                     LogMessage("Win32 ListView inicijalizovan - kolone postavljene", true);
                     UpdateTimelineDisplay();
@@ -4206,7 +4269,7 @@ namespace UltraVideoEditor
                     "Video" => "Video",
                     "Audio" => "Audio",
                     "Image" => "Slika",
-                    _ => item.Type ?? "Nepoznato"
+                    _ => item.Type ?? "Unknown"
                 };
                 string duration = TimeSpan.FromSeconds(item.Duration).ToString(@"mm\:ss");
                 string start = TimeSpan.FromSeconds(item.Start).ToString(@"mm\:ss");
@@ -4335,8 +4398,8 @@ namespace UltraVideoEditor
                 if (txtTimelineInfo != null)
                 {
                     string infoText = filteredItems.Count > 0
-                        ? $"Ukupno klipova: {filteredItems.Count} | Ukupno trajanje: {FormatTime(GetTotalDuration())} | Zoom: {zoomLevel:F1}x"
-                        : "Nema klipova na timeline-u.";
+                        ? $"Total clips: {filteredItems.Count} | Total duration: {FormatTime(GetTotalDuration())} | Zoom: {zoomLevel:F1}x"
+                        : "No clips on the timeline.";
                     txtTimelineInfo.Text = infoText;
                     // Help screen readers to read the updated status
                     AutomationProperties.SetName(txtTimelineInfo, infoText);
@@ -4379,12 +4442,12 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                System.Windows.MessageBox.Show("Prvo sacuvaj projekat!");
+                System.Windows.MessageBox.Show("Save the project first!");
                 return;
             }
             if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text))
             {
-                LogMessage("Unesi opis slike u polje za prompt.", true);
+                LogMessage("Enter an image description in the prompt field.", true);
                 return;
             }
 
@@ -4429,11 +4492,11 @@ namespace UltraVideoEditor
                             VideoEffect = new VideoEffectData()
                         });
                         generated++;
-                        LogMessage("Slika " + (i + 1) + " gotova. Opis: " + desc, true);
+                        LogMessage("Image " + (i + 1) + " ready. Description: " + desc, true);
                         if (prgAI != null)
                             Dispatcher.Invoke(() => prgAI.Value = (i + 1) * 100 / prompts.Length);
                     }
-                    catch (Exception ex) { LogMessage("Pollinations greska: " + ex.Message, true); }
+                    catch (Exception ex) { LogMessage("Pollinations error: " + ex.Message, true); }
                     await Task.Delay(300);
                 }
             }
@@ -4453,13 +4516,13 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                System.Windows.MessageBox.Show("Prvo sacuvaj projekat!");
+                System.Windows.MessageBox.Show("Save the project first!");
                 return;
             }
             var dlg = new SkiaAnimationDialog();
             if (dlg.ShowDialog() != true) return;
 
-            LogMessage("Generisem SkiaSharp animaciju: " + dlg.AnimationText + "...", true);
+            LogMessage("Generating SkiaSharp animation: " + dlg.AnimationText + "...", true);
             try
             {
                 string outPath = System.IO.Path.Combine(currentProjectFolder,
@@ -4474,7 +4537,7 @@ namespace UltraVideoEditor
                         dlg.DurationSeconds,
                         outPath));
 
-                string desc = "Animacija teksta: " + dlg.AnimationText + ", stil: " + dlg.AnimationStyle;
+                string desc = "Text animation: " + dlg.AnimationText + ", style: " + dlg.AnimationStyle;
                 SaveState();
                 timelineItems.Add(new TimelineItem
                 {
@@ -4522,17 +4585,17 @@ namespace UltraVideoEditor
                 var audioItem = timelineItems.FirstOrDefault(i => i.IsAudio);
                 if (audioItem == null)
                 {
-                    LogMessage("Nema audio fajla na timeline-u. Prvo dodajte pjesmu.", true);
+                    LogMessage("No audio file on the timeline. Add a song first.", true);
                     return;
                 }
 
                 // Find all images
                 var images = timelineItems.Where(i => i.IsImage &&
-                    !i.Name.Contains("Najavni") &&
-                    !i.Name.Contains("Odjavni")).ToList();
+                    !i.Name.Contains("Intro") &&
+                    !i.Name.Contains("Outro")).ToList();
                 if (images.Count == 0)
                 {
-                    LogMessage("Nema slika na timeline-u. Prvo dodajte slike.", true);
+                    LogMessage("No images on the timeline. Add images first.", true);
                     return;
                 }
 
@@ -4544,7 +4607,7 @@ namespace UltraVideoEditor
                 SaveState();
 
                 // Remove existing text layers
-                var existingTextItems = timelineItems.Where(i => i.Name.Contains("Najavni") || i.Name.Contains("Odjavni")).ToList();
+                var existingTextItems = timelineItems.Where(i => i.Name.Contains("Intro") || i.Name.Contains("Outro")).ToList();
                 foreach (var textItem in existingTextItems)
                 {
                     timelineItems.Remove(textItem);
@@ -4556,7 +4619,7 @@ namespace UltraVideoEditor
 
                 if (timePerImage <= 0)
                 {
-                    LogMessage("Nema dovoljno vremena za slike. Smanjite trajanje teksta.", true);
+                    LogMessage("Not enough time for images. Reduce the text duration.", true);
                     return;
                 }
 
@@ -4651,13 +4714,13 @@ namespace UltraVideoEditor
                 }
                 if (transitionSounds.Count > 0)
                 {
-                    LogMessage($"Dodato {transitionSounds.Count} tranzicionih zvukova", true);
+                    LogMessage($"Added {transitionSounds.Count} transition sounds", true);
                 }
 
                 // Ambijentalni zvukovi — lokalna biblioteka
                 if (dialog.EnableAmbientSounds)
                 {
-                    LogMessage("Dodajem ambijentalne zvukove iz lokalne biblioteke...", true);
+                    LogMessage("Adding ambient sounds from the local library...", true);
                     var ambientSounds = new List<TimelineItem>();
 
                     string[] ambientTypes = { "birds", "children laughing", "wind" };
@@ -4677,7 +4740,7 @@ namespace UltraVideoEditor
                                     Duration = ambientEnd - ambientStart,
                                     Start = ambientStart,
                                     End = ambientEnd,
-                                    Name = $"🌳 Ambijentalni zvuk: {ambientType}",
+                                    Name = $"🌳 Ambient sound: {ambientType}",
                                     Type = "Audio",
                                     Volume = 15,
                                     TrackIndex = 2,
@@ -4694,7 +4757,7 @@ namespace UltraVideoEditor
                     }
                     if (ambientSounds.Count > 0)
                     {
-                        LogMessage($"Dodato {ambientSounds.Count} ambijentalnih zvukova", true);
+                        LogMessage($"Added {ambientSounds.Count} ambient sounds", true);
                     }
                 }
                 // ADD INTRO TEXT (at the start)
@@ -4709,14 +4772,14 @@ namespace UltraVideoEditor
                         UseFixedPosition = true,
                         Start = 0,
                         End = dialog.IntroDuration,
-                        Name = $"Najavni tekst: {dialog.IntroText}",
+                        Name = $"Intro text: {dialog.IntroText}",
                         Type = "Image",
                         Volume = 100,
                         TrackIndex = 0,
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(introTextItem);
-                    LogMessage($"Dodat najavni tekst: {dialog.IntroText}", true);
+                    LogMessage($"Added intro text: {dialog.IntroText}", true);
                 }
 
                 // DODAJ ODJAVNI TEKST (na kraju)
@@ -4734,14 +4797,14 @@ namespace UltraVideoEditor
                         UseFixedPosition = true,
                         Start = outroStart,
                         End = outroStart + dialog.OutroDuration,
-                        Name = $"Odjavni tekst: {dialog.OutroText}",
+                        Name = $"Outro text: {dialog.OutroText}",
                         Type = "Image",
                         Volume = 100,
                         TrackIndex = 0,
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(outroTextItem);
-                    LogMessage($"Dodat odjavni tekst: {dialog.OutroText}", true);
+                    LogMessage($"Added outro text: {dialog.OutroText}", true);
                 }
 
                 // Logo
@@ -4762,7 +4825,7 @@ namespace UltraVideoEditor
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(logoItem);
-                    LogMessage($"Dodat logo: {Path.GetFileName(dialog.LogoPath)}", true);
+                    LogMessage($"Added logo: {Path.GetFileName(dialog.LogoPath)}", true);
                 }
 
                 // Crossfade between images (if enabled)
@@ -4957,13 +5020,13 @@ namespace UltraVideoEditor
             subtitles.Add(subtitle);
             lstSubtitles.Items.Add($"{FormatTime(startTime)} -> {FormatTime(startTime + duration)}: {text}");
 
-            LogMessage($"Dodat tekst: '{text}' od {FormatTime(startTime)} do {FormatTime(startTime + duration)}", true);
+            LogMessage($"Added text: '{text}' from {FormatTime(startTime)} to {FormatTime(startTime + duration)}", true);
         }
         private void AddTextToImage_Click(object sender, RoutedEventArgs e)
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Selektujte sliku prvo", true);
+                LogMessage("Select an image first", true);
                 return;
             }
 
@@ -4973,7 +5036,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            var dialog = new TextOverlayDialog($"Dodaj tekst na: {item.Name}");
+            var dialog = new TextOverlayDialog($"Add text to: {item.Name}");
             if (dialog.ShowDialog() == true)
             {
                 item.TextOverlay = new TextOverlayData
@@ -4986,27 +5049,10 @@ namespace UltraVideoEditor
                     Enabled = true
                 };
 
-                LogMessage($"Tekst '{dialog.Text}' dodat na sliku {item.Index}", true);
+                LogMessage($"Text '{dialog.Text}' added to image {item.Index}", true);
                 PlayBeep();
 
                 // Refresh display in ListView
-                UpdateTimelineDisplay();
-            }
-        }
-        private void btnTestFix_Click(object sender, RoutedEventArgs e)
-        {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
-            {
-                LogMessage($"=== TEST ===", true);
-                LogMessage($"Prije: Start={item.Start}, End={item.End}, FixedPos={item.FixedPosition}, UseFixed={item.UseFixedPosition}", true);
-
-                item.FixedPosition = 10;
-                item.Duration = 5;
-                item.UseFixedPosition = true;
-
-                ApplyFixedPositions();
-
-                LogMessage($"Poslije: Start={item.Start}, End={item.End}", true);
                 UpdateTimelineDisplay();
             }
         }
@@ -5018,12 +5064,12 @@ namespace UltraVideoEditor
             {
                 nativeListView.Items[number - 1].Selected = true;
                 nativeListView.Items[number - 1].EnsureVisible();
-                LogMessage($"Navigirano na klip {number}", true);
+                LogMessage($"Navigated to clip {number}", true);
                 PlayBeep();
             }
             else
             {
-                LogMessage($"Broj {number} ne postoji (1-{nativeListView.Items.Count})", true);
+                LogMessage($"Number {number} does not exist (1-{nativeListView.Items.Count})", true);
             }
         }
         private void MoveToFirst_Click(object sender, RoutedEventArgs e)
@@ -5044,7 +5090,7 @@ namespace UltraVideoEditor
                     }
                 }), System.Windows.Threading.DispatcherPriority.Background);
 
-                LogMessage($"Klip '{item.Name}' pomjeren na prvo mjesto", true);
+                LogMessage($"Clip '{item.Name}' moved to the first position", true);
                 PlayBeep();
             }
         }
@@ -5068,7 +5114,7 @@ namespace UltraVideoEditor
                     }
                 }), System.Windows.Threading.DispatcherPriority.Background);
 
-                LogMessage($"Klip '{item.Name}' pomjeren na zadnje mjesto", true);
+                LogMessage($"Clip '{item.Name}' moved to the last position", true);
                 PlayBeep();
             }
         }
@@ -5099,7 +5145,7 @@ namespace UltraVideoEditor
                             }
                         }), System.Windows.Threading.DispatcherPriority.Background);
 
-                        LogMessage($"Klip '{item.Name}' pomjeren na poziciju {newPosition}", true);
+                        LogMessage($"Clip '{item.Name}' moved to position {newPosition}", true);
                         PlayBeep();
                     }
                 }
@@ -5131,7 +5177,7 @@ namespace UltraVideoEditor
                 }
 
                 UpdateTimelineDisplay();
-                LogMessage($"✅ Dodato {dialog.DownloadedMediaPaths.Count} medija sa Pixabay-a", true);
+                LogMessage($"✅ Added {dialog.DownloadedMediaPaths.Count} media items from Pixabay", true);
                 PlayBeep();
             }
         }
@@ -5215,11 +5261,11 @@ namespace UltraVideoEditor
                     new System.Threading.CancellationToken());
 
                 string nl = Environment.NewLine;
-                string msg = "Export zavrsen!" + nl + nl;
+                string msg = "Export complete!" + nl + nl;
                 msg += "Original (16:9): " + System.IO.Path.GetFileName(finalVideo) + nl;
                 if (results.HasShorts) msg += "Shorts/TikTok (9:16): " + System.IO.Path.GetFileName(results.Shorts) + nl;
                 if (results.HasSquare) msg += "Instagram (1:1): " + System.IO.Path.GetFileName(results.Square) + nl;
-                msg += nl + "Svi fajlovi su u: " + dir;
+                msg += nl + "All files are in: " + dir;
 
                 LogMessage(L("export_done"), true);
                 System.Windows.MessageBox.Show(msg, "Export", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -5247,7 +5293,7 @@ namespace UltraVideoEditor
             {
                 string models = string.Join(Environment.NewLine, VisionAI.RecommendedModels
                     .Select(m => "  " + m.pullCmd));
-                string visionMsg = "Vision AI model nije dostupan." + Environment.NewLine + Environment.NewLine +
+                string visionMsg = "Vision AI model is not available." + Environment.NewLine + Environment.NewLine +
                     "Instaliraj jedan od modela:" + Environment.NewLine + models;
                 System.Windows.MessageBox.Show(visionMsg,
                     "Vision AI", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -5257,7 +5303,7 @@ namespace UltraVideoEditor
             string ffmpeg = System.IO.Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 
-            LogMessage("Vision AI: Generisujem opise klipova...", true);
+            LogMessage("Vision AI: Generating clip descriptions...", true);
             var items = timelineItems.Where(i => !i.IsAudio).ToList();
 
             await VisionAI.DescribeAllClips(

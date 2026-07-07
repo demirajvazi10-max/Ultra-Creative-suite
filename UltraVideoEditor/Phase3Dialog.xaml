@@ -6,17 +6,12 @@
         MinWidth="580" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Phase 3 dialog: Transitions, Audio Mix, Accessibility and Export">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#7C3AED"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#9D5FFF"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
         <SolidColorBrush x:Key="SuccessBrush"     Color="#10B981"/>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
@@ -51,29 +46,30 @@
 
         <Style x:Key="SecondaryButton" TargetType="Button"
                BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
         <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="Foreground"  Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Foreground"  Value="{DynamicResource TextPrimary}"/>
             <Setter Property="FontSize"    Value="13"/>
             <Setter Property="FontWeight"  Value="SemiBold"/>
             <Setter Property="Margin"      Value="0,0,0,8"/>
         </Style>
 
         <Style x:Key="FieldLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize"   Value="12"/>
             <Setter Property="Margin"     Value="0,0,0,3"/>
         </Style>
 
         <Style x:Key="CardBorder" TargetType="Border">
-            <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource PanelBg2}"/>
             <Setter Property="CornerRadius"    Value="8"/>
             <Setter Property="Padding"         Value="14"/>
             <Setter Property="Margin"          Value="0,0,0,10"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
         </Style>
     </Window.Resources>
 
@@ -89,10 +85,10 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="🎬  AI Highlight Suite — Faza 3"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="Transitions · Smart Audio Mix · Accessibility · Multi-format Export"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}"
                        Margin="0,3,0,0"/>
         </StackPanel>
 
@@ -120,7 +116,7 @@
                                         Foreground="{StaticResource AccentBrush}"
                                         AutomationProperties.Name="Music volume"/>
                                 <TextBlock x:Name="TxtMusicVol" Text="85%"
-                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Foreground="{DynamicResource TextSecondary}"
                                            FontSize="11" Margin="0,2,0,8"/>
 
                                 <TextBlock Text="Original audio volume (%)"
@@ -131,26 +127,26 @@
                                         Foreground="{StaticResource AccentBrush}"
                                         AutomationProperties.Name="Original audio volume"/>
                                 <TextBlock x:Name="TxtClipVol" Text="70%"
-                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Foreground="{DynamicResource TextSecondary}"
                                            FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                 <CheckBox x:Name="ChkDucking"
                                           Content="Ducking (music lowers during dialogue)"
                                           IsChecked="True"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimary}"
                                           FontSize="12" Margin="0,0,0,8"
                                           AutomationProperties.Name="Enable audio ducking"/>
                                 <CheckBox x:Name="ChkNormalize"
                                           Content="Normalize to -14 LUFS (YouTube)"
                                           IsChecked="True"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimary}"
                                           FontSize="12" Margin="0,0,0,8"
                                           AutomationProperties.Name="Normalize volume"/>
                                 <CheckBox x:Name="ChkMuteOriginal"
                                           Content="Mute original audio (music only)"
                                           IsChecked="False"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimary}"
                                           FontSize="12"
                                           AutomationProperties.Name="Mute original clip audio"/>
                             </StackPanel>
@@ -167,11 +163,11 @@
                         <CheckBox x:Name="ChkEnableTransitions"
                                   Content="Automatically add transitions between segments (beat-synced)"
                                   IsChecked="True"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Foreground="{DynamicResource TextPrimary}"
                                   FontSize="12" Margin="0,0,0,8"
                                   AutomationProperties.Name="Enable automatic transitions"/>
                         <TextBlock Text="Transition type is selected based on content: action→flash, portrait→dissolve, arc→wipe…"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
@@ -185,19 +181,19 @@
                         <CheckBox x:Name="ChkGenReport"
                                   Content="Generate audio-description report (TXT)"
                                   IsChecked="True"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Foreground="{DynamicResource TextPrimary}"
                                   FontSize="12" Margin="0,0,0,8"
                                   AutomationProperties.Name="Generate accessibility report"/>
                         <CheckBox x:Name="ChkTtsSummary"
                                   Content="Include TTS-optimized summary"
                                   IsChecked="True"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Foreground="{DynamicResource TextPrimary}"
                                   FontSize="12" Margin="0,0,0,4"
                                   AutomationProperties.Name="Include TTS summary"/>
                         <CheckBox x:Name="ChkNavMarkers"
                                   Content="Include navigation markers (timestamp list)"
                                   IsChecked="True"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Foreground="{DynamicResource TextPrimary}"
                                   FontSize="12"
                                   AutomationProperties.Name="Include navigation markers"/>
                     </StackPanel>
@@ -221,9 +217,9 @@
                                     Click="BtnPickFolder_Click"
                                     AutomationProperties.Name="Select output folder"/>
                             <TextBox x:Name="TxtOutputFolder"
-                                     Background="{StaticResource SurfaceBrush}"
-                                     Foreground="{StaticResource TextPrimaryBrush}"
-                                     BorderBrush="{StaticResource BorderBrush}"
+                                     Background="{DynamicResource PanelBg}"
+                                     Foreground="{DynamicResource TextPrimary}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}"
                                      BorderThickness="1" Padding="8,6"
                                      FontSize="12"
                                      AutomationProperties.Name="Output folder path"/>
@@ -235,25 +231,25 @@
                             <CheckBox x:Name="ChkExportYoutube"
                                       Content="🎬 YouTube FHD (1920×1080)"
                                       IsChecked="True"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       FontSize="12" Margin="0,0,16,6"
                                       AutomationProperties.Name="Export for YouTube FHD"/>
                             <CheckBox x:Name="ChkExportReels"
                                       Content="📱 Reels / TikTok (1080×1920)"
                                       IsChecked="True"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       FontSize="12" Margin="0,0,16,6"
                                       AutomationProperties.Name="Export for Instagram Reels and TikTok"/>
                             <CheckBox x:Name="ChkExportMp3"
                                       Content="🎵 MP3 Audio"
                                       IsChecked="True"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       FontSize="12" Margin="0,0,16,6"
                                       AutomationProperties.Name="Export audio MP3"/>
                             <CheckBox x:Name="ChkExportReport"
                                       Content="♿ Accessibility TXT"
                                       IsChecked="True"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       FontSize="12" Margin="0,0,0,6"
                                       AutomationProperties.Name="Export accessibility report"/>
                         </WrapPanel>
@@ -261,7 +257,7 @@
                         <CheckBox x:Name="ChkUseGPU"
                                   Content="⚡ GPU encoding (NVENC)"
                                   IsChecked="True"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Foreground="{DynamicResource TextPrimary}"
                                   FontSize="12" Margin="0,8,0,0"
                                   AutomationProperties.Name="Koristi GPU NVENC encoding"/>
                     </StackPanel>
@@ -274,7 +270,7 @@
         <Border Grid.Row="2"
                 x:Name="ProgressPanel"
                 Visibility="Collapsed"
-                Background="{StaticResource SurfaceBrush}"
+                Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
             <StackPanel>
                 <DockPanel Margin="0,0,0,5">
@@ -284,21 +280,21 @@
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg"
                                Text="Starting…"
-                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Foreground="{DynamicResource TextPrimary}"
                                FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
                 <ProgressBar x:Name="ProgressBar"
                              Height="6" Minimum="0" Maximum="100"
                              Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BorderBrush}"
+                             Background="{DynamicResource ThemeBorderBrush}"
                              BorderThickness="0"/>
             </StackPanel>
         </Border>
 
         <!-- Buttons -->
         <DockPanel Grid.Row="3" LastChildFill="False">
-            <Button x:Name="BtnClose"
+            <Button x:Name="BtnClose" IsCancel="True"
                     DockPanel.Dock="Right"
                     Content="Close"
                     Style="{StaticResource SecondaryButton}"

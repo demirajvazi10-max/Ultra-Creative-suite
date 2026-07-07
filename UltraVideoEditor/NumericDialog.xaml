@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Enter position" Height="150" Width="300"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        Background="#1E1E1E">
+        Background="{DynamicResource PanelBg}">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,14 +11,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="lblInstruction" Text="Position:" Foreground="White" Margin="0,0,0,10"/>
-        <TextBox x:Name="txtNumber" Grid.Row="1" Height="30" Background="#2D2D2D" Foreground="White" Margin="0,0,0,10"
+        <TextBlock x:Name="lblInstruction" Text="Position:" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,10"/>
+        <TextBox x:Name="txtNumber" Grid.Row="1" Height="30" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,10"
                  AutomationProperties.Name="Enter clip number"
                  AutomationProperties.HelpText="Enter the clip number you want to select"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button Content="OK" Width="80" Margin="0,0,10,0" Click="Ok_Click" Background="#2E7D32" Foreground="White"/>
-            <Button Content="Cancel" Width="80" Click="Cancel_Click" Background="#B71C1C" Foreground="White"/>
+            <Button Content="OK" Width="80" Margin="0,0,10,0" Click="Ok_Click" Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Click="Cancel_Click" Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" IsCancel="True"/>
         </StackPanel>
     </Grid>
 </Window>

@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Backgrounds: pure black throughout for maximum contrast -->
+    <SolidColorBrush x:Key="MainWindowBg" Color="#000000"/>
+    <SolidColorBrush x:Key="WindowBg" Color="#000000"/>
+    <SolidColorBrush x:Key="PanelBg" Color="#000000"/>
+    <SolidColorBrush x:Key="PanelBg2" Color="#0A0A0A"/>
+    <SolidColorBrush x:Key="ControlBg" Color="#111111"/>
+
+    <!-- Text: pure white, no muted grays (grays fail contrast on black) -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF"/>
+    <!-- Text used ON TOP of colored action buttons. Contrast theme's action colors
+         (yellow/green/red/orange/magenta) are all bright, so black text reads far
+         better on them than white text would. -->
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#000000"/>
+
+    <!-- Accents / actions: high-saturation, high-contrast colors -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#FFFF00"/>
+    <SolidColorBrush x:Key="ApplyBrush" Color="#00FF00"/>
+    <SolidColorBrush x:Key="CancelBrush" Color="#FF3B30"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FFA500"/>
+    <SolidColorBrush x:Key="PurpleBrush" Color="#FF00FF"/>
+
+    <!-- Structure: white borders so panels/controls are clearly delineated -->
+    <SolidColorBrush x:Key="ThemeBorderBrush" Color="#FFFFFF"/>
+
+</ResourceDictionary>

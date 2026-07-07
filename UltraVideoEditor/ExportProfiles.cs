@@ -23,7 +23,7 @@ namespace UltraVideoEditor
                 new ExportProfile { Name = "YouTube (720p)", Resolution = "1280x720", Width = 1280, Height = 720, Bitrate = 5000, FrameRate = 30, AudioCodec = "aac" },
                 new ExportProfile { Name = "TikTok/Reels (9:16)", Resolution = "1080x1920", Width = 1080, Height = 1920, Bitrate = 6000, FrameRate = 30, AudioCodec = "aac" },
                 new ExportProfile { Name = "Instagram (1:1)", Resolution = "1080x1080", Width = 1080, Height = 1080, Bitrate = 5000, FrameRate = 30, AudioCodec = "aac" },
-                new ExportProfile { Name = "Visoka kvaliteta (4K)", Resolution = "3840x2160", Width = 3840, Height = 2160, Bitrate = 20000, FrameRate = 60, AudioCodec = "aac" },
+                new ExportProfile { Name = "High quality (4K)", Resolution = "3840x2160", Width = 3840, Height = 2160, Bitrate = 20000, FrameRate = 60, AudioCodec = "aac" },
                 new ExportProfile { Name = "Samo audio (MP3)", Resolution = "0x0", Width = 0, Height = 0, Bitrate = 320, FrameRate = 0, AudioCodec = "mp3" }
             };
         }

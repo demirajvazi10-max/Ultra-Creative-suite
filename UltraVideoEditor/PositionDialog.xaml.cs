@@ -11,7 +11,7 @@ namespace UltraVideoEditor
     public partial class PositionDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -36,13 +36,13 @@ namespace UltraVideoEditor
         {
             string dur = TimeSpan.FromSeconds(_audioDuration).ToString(@"mm\:ss");
             txtAudioInfo.Text = _audioDuration > 0
-                ? string.Format("Audio trajanje: {0} ({1:F0} sekundi)", dur, _audioDuration)
-                : "Nema ucitanog audio fajla.";
+                ? string.Format("Audio duration: {0} ({1:F0} seconds)", dur, _audioDuration)
+                : "No audio file loaded.";
 
-            txtImageName.Text = "Slika: " + _currentItem.Name;
+            txtImageName.Text = "Image: " + _currentItem.Name;
             txtImageDesc.Text = string.IsNullOrWhiteSpace(_currentItem.AudioDescription)
-                ? "(Nema audio opisa)"
-                : "Opis: " + _currentItem.AudioDescription;
+                ? "(No audio description)"
+                : "Description: " + _currentItem.AudioDescription;
 
             double pos = _currentItem.UseFixedPosition && _currentItem.FixedPosition > 0
                 ? _currentItem.FixedPosition : _currentItem.Start;
@@ -56,12 +56,12 @@ namespace UltraVideoEditor
             {
                 double interval = _audioDuration / images.Count;
                 txtAutoInfo.Text = string.Format(
-                    "{0} slika, audio {1}.\nRavnomerni raspored: jedna slika svakih {2:F1} sekundi.",
+                    "{0} images, audio {1}.\nEven distribution: one image every {2:F1} seconds.",
                     images.Count, dur, interval);
             }
             else
             {
-                txtAutoInfo.Text = images.Count == 0 ? "Nema slika na timeline-u." : "Nije ucitan audio fajl.";
+                txtAutoInfo.Text = images.Count == 0 ? "No images on the timeline." : "No audio file loaded.";
             }
 
             RefreshScheduleList();

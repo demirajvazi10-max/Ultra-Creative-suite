@@ -44,13 +44,13 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Odaberite video fajl",
-                Filter = "Video fajlovi|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|Svi fajlovi|*.*",
+                Title  = "Select a video file",
+                Filter = "Video files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
             {
                 TxtVideoPath.Text       = dlg.FileName;
-                TxtVideoPath.Foreground = Brushes.White;
+                TxtVideoPath.Foreground = ThemeBrushes.TextPrimary;
                 BtnDetect.IsEnabled     = true;
             }
         }
@@ -112,8 +112,8 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                TxtSceneCount.Text = "Otkazano.";
-                SetProgress(0, "Otkazano.");
+                TxtSceneCount.Text = "Cancelled.";
+                SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
@@ -144,7 +144,7 @@ namespace UltraVideoEditor
                 _selected.Add(scene); // all included by default
             }
 
-            TxtSceneCount.Text = $"{scenes.Count} scena  ·  {AIHighlightEngine.FormatTime(_result.TotalDuration)}";
+            TxtSceneCount.Text = $"{scenes.Count} scenes  ·  {AIHighlightEngine.FormatTime(_result.TotalDuration)}";
             BtnAddToTimeline.IsEnabled = _selected.Count > 0;
         }
 
@@ -152,7 +152,7 @@ namespace UltraVideoEditor
         {
             var card = new Border
             {
-                Background   = new SolidColorBrush(Color.FromRgb(15, 52, 96)),
+                Background   = ThemeBrushes.PanelBg2,
                 CornerRadius = new CornerRadius(8),
                 Margin       = new Thickness(0, 0, 0, 8),
                 Padding      = new Thickness(10),
@@ -168,7 +168,7 @@ namespace UltraVideoEditor
                 Width        = 160,
                 Height       = 90,
                 CornerRadius = new CornerRadius(5),
-                Background   = new SolidColorBrush(Color.FromRgb(22, 33, 62)),
+                Background   = ThemeBrushes.PanelBg,
                 Margin       = new Thickness(0, 0, 10, 0),
             };
             if (!string.IsNullOrEmpty(scene.ThumbnailPath) && File.Exists(scene.ThumbnailPath))
@@ -199,13 +199,13 @@ namespace UltraVideoEditor
             var chk = new CheckBox
             {
                 IsChecked  = true,
-                Foreground = Brushes.White,
+                Foreground = ThemeBrushes.TextPrimary,
                 FontWeight = FontWeights.SemiBold,
                 FontSize   = 13,
                 Content    = $"#{scene.Index:D3}  {AIHighlightEngine.FormatTime(scene.Start)} → {AIHighlightEngine.FormatTime(scene.End)}  ({scene.Duration:F1}s)",
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            AutomationProperties.SetName(chk, $"Scena {scene.Index}, {scene.Duration:F1} sekundi");
+            AutomationProperties.SetName(chk, $"Scene {scene.Index}, {scene.Duration:F1} seconds");
             chk.Checked   += (_, _) => { if (!_selected.Contains(scene)) { _selected.Add(scene); UpdateAddButton(); } };
             chk.Unchecked += (_, _) => { _selected.Remove(scene); UpdateAddButton(); };
             DockPanel.SetDock(chk, Dock.Left);
@@ -216,7 +216,7 @@ namespace UltraVideoEditor
             var lblText = new TextBlock
             {
                 Text       = scene.Label,
-                Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                Foreground = ThemeBrushes.TextSecondary,
                 FontSize   = 12,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Margin     = new Thickness(0, 0, 0, 4),
@@ -227,11 +227,11 @@ namespace UltraVideoEditor
             if (scene.Motion != null)
             {
                 string motionStr = scene.Motion.IsStatic ? "📷 Static shot"
-                    : $"🎥 Pokret: {scene.Motion.Direction}";
+                    : $"🎥 Motion: {scene.Motion.Direction}";
                 info.Children.Add(new TextBlock
                 {
                     Text       = motionStr,
-                    Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+                    Foreground = ThemeBrushes.TextSecondary,
                     FontSize   = 11,
                 });
             }
@@ -297,7 +297,7 @@ namespace UltraVideoEditor
                     cursor += scene.Duration;
                 }
                 MessageBox.Show(
-                    $"Dodato {_selected.Count} scena na timeline.",
+                    $"Added {_selected.Count} scenes to the timeline.",
                     "Timeline", MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
                 Close();

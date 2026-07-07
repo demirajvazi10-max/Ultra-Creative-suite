@@ -97,7 +97,7 @@ namespace UltraVideoEditor
                 {
                     var mw = System.Windows.Application.Current?.MainWindow as MainWindow;
                     res = mw?.GetExportResolution?.Invoke() ?? "1920x1080";
-                    lang = mw?._currentLanguage ?? "sr";
+                    lang = mw?._currentLanguage ?? "en";
                 });
             }
             catch { }
@@ -270,7 +270,7 @@ namespace UltraVideoEditor
                 }
             }
 
-            LogToMainWindow($"🎵 Auto-popunjeno iz audio fajla: '{fileName}'");
+            LogToMainWindow($"🎵 Auto-filled from audio file: '{fileName}'");
         }
 
         private void InitLocalSounds()
@@ -283,7 +283,7 @@ namespace UltraVideoEditor
             else
             {
                 LogToMainWindow("⚠️ Assets/Sounds/ is empty or does not exist — ambient sounds will not be available.");
-                LogToMainWindow("   Postavi MP3/WAV fajlove u Assets/Sounds/ za aktivaciju.");
+                LogToMainWindow("   Place MP3/WAV files in Assets/Sounds/ to activate.");
                 _enableAmbientSounds = false;
                 if (chkAmbientSounds != null) chkAmbientSounds.IsChecked = false;
                 if (chkAmbientSounds != null) chkAmbientSounds.IsEnabled = false;
@@ -457,7 +457,7 @@ namespace UltraVideoEditor
                         Duration = 0,
                         Start = 0,
                         End = 0,
-                        Name = "🎵 AI generisana muzika",
+                        Name = "🎵 AI-generated music",
                         Type = "Audio",
                         Volume = 100,
                         TrackIndex = 1
@@ -468,7 +468,7 @@ namespace UltraVideoEditor
                     newAudioItem.Duration = totalDuration;
                     newAudioItem.End = totalDuration;
 
-                    LogToMainWindow($"🎵 AI generisana muzika dodata, trajanje: {FormatTime(totalDuration)}");
+                    LogToMainWindow($"🎵 AI-generated music added, duration: {FormatTime(totalDuration)}");
                     audioItem = newAudioItem;
                     hasAudio = true;
                 }
@@ -551,14 +551,14 @@ namespace UltraVideoEditor
                         && !string.IsNullOrWhiteSpace(analysis.Mood);
                     if (validAnalysis)
                     {
-                        LogToMainWindow($"🎭 AI analiza: kontekst='{analysis.Context}', mood='{analysis.Mood}', tema='{analysis.Theme}'");
+                        LogToMainWindow($"🎭 AI analysis: context='{analysis.Context}', mood='{analysis.Mood}', theme='{analysis.Theme}'");
                         return analysis;
                     }
                     LogToMainWindow(L("ai_empty_values"));
                 }
                 else
                 {
-                    LogToMainWindow($"⚠️ AI nije vratio JSON. Odgovor: '{response?.Substring(0, Math.Min(100, response?.Length ?? 0))}'");
+                    LogToMainWindow($"⚠️ AI did not return JSON. Response: '{response?.Substring(0, Math.Min(100, response?.Length ?? 0))}'");
                 }
             }
             catch (Exception ex)
@@ -661,7 +661,7 @@ namespace UltraVideoEditor
             var results = new List<SceneKeywords>();
             int total = lyrics.Count;
 
-            LogToMainWindow($"🎬 Generiram vizualne keywords za {total} stihova (LITERAL ACTION SYNC)...");
+            LogToMainWindow($"🎬 Generating visual keywords for {total} lines (LITERAL ACTION SYNC)...");
 
             int batchSize = 4;
             for (int i = 0; i < total; i += batchSize)
@@ -748,7 +748,7 @@ namespace UltraVideoEditor
                                     if (hasAdultContent)
                                         LogToMainWindow(LF("ai_bad_keywords", r.Line, r.Keywords));
                                     if (hasContextForbidden)
-                                        LogToMainWindow($"🚫 Kontekstualno zabranjen keyword (ctx={analysis?.Context}): {r.Keywords}");
+                                        LogToMainWindow($"🚫 Contextually forbidden keyword (ctx={analysis?.Context}): {r.Keywords}");
                                     int lyricIdx = r.Line - batchStart - 1;
                                     if (lyricIdx >= 0 && lyricIdx < batch.Count)
                                     {
@@ -760,7 +760,7 @@ namespace UltraVideoEditor
                             }
                             results.AddRange(batchResults);
                             foreach (var r in batchResults)
-                                LogToMainWindow($"   Stih {r.Line}: akcija='{r.Keywords}', zvuk='{r.Ambient}'");
+                                LogToMainWindow($"   Line {r.Line}: action='{r.Keywords}', sound='{r.Ambient}'");
                             continue;
                         }
                     }
@@ -983,7 +983,7 @@ namespace UltraVideoEditor
             for (int i = 0; i < count; i++)
                 result.Add(templates[i % templates.Length]);
 
-            LogToMainWindow($"🎵 Instrumental scene ({count} kadrova) — kontekst: '{context}', raspolozenje: '{mood}'");
+            LogToMainWindow($"🎵 Instrumental scene ({count} frames) — context: '{context}', mood: '{mood}'");
             return result;
         }
 
@@ -2272,7 +2272,7 @@ namespace UltraVideoEditor
                 Theme = analysis.Theme ?? _detectedContext,
                 VisualStyle = analysis.VisualStyle ?? "bright colorful outdoor children"
             };
-            LogToMainWindow($"🎯 SongContext: uzrast={_songContext.AgeGroup}, kontekst={_songContext.Context}, sezona={_songContext.Season}");
+            LogToMainWindow($"🎯 SongContext: age={_songContext.AgeGroup}, context={_songContext.Context}, season={_songContext.Season}");
 
             if (_contextKeywords.TryGetValue(_detectedContext, out var ctxList))
                 _universalKeywords = new List<string>(ctxList);
@@ -2320,7 +2320,7 @@ namespace UltraVideoEditor
                 _ => "Cheerful Children's Song"
             });
 
-            LogToMainWindow($"✅ Story board created: {scenes.Count} scena za temu: '{overallTheme}'");
+            LogToMainWindow($"✅ Story board created: {scenes.Count} scenes for theme: '{overallTheme}'");
             return new StoryBoard { Scenes = scenes, MainCharacter = analysis.MainSubject ?? "Happy child", OverallTheme = overallTheme };
         }
 
@@ -2426,7 +2426,7 @@ namespace UltraVideoEditor
                 bool hasPeak = scenes.Any(s => s.Energy >= 4);
                 if (!hasPeak)
                 {
-                    LogToMainWindow("⚠️ Nema scene sa visokom energijom (peak)");
+                    LogToMainWindow("⚠️ No scene with high energy (peak)");
                     valid = false;
                 }
             }
@@ -2436,7 +2436,7 @@ namespace UltraVideoEditor
                 bool allCalm = scenes.All(s => s.Energy <= 2);
                 if (!allCalm)
                 {
-                    LogToMainWindow("⚠️ Uspavanka ima scenu sa previsoko energijom");
+                    LogToMainWindow("⚠️ Lullaby has a scene with too much energy");
                     valid = false;
                 }
             }
@@ -2507,7 +2507,7 @@ namespace UltraVideoEditor
 
         private StoryBoard CreateFallbackStoryBoard()
         {
-            LogToMainWindow("🔄 Koristim fallback story board");
+            LogToMainWindow("🔄 Using fallback story board");
             var scenes = new List<StoryScene>();
 
             string mainCharacter = _detectedContext switch
@@ -2699,7 +2699,7 @@ namespace UltraVideoEditor
                                 string fileName = $"background_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3";
                                 string outputPath = Path.Combine(tempDir, fileName);
 
-                                LogToMainWindow($"🎵 Preuzimam pozadinsku muziku: {hit["title"]?.ToString() ?? searchQuery}");
+                                LogToMainWindow($"🎵 Downloading background music: {hit["title"]?.ToString() ?? searchQuery}");
 
                                 using var dlStream = await _dlHttpClient.GetStreamAsync(audioUrl, ct);
                                 using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
@@ -2819,11 +2819,11 @@ namespace UltraVideoEditor
             string localPath = await GetLocalAmbientSound(soundType, tempDir);
             if (localPath != null)
             {
-                LogToMainWindow($"✅ Lokalni ambijentalni zvuk: {localPath}");
+                LogToMainWindow($"✅ Local ambient sound: {localPath}");
                 return localPath;
             }
 
-            LogToMainWindow($"⚠️ Nema ambijentalnog zvuka za '{soundType}' u lokalnoj biblioteci.");
+            LogToMainWindow($"⚠️ No ambient sound found for '{soundType}' in the local library.");
             return null;
         }
 
@@ -3147,7 +3147,7 @@ namespace UltraVideoEditor
                     if (!isBlacklisted)
                         filteredIndex[file] = tags;
                 }
-                LogToMainWindow($"🔊 Outdoor filter aktivan: {filteredIndex.Count}/{_soundIndex.Count} fajlova u pretrazi");
+                LogToMainWindow($"🔊 Outdoor filter active: {filteredIndex.Count}/{_soundIndex.Count} files in search");
             }
 
             string found = FindBestMatch(filteredIndex, expandedTags);
@@ -3163,11 +3163,11 @@ namespace UltraVideoEditor
                 string ext = Path.GetExtension(found);
                 string outputPath = Path.Combine(tempDir, $"ambient_{Guid.NewGuid().ToString().Substring(0, 8)}{ext}");
                 await Task.Run(() => File.Copy(found, outputPath, true));
-                LogToMainWindow($"🔊 Lokalni zvuk: '{Path.GetFileName(found)}' za '{soundType}'");
+                LogToMainWindow($"🔊 Local sound: '{Path.GetFileName(found)}' for '{soundType}'");
                 return outputPath;
             }
 
-            LogToMainWindow($"🔊 Nema lokalnog zvuka za '{soundType}' u Assets/Sounds/");
+            LogToMainWindow($"🔊 No local sound found for '{soundType}' in Assets/Sounds/");
             return null;
         }
 
@@ -3181,7 +3181,7 @@ namespace UltraVideoEditor
                 {
                     _sfxIndex = BuildSoundIndex(sfxDir);
                     if (_sfxIndex.Count > 0)
-                        LogToMainWindow($"🎵 SFX indeks: {_sfxIndex.Count} fajlova u Assets/SFX/");
+                        LogToMainWindow($"🎵 SFX index: {_sfxIndex.Count} files in Assets/SFX/");
                 }
             }
 
@@ -3213,9 +3213,9 @@ namespace UltraVideoEditor
             {
                 if (!Directory.Exists(dir)) continue;
                 var idx = BuildSoundIndex(dir);
-                sb.AppendLine($"\n═══ {label} ({idx.Count} fajlova) ═══");
+                sb.AppendLine($"\n═══ {label} ({idx.Count} files) ═══");
                 foreach (var (file, tags) in idx.OrderBy(x => Path.GetFileName(x.Key)))
-                    sb.AppendLine($"  {Path.GetFileName(file)}\n    Tagovi: {string.Join(", ", tags.Distinct().Take(8))}");
+                    sb.AppendLine($"  {Path.GetFileName(file)}\n    Tags: {string.Join(", ", tags.Distinct().Take(8))}");
             }
             return sb.ToString();
         }
@@ -3246,7 +3246,7 @@ namespace UltraVideoEditor
                 "fun" => 0.30,
                 _ => 0.27
             };
-            LogToMainWindow($"🔊 Miksiram ambijentalne zvukove: {scenes.Count(s => !string.IsNullOrEmpty(s.AmbientPath))} zvukova, gain={ambientVolume:F2}");
+            LogToMainWindow($"🔊 Mixing ambient sounds: {scenes.Count(s => !string.IsNullOrEmpty(s.AmbientPath))} sounds, gain={ambientVolume:F2}");
 
             var filterParts = new List<string>();
             var inputs = new List<string>();
@@ -3294,7 +3294,7 @@ namespace UltraVideoEditor
                         $"adelay={startMs}|{startMs}[a{ambientIndex}]");
 
                     ambientIndex++;
-                    LogToMainWindow($"🔊 Scena {i + 1}: ambient start={startTime:F1}s dur={duration:F1}s");
+                    LogToMainWindow($"🔊 Scene {i + 1}: ambient start={startTime:F1}s dur={duration:F1}s");
                 }
             }
 
@@ -3386,7 +3386,7 @@ namespace UltraVideoEditor
                 if (ok && File.Exists(genPath))
                 {
                     _transitionSoundCache[type] = genPath;
-                    LogToMainWindow($"🔊 Tranzicioni zvuk generisan: {type}");
+                    LogToMainWindow($"🔊 Transition sound generated: {type}");
                     string copyPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}.wav");
                     File.Copy(genPath, copyPath, true);
                     return copyPath;
@@ -3543,7 +3543,7 @@ namespace UltraVideoEditor
                     sc.Duration = Math.Round(2.8 + rng.NextDouble() * 0.4, 2); // 2.8–3.2s
                 }
 
-                LogToMainWindow($"🎬 Pacing [{sc.PacingCategory}] Scena {sc.SceneNumber} E={sc.Energy}: {prev:F1}s→{sc.Duration:F1}s");
+                LogToMainWindow($"🎬 Pacing [{sc.PacingCategory}] Scene {sc.SceneNumber} E={sc.Energy}: {prev:F1}s→{sc.Duration:F1}s");
             }
         }
 
@@ -3563,11 +3563,11 @@ namespace UltraVideoEditor
 
             if (storyBoard?.Scenes == null || storyBoard.Scenes.Count == 0)
             {
-                LogToMainWindow("❌ Story board nije generisan, koristim fallback");
+                LogToMainWindow("❌ Story board was not generated, using fallback");
                 storyBoard = CreateFallbackStoryBoard();
             }
 
-            LogToMainWindow($"📖 Story created: {storyBoard.Scenes.Count} scena");
+            LogToMainWindow($"📖 Story created: {storyBoard.Scenes.Count} scenes");
             LogToMainWindow($"👤 Glavni lik: {storyBoard.MainCharacter}");
             LogToMainWindow($"🎬 Tema: {storyBoard.OverallTheme}");
 
@@ -3604,18 +3604,18 @@ namespace UltraVideoEditor
                 double rawTotalDuration = totalDuration;
                 totalDuration = Math.Max(10.0, totalDuration - _audioStartSeconds);
                 _totalDuration = totalDuration;
-                LogToMainWindow($"⏱ Duration korekcija: {rawTotalDuration:F1}s → {totalDuration:F1}s (oduzeto {_audioStartSeconds:F2}s Beat-Lock offset)");
+                LogToMainWindow($"⏱ Duration correction: {rawTotalDuration:F1}s → {totalDuration:F1}s (subtracted {_audioStartSeconds:F2}s Beat-Lock offset)");
             }
 
             _lyricQueryCache.Clear();  // reset refrain cache za svaki novi video
 
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
-            LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX aktivan" : "🧠 VisionAnalyzer: FFmpeg mod");
+            LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX active" : "🧠 VisionAnalyzer: FFmpeg mod");
 
             // Try Qwen2-VL — if successful, used as priority 1 ahead of ONNX
             bool qwenOk = await VisionAnalyzer.InitializeQwenAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             if (qwenOk)
-                LogToMainWindow("🤖 VisionAnalyzer: Qwen2-VL aktivan — koristim AI analizu slike");
+                LogToMainWindow("🤖 VisionAnalyzer: Qwen2-VL active — using AI image analysis");
 
             MotionAnalyzer.ClearCache();
             _lastClipMotion = null;
@@ -3697,7 +3697,7 @@ namespace UltraVideoEditor
                     "adventure" or "dance" => 2.5,
                     _ => 3.5   // YouTube Kids default bez BPM-a
                 };
-                LogToMainWindow($"🎬 Nema BPM, context '{_detectedContext}' → max {MAX_LYRIC_SCENE_DURATION}s po kadru");
+                LogToMainWindow($"🎬 No BPM, context '{_detectedContext}' → max {MAX_LYRIC_SCENE_DURATION}s per frame");
             }
 
             for (int si = 0; si < storyBoard.Scenes.Count; si++)
@@ -3750,7 +3750,7 @@ namespace UltraVideoEditor
                         if (bestMatch != null)
                         {
                             double wordSync = Math.Max(0, bestMatch.StartSecond - cutAdvanceSec);
-                            LogToMainWindow($"   🔤 WordSync scena {si + 1}: '{bestMatch.Word}' @ {bestMatch.StartSecond:F2}s → StartTime {sc.StartTime:F2}s → {wordSync:F2}s");
+                            LogToMainWindow($"   🔤 WordSync scene {si + 1}: '{bestMatch.Word}' @ {bestMatch.StartSecond:F2}s → StartTime {sc.StartTime:F2}s → {wordSync:F2}s");
                             sc.StartTime = wordSync;
                         }
                     }
@@ -3820,11 +3820,11 @@ namespace UltraVideoEditor
             // Called AFTER computing StartTime/Duration, but ONLY for instrumental music
             ApplyRhythmicPacing(storyBoard.Scenes, _lyricTimestamps.Count > 0);
 
-            LogToMainWindow($"📊 Trajanje audio: {FormatTime(totalDuration)} | Stihovi: {FormatTime(lyricsTotalDuration)} | Instrumentalni rep: {FormatTime(Math.Max(0, remainingDuration))}");
+            LogToMainWindow($"📊 Audio duration: {FormatTime(totalDuration)} | Lyrics: {FormatTime(lyricsTotalDuration)} | Instrumental remainder: {FormatTime(Math.Max(0, remainingDuration))}");
 
             if (remainingDuration > 1.5)
             {
-                LogToMainWindow($"🎵 Detektovan instrumentalni dio: {FormatTime(remainingDuration)} (ukupno trajanje: {FormatTime(totalDuration)}, stihovi: {FormatTime(lyricsTotalDuration)})");
+                LogToMainWindow($"🎵 Detected instrumental section: {FormatTime(remainingDuration)} (total duration: {FormatTime(totalDuration)}, lyrics: {FormatTime(lyricsTotalDuration)})");
 
                 List<string> bRollKeywords = new List<string>();
 
@@ -4358,7 +4358,7 @@ namespace UltraVideoEditor
                                 string rawPreview = string.IsNullOrWhiteSpace(ollamaRaw)
                                     ? "(prazan odgovor)"
                                     : ollamaRaw.Substring(0, Math.Min(80, ollamaRaw.Length)).Replace("\n", "↵").Replace("\r", "");
-                                LogToMainWindow($"   ⚠️ Ollama nije dala upotrebljiv query | Raw: '{rawPreview}'");
+                                LogToMainWindow($"   ⚠️ Ollama did not return a usable query | Raw: '{rawPreview}'");
                             }
 
                             // LITERAL SYNC FIX: ActionMap direct hit beats Ollama
@@ -4424,7 +4424,7 @@ namespace UltraVideoEditor
                                 "autumn" => $"{primaryQuery} golden leaves autumn",
                                 _ => $"{primaryQuery} different angle perspective"
                             };
-                            LogToMainWindow($"   🔄 Cooldown varijanta (tema '{queryTheme}' bila scena {lastUsed}): '{variant}'");
+                            LogToMainWindow($"   🔄 Cooldown variant (theme '{queryTheme}' was scene {lastUsed}): '{variant}'");
                             primaryQuery = variant;
                         }
 
@@ -4439,7 +4439,7 @@ namespace UltraVideoEditor
                     _currentLyric = scene.Description;
                     _currentSeason = _detectedSeason;
 
-                    LogToMainWindow($"🎬 Scena {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
+                    LogToMainWindow($"🎬 Scene {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
                     LogToMainWindow($"   📝 Stih: '{(lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)}'");
                     LogToMainWindow($"   🎯 Query: '{primaryQuery}'" + (multiMatches.Count > 1 ? $" (+ {multiMatches.Count - 1} multi-anchor)" : ""));
 
@@ -4466,9 +4466,9 @@ namespace UltraVideoEditor
                         LogToMainWindow($"   🎬 Sub-scene detection: {subSceneQueries.Count} visual objects → clip montage");
                         mediaPath = await BuildSubSceneVideo(subSceneQueries, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                         if (mediaPath != null)
-                            LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} klipa");
+                            LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} clips");
                         else
-                            LogToMainWindow($"   ⚠ Sub-scene video nije uspio, koristim standardni path");
+                            LogToMainWindow($"   ⚠ Sub-scene video failed, using the standard path");
                     }
 
                     double effectiveDuration = Math.Min(scene.Duration, MAX_LYRIC_SCENE_DURATION);
@@ -4536,7 +4536,7 @@ namespace UltraVideoEditor
                         if (!string.IsNullOrEmpty(mediaPath))
                             LogToMainWindow($"   ✅ {attemptLabel} successful");
                         else
-                            LogToMainWindow($"   ⚠️ {attemptLabel} nije vratio medij");
+                            LogToMainWindow($"   ⚠️ {attemptLabel} did not return any media");
                     }
 
                     if (!string.IsNullOrEmpty(mediaPath))
@@ -4549,7 +4549,7 @@ namespace UltraVideoEditor
                         if (effectiveMediaType == "video")
                         {
                             double videoDuration = await GetVideoDuration(mediaPath);
-                            LogToMainWindow($"📹 Video trajanje: {videoDuration:F1}s, potrebno: {scene.Duration:F1}s");
+                            LogToMainWindow($"📹 Video duration: {videoDuration:F1}s, needed: {scene.Duration:F1}s");
 
                             if (videoDuration > scene.Duration + 0.5)
                             {
@@ -4566,7 +4566,7 @@ namespace UltraVideoEditor
                         if (ambientPath != null)
                         {
                             scene.AmbientPath = ambientPath;
-                            LogToMainWindow($"🔊 Ambijentalni zvuk za scenu {i + 1}: {scene.AmbientSound}");
+                            LogToMainWindow($"🔊 Ambient sound for scene {i + 1}: {scene.AmbientSound}");
                         }
 
                         scene.VisionScore = _lastDownloadedVisionScore;
@@ -4596,7 +4596,7 @@ namespace UltraVideoEditor
                             Sentiment = StrictQueryEngine.ClassifySentiment(
                                 i < _lyricLines?.Count ? _lyricLines[i] : "").ToString()
                         });
-                        LogToMainWindow($"✅ Scena {i + 1}: medij preuzet");
+                        LogToMainWindow($"✅ Scene {i + 1}: media downloaded");
                     }
                     else
                     {
@@ -4613,7 +4613,7 @@ namespace UltraVideoEditor
                         if (!string.IsNullOrEmpty(_segments[idx].AmbientSoundPath))
                             storyBoard.Scenes[idx].AmbientPath = _segments[idx].AmbientSoundPath;
                     }
-                    LogToMainWindow("🔊 Ambijentalni zvukovi pripremljeni — miksanje u toku sa video timeline-om...");
+                    LogToMainWindow("🔊 Ambient sounds prepared — mixing with the video timeline in progress...");
 
                 }
 
@@ -4627,17 +4627,17 @@ namespace UltraVideoEditor
 
                     foreach (var bad in lowQuality)
                     {
-                        LogToMainWindow($"   🗑 Quality Gate: uklanjam scenu '{bad.Description}' (Score={bad.VisionScore:F1}/10)");
+                        LogToMainWindow($"   🗑 Quality Gate: removing scene '{bad.Description}' (Score={bad.VisionScore:F1}/10)");
                         _segments.Remove(bad);
                     }
 
                     if (lowQuality.Count > 0)
-                        LogToMainWindow($"✂️ Quality Gate: uklonjen(o) {lowQuality.Count} slab(ih) kadar(a) — ostalo {_segments.Count} scena");
+                        LogToMainWindow($"✂️ Quality Gate: removed {lowQuality.Count} weak frame(s) — {_segments.Count} scenes remaining");
                 }
 
                 AnnounceToUser(L("generation_done_reviewing"), 95);
                 LogToMainWindow("═══════════════════════════════════════");
-                LogToMainWindow($"📋 PREGLED SCENE — {_segments.Count} scena spremno");
+                LogToMainWindow($"📋 SCENE OVERVIEW — {_segments.Count} scenes ready");
                 LogToMainWindow("═══════════════════════════════════════");
 
                 const double DISPLAY_CURSOR = 4.0;
@@ -4645,7 +4645,7 @@ namespace UltraVideoEditor
                 {
                     var seg = _segments[si];
                     string hasMedia = string.IsNullOrEmpty(seg.Path) || !File.Exists(seg.Path)
-                        ? "❌ NEMA MEDIJA" : "✅";
+                        ? "❌ NO MEDIA" : "✅";
                     string lyric = !string.IsNullOrEmpty(seg.LyricText) ? $" | Stih: \"{seg.LyricText}\"" : "";
                     double displayStart = DISPLAY_CURSOR + seg.StartTime;
                     LogToMainWindow($"  [{si + 1:D2}] {hasMedia} {FormatTime(displayStart)}-{FormatTime(displayStart + seg.Duration)} " +
@@ -4712,7 +4712,7 @@ namespace UltraVideoEditor
                             if (outputOk)
                             {
                                 Directory.Delete(folderToClean, true);
-                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Obrisan temp folder: {folderToClean}");
+                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Deleted temp folder: {folderToClean}");
                             }
                             else
                             {
@@ -4772,7 +4772,7 @@ namespace UltraVideoEditor
                 var mainWindow = System.Windows.Application.Current?.MainWindow as MainWindow;
                 if (mainWindow == null)
                 {
-                    LogToMainWindow("⚠️ Auto-Render: MainWindow nije dostupan");
+                    LogToMainWindow("⚠️ Auto-Render: MainWindow is not available");
                     return;
                 }
 
@@ -4821,20 +4821,20 @@ namespace UltraVideoEditor
             LogToMainWindow("═══════════════════════════════════════");
             LogToMainWindow("📊 VALIDATION REPORT — Automatska provjera kvaliteta");
             LogToMainWindow("═══════════════════════════════════════");
-            LogToMainWindow($"  ✅ Ukupno scena: {totalSegs}");
-            LogToMainWindow($"  ⏱ Ukupno trajanje: {FormatTime(totalDur)}");
+            LogToMainWindow($"  ✅ Total scenes: {totalSegs}");
+            LogToMainWindow($"  ⏱ Total duration: {FormatTime(totalDur)}");
             LogToMainWindow($"  ⭐ Average Vision Score: {avgScore:F1}/10" +
                             (avgScore >= 6.5 ? " — Dobar" : avgScore >= 5.0 ? " — Prihvatljiv" : " — ⚠ Slab"));
             LogToMainWindow($"  🌿 Priroda/Outdoor kadrovi: {outdoorCount}/{totalSegs}" +
                             (outdoorCount >= totalSegs / 2 ? " ✅" : " ⚠ Malo outdoor"));
             double humanPresenceRatio = (double)childrenCount / totalSegs;
             LogToMainWindow($"  👧 Children/Family shots: {childrenCount}/{totalSegs}" +
-                (childrenCount == 0 ? " ⚠️ Nema djece na snimcima!" :
+                (childrenCount == 0 ? " ⚠️ No children in the footage!" :
                  humanPresenceRatio < 0.70 ? $" ⚠️ Samo {humanPresenceRatio:P0} — cilj je min. 70%!" :
                  $" ✅ ({humanPresenceRatio:P0})"));
             LogToMainWindow($"  🎬 Static shots (Ken Burns applied): {staticCount}/{totalSegs}");
-            LogToMainWindow($"  ⚡ Visoka energija (scena 4-5): {highEnergy} scena");
-            LogToMainWindow($"  🌊 Niska energija (scena 1-2): {lowEnergy} scena");
+            LogToMainWindow($"  ⚡ High energy (scene 4-5): {highEnergy} scenes");
+            LogToMainWindow($"  🌊 Low energy (scene 1-2): {lowEnergy} scenes");
 
             bool hasWarnings = false;
             if (avgScore < 5.0)
@@ -4847,7 +4847,7 @@ namespace UltraVideoEditor
             if (!hasWarnings)
                 LogToMainWindow("  🎉 All checks passed — video should be free of 'nonsense'!");
 
-            LogToMainWindow($"  🎵 Kontekst: {_detectedContext} | Mood: {_detectedMood}");
+            LogToMainWindow($"  🎵 Context: {_detectedContext} | Mood: {_detectedMood}");
             LogToMainWindow("  📝 Description: Shots are predominantly " +
                 (outdoorCount > childrenCount ? "priroda i vanjski prostori" : "djeca i porodica") +
                 $", ukupno {FormatTime(totalDur)} materijala.");
@@ -5452,7 +5452,7 @@ namespace UltraVideoEditor
                                     if (vision.RetryNeeded && hitOffset < sortedHits.Count - 2)
                                     {
                                         string lyricPreview = _currentLyric?.Length > 40 ? _currentLyric.Substring(0, 40) + "..." : _currentLyric;
-                                        LogToMainWindow($"   🔄 Qwen: scena ne odgovara stihu '{lyricPreview}' — trazim bolji klip...");
+                                        LogToMainWindow($"   🔄 Qwen: scene doesn't match the lyric '{lyricPreview}' — looking for a better clip...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6109,7 +6109,7 @@ namespace UltraVideoEditor
                     Duration = logoDuration,
                     Start = cursor,
                     End = cursor + logoDuration,
-                    Name = "Logo kanala - Rastimo uz Iskru",
+                    Name = "Channel logo - Growing with Iskra",
                     Type = "Image",
                     Volume = 100,
                     TrackIndex = 0,
@@ -6130,7 +6130,7 @@ namespace UltraVideoEditor
                 introDuration = 0.5;
             else
                 introDuration = 4.0;
-            LogToMainWindow($"🎬 Intro trajanje: {introDuration:F1}s (AudioStart={_beatInfo?.AudioStartSeconds:F2}s)");
+            LogToMainWindow($"🎬 Intro duration: {introDuration:F1}s (AudioStart={_beatInfo?.AudioStartSeconds:F2}s)");
             string introImagePath = await CreateTextImage(songTitle, introDuration, true);
             var introItem = new TimelineItem
             {
@@ -6138,7 +6138,7 @@ namespace UltraVideoEditor
                 Duration = introDuration,
                 Start = cursor,
                 End = cursor + introDuration,
-                Name = $"Naslov: {songTitle}",
+                Name = $"Title: {songTitle}",
                 Type = "Image",
                 Volume = 100,
                 TrackIndex = 0,
@@ -6272,7 +6272,7 @@ namespace UltraVideoEditor
                 Duration = outroDuration,
                 Start = outroStart,
                 End = outroStart + outroDuration,
-                Name = "Odjavni tekst",
+                Name = "Outro text",
                 Type = "Image",
                 Volume = 100,
                 TrackIndex = 0,
@@ -6289,7 +6289,7 @@ namespace UltraVideoEditor
                     if (!string.IsNullOrEmpty(_ambientAudioPath) && File.Exists(_ambientAudioPath))
                     {
                         audioItem.Path = _ambientAudioPath;
-                        LogToMainWindow("🎵 Koristim miksani audio sa ambijentalnim zvukovima");
+                        LogToMainWindow("🎵 Using mixed audio with ambient sounds");
                     }
                     audioItem.Start = 0;
                     audioItem.End = totalDuration;
@@ -6956,7 +6956,7 @@ namespace UltraVideoEditor
             double clipDuration = targetDuration / clipCount;
             var clipPaths = new List<string>();
 
-            LogToMainWindow($"🎬 MultiClip: {clipCount} klipa × {clipDuration:F1}s = {targetDuration:F1}s ukupno");
+            LogToMainWindow($"🎬 MultiClip: {clipCount} clips × {clipDuration:F1}s = {targetDuration:F1}s total");
 
             for (int c = 0; c < clipCount; c++)
             {
@@ -7020,7 +7020,7 @@ namespace UltraVideoEditor
             if ((proc.ExitCode != 0 || !File.Exists(outputPath) || new FileInfo(outputPath).Length < 1000)
                 && (ffmpegErr.Contains("nvenc") || ffmpegErr.Contains("No NVENC") || ffmpegErr.Contains("Cannot load")))
             {
-                LogToMainWindow("⚠ MultiClip: NVENC nedostupan, koristim libx264...");
+                LogToMainWindow("⚠ MultiClip: NVENC unavailable, using libx264...");
                 string argsCpu = $"-nostdin -f concat -safe 0 -i \"{concatList}\" " +
                                  $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                                  $"-c:v libx264 -preset fast -crf 23 -profile:v high -level 4.1 " +
@@ -7045,14 +7045,14 @@ namespace UltraVideoEditor
                 ffmpegErr = se2.Result;
                 if (proc2.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
                 {
-                    LogToMainWindow($"✅ MultiClip spojen (libx264): {preparedPaths.Count} klipa → {targetDuration:F1}s");
+                    LogToMainWindow($"✅ MultiClip merged (libx264): {preparedPaths.Count} clips → {targetDuration:F1}s");
                     return outputPath;
                 }
             }
 
             if (proc.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
             {
-                LogToMainWindow($"✅ MultiClip spojen: {preparedPaths.Count} klipa → {targetDuration:F1}s");
+                LogToMainWindow($"✅ MultiClip merged: {preparedPaths.Count} clips → {targetDuration:F1}s");
                 return outputPath;
             }
 
@@ -7063,12 +7063,12 @@ namespace UltraVideoEditor
                     .Where(l => l.Contains("Error") || l.Contains("Invalid") || l.Contains("failed") || l.Contains("error") || l.Contains("moov"))
                     .Take(5));
                 if (!string.IsNullOrEmpty(realError))
-                    LogToMainWindow($"⚠ MultiClip FFmpeg greska: {realError}");
+                    LogToMainWindow($"⚠ MultiClip FFmpeg error: {realError}");
                 else
                     LogToMainWindow($"⚠ MultiClip FFmpeg exit={proc.ExitCode}");
             }
 
-            LogToMainWindow("⚠ MultiClip concat neuspjesan — koristim prvi klip");
+            LogToMainWindow("⚠ MultiClip concat failed — using the first clip");
             return clipPaths[0];
         }
         #endregion

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Volume settings" Height="180" Width="400"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        Background="#2D2D2D"
+        Background="{DynamicResource ControlBg}"
         AutomationProperties.Name="Dialog for setting clip volume">
 
     <Grid Margin="20">
@@ -13,31 +13,31 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Volume" Foreground="White" FontSize="14" 
+        <TextBlock Text="Volume" Foreground="{DynamicResource TextPrimary}" FontSize="14" 
                    HorizontalAlignment="Center" Margin="0,0,0,15"
                    AutomationProperties.Name="Volume heading"/>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
-            <TextBlock Text="0%" Foreground="White" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBlock Text="0%" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <Slider x:Name="sldVolume" Minimum="0" Maximum="200" Width="250" 
                     ValueChanged="VolumeSlider_ValueChanged"
                     AutomationProperties.Name="Volume slider"
                     AutomationProperties.HelpText="Left for quieter, right for louder, arrow keys for fine adjustment"/>
-            <TextBlock Text="200%" Foreground="White" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            <TextBlock Text="200%" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
         </StackPanel>
 
         <TextBlock x:Name="txtVolumeValue" Grid.Row="2" Text="100%" 
-                   Foreground="#00E676" FontSize="16" FontWeight="Bold"
+                   Foreground="{DynamicResource AccentBrush}" FontSize="16" FontWeight="Bold"
                    HorizontalAlignment="Center" Margin="0,0,0,15"
                    AutomationProperties.Name="Current volume value"
                    AutomationProperties.LiveSetting="Polite"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,40,0,0">
             <Button x:Name="btnOk" Content="✅ CONFIRM" Click="Ok_Click" Width="100" Height="35" 
-                    Background="#2E7D32" Foreground="White" Margin="0,0,10,0"
+                    Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}" Margin="0,0,10,0"
                     AutomationProperties.Name="Confirm volume"/>
             <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" 
-                    Background="#B71C1C" Foreground="White"
+                    Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                     AutomationProperties.Name="Cancel"/>
         </StackPanel>
     </Grid>

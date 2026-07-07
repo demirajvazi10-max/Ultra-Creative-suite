@@ -15,7 +15,7 @@ namespace UltraVideoEditor
     public partial class VideoEngineDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -69,7 +69,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                txtOllamaInfo.Text          = "Ollama nije dostupna — koristim lokalni engine";
+                txtOllamaInfo.Text          = "Ollama is not available — using the local engine";
                 txtOllamaInfo.Foreground    = System.Windows.Media.Brushes.Orange;
                 chkUseOllama.IsChecked      = false;
                 chkUseOllama.IsEnabled      = false;
@@ -81,7 +81,7 @@ namespace UltraVideoEditor
             {
                 if (txtFreesoundInfo != null)
                 {
-                    txtFreesoundInfo.Text       = $"🔊 Lokalna biblioteka: {soundCount} zvukova — ambijentalni zvukovi aktivni";
+                    txtFreesoundInfo.Text       = $"🔊 Local library: {soundCount} sounds — ambient sounds active";
                     txtFreesoundInfo.Foreground = System.Windows.Media.Brushes.LightGreen;
                 }
             }
@@ -89,13 +89,13 @@ namespace UltraVideoEditor
             {
                 if (txtFreesoundInfo != null)
                 {
-                    txtFreesoundInfo.Text       = "⚠️ Assets/Sounds/ prazan — dodaj MP3/WAV fajlove za ambijentalne zvukove";
+                    txtFreesoundInfo.Text       = "⚠️ Assets/Sounds/ is empty — add MP3/WAV files for ambient sounds";
                     txtFreesoundInfo.Foreground = System.Windows.Media.Brushes.Orange;
                 }
                 if (chkAmbient != null) chkAmbient.IsEnabled = false;
             }
 
-            UpdateStatus("Spreman. Unesi stihove pesme i pritisni ANALIZIRAJ.");
+            UpdateStatus("Ready. Enter the song lyrics and press ANALYZE.");
             txtLyrics.Focus();
         }
 
@@ -105,7 +105,7 @@ namespace UltraVideoEditor
             var lyrics = ParseLyrics();
             if (lyrics.Count == 0)
             {
-                Announce("Unesi stihove pesme, jedan po redu.");
+                Announce("Enter the song lyrics, one per line.");
                 return;
             }
 
@@ -116,8 +116,8 @@ namespace UltraVideoEditor
             _shots = VideoEngine.GenerateFromLyrics(lyrics, dur, intent);
 
             RefreshShotList();
-            Announce($"Analizovano: {_shots.Count} stihova, {_shots.Count(s => s.IsChorus)} refrena detektovano. " +
-                     $"Trajanje: {FormatTime(dur)}. Pregled shot liste je spreman.");
+            Announce($"Analyzed: {_shots.Count} lines, {_shots.Count(s => s.IsChorus)} chorus lines detected. " +
+                     $"Duration: {FormatTime(dur)}. Shot list preview is ready.");
         }
 
         private void RefreshShotList()
@@ -161,16 +161,16 @@ namespace UltraVideoEditor
             if (audio == null)
             {
                 WpfMessageBox.Show(
-                    "Nema audio fajla na timeline-u.\nDodaj pesmu prvo (Ctrl+Shift+I).",
-                    "Upozorenje", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "No audio file on the timeline.\nAdd a song first (Ctrl+Shift+I).",
+                    "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             var lyrics = ParseLyrics();
             if (lyrics.Count == 0)
             {
-                WpfMessageBox.Show("Unesi stihove pesme.",
-                    "Upozorenje", MessageBoxButton.OK, MessageBoxImage.Warning);
+                WpfMessageBox.Show("Enter the song lyrics.",
+                    "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -181,8 +181,8 @@ namespace UltraVideoEditor
                 if (string.IsNullOrEmpty(_pixabayApiKey))
                 {
                     var dlg = new ApiKeyDialog("pixabay",
-                        "Pixabay API kljuc nije pronadjen.\n" +
-                        "Registruj se besplatno na pixabay.com/api.");
+                        "Pixabay API key not found.\n" +
+                        "Sign up for free at pixabay.com/api.");
                     if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ApiKey))
                     {
                         SavePixabayKey(dlg.ApiKey);
@@ -205,15 +205,15 @@ namespace UltraVideoEditor
                 bool   useOllama  = chkUseOllama.IsChecked == true && _ollamaAvailable;
 
                 // ── Step 1: Generate shot list ──────────────────────
-                Announce("Generisujem shot listu...", 5);
+                Announce("Generating the shot list...", 5);
 
                 if (useOllama)
                 {
-                    Announce("Ollama analizira stihove i generise profesionalne query-je...", 8);
+                    Announce("Ollama is analyzing the lyrics and generating professional queries...", 8);
                     string prompt    = VideoEngine.BuildOllamaPrompt(lyrics, duration, intent);
                     string aiOutput  = await _ollama.GenerateAsync(prompt, ct: _cts.Token);
                     _shots           = VideoEngine.MergeWithAIOutput(lyrics, duration, aiOutput);
-                    Announce($"Ollama generisala {_shots.Count} kadrova.", 15);
+                    Announce($"Ollama generated {_shots.Count} shots.", 15);
                 }
                 else
                 {
@@ -255,14 +255,14 @@ namespace UltraVideoEditor
                     if (!string.IsNullOrEmpty(path))
                         downloaded.Add((path, shot));
                     else
-                        Announce($"Upozorenje: kadar {i+1} nije preuzet.");
+                        Announce($"Warning: shot {i+1} was not downloaded.");
                 }
 
                 // ── Korak 2b: Lokalni ambijentalni zvukovi ────────────
                 var ambientFiles = new Dictionary<int, string>(); // shotIndex -> ambientPath
                 if (downloaded.Count > 0 && chkAmbient?.IsChecked == true)
                 {
-                    Announce("Biram ambijentalne zvukove iz lokalne biblioteke...", 93);
+                    Announce("Selecting ambient sounds from the local library...", 93);
 
                     var processedScenes = new HashSet<string>();
                     for (int i = 0; i < downloaded.Count; i++)
@@ -280,11 +280,11 @@ namespace UltraVideoEditor
                         if (!string.IsNullOrEmpty(ambPath))
                             ambientFiles[i] = ambPath;
                     }
-                    Announce($"Odabrano {ambientFiles.Count} ambijentalnih zvukova.", 96);
+                    Announce($"Selected {ambientFiles.Count} ambient sounds.", 96);
                 }
 
                 // ── Korak 3: Dodaj na timeline ────────────────────────
-                Announce("Dodajem na timeline...", 97);
+                Announce("Adding to timeline...", 97);
                 mainWin.SaveState();
 
                 // Remove existing video/image clips
@@ -327,28 +327,28 @@ namespace UltraVideoEditor
                 }
 
                 mainWin.UpdateTimelineDisplay();
-                Announce("Gotovo!", 100);
+                Announce("Done!", 100);
 
                 int choruses = downloaded.Count(d => d.shot.IsChorus);
                 WpfMessageBox.Show(
-                    $"Video Engine zavrsio!\n\n" +
-                    $"Preuzeto: {downloaded.Count}/{total} kadrova\n" +
-                    $"Od toga refrena: {choruses}\n" +
-                    $"Trajanje klipova: {FormatTime(cursor)}\n" +
-                    $"Audio trajanje: {FormatTime(duration)}\n\n" +
-                    $"Renderuj video: Ctrl+R",
-                    "Zavrseno", MessageBoxButton.OK, MessageBoxImage.Information);
+                    $"Video Engine finished!\n\n" +
+                    $"Downloaded: {downloaded.Count}/{total} shots\n" +
+                    $"Of which chorus: {choruses}\n" +
+                    $"Clip duration: {FormatTime(cursor)}\n" +
+                    $"Audio duration: {FormatTime(duration)}\n\n" +
+                    $"Render video: Ctrl+R",
+                    "Done", MessageBoxButton.OK, MessageBoxImage.Information);
 
                 DialogResult = true;
                 Close();
             }
             catch (OperationCanceledException)
             {
-                Announce("Zaustavljeno.");
+                Announce("Stopped.");
             }
             catch (Exception ex)
             {
-                WpfMessageBox.Show($"Greska: {ex.Message}", "Greska",
+                WpfMessageBox.Show($"Error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -364,15 +364,15 @@ namespace UltraVideoEditor
         {
             if (_shots == null || _shots.Count == 0)
             {
-                Announce("Nema shot liste. Pritisni ANALIZIRAJ prvo.");
+                Announce("No shot list. Press ANALYZE first.");
                 return;
             }
 
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
                 Title      = L("ved_save_shotlist"),
-                Filter     = "JSON fajl|*.json",
-                FileName   = "shot_lista.json"
+                Filter     = "JSON file|*.json",
+                FileName   = "shot_list.json"
             };
             if (dlg.ShowDialog() == true)
             {

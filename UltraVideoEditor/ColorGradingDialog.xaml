@@ -6,17 +6,12 @@
         MinWidth="640" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Color Grading Engine dialog">
 
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#F59E0B"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#FBBF24"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
 
         <Style x:Key="PrimaryBtn" TargetType="Button">
             <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
@@ -46,17 +41,17 @@
             </Setter>
         </Style>
         <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background"  Value="#2D3748"/>
-            <Setter Property="Foreground"  Value="White"/>
+            <Setter Property="Background"  Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground"  Value="{DynamicResource TextPrimary}"/>
             <Setter Property="FontWeight"  Value="SemiBold"/>
         </Style>
         <Style x:Key="PresetBtn" TargetType="ToggleButton">
             <Setter Property="Background"      Value="#1E293B"/>
-            <Setter Property="Foreground"      Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize"        Value="11"/>
             <Setter Property="Padding"         Value="10,6"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="Margin"          Value="0,0,6,6"/>
             <Setter Property="Template">
@@ -99,23 +94,23 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="🎨  Color Grading Engine"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="AI automatically grades by clip content · 10 presets · Preview thumbnails"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,3,0,0"/>
         </StackPanel>
 
         <!-- Preset izbor -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}"
                 CornerRadius="10" Padding="14,12" Margin="0,0,0,10">
             <StackPanel>
                 <TextBlock Text="🎬  Select preset"
-                           Foreground="{StaticResource TextMutedBrush}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="12" Margin="0,0,0,10"/>
                 <WrapPanel x:Name="PresetPanel"/>
                 <TextBlock x:Name="TxtPresetDesc"
                            Text="Choose a preset or leave Auto for AI to select by content."
-                           Foreground="{StaticResource TextMutedBrush}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="11" Margin="0,8,0,0" FontStyle="Italic"
                            AutomationProperties.LiveSetting="Polite"/>
             </StackPanel>
@@ -123,7 +118,7 @@
 
         <!-- Progress -->
         <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed"
-                Background="{StaticResource SurfaceBrush}"
+                Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
             <StackPanel>
                 <DockPanel Margin="0,0,0,5">
@@ -132,26 +127,26 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg" Text="Waiting…"
-                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                               Foreground="{DynamicResource TextPrimary}" FontSize="13"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
                 <ProgressBar x:Name="ProgressBar" Height="6"
                              Minimum="0" Maximum="100"
                              Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BorderBrush}"
+                             Background="{DynamicResource ThemeBorderBrush}"
                              BorderThickness="0"/>
             </StackPanel>
         </Border>
 
         <!-- Klipoivi -->
-        <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.Row="3" Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                <Border Grid.Row="0" Background="{DynamicResource PanelBg2}"
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,0,0">
@@ -167,7 +162,7 @@
                                     AutomationProperties.Name="Deselect all clips"/>
                         </StackPanel>
                         <TextBlock x:Name="TxtClipCount" Text="No clips"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" VerticalAlignment="Center"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </DockPanel>
@@ -186,7 +181,7 @@
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" Click="BtnAnalyze_Click"
                     AutomationProperties.Name="Start analysis and color grading"/>
-            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+            <Button x:Name="BtnClose" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
                     AutomationProperties.Name="Close dialog"/>

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="🔑 API Keys" Height="520" Width="520"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
-        Background="#1E1E1E">
+        Background="{DynamicResource PanelBg}">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Margin="15">
@@ -24,13 +24,13 @@
 
         <!-- Naslov -->
         <TextBlock Text="🔑 API Keys" FontSize="16" FontWeight="Bold"
-                   Foreground="#00E676" HorizontalAlignment="Center" Margin="0,0,0,15"
+                   Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,15"
                    AutomationProperties.Name="API Keys dialog"/>
 
         <!-- Pixabay -->
-        <TextBlock Grid.Row="1" Text="Pixabay API key:" Foreground="White" Margin="0,0,0,5"/>
+        <TextBlock Grid.Row="1" Text="Pixabay API key:" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,5"/>
         <TextBox x:Name="txtApiKey" Grid.Row="2" Height="30" Padding="5"
-                 Background="#2D2D2D" Foreground="White" FontSize="12"
+                 Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" FontSize="12"
                  AutomationProperties.Name="Pixabay API key"
                  AutomationProperties.HelpText="Enter your Pixabay API key for downloading video clips"/>
 
@@ -39,37 +39,37 @@
 
         <!-- Azure AI Foundry -->
         <TextBlock Grid.Row="4"
-                   Text="☁ Microsoft Azure AI Foundry (Accessibility IQ layer — opciono)"
+                   Text="☁ Microsoft Azure AI Foundry (Accessibility IQ layer — optional)"
                    Foreground="#64B5F6" FontWeight="Bold" Margin="0,5,0,8"
                    AutomationProperties.Name="Microsoft Azure AI Foundry section — optional"/>
 
         <TextBlock Grid.Row="5" Text="Project endpoint:" Foreground="#CCC" Margin="0,0,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureEndpoint" Grid.Row="6" Height="30" Padding="5"
-                 Background="#2D2D2D" Foreground="White" FontSize="11"
+                 Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" FontSize="11"
                  AutomationProperties.Name="Azure AI Foundry project endpoint"
                  AutomationProperties.HelpText="Endpoint URL from Azure AI Foundry project, e.g. https://resource-name.services.ai.azure.com"/>
 
         <TextBlock Grid.Row="7" Text="API key:" Foreground="#CCC" Margin="0,8,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureApiKey" Grid.Row="8" Height="30" Padding="5"
-                 Background="#2D2D2D" Foreground="White" FontSize="11"
+                 Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" FontSize="11"
                  AutomationProperties.Name="Azure AI Foundry API key"
                  AutomationProperties.HelpText="API key from Azure AI Foundry project"/>
 
         <TextBlock Grid.Row="9" Text="Model deployment (default: gpt-4o-mini):" Foreground="#CCC" Margin="0,8,0,3" FontSize="11"/>
         <TextBox x:Name="txtAzureDeployment" Grid.Row="10" Height="30" Padding="5"
-                 Background="#2D2D2D" Foreground="White" FontSize="11"
+                 Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" FontSize="11"
                  Text="gpt-4o-mini"
                  AutomationProperties.Name="Azure AI model deployment name"
                  AutomationProperties.HelpText="Name of deployed model, e.g. gpt-4o-mini or gpt-4o"/>
 
         <!-- Dugmad -->
         <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-            <Button x:Name="btnCancel" Content="Cancel" Width="80" Height="30"
-                    Click="BtnCancel_Click" Background="#B71C1C" Foreground="White"
+            <Button x:Name="btnCancel" Content="Cancel" Width="80" Height="30" IsCancel="True"
+                    Click="BtnCancel_Click" Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                     Margin="0,0,10,0"
                     AutomationProperties.Name="Cancel — close without saving"/>
-            <Button x:Name="btnSave" Content="Save" Width="80" Height="30"
-                    Click="BtnSave_Click" Background="#2E7D32" Foreground="White"
+            <Button x:Name="btnSave" Content="Save" Width="80" Height="30" IsDefault="True"
+                    Click="BtnSave_Click" Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"
                     AutomationProperties.Name="Save — save API keys"/>
         </StackPanel>
     </Grid>

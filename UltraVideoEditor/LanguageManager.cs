@@ -147,6 +147,10 @@ namespace UltraVideoEditor
             sr["menu_show_video_only"] = "Prikaži samo video trake";
             sr["menu_show_audio_only"] = "Prikaži samo audio trake";
             sr["menu_accessibility"] = "Pristupačni mod";
+            sr["mnu_display_mode"] = "Režim prikaza";
+            sr["mode_sighted"] = "Standardni (za osobe koje vide)";
+            sr["mode_accessibility"] = "Pristupačnost (čitač ekrana)";
+            sr["mode_low_vision"] = "Slabovidost";
             sr["menu_set_volume"] = "Podesi jačinu zvuka...";
             sr["preview_duration_sec"] = "Dužina pregleda: {0} sekundi";
             sr["playback_done"] = "Reprodukcija završena";
@@ -724,6 +728,10 @@ namespace UltraVideoEditor
             en["menu_show_video_only"] = "Show video tracks only";
             en["menu_show_audio_only"] = "Show audio tracks only";
             en["menu_accessibility"] = "Accessibility mode";
+            en["mnu_display_mode"] = "Display mode";
+            en["mode_sighted"] = "Sighted (default)";
+            en["mode_accessibility"] = "Accessibility (screen reader)";
+            en["mode_low_vision"] = "Low Vision";
             en["menu_set_volume"] = "Set volume...";
             en["preview_duration_sec"] = "Preview duration: {0} seconds";
             en["playback_done"] = "Playback finished";
@@ -1278,6 +1286,10 @@ namespace UltraVideoEditor
             de["menu_show_video_only"] = "Nur Videospuren anzeigen";
             de["menu_show_audio_only"] = "Nur Audiospuren anzeigen";
             de["menu_accessibility"] = "Barrierefreiheitsmodus";
+            de["mnu_display_mode"] = "Anzeigemodus";
+            de["mode_sighted"] = "Sehend (Standard)";
+            de["mode_accessibility"] = "Barrierefreiheit (Screenreader)";
+            de["mode_low_vision"] = "Sehbehinderung";
             de["menu_set_volume"] = "Lautstärke einstellen...";
             de["mw_file_menu"] = "Datei";
             de["mnu_export_options"] = "Exportoptionen...";

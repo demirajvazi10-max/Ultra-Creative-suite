@@ -38,7 +38,7 @@ namespace UltraVideoEditor
             InitializeComponent();
             _items = timelineItems.Where(i => i.IsVideoTrack && File.Exists(i.Path)).ToList();
             BuildPresetButtons();
-            TxtClipCount.Text = $"{_items.Count} video klipoiva na timeline-u";
+            TxtClipCount.Text = $"{_items.Count} video clips on the timeline";
         }
 
         // ── Preset buttons ────────────────────────────────────────────
@@ -103,7 +103,7 @@ namespace UltraVideoEditor
             if (_running) { _cts?.Cancel(); return; }
             if (_items.Count == 0)
             {
-                MessageBox.Show("Nema video klipoiva na timeline-u.",
+                MessageBox.Show("No video clips on the timeline.",
                     "Color Grading", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -135,12 +135,12 @@ namespace UltraVideoEditor
                 BtnApply.IsEnabled       = true;
                 BtnSelectAll.IsEnabled   = true;
                 BtnDeselectAll.IsEnabled = true;
-                TxtClipCount.Text = $"{_gradeResults.Count} klipoiva  ·  preset: {_selected}";
+                TxtClipCount.Text = $"{_gradeResults.Count} clips  ·  preset: {_selected}";
             }
             catch (OperationCanceledException)
             {
-                SetProgress(0, "Otkazano.");
-                TxtClipCount.Text = "Otkazano.";
+                SetProgress(0, "Cancelled.");
+                TxtClipCount.Text = "Cancelled.";
             }
             catch (Exception ex)
             {
@@ -151,7 +151,7 @@ namespace UltraVideoEditor
             {
                 _running = false;
                 _cts?.Dispose(); _cts = null;
-                BtnAnalyze.Content       = "🎨 Analiziraj i grade-uj";
+                BtnAnalyze.Content       = "🎨 Analyze and grade";
                 BtnAnalyze.IsEnabled     = true;
                 ProgressPanel.Visibility = Visibility.Collapsed;
             }
@@ -171,7 +171,7 @@ namespace UltraVideoEditor
             var card = new Border
             {
                 Width        = 200,
-                Background   = new SolidColorBrush(Color.FromRgb(15, 52, 96)),
+                Background   = ThemeBrushes.PanelBg2,
                 CornerRadius = new CornerRadius(8),
                 Margin       = new Thickness(0, 0, 8, 8),
                 Padding      = new Thickness(8),
@@ -185,7 +185,7 @@ namespace UltraVideoEditor
                 Width        = 184,
                 Height       = 103,
                 CornerRadius = new CornerRadius(5),
-                Background   = new SolidColorBrush(Color.FromRgb(22, 33, 62)),
+                Background   = ThemeBrushes.PanelBg,
                 Margin       = new Thickness(0, 0, 0, 6),
             };
 
@@ -235,7 +235,7 @@ namespace UltraVideoEditor
                 Text         = r.Item.Name ?? System.IO.Path.GetFileNameWithoutExtension(r.Item.Path),
                 TextWrapping = TextWrapping.Wrap,
                 FontSize     = 11,
-                Foreground   = System.Windows.Media.Brushes.White,
+                Foreground   = ThemeBrushes.TextPrimary,
             };
             var chk = new CheckBox
             {
@@ -253,14 +253,14 @@ namespace UltraVideoEditor
             sp.Children.Add(new TextBlock
             {
                 Text         = r.Grade.Description,
-                Foreground   = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+                Foreground   = ThemeBrushes.TextSecondary,
                 FontSize     = 10,
                 TextWrapping = TextWrapping.Wrap,
             });
 
             card.Child = sp;
             AutomationProperties.SetName(card,
-                $"Klip {r.Item.Name}, grade preset {r.Grade.AppliedPreset}");
+                $"Clip {r.Item.Name}, grade preset {r.Grade.AppliedPreset}");
             return card;
         }
 
@@ -296,17 +296,17 @@ namespace UltraVideoEditor
             if (count == 0) return;
 
             var confirm = MessageBox.Show(
-                $"Primeniti color grade na {count} klipoiva?\n\n" +
-                "Grade filter se upisuje u ContentTag svakog klipa\n" +
+                $"Apply color grade to {count} clips?\n\n" +
+                "The grade filter is written into each clip's ContentTag\n" +
                 "and is applied at the next render.",
-                "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
 
             ColorGradingEngine.ApplyGradesToItems(_gradeResults);
 
             MessageBox.Show(
-                $"Color grade primenjen na {count} klipoiva.\n" +
-                "Pokrenite render da vidite rezultat.",
+                $"Color grade applied to {count} clips.\n" +
+                "Run the render to see the result.",
                 "Color Grading", MessageBoxButton.OK, MessageBoxImage.Information);
 
             DialogResult = true;

@@ -45,7 +45,7 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrWhiteSpace(txtText.Text))
             {
-                WpfMessageBox.Show("Unesi tekst animacije.", "Greska",
+                WpfMessageBox.Show("Enter animation text.", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 txtText.Focus();
                 return;

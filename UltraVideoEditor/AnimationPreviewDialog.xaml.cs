@@ -22,7 +22,7 @@ namespace UltraVideoEditor
             _scenes = scenes;
             lstScenes.ItemsSource = _scenes;
 
-            AutomationProperties.SetName(this, "Dijalog za pregled scenarija animacije");
+            AutomationProperties.SetName(this, "Animation scenario preview dialog");
         }
 
         public List<AnimationScene> GetScenes() => _scenes;

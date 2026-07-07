@@ -101,8 +101,8 @@ namespace UltraVideoEditor
                     : $"🎬 {info.Title}";
 
                 txbInfoMeta.Text = info.IsPlaylist
-                    ? $"Kanal: {info.Channel}"
-                    : $"Kanal: {info.Channel}   Trajanje: {FormatDuration(info.DurationSec)}";
+                    ? $"Channel: {info.Channel}"
+                    : $"Channel: {info.Channel}   Duration: {FormatDuration(info.DurationSec)}";
 
                 pnlInfo.Visibility = Visibility.Visible;
                 btnDownload.IsEnabled = true;
@@ -155,8 +155,8 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                Announce("Preuzimanje otkazano.");
-                SetProgress(0, "Otkazano.");
+                Announce("Download cancelled.");
+                SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
@@ -215,7 +215,7 @@ namespace UltraVideoEditor
         {
             var result = WpfMessageBox.Show(
                 "yt-dlp not found on this system.\n\n" +
-                "Yt-dlp je besplatan alat neophodan za preuzimanje sa YouTube-a.\n\n" +
+                "Yt-dlp is a free tool required for downloading from YouTube.\n\n" +
                 "Would you like to download it automatically? (~10 MB, one time)",
                 "yt-dlp not found",
                 MessageBoxButton.YesNo,
@@ -293,7 +293,7 @@ namespace UltraVideoEditor
             string output = await RunProcessAsync(ytdlp, args, null, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(output))
             {
-                ShowError("Nema odgovora od yt-dlp. Proveri URL.");
+                ShowError("No response from yt-dlp. Check the URL.");
                 return null;
             }
 
@@ -414,8 +414,8 @@ namespace UltraVideoEditor
                 string path = destMatch.Groups[1].Value.Trim();
                 Dispatcher.Invoke(() =>
                 {
-                    txbProgress.Text = $"Skida se: {Path.GetFileName(path)}";
-                    Announce($"Preuzimanje: {Path.GetFileName(path)}");
+                    txbProgress.Text = $"Downloading: {Path.GetFileName(path)}";
+                    Announce($"Downloading: {Path.GetFileName(path)}");
                 });
                 return;
             }

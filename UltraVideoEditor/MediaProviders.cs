@@ -506,7 +506,7 @@ namespace UltraVideoEditor
     public class CoverrProvider : IMediaProvider
     {
         public string Name        => "Coverr";
-        public string Description => "Besplatni lifestyle video. Odlican za djeciji sadrzaj. Nema rate limita.";
+        public string Description => "Free lifestyle video. Great for children's content. No rate limit.";
         public string ApiKeyUrl   => "https://coverr.co/api";
 
         public bool IsConfigured

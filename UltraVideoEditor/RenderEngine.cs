@@ -17,7 +17,7 @@ namespace UltraVideoEditor
     {
         private string _ffmpegPath;
 
-        private static string _LangCode => (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private static string _LangCode => (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -76,26 +76,26 @@ namespace UltraVideoEditor
 
             var sortedItems = items.OrderBy(i => i.Start).ToList();
 
-            LogToMainWindow($"RenderEngine: Ukupno klipova prije filtriranja: {sortedItems.Count}");
+            LogToMainWindow($"RenderEngine: Total clips before filtering: {sortedItems.Count}");
 
             foreach (var item in sortedItems)
             {
-                LogToMainWindow($"  Klip: Type={item.Type}, Name={item.Name}, Path={(string.IsNullOrEmpty(item.Path) ? "EMPTY" : item.Path)}");
+                LogToMainWindow($"  Clip: Type={item.Type}, Name={item.Name}, Path={(string.IsNullOrEmpty(item.Path) ? "EMPTY" : item.Path)}");
             }
 
             var allImageItems = sortedItems.Where(i => i.Type == "Image").ToList();
-            LogToMainWindow($"RenderEngine: Ukupno Image klipova: {allImageItems.Count}");
+            LogToMainWindow($"RenderEngine: Total Image clips: {allImageItems.Count}");
 
             var images = allImageItems.Where(i =>
                 !string.IsNullOrEmpty(i.Path) &&
                 File.Exists(i.Path) &&
-                !i.Name.Contains("Najavni") &&
-                !i.Name.Contains("Odjavni")).ToList();
+                !i.Name.Contains("Intro") &&
+                !i.Name.Contains("Outro")).ToList();
 
             var textImages = allImageItems.Where(i =>
                 string.IsNullOrEmpty(i.Path) ||
-                i.Name.Contains("Najavni") ||
-                i.Name.Contains("Odjavni")).ToList();
+                i.Name.Contains("Intro") ||
+                i.Name.Contains("Outro")).ToList();
 
             var audio = sortedItems
                 .Where(i => (i.Type == "Audio" || i.IsAudio) &&
@@ -106,15 +106,15 @@ namespace UltraVideoEditor
             var videos = sortedItems.Where(i => i.Type == "Video" || i.IsVideo).ToList();
 
             LogToMainWindow(LF("re_found_media", images.Count, textImages.Count, videos.Count));
-            LogToMainWindow($"RenderEngine: Odabrana rezolucija: {resolution}");
-            LogToMainWindow($"RenderEngine: Sortirano {sortedItems.Count} klipova po vremenskoj liniji");
+            LogToMainWindow($"RenderEngine: Selected resolution: {resolution}");
+            LogToMainWindow($"RenderEngine: Sorted {sortedItems.Count} clips along the timeline");
 
             if (images.Count == 0 && videos.Count == 0 && textImages.Count == 0)
-                throw new Exception("Nema slika, tekstova ili videa za render");
+                throw new Exception("No images, text or video to render");
 
             string tempDir = Path.Combine(Path.GetTempPath(), "UVE_Render_") + Guid.NewGuid().ToString().Substring(0, 8);
             Directory.CreateDirectory(tempDir);
-            LogToMainWindow($"RenderEngine: Privremeni folder: {tempDir}");
+            LogToMainWindow($"RenderEngine: Temp folder: {tempDir}");
 
             string[] res = resolution.Split('x');
             int targetWidth = int.Parse(res[0]);
@@ -139,8 +139,8 @@ namespace UltraVideoEditor
                     bool isImage = item.Type == "Image";
                     bool isAudio = item.Type == "Audio" || item.IsAudio;
                     bool isTextItem = isImage && (string.IsNullOrEmpty(item.Path) ||
-                                                  item.Name.Contains("Najavni") ||
-                                                  item.Name.Contains("Odjavni") ||
+                                                  item.Name.Contains("Intro") ||
+                                                  item.Name.Contains("Outro") ||
                                                   (item.Path != null && !File.Exists(item.Path)));
 
                     if (isAudio) continue;
@@ -203,14 +203,14 @@ namespace UltraVideoEditor
 
                     if (isTextItem)
                     {
-                        LogToMainWindow($"RenderEngine: Tekstualni sloj '{item.Name}' (Start={item.Start:F1}s, trajanje: {item.Duration:F2}s)");
+                        LogToMainWindow($"RenderEngine: Text layer '{item.Name}' (Start={item.Start:F1}s, duration: {item.Duration:F2}s)");
 
-                        bool isOdjavniTekst = item.Name == "Odjavni tekst";
+                        bool isOdjavniTekst = item.Name == "Outro text";
 
                         if (isOdjavniTekst)
                         {
                             // OUTRO FIX (isTextItem branch) — generate black canvas directly.
-                            // Outro uvijek ulazi ovdje jer isTextItem=true (Name.Contains("Odjavni")).
+                            // Outro uvijek ulazi ovdje jer isTextItem=true (Name.Contains("Outro")).
                             // Bypass Magick/pad pipeline which can introduce a yellow padding artifact.
                             string outroRaw = !string.IsNullOrEmpty(item.Path) && File.Exists(item.Path)
                                 ? ExtractTextFromName(item.Name)
@@ -262,7 +262,7 @@ namespace UltraVideoEditor
                                 ? ExtractTextFromName(item.Name)
                                 : item.Name;
                             string escapedText = EscapeText(displayText);
-                            int fontSize = item.Name.Contains("Najavni") ? 60 : 34;
+                            int fontSize = item.Name.Contains("Intro") ? 60 : 34;
 
                             if (!string.IsNullOrEmpty(item.Path) && File.Exists(item.Path))
                             {
@@ -288,8 +288,8 @@ namespace UltraVideoEditor
                     {
                         if (!File.Exists(item.Path)) continue;
 
-                        bool isNaslov = item.Name.StartsWith("Naslov:");
-                        bool isOdjava = item.Name == "Odjavni tekst";
+                        bool isNaslov = item.Name.StartsWith("Title:");
+                        bool isOdjava = item.Name == "Outro text";
                         double dur = item.Duration;
 
                         if (isOdjava)
@@ -799,7 +799,7 @@ namespace UltraVideoEditor
 
                             // FIX 3: Ukupni kapacitet poola bez ponavljanja
                             double poolTotalCapacity = outroPoolDurs.Sum();
-                            LogToMainWindow($"[IskraSync] SmartOutroPool: {outroPool.Count} klipova, kapacitet={poolTotalCapacity:F1}s, deficit={deficit:F2}s");
+                            LogToMainWindow($"[IskraSync] SmartOutroPool: {outroPool.Count} clips, capacity={poolTotalCapacity:F1}s, deficit={deficit:F2}s");
 
                             // FIX 5: Buffer +0.5s (umjesto +1.0s) — preciznije poklapanje s xfade-om
                             double remaining    = deficit + 0.5;
@@ -897,10 +897,10 @@ namespace UltraVideoEditor
                     crossfadedVideo = await ApplyCrossfadeSinglePass(
                         videoFiles, tempDir, fadeDurations, CROSSFADE_DURATION, cancellationToken, transitionTypes);
                     if (crossfadedVideo != null)
-                        LogToMainWindow($"✨ Cross-dissolve: {videoFiles.Count} klipova, avg fade {avgFade}s (pacing-aware)");
+                        LogToMainWindow($"✨ Cross-dissolve: {videoFiles.Count} clips, avg fade {avgFade}s (pacing-aware)");
                     else
                     {
-                        LogToMainWindow("⚠️ Cross-dissolve nije uspio — koristim pairwise");
+                        LogToMainWindow("⚠️ Cross-dissolve failed — using pairwise");
                         if (videoFiles.Count <= 24)
                             crossfadedVideo = await ApplyCrossfadePairwise(
                                 videoFiles, tempDir, fadeDurations, CROSSFADE_DURATION, cancellationToken);
@@ -991,7 +991,7 @@ namespace UltraVideoEditor
                             // to avoid silence at the end
                             string tVal = crossfadedDur.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
                             shortestArg = $"-t {tVal} ";
-                            LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → -t {tVal} (SmartOutroPool nije potpuno popunio deficit)");
+                            LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → -t {tVal} (SmartOutroPool did not fully cover the deficit)");
                         }
                         argsFinal = $"-nostdin -i \"{crossfadedVideo}\" {audioSsArg}-i \"{tempAudioPath}\" -c:v copy -c:a aac -map 0:v -map 1:a {shortestArg}-y \"{finalOutput}\"";
                     }
@@ -1272,10 +1272,10 @@ namespace UltraVideoEditor
             {
                 return name.Substring(name.IndexOf(':') + 1).Trim();
             }
-            if (name.StartsWith("Najavni tekst:"))
-                return name.Substring("Najavni tekst:".Length).Trim();
-            if (name.StartsWith("Odjavni tekst:"))
-                return name.Substring("Odjavni tekst:".Length).Trim();
+            if (name.StartsWith("Intro text:"))
+                return name.Substring("Intro text:".Length).Trim();
+            if (name.StartsWith("Outro text:"))
+                return name.Substring("Outro text:".Length).Trim();
             return name;
         }
 
@@ -1632,7 +1632,7 @@ namespace UltraVideoEditor
 
                 if (durations.Any(d => d <= 0.05))
                 {
-                    LogToMainWindow("   ⚠️ CrossfadeSinglePass: neispravno trajanje jednog od klipova");
+                    LogToMainWindow("   ⚠️ CrossfadeSinglePass: invalid duration on one of the clips");
                     return null;
                 }
 
@@ -1650,7 +1650,7 @@ namespace UltraVideoEditor
 
                     if (prevDur <= thisFade + 0.05)
                     {
-                        LogToMainWindow($"   ⚠️ CrossfadeSinglePass: klip {i - 1} prekratak za fade ({prevDur:F2}s ≤ {thisFade:F2}s)");
+                        LogToMainWindow($"   ⚠️ CrossfadeSinglePass: clip {i - 1} too short for fade ({prevDur:F2}s ≤ {thisFade:F2}s)");
                         return null;
                     }
 
@@ -1740,7 +1740,7 @@ namespace UltraVideoEditor
 
                 if (!ok || !File.Exists(normPath) || new FileInfo(normPath).Length < 500)
                 {
-                    LogToMainWindow($"   ⚠️ Crossfade norm fail za klip {i} — koristim original");
+                    LogToMainWindow($"   ⚠️ Crossfade norm fail for clip {i} — using original");
                     normalized.Add(input);
                 }
                 else
@@ -1810,7 +1810,7 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogToMainWindow($"   ⚠️ xfade par {i - 1}→{i} nije uspio — hard cut");
+                    LogToMainWindow($"   ⚠️ xfade pair {i - 1}→{i} failed — hard cut");
 
                     string concatPath = Path.Combine(tempDir, $"xf_hc_{i:D4}.mp4");
                     string concatList = Path.Combine(tempDir, $"xf_hcl_{i:D4}.txt");

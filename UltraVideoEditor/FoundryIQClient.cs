@@ -130,7 +130,7 @@ namespace UltraVideoEditor
                 _available   = false;
                 _lastFailure = DateTime.Now;
                 System.Diagnostics.Debug.WriteLine(
-                    $"[AzureFoundry] Nije dostupan: {ex.Message} — nastavljam bez Azure sloja.");
+                    $"[AzureFoundry] Unavailable: {ex.Message} — continuing without the Azure layer.");
                 return null;
             }
         }

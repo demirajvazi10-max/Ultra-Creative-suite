@@ -17,7 +17,7 @@ namespace UltraVideoEditor
     public partial class MediaProvidersDialog : Window
     {
         private string _lang =>
-            (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+            (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _lang);
 
         private readonly AIVideoCreator _creator;
@@ -48,7 +48,7 @@ namespace UltraVideoEditor
             string key        = MediaProviderSettings.LoadKey(providerName);
             bool   configured = !string.IsNullOrWhiteSpace(key);
 
-            statusLabel.Text       = configured ? "● Aktivan" : "● Nije konfigurisan";
+            statusLabel.Text       = configured ? "● Active" : "● Not configured";
             statusLabel.Foreground = configured
                 ? new WpfBrush(WpfColor.FromRgb(0x00, 0xE6, 0x76))
                 : new WpfBrush(WpfColor.FromRgb(0xEF, 0x53, 0x50));
@@ -85,7 +85,7 @@ namespace UltraVideoEditor
         private void BtnCoverrDelete_Click(object sender, RoutedEventArgs e)
             => DeleteKey("Coverr", txtCoverrKey, txtCoverrStatus);
 
-        // ── Save / Delete logika ───────────────────────────────────────────────
+        // ── Save / Delete logic ───────────────────────────────────────────────
 
         private void SaveKey(string providerName, WpfTextBox keyBox, WpfTextBlock statusLabel)
         {
@@ -93,7 +93,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrWhiteSpace(input))
             {
-                WpfMessageBox.Show("Unesite API kljuc.", "Upozorenje",
+                WpfMessageBox.Show("Enter an API key.", "Warning",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 keyBox.Focus();
                 return;
@@ -107,24 +107,24 @@ namespace UltraVideoEditor
                 {
                     _creator?.SaveMediaProviderKey(providerName, input);
                     RefreshStatus(providerName, statusLabel, keyBox);
-                    txtInfo.Text = "OK [" + providerName + "] Kljuc sacuvan, provajder aktivan.";
+                    txtInfo.Text = "OK [" + providerName + "] Key saved, provider active.";
                 }
                 else
                 {
-                    txtInfo.Text = "GRESKA [" + providerName + "] Greska pri cuvanju.";
+                    txtInfo.Text = "ERROR [" + providerName + "] Error while saving.";
                 }
             }
             else
             {
-                txtInfo.Text = "[" + providerName + "] Kljuc nije promijenjen.";
+                txtInfo.Text = "[" + providerName + "] Key was not changed.";
             }
         }
 
         private void DeleteKey(string providerName, WpfTextBox keyBox, WpfTextBlock statusLabel)
         {
             var result = WpfMessageBox.Show(
-                "Obrisati API kljuc za " + providerName + "?\nProvajder ce biti deaktiviran.",
-                "Potvrda brisanja",
+                "Delete the API key for " + providerName + "?\nThe provider will be deactivated.",
+                "Confirm deletion",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -133,7 +133,7 @@ namespace UltraVideoEditor
             MediaProviderSettings.DeleteKey(providerName);
             _creator?.DeleteMediaProviderKey(providerName);
             RefreshStatus(providerName, statusLabel, keyBox);
-            txtInfo.Text = "[" + providerName + "] Kljuc obrisan, provajder deaktiviran.";
+            txtInfo.Text = "[" + providerName + "] Key deleted, provider deactivated.";
         }
 
         // ── Hyperlink ──────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ namespace UltraVideoEditor
             e.Handled = true;
         }
 
-        // ── JSON provajderi ────────────────────────────────────────────────────
+        // ── JSON providers ────────────────────────────────────────────────────
 
         private void BtnOpenFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -159,8 +159,8 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                WpfMessageBox.Show("Greska pri otvaranju foldera: " + ex.Message,
-                    "Greska", MessageBoxButton.OK, MessageBoxImage.Error);
+                WpfMessageBox.Show("Error while opening folder: " + ex.Message,
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -168,7 +168,7 @@ namespace UltraVideoEditor
         {
             MediaProviderRegistry.Instance.ReloadJsonProviders();
             RefreshJsonProvidersList();
-            txtInfo.Text = "Provajderi osvjezeni.";
+            txtInfo.Text = "Providers refreshed.";
         }
 
         private void RefreshJsonProvidersList()
@@ -177,12 +177,12 @@ namespace UltraVideoEditor
                 .OfType<JsonMediaProvider>().ToList();
 
             txtJsonProviders.Text = jsonProviders.Count == 0
-                ? "Nema ucitanih eksternih provajdera."
-                : "Ucitani: " + string.Join(", ", jsonProviders.Select(p =>
-                    p.Name + (p.IsConfigured ? " (aktivan)" : " (bez kljuca)")));
+                ? "No external providers loaded."
+                : "Loaded: " + string.Join(", ", jsonProviders.Select(p =>
+                    p.Name + (p.IsConfigured ? " (active)" : " (no key)")));
         }
 
-        // ── Zatvori ────────────────────────────────────────────────────────────
+        // ── Close ────────────────────────────────────────────────────────────
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
     }

@@ -6,15 +6,10 @@
         MinWidth="600" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Batch Export dialog">
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#F59E0B"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
         <Style x:Key="PrimaryBtn" TargetType="Button">
             <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground"      Value="#1A1A2E"/>
@@ -39,8 +34,8 @@
             </Setter>
         </Style>
         <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#2D3748"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
     </Window.Resources>
 
@@ -58,14 +53,14 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="📦  Batch Export"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="Add multiple .iskra projects and render them all with one click"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,3,0,0"/>
         </StackPanel>
 
         <!-- Settings -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}"
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg2}"
                 CornerRadius="10" Padding="14,12" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -76,12 +71,12 @@
 
                 <!-- Format -->
                 <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                    <TextBlock Text="Format" Foreground="{StaticResource TextMutedBrush}"
+                    <TextBlock Text="Format" Foreground="{DynamicResource TextSecondary}"
                                FontSize="11" Margin="0,0,0,5"/>
                     <ComboBox x:Name="CmbFormat"
-                              Background="{StaticResource SurfaceBrush}"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              BorderBrush="{StaticResource BorderBrush}"
+                              Background="{DynamicResource PanelBg}"
+                              Foreground="{DynamicResource TextPrimary}"
+                              BorderBrush="{DynamicResource ThemeBorderBrush}"
                               FontSize="13" Padding="8,6"
                               AutomationProperties.Name="Select format for batch export">
                         <ComboBoxItem Content="YouTube FHD (MP4)" Tag="youtube" IsSelected="True"/>
@@ -92,7 +87,7 @@
 
                 <!-- Output folder -->
                 <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                    <TextBlock Text="Output folder" Foreground="{StaticResource TextMutedBrush}"
+                    <TextBlock Text="Output folder" Foreground="{DynamicResource TextSecondary}"
                                FontSize="11" Margin="0,0,0,5"/>
                     <DockPanel>
                         <Button x:Name="BtnPickFolder" DockPanel.Dock="Right"
@@ -101,9 +96,9 @@
                                 Click="BtnPickFolder_Click"
                                 AutomationProperties.Name="Select output folder"/>
                         <TextBox x:Name="TxtOutputFolder"
-                                 Background="{StaticResource SurfaceBrush}"
-                                 Foreground="{StaticResource TextPrimaryBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Background="{DynamicResource PanelBg}"
+                                 Foreground="{DynamicResource TextPrimary}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                                  BorderThickness="1" Padding="8,6" FontSize="12"
                                  IsReadOnly="True" Text="Not selected…"
                                  AutomationProperties.Name="Output folder path"/>
@@ -122,7 +117,7 @@
 
         <!-- Ukupni progress -->
         <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed"
-                Background="{StaticResource SurfaceBrush}"
+                Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
             <StackPanel>
                 <DockPanel Margin="0,0,0,5">
@@ -131,27 +126,27 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontWeight="Bold" FontSize="13"/>
                     <TextBlock x:Name="TxtProgressMsg"
-                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Foreground="{DynamicResource TextPrimary}"
                                FontSize="12" TextTrimming="CharacterEllipsis"
                                AutomationProperties.LiveSetting="Polite"/>
                 </DockPanel>
                 <ProgressBar x:Name="TotalProgressBar" Height="6"
                              Minimum="0" Maximum="100"
                              Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BorderBrush}"
+                             Background="{DynamicResource ThemeBorderBrush}"
                              BorderThickness="0"/>
             </StackPanel>
         </Border>
 
         <!-- Lista jobova -->
-        <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.Row="3" Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                <Border Grid.Row="0" Background="{DynamicResource PanelBg2}"
                         CornerRadius="8,8,0,0" Padding="12,8">
                     <DockPanel>
                         <Button x:Name="BtnClearDone" DockPanel.Dock="Right"
@@ -165,14 +160,14 @@
                                 Click="BtnRemoveSelected_Click"
                                 AutomationProperties.Name="Remove selected job"/>
                         <TextBlock x:Name="TxtJobCount" Text="No projects"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="12" VerticalAlignment="Center"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </DockPanel>
                 </Border>
                 <ListView x:Name="JobsList" Grid.Row="1"
                           Background="Transparent" BorderThickness="0"
-                          Foreground="{StaticResource TextPrimaryBrush}"
+                          Foreground="{DynamicResource TextPrimary}"
                           FontSize="12" SelectionMode="Single"
                           AutomationProperties.Name="Batch export jobs list">
                     <ListView.View>
@@ -194,11 +189,11 @@
         </Border>
 
         <!-- Log -->
-        <Border Grid.Row="4" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.Row="4" Background="{DynamicResource PanelBg}"
                 CornerRadius="8" Padding="10,6" Margin="0,0,0,10" Height="70">
             <TextBox x:Name="TxtLog"
                      Background="Transparent" BorderThickness="0"
-                     Foreground="{StaticResource TextMutedBrush}"
+                     Foreground="{DynamicResource TextSecondary}"
                      FontFamily="Consolas" FontSize="11"
                      IsReadOnly="True" TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
@@ -213,7 +208,7 @@
                     Padding="16,9" IsEnabled="False"
                     Click="BtnStartBatch_Click"
                     AutomationProperties.Name="Start batch export of all projects"/>
-            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+            <Button x:Name="BtnClose" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
                     AutomationProperties.Name="Close dialog"/>

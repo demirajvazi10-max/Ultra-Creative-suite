@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="📋 Log - Event history" Height="450" Width="700"
         WindowStartupLocation="CenterOwner"
-        Background="#1E1E1E"
+        Background="{DynamicResource PanelBg}"
         AutomationProperties.Name="Window with log message history">
 
     <Grid Margin="10">
@@ -15,21 +15,21 @@
 
         <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="📋 EVENT HISTORY" FontSize="16" FontWeight="Bold" 
-                       Foreground="#00E676" VerticalAlignment="Center"/>
+                       Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
             <Button x:Name="btnCopyAll" Content="📋 COPY ALL" Click="CopyAll_Click"
-                    Width="120" Height="30" Background="#4A148C" Foreground="White" Margin="20,0,5,0"/>
+                    Width="120" Height="30" Background="{DynamicResource PurpleBrush}" Foreground="{DynamicResource ButtonTextBrush}" Margin="20,0,5,0"/>
             <Button x:Name="btnClear" Content="🗑 CLEAR" Click="Clear_Click"
-                    Width="100" Height="30" Background="#B71C1C" Foreground="White"/>
+                    Width="100" Height="30" Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}"/>
         </StackPanel>
 
-        <ListBox x:Name="lstLog" Grid.Row="1" Background="#2D2D2D" Foreground="#00FF00"
+        <ListBox x:Name="lstLog" Grid.Row="1" Background="{DynamicResource ControlBg}" Foreground="#00FF00"
                  FontFamily="Consolas" FontSize="12"
                  AutomationProperties.Name="Log messages list, event history"
                  AutomationProperties.HelpText="Use up/down arrows to navigate messages. Ctrl+C to copy selected message.">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding Time}" Width="60" Foreground="#FF9800"/>
+                        <TextBlock Text="{Binding Time}" Width="60" Foreground="{DynamicResource WarningBrush}"/>
                         <TextBlock Text=" - " Foreground="Gray"/>
                         <TextBlock Text="{Binding Message}" Foreground="#00FF00" TextWrapping="Wrap"/>
                     </StackPanel>
@@ -38,9 +38,9 @@
         </ListBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Name="txtStatus" Text="Ready" Foreground="#00E676" FontSize="11"/>
+            <TextBlock x:Name="txtStatus" Text="Ready" Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
             <Button x:Name="btnClose" Content="❌ CLOSE" Click="Close_Click"
-                    Width="100" Height="30" Background="#333" Foreground="White" Margin="20,0,0,0"/>
+                    Width="100" Height="30" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="20,0,0,0"/>
         </StackPanel>
     </Grid>
 </Window>

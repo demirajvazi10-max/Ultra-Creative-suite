@@ -6,15 +6,10 @@
         MinWidth="520" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#1A1A2E"
+        Background="{DynamicResource MainWindowBg}"
         AutomationProperties.Name="Project Templates dialog">
     <Window.Resources>
         <SolidColorBrush x:Key="AccentBrush"      Color="#06B6D4"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#16213E"/>
-        <SolidColorBrush x:Key="CardBrush"        Color="#0F3460"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextMutedBrush"   Color="#94A3B8"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#334155"/>
         <Style x:Key="PrimaryBtn" TargetType="Button">
             <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground"      Value="#1A1A2E"/>
@@ -39,13 +34,13 @@
             </Setter>
         </Style>
         <Style x:Key="SecBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#2D3748"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBg2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style x:Key="InputBox" TargetType="TextBox">
-            <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource PanelBg}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource ThemeBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding"         Value="8,6"/>
             <Setter Property="FontSize"        Value="13"/>
@@ -79,10 +74,10 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="📋  Project Templates"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimary}"
                        AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="Save project settings · Load template into a new project"
-                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0"/>
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,3,0,0"/>
         </StackPanel>
 
         <!-- Levo: lista + desno: detalji -->
@@ -93,22 +88,22 @@
             </Grid.ColumnDefinitions>
 
             <!-- Lista templatea -->
-            <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
+            <Border Grid.Column="0" Background="{DynamicResource PanelBg}"
                     CornerRadius="8" Margin="0,0,10,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="{StaticResource CardBrush}"
+                    <Border Grid.Row="0" Background="{DynamicResource PanelBg2}"
                             CornerRadius="8,8,0,0" Padding="10,8">
                         <TextBlock Text="Saved templates"
-                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    FontSize="11"/>
                     </Border>
                     <ListBox x:Name="TemplateList" Grid.Row="1"
                              Background="Transparent" BorderThickness="0"
-                             Foreground="{StaticResource TextPrimaryBrush}"
+                             Foreground="{DynamicResource TextPrimary}"
                              FontSize="13" Padding="6"
                              SelectionChanged="TemplateList_SelectionChanged"
                              AutomationProperties.Name="Project templates list"/>
@@ -116,28 +111,28 @@
             </Border>
 
             <!-- Detalji / editor -->
-            <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}"
+            <Border Grid.Column="1" Background="{DynamicResource PanelBg}"
                     CornerRadius="8">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
                     <StackPanel x:Name="DetailsPanel">
                         <!-- Naziv -->
-                        <TextBlock Text="Name" Foreground="{StaticResource TextMutedBrush}"
+                        <TextBlock Text="Name" Foreground="{DynamicResource TextSecondary}"
                                    FontSize="11" Margin="0,0,0,4"/>
                         <TextBox x:Name="TxtTemplateName" Style="{StaticResource InputBox}"
                                  Margin="0,0,0,12"
                                  AutomationProperties.Name="Template name"/>
 
                         <!-- Opis -->
-                        <TextBlock Text="Description" Foreground="{StaticResource TextMutedBrush}"
+                        <TextBlock Text="Description" Foreground="{DynamicResource TextSecondary}"
                                    FontSize="11" Margin="0,0,0,4"/>
                         <TextBox x:Name="TxtTemplateDesc" Style="{StaticResource InputBox}"
                                  Margin="0,0,0,16"
                                  AutomationProperties.Name="Template description"/>
 
-                        <Separator Background="{StaticResource BorderBrush}" Margin="0,0,0,16"/>
+                        <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,0,0,16"/>
 
                         <!-- Export -->
-                        <TextBlock Text="🎬  Export" Foreground="{StaticResource TextPrimaryBrush}"
+                        <TextBlock Text="🎬  Export" Foreground="{DynamicResource TextPrimary}"
                                    FontWeight="SemiBold" FontSize="13" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -145,22 +140,22 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="Profile" Foreground="{StaticResource TextMutedBrush}"
+                                <TextBlock Text="Profile" Foreground="{DynamicResource TextSecondary}"
                                            FontSize="11" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="CmbExportProfile"
-                                          Background="{StaticResource SurfaceBrush}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                          BorderBrush="{StaticResource BorderBrush}"
+                                          Background="{DynamicResource PanelBg}"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          BorderBrush="{DynamicResource ThemeBorderBrush}"
                                           FontSize="12" Padding="6,5"
                                           AutomationProperties.Name="Export profil"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Language" Foreground="{StaticResource TextMutedBrush}"
+                                <TextBlock Text="Language" Foreground="{DynamicResource TextSecondary}"
                                            FontSize="11" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="CmbLanguage"
-                                          Background="{StaticResource SurfaceBrush}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                          BorderBrush="{StaticResource BorderBrush}"
+                                          Background="{DynamicResource PanelBg}"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          BorderBrush="{DynamicResource ThemeBorderBrush}"
                                           FontSize="12" Padding="6,5"
                                           AutomationProperties.Name="Project language">
                                     <ComboBoxItem Content="Srpski (sr)"   Tag="sr" IsSelected="True"/>
@@ -173,46 +168,46 @@
                         <!-- Checkboxovi -->
                         <WrapPanel Margin="0,0,0,12">
                             <CheckBox x:Name="ChkYouTube"  Content="YouTube FHD"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       IsChecked="True" Margin="0,0,16,6"
                                       AutomationProperties.Name="Enable YouTube FHD export"/>
                             <CheckBox x:Name="ChkReels"    Content="Reels/TikTok"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       Margin="0,0,16,6"
                                       AutomationProperties.Name="Enable Reels TikTok export"/>
                             <CheckBox x:Name="ChkMP3"      Content="MP3 Audio"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       Margin="0,0,16,6"
                                       AutomationProperties.Name="Enable MP3 audio export"/>
                             <CheckBox x:Name="ChkSubtitles" Content="Subtitles"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       Margin="0,0,0,6"
                                       AutomationProperties.Name="Enable subtitles"/>
                         </WrapPanel>
 
-                        <Separator Background="{StaticResource BorderBrush}" Margin="0,0,0,16"/>
+                        <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,0,0,16"/>
 
                         <!-- AI -->
-                        <TextBlock Text="🎨  AI settings" Foreground="{StaticResource TextPrimaryBrush}"
+                        <TextBlock Text="🎨  AI settings" Foreground="{DynamicResource TextPrimary}"
                                    FontWeight="SemiBold" FontSize="13" Margin="0,0,0,10"/>
                         <StackPanel Margin="0,0,0,8">
-                            <TextBlock Text="Color Grade preset" Foreground="{StaticResource TextMutedBrush}"
+                            <TextBlock Text="Color Grade preset" Foreground="{DynamicResource TextSecondary}"
                                        FontSize="11" Margin="0,0,0,4"/>
                             <ComboBox x:Name="CmbGradePreset"
-                                      Background="{StaticResource SurfaceBrush}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="{StaticResource BorderBrush}"
+                                      Background="{DynamicResource PanelBg}"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                                       FontSize="12" Padding="6,5"
                                       AutomationProperties.Name="Color grade preset"/>
                         </StackPanel>
 
                         <WrapPanel>
                             <CheckBox x:Name="ChkGPU"        Content="GPU render"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       Margin="0,0,16,0"
                                       AutomationProperties.Name="Use GPU render"/>
                             <CheckBox x:Name="ChkFastRender" Content="Fast render"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimary}"
                                       AutomationProperties.Name="Koristi fast render"/>
                         </WrapPanel>
                     </StackPanel>
@@ -241,18 +236,18 @@
             <Button x:Name="BtnExportTemplate" Content="📤 Izvezi"
                     Style="{StaticResource SecBtn}" Padding="12,7"
                     IsEnabled="False" Click="BtnExportTemplate_Click"
-                    AutomationProperties.Name="Izvezi template u fajl"/>
+                    AutomationProperties.Name="Export template to file"/>
         </WrapPanel>
 
         <!-- Footer -->
         <DockPanel Grid.Row="3" LastChildFill="False">
             <Button x:Name="BtnApplyTemplate" DockPanel.Dock="Left"
-                    Content="✅ Primeni na projekat"
+                    Content="✅ Apply to project"
                     Style="{StaticResource PrimaryBtn}"
                     Padding="16,9" IsEnabled="False"
                     Click="BtnApplyTemplate_Click"
-                    AutomationProperties.Name="Primeni selektovani template na trenutni projekat"/>
-            <Button x:Name="BtnClose" DockPanel.Dock="Right"
+                    AutomationProperties.Name="Apply the selected template to the current project"/>
+            <Button x:Name="BtnClose" DockPanel.Dock="Right" IsCancel="True"
                     Content="Close" Style="{StaticResource SecBtn}"
                     Padding="16,9" Click="BtnClose_Click"
                     AutomationProperties.Name="Close dialog"/>

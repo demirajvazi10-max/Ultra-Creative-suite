@@ -56,7 +56,7 @@ namespace UltraVideoEditor
     // Timeline Item with support for multiple tracks and keyframes
     public class TimelineItem
     {
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -150,12 +150,12 @@ namespace UltraVideoEditor
                 _ => $"Track {TrackIndex + 1} "
             };
 
-            string typeInfo = IsAudio ? "Audio" : (IsVideo ? "Video" : "Slika");
+            string typeInfo = IsAudio ? "Audio" : (IsVideo ? "Video" : "Image");
             string volumeInfo = IsAudio ? string.Format(L("models_volume_sfx"), Volume) : "";
-            string audioDescInfo = !string.IsNullOrEmpty(AudioDescription) ? $", opis: {AudioDescription}" : "";
-            string textOverlayInfo = TextOverlay.Enabled && !string.IsNullOrEmpty(TextOverlay.Text) ? $", tekst: {TextOverlay.Text}" : "";
+            string audioDescInfo = !string.IsNullOrEmpty(AudioDescription) ? $", description: {AudioDescription}" : "";
+            string textOverlayInfo = TextOverlay.Enabled && !string.IsNullOrEmpty(TextOverlay.Text) ? $", text: {TextOverlay.Text}" : "";
 
-            return $"{trackInfo}{Index}. {typeInfo}: {Name} (trajanje: {TimeSpan.FromSeconds(Duration):mm\\:ss}{volumeInfo}{audioDescInfo}{textOverlayInfo})";
+            return $"{trackInfo}{Index}. {typeInfo}: {Name} (duration: {TimeSpan.FromSeconds(Duration):mm\\:ss}{volumeInfo}{audioDescInfo}{textOverlayInfo})";
         }
 
         public void AddKeyframe(AnimationKeyframe keyframe)

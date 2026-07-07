@@ -66,7 +66,7 @@ namespace UltraVideoEditor
             options ??= new AccessibilityReportOptions();
 
             if (result == null || !result.Success)
-                return Fail("HighlightResult nije validan.");
+                return Fail("HighlightResult is not valid.");
 
             await Task.Yield(); // async kompatibilnost
 

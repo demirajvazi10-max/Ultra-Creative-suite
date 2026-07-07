@@ -33,8 +33,8 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title      = "Odaberite Iskra projekte",
-                Filter     = "Iskra projekat|*.iskra|Svi fajlovi|*.*",
+                Title      = "Select Iskra projects",
+                Filter     = "Iskra project|*.iskra|All files|*.*",
                 Multiselect = true,
             };
             if (dlg.ShowDialog() != true) return;
@@ -48,7 +48,7 @@ namespace UltraVideoEditor
                 _jobs.Add(new BatchExportJob
                 {
                     ProjectPath  = path,
-                    OutputFolder = string.IsNullOrEmpty(outFolder) || outFolder == "Nije odabran…"
+                    OutputFolder = string.IsNullOrEmpty(outFolder) || outFolder == "Not selected…"
                                    ? Path.GetDirectoryName(path) ?? ""
                                    : outFolder,
                     FormatId     = formatId,
@@ -61,7 +61,7 @@ namespace UltraVideoEditor
         {
             using var dlg = new System.Windows.Forms.FolderBrowserDialog
             {
-                Description         = "Odaberite output folder",
+                Description         = "Select output folder",
                 UseDescriptionForTitle = true,
             };
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
@@ -146,12 +146,12 @@ namespace UltraVideoEditor
             {
                 _running = false;
                 _cts?.Dispose(); _cts = null;
-                BtnStartBatch.Content = "▶ Pokreni Batch Export";
+                BtnStartBatch.Content = "▶ Start Batch Export";
                 ProgressPanel.Visibility = Visibility.Collapsed;
                 JobsList.Items.Refresh();
                 UpdateJobCount();
                 BtnOpenFolder.IsEnabled = !string.IsNullOrEmpty(TxtOutputFolder.Text) &&
-                                          TxtOutputFolder.Text != "Nije odabran…";
+                                          TxtOutputFolder.Text != "Not selected…";
 
                 int okCount = _jobs.Count(j => j.Status == BatchJobStatus.Done);
                 int errCount = _jobs.Count(j => j.Status == BatchJobStatus.Error);
@@ -204,7 +204,7 @@ namespace UltraVideoEditor
             int total   = _jobs.Count;
             int pending = _jobs.Count(j => j.Status == BatchJobStatus.Pending);
             TxtJobCount.Text         = total == 0
-                ? "Nema projekata"
+                ? "No projects"
                 : $"{total} projects  ·  {pending} pending";
             BtnStartBatch.IsEnabled  = total > 0 && !_running;
         }
@@ -219,7 +219,7 @@ namespace UltraVideoEditor
         {
             if (_running)
             {
-                var r = MessageBox.Show("Batch export je u toku. Otkazati?",
+                var r = MessageBox.Show("Batch export is in progress. Cancel it?",
                     "Cancel", MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (r != MessageBoxResult.Yes) return;
                 _cts?.Cancel();

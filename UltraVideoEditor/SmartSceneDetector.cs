@@ -79,7 +79,7 @@ namespace UltraVideoEditor
                 var segments = BuildSegments(videoPath, cutTimes, duration);
 
                 // 3 — Vision analiza (paralelno, max 3)
-                Report(progress, 50, $"Analiziram {segments.Count} scena…");
+                Report(progress, 50, $"Analyzing {segments.Count} scenes…");
                 await AnalyzeScenesAsync(segments, ffmpegPath, progress, ct);
 
                 // 4 — Thumbnailovi
@@ -95,7 +95,7 @@ namespace UltraVideoEditor
                 Report(progress, 100, "Gotovo!");
                 return result;
             }
-            catch (OperationCanceledException) { return Fail("Detekcija je otkazana."); }
+            catch (OperationCanceledException) { return Fail("Detection was cancelled."); }
             catch (Exception ex)               { return Fail($"Error: {ex.Message}"); }
         }
 
@@ -229,9 +229,9 @@ namespace UltraVideoEditor
                     seg.Label  = BuildLabel(seg);
 
                     int pct = 50 + (int)(Interlocked.Increment(ref done) * 30.0 / total);
-                    progress?.Report((pct, $"Analiziram scenu {done}/{total}…"));
+                    progress?.Report((pct, $"Analyzing scene {done}/{total}…"));
                 }
-                catch { seg.Label = "Scena"; }
+                catch { seg.Label = "Scene"; }
                 finally { sem.Release(); }
             });
             await Task.WhenAll(tasks);
@@ -239,13 +239,13 @@ namespace UltraVideoEditor
 
         private static string BuildLabel(SceneSegment seg)
         {
-            if (seg.Vision == null) return "Scena";
+            if (seg.Vision == null) return "Scene";
             var parts = new List<string>();
             if (!string.IsNullOrEmpty(seg.Vision.TopLabel)) parts.Add(seg.Vision.TopLabel);
             if (seg.Vision.HasFaces)  parts.Add("lice");
             if (seg.Vision.IsOutdoor) parts.Add("eksterijer");
             if (seg.Motion != null && seg.Motion.HasStrongMotion) parts.Add("pokret");
-            return parts.Count > 0 ? string.Join(", ", parts) : "Scena";
+            return parts.Count > 0 ? string.Join(", ", parts) : "Scene";
         }
 
         // ── Thumbnailovi ──────────────────────────────────────────────
@@ -274,8 +274,8 @@ namespace UltraVideoEditor
             sb.AppendLine("╚══════════════════════════════════════════════════════╝");
             sb.AppendLine();
             sb.AppendLine($"   Video:   {Path.GetFileName(videoPath)}");
-            sb.AppendLine($"   Trajanje:{AIHighlightEngine.FormatTime(result.TotalDuration)}");
-            sb.AppendLine($"   Scena:   {result.SceneCount}");
+            sb.AppendLine($"   Duration:{AIHighlightEngine.FormatTime(result.TotalDuration)}");
+            sb.AppendLine($"   Scenes:  {result.SceneCount}");
             sb.AppendLine();
             sb.AppendLine("🎬 DETEKTOVANE SCENE");
             foreach (var s in result.Scenes)

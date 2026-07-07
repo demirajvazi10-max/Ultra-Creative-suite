@@ -551,7 +551,7 @@ namespace UltraVideoEditor
     public static class VisionAI
     {
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -570,7 +570,7 @@ namespace UltraVideoEditor
             string ollamaModel = "moondream",  // moondream is the fastest
             CancellationToken ct = default)
         {
-            if (!File.Exists(mediaPath)) return "Fajl ne postoji.";
+            if (!File.Exists(mediaPath)) return "File does not exist.";
 
             try
             {
@@ -584,7 +584,7 @@ namespace UltraVideoEditor
                     imagePath = await ExtractFrame(mediaPath, ffmpegPath, ct);
                     tempFrame = true;
                     if (string.IsNullOrEmpty(imagePath))
-                        return "Nije moguce izvuci frame iz videa.";
+                        return "Could not extract a frame from the video.";
                 }
 
                 // Konvertuj sliku u base64
@@ -599,13 +599,13 @@ namespace UltraVideoEditor
                     base64, ollamaModel, ct);
 
                 return string.IsNullOrEmpty(description)
-                    ? "Opis nije dostupan."
+                    ? "Description not available."
                     : description;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                return $"Greska pri opisu: {ex.Message}";
+                return $"Error while describing: {ex.Message}";
             }
         }
 
@@ -623,8 +623,8 @@ namespace UltraVideoEditor
             // Provjeri da li Ollama radi
             if (!await IsVisionModelAvailable(ollamaModel))
             {
-                onProgress(-1, $"Ollama vision model '{ollamaModel}' nije dostupan. " +
-                    $"Pokrenite: ollama pull {ollamaModel}");
+                onProgress(-1, $"Ollama vision model '{ollamaModel}' is not available. " +
+                    $"Run: ollama pull {ollamaModel}");
                 return;
             }
 
@@ -645,7 +645,7 @@ namespace UltraVideoEditor
                 item.AudioDescription = desc;
 
                 count++;
-                onProgress(count, $"Klip {count}: {item.Name} — {desc}");
+                onProgress(count, $"Clip {count}: {item.Name} — {desc}");
 
                 // Small delay between requests
                 await Task.Delay(200, ct);
@@ -676,8 +676,8 @@ namespace UltraVideoEditor
         public static readonly (string model, string desc, string pullCmd)[] RecommendedModels =
         {
             ("moondream",    "Fastest (1.7B), great for image descriptions",   "ollama pull moondream"),
-            ("llava",        "Balansiran (7B), detaljan opis scena",      "ollama pull llava"),
-            ("llava-phi3",   "Precizan (4B), dobar za ljude i akciju",    "ollama pull llava-phi3"),
+            ("llava",        "Balanced (7B), detailed scene description",  "ollama pull llava"),
+            ("llava-phi3",   "Precise (4B), good for people and action",  "ollama pull llava-phi3"),
             ("bakllava-1",   "Specialized for visual content",        "ollama pull bakllava-1"),
             ("llava:13b",    "Najprecizniji, sporiji (13B)",              "ollama pull llava:13b"),
         };

@@ -255,7 +255,7 @@ namespace UltraVideoEditor
 
                 if (!IsOnnxRuntimeAvailable())
                 {
-                    log?.Invoke("🧠 VisionAnalyzer: ONNX Runtime nije instaliran — FFmpeg mod aktivan");
+                    log?.Invoke("🧠 VisionAnalyzer: ONNX Runtime is not installed — FFmpeg mode active");
                     _onnxAvailable = false;
                     _initDone = true;
                     return false;
@@ -267,7 +267,7 @@ namespace UltraVideoEditor
                     bool downloaded = await DownloadFileAsync(MODEL_URL, _modelPath, ct);
                     if (!downloaded)
                     {
-                        log?.Invoke("⚠ VisionAnalyzer: Download nije uspio — FFmpeg mod aktivan");
+                        log?.Invoke("⚠ VisionAnalyzer: Download failed — FFmpeg mode active");
                         _onnxAvailable = false;
                         _initDone = true;
                         return false;
@@ -291,14 +291,14 @@ namespace UltraVideoEditor
                 if (_onnxAvailable)
                     log?.Invoke("✅ VisionAnalyzer: ONNX aktivan, " + (_labels?.Length ?? 0) + " labela");
                 else
-                    log?.Invoke(LanguageManager.GetText("va_onnx_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr"));
+                    log?.Invoke(LanguageManager.GetText("va_onnx_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"));
 
                 _initDone = true;
                 return _onnxAvailable;
             }
             catch (Exception ex)
             {
-                log?.Invoke(string.Format(LanguageManager.GetText("va_init_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr"), ex.Message));
+                log?.Invoke(string.Format(LanguageManager.GetText("va_init_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"), ex.Message));
                 _onnxAvailable = false;
                 _initDone = true;
                 return false;
@@ -324,7 +324,7 @@ namespace UltraVideoEditor
                 _ollamaClient = new OllamaClient();
                 if (!await _ollamaClient.IsOllamaRunning())
                 {
-                    log?.Invoke("🧠 VisionAnalyzer: Ollama nije pokrenuta — Qwen2-VL nedostupan");
+                    log?.Invoke("🧠 VisionAnalyzer: Ollama is not running — Qwen2-VL unavailable");
                     return false;
                 }
 
@@ -344,9 +344,9 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    log?.Invoke($"⚠️ VisionAnalyzer: Qwen2-VL model nije instaliran.\n" +
-                                $"   Instaliraj: ollama pull {QWEN_MODEL}\n" +
-                                $"   Koristi se ONNX/FFmpeg fallback.");
+                    log?.Invoke($"⚠️ VisionAnalyzer: Qwen2-VL model is not installed.\n" +
+                                $"   Install: ollama pull {QWEN_MODEL}\n" +
+                                $"   Using ONNX/FFmpeg fallback.");
                 }
 
                 return _qwenAvailable;
@@ -373,7 +373,7 @@ namespace UltraVideoEditor
             string context = null)
         {
             if (!File.Exists(videoPath))
-                return MakeResult(5.0, "Fajl ne postoji");
+                return MakeResult(5.0, "File does not exist");
 
             // If videoPath is already an image (jpg/png) — we skip extraction
             string ext = Path.GetExtension(videoPath).ToLowerInvariant();
@@ -732,7 +732,7 @@ namespace UltraVideoEditor
             var result = new VisionResult { OnnxUsed = false };
 
             if (!File.Exists(framePath) || !File.Exists(ffmpegPath))
-                return MakeResult(6.0, "FFmpeg nije dostupan");
+                return MakeResult(6.0, "FFmpeg is not available");
 
             try
             {
@@ -814,7 +814,7 @@ namespace UltraVideoEditor
 
                 if (result.Score < 4.0)
                 {
-                    result.RejectReason = "Nizak kvalitet: lum=" + luminance.ToString("F0") +
+                    result.RejectReason = "Low quality: lum=" + luminance.ToString("F0") +
                         ", sat=" + saturation.ToString("F0") +
                         ", sharp=" + result.Sharpness.ToString("F0");
                 }
@@ -823,7 +823,7 @@ namespace UltraVideoEditor
             }
             catch
             {
-                return MakeResult(6.0, LanguageManager.GetText("va_analysis_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr"));
+                return MakeResult(6.0, LanguageManager.GetText("va_analysis_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"));
             }
         }
 

@@ -11,7 +11,7 @@ namespace UltraVideoEditor
     public class OllamaClient
     {
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -146,7 +146,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                return "Operacija otkazana.";
+                return "Operation cancelled.";
             }
             catch (Exception ex)
             {
@@ -190,7 +190,7 @@ namespace UltraVideoEditor
             if (imagePath != null)
             {
                 if (!File.Exists(imagePath))
-                    return (null, $"Fajl ne postoji: {imagePath}");
+                    return (null, $"File does not exist: {imagePath}");
 
                 byte[] imageBytes;
                 try
@@ -199,7 +199,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    return (null, $"Greska citanja slike: {ex.Message}");
+                    return (null, $"Error reading image: {ex.Message}");
                 }
 
                 if (imageBytes.Length < 100)
@@ -234,21 +234,21 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return (null, "Korisnik otkazao analizu");
+                return (null, "User cancelled the analysis");
             }
             catch (OperationCanceledException)
             {
                 // Nije korisnik — Qwen timeout (model jos procesira)
-                return (null, $"Qwen timeout — model nije odgovorio na vrijeme. " +
-                              $"Pokusaj smanjiti interval analize ili restartovati Ollamu.");
+                return (null, $"Qwen timeout — the model did not respond in time. " +
+                              $"Try reducing the analysis interval or restarting Ollama.");
             }
             catch (HttpRequestException ex)
             {
-                return (null, $"HTTP greska: {ex.Message} — da li Ollama radi?");
+                return (null, $"HTTP error: {ex.Message} — is Ollama running?");
             }
             catch (Exception ex)
             {
-                return (null, $"Neocekivana greska: {ex.Message}");
+                return (null, $"Unexpected error: {ex.Message}");
             }
 
             if (!response.IsSuccessStatusCode)
@@ -277,7 +277,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                return (null, $"JSON parse greska: {ex.Message}");
+                return (null, $"JSON parse error: {ex.Message}");
             }
 
             string text = result?.response?.Trim();

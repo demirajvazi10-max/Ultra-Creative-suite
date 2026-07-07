@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AI Video Engine" Height="720" Width="780"
         WindowStartupLocation="CenterOwner"
-        Background="#1A1A2E" Foreground="White"
+        Background="{DynamicResource MainWindowBg}" Foreground="{DynamicResource TextPrimary}"
         AutomationProperties.Name="AI Video Engine - professional automatic video editor for children's songs">
 
     <Grid Margin="15">
@@ -20,21 +20,21 @@
         <!-- Naslov -->
         <StackPanel HorizontalAlignment="Center" Margin="0,0,0,10">
             <TextBlock Text="AI VIDEO ENGINE" FontSize="22" FontWeight="Bold"
-                       Foreground="#00E676" HorizontalAlignment="Center"/>
+                       Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
             <TextBlock Text="Professional automatic video editor for children's songs"
-                       Foreground="#888888" FontSize="11" HorizontalAlignment="Center"/>
+                       Foreground="{DynamicResource TextSecondary}" FontSize="11" HorizontalAlignment="Center"/>
         </StackPanel>
 
         <!-- Status -->
-        <Border Grid.Row="1" Background="#1E1E1E" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="10" Margin="0,0,0,8">
             <TextBlock x:Name="txtStatus" Text="Initializing..."
-                       Foreground="#FF9800" TextWrapping="Wrap" FontSize="12"
+                       Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" FontSize="12"
                        AutomationProperties.LiveSetting="Assertive"
                        AutomationProperties.Name="AI engine status"/>
         </Border>
 
         <!-- Opcije -->
-        <Border Grid.Row="2" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -42,11 +42,11 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="VIDEO STYLE" FontSize="12" FontWeight="Bold"
-                               Foreground="#00E676" Margin="0,0,0,6"/>
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <TextBlock Text="Intent:" Foreground="White" Width="60" VerticalAlignment="Center"/>
+                        <TextBlock Text="Intent:" Foreground="{DynamicResource TextPrimary}" Width="60" VerticalAlignment="Center"/>
                         <ComboBox x:Name="cmbIntent" Width="190" Height="26"
-                                  Background="#2D2D2D" Foreground="White"
+                                  Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                                   AutomationProperties.Name="Video style and purpose">
                             <ComboBoxItem Tag="emotional" IsSelected="True">Emotional - ljubavna / porodica</ComboBoxItem>
                             <ComboBoxItem Tag="hype">Hype - energican, brzi rezovi</ComboBoxItem>
@@ -55,55 +55,55 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Media:" Foreground="White" Width="60" VerticalAlignment="Center"/>
+                        <TextBlock Text="Media:" Foreground="{DynamicResource TextPrimary}" Width="60" VerticalAlignment="Center"/>
                         <ComboBox x:Name="cmbMedia" Width="130" Height="26"
-                                  Background="#2D2D2D" Foreground="White"
+                                  Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                                   AutomationProperties.Name="Media type for download">
                             <ComboBoxItem Tag="video" IsSelected="True">Video klipovi</ComboBoxItem>
                             <ComboBoxItem Tag="image">Slike</ComboBoxItem>
                         </ComboBox>
                         <CheckBox x:Name="chkTitles" Content="Subtitles"
-                                  Foreground="White" Margin="12,0,0,0"
+                                  Foreground="{DynamicResource TextPrimary}" Margin="12,0,0,0"
                                   VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
                     <TextBlock Text="AI GENERATION" FontSize="12" FontWeight="Bold"
-                               Foreground="#00E676" Margin="0,0,0,6"/>
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
                     <CheckBox x:Name="chkUseOllama"
                               Content="Use Ollama AI for queries"
-                              Foreground="White" Margin="0,0,0,4"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"
                               AutomationProperties.Name="Enable Ollama AI for generating Pixabay search queries"/>
                     <CheckBox x:Name="chkAmbient" IsChecked="True"
-                              Content="🌳 Ambijentalni zvukovi (lokalna biblioteka)"
-                              Foreground="White" Margin="0,4,0,4"
+                              Content="🌳 Ambient sounds (local library)"
+                              Foreground="{DynamicResource TextPrimary}" Margin="0,4,0,4"
                               AutomationProperties.Name="Download ambient sounds from local library and mix under music at 15 percent"/>
                     <TextBlock x:Name="txtFreesoundInfo" Text="Local library: checking..."
-                               Foreground="#888888" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondary}" FontSize="11" TextWrapping="Wrap"
                                Margin="0,0,0,4"/>
                     <TextBlock x:Name="txtOllamaInfo"
-                               Text="Ollama: checking..." Foreground="#888888"
+                               Text="Ollama: checking..." Foreground="{DynamicResource TextSecondary}"
                                FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Lyrics -->
-        <Border Grid.Row="3" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <Border Grid.Row="3" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                     <TextBlock Text="SONG LYRICS" FontSize="12" FontWeight="Bold"
-                               Foreground="#00E676" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                     <TextBlock Text=" — one lyric per row (chorus will be automatically recognized)"
-                               Foreground="#888888" FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}" FontSize="11"
                                VerticalAlignment="Center" Margin="5,0,0,0"/>
-                    <Button x:Name="btnAnalyze" Content="ANALIZIRAJ"
+                    <Button x:Name="btnAnalyze" Content="ANALYZE"
                             Click="btnAnalyze_Click" Height="24" Margin="10,0,0,0"
-                            Background="#1565C0" Foreground="White" FontSize="11"
+                            Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}" FontSize="11"
                             AutomationProperties.Name="Analyze lyrics and generate shot list preview"/>
                 </StackPanel>
                 <TextBox x:Name="txtLyrics" Height="85" TextWrapping="Wrap"
-                         AcceptsReturn="True" Background="#2D2D2D" Foreground="White"
+                         AcceptsReturn="True" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                          Padding="8" VerticalScrollBarVisibility="Auto"
                          AutomationProperties.Name="Song lyrics, one per row"
                          AutomationProperties.HelpText="Enter song lyrics, one per row. The chorus will be automatically recognized by repetition."/>
@@ -111,7 +111,7 @@
         </Border>
 
         <!-- Shot lista pregled -->
-        <Border Grid.Row="4" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <Border Grid.Row="4" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -119,13 +119,13 @@
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                     <TextBlock Text="SHOT LIST" FontSize="12" FontWeight="Bold"
-                               Foreground="#00E676" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                     <TextBlock x:Name="txtShotCount" Text=""
-                               Foreground="#888888" FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}" FontSize="11"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
                 <ListBox x:Name="lstShots" Grid.Row="1"
-                         Background="#2D2D2D" Foreground="White"
+                         Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                          SelectionChanged="lstShots_SelectionChanged"
                          AutomationProperties.Name="Shot list - navigate with arrows for description of each shot">
                     <ListBox.ItemTemplate>
@@ -139,23 +139,23 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="{Binding Timestamp}"
-                                           Foreground="#888888" FontSize="10"
+                                           Foreground="{DynamicResource TextSecondary}" FontSize="10"
                                            VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Data.ShotType}"
-                                           Foreground="#00E676" FontSize="11"
+                                           Foreground="{DynamicResource AccentBrush}" FontSize="11"
                                            FontWeight="Bold" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding ChorusLabel}"
-                                           Foreground="#FF9800" FontSize="10"
+                                           Foreground="{DynamicResource WarningBrush}" FontSize="10"
                                            VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="3"
                                            Text="{Binding VibeLabel}"
-                                           Foreground="#AAAAAA" FontSize="10"
+                                           Foreground="{DynamicResource TextSecondary}" FontSize="10"
                                            VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="4"
                                            Text="{Binding Data.SearchQuery}"
-                                           Foreground="White" FontSize="11"
+                                           Foreground="{DynamicResource TextPrimary}" FontSize="11"
                                            TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center"/>
                             </Grid>
@@ -169,8 +169,8 @@
         <StackPanel Grid.Row="5" Margin="0,0,0,8">
             <ProgressBar x:Name="prgProgress" Height="6" Minimum="0" Maximum="100"
                          Value="0" Visibility="Collapsed"
-                         Background="#333" Foreground="#00E676"/>
-            <TextBlock x:Name="txtProgress" Text="" Foreground="#AAAAAA"
+                         Background="{DynamicResource ControlBg}" Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock x:Name="txtProgress" Text="" Foreground="{DynamicResource TextSecondary}"
                        FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap"
                        AutomationProperties.LiveSetting="Assertive"/>
         </StackPanel>
@@ -185,22 +185,22 @@
             </Grid.ColumnDefinitions>
             <Button x:Name="btnExportJson" Content="EXPORT JSON"
                     Click="btnExportJson_Click" Height="34"
-                    Background="#333" Foreground="White" Margin="0,0,6,0"
+                    Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,6,0"
                     AutomationProperties.Name="Export shot list as JSON file"/>
             <Button x:Name="btnGenerate" Grid.Column="1"
                     Content="CREATE VIDEO" Click="btnGenerate_Click"
                     Height="34" Width="150" Margin="0,0,6,0"
-                    Background="#2E7D32" Foreground="White" FontWeight="Bold"
+                    Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontWeight="Bold"
                     AutomationProperties.Name="Start creation - download media and add to timeline"/>
             <Button x:Name="btnStop" Grid.Column="2"
                     Content="STOP" Click="btnStop_Click"
                     Height="34" Width="100" IsEnabled="False" Margin="0,0,6,0"
-                    Background="#B71C1C" Foreground="White" FontWeight="Bold"
+                    Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontWeight="Bold"
                     AutomationProperties.Name="Stop operation"/>
-            <Button x:Name="btnClose" Grid.Column="3"
-                    Content="ZATVORI" Click="btnClose_Click"
+            <Button x:Name="btnClose" Grid.Column="3" IsCancel="True"
+                    Content="CLOSE" Click="btnClose_Click"
                     Height="34" Width="90"
-                    Background="#424242" Foreground="White"
+                    Background="#424242" Foreground="{DynamicResource ButtonTextBrush}"
                     AutomationProperties.Name="Close dialog"/>
         </Grid>
     </Grid>

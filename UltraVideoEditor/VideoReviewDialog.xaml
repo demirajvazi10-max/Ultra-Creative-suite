@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AI Video Review" Height="780" Width="860"
         WindowStartupLocation="CenterOwner"
-        Background="#1A1A2E" Foreground="White"
+        Background="{DynamicResource MainWindowBg}" Foreground="{DynamicResource TextPrimary}"
         AutomationProperties.Name="AI Video Review — Qwen2-VL analyzes video like a human">
 
     <Grid Margin="15">
@@ -20,37 +20,37 @@
         <!-- Naslov -->
         <StackPanel HorizontalAlignment="Center" Margin="0,0,0,12">
             <TextBlock Text="AI VIDEO REVIEW" FontSize="22" FontWeight="Bold"
-                       Foreground="#00E676" HorizontalAlignment="Center"/>
+                       Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
             <TextBlock Text="Qwen2-VL analyzes video frame by frame — cuts, stutters, inconsistencies, quality"
-                       Foreground="#888888" FontSize="11" HorizontalAlignment="Center"/>
+                       Foreground="{DynamicResource TextSecondary}" FontSize="11" HorizontalAlignment="Center"/>
         </StackPanel>
 
         <!-- Odabir fajla -->
-        <Border Grid.Row="1" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtVideoPath" Background="#2D2D2D" Foreground="White"
+                <TextBox x:Name="txtVideoPath" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                          BorderBrush="#444" Padding="6,4" FontSize="12" IsReadOnly="True"
                          Text="Select video file for analysis..."
                          AutomationProperties.Name="Video file path for analysis"/>
                 <Button Grid.Column="1" x:Name="btnBrowse" Content="📂 Open" Click="btnBrowse_Click"
                         Width="90" Height="30" Margin="8,0,0,0"
-                        Background="#1565C0" Foreground="White" FontWeight="Bold"
+                        Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}" FontWeight="Bold"
                         AutomationProperties.Name="Open video file for analysis"/>
                 <Button Grid.Column="2" x:Name="btnFromTimeline" Content="🎬 From Editor" Click="btnFromTimeline_Click"
                         Width="100" Height="30" Margin="6,0,0,0"
-                        Background="#4A148C" Foreground="White" FontWeight="Bold"
+                        Background="{DynamicResource PurpleBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontWeight="Bold"
                         AutomationProperties.Name="Use video file currently in editor"
                         ToolTip="Take the last exported video from editor"/>
             </Grid>
         </Border>
 
         <!-- Opcije analize -->
-        <Border Grid.Row="2" Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -60,11 +60,11 @@
 
                 <StackPanel>
                     <TextBlock Text="ANALYSIS INTERVAL" FontSize="11" FontWeight="Bold"
-                               Foreground="#00E676" Margin="0,0,0,6"/>
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Every" Foreground="#AAAAAA" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Every" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox x:Name="cmbInterval" Width="70" Height="26"
-                                  Background="#2D2D2D" Foreground="White"
+                                  Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                                   AutomationProperties.Name="Sampling interval in seconds">
                             <ComboBoxItem Tag="1">1 sek</ComboBoxItem>
                             <ComboBoxItem Tag="2" IsSelected="True">2 sek</ComboBoxItem>
@@ -76,25 +76,25 @@
 
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="WHAT TO CHECK" FontSize="11" FontWeight="Bold"
-                               Foreground="#00E676" Margin="0,0,0,6"/>
-                    <CheckBox x:Name="chkCuts" Content="Cuts and stutters" Foreground="White"
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                    <CheckBox x:Name="chkCuts" Content="Cuts and stutters" Foreground="{DynamicResource TextPrimary}"
                               IsChecked="True" Margin="0,0,0,3"
                               AutomationProperties.Name="Check for abrupt cuts and stutters"/>
-                    <CheckBox x:Name="chkQuality" Content="Frame quality" Foreground="White"
+                    <CheckBox x:Name="chkQuality" Content="Frame quality" Foreground="{DynamicResource TextPrimary}"
                               IsChecked="True" Margin="0,0,0,3"
                               AutomationProperties.Name="Check image quality, sharpness, exposure"/>
-                    <CheckBox x:Name="chkLogic" Content="Flow logic" Foreground="White"
+                    <CheckBox x:Name="chkLogic" Content="Flow logic" Foreground="{DynamicResource TextPrimary}"
                               IsChecked="True"
                               AutomationProperties.Name="Check logical flow of transitions between scenes"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
                     <TextBlock Text="ADDITIONAL" FontSize="11" FontWeight="Bold"
-                               Foreground="#00E676" Margin="0,0,0,6"/>
-                    <CheckBox x:Name="chkRepeat" Content="Scene repetition" Foreground="White"
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                    <CheckBox x:Name="chkRepeat" Content="Scene repetition" Foreground="{DynamicResource TextPrimary}"
                               IsChecked="True" Margin="0,0,0,3"
                               AutomationProperties.Name="Check if the same scenes repeat"/>
-                    <CheckBox x:Name="chkFreeze" Content="Frozen frames" Foreground="White"
+                    <CheckBox x:Name="chkFreeze" Content="Frozen frames" Foreground="{DynamicResource TextPrimary}"
                               IsChecked="True" Margin="0,0,0,3"
                               AutomationProperties.Name="Check for freeze frame errors"/>
                     <CheckBox x:Name="chkTeachMode" Content="🧠 Training mode" Foreground="#FFD54F"
@@ -106,15 +106,15 @@
         </Border>
 
         <!-- Status / progress -->
-        <Border Grid.Row="3" Background="#1E1E1E" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+        <Border Grid.Row="3" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="10" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock x:Name="txtStatus" Text="Ready. Select a video and press ANALYZE."
-                           Foreground="#FF9800" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" FontSize="12"
                            AutomationProperties.LiveSetting="Polite"
                            AutomationProperties.Name="Analysis status"/>
                 <ProgressBar x:Name="pbProgress" Height="10" Margin="0,8,0,4"
                              Minimum="0" Maximum="100" Value="0"
-                             Foreground="#00E676" Background="#333"
+                             Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBg}"
                              AutomationProperties.Name="Analysis progress"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -123,12 +123,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="txtFrameCounter" Text=""
-                               Foreground="#888888" FontSize="10" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource TextSecondary}" FontSize="10" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" x:Name="txtETA" Text=""
-                               Foreground="#888888" FontSize="10" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondary}" FontSize="10" VerticalAlignment="Center"
                                Margin="0,0,10,0"/>
                     <TextBlock Grid.Column="2" x:Name="txtPct" Text=""
-                               Foreground="#00E676" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold"
                                VerticalAlignment="Center"/>
                 </Grid>
             </StackPanel>
@@ -143,24 +143,24 @@
                 </Grid.RowDefinitions>
 
                 <!-- Report header with summary -->
-                <Border Background="#1E1E1E" CornerRadius="6,6,0,0" Padding="12,8">
+                <Border Background="{DynamicResource PanelBg}" CornerRadius="6,6,0,0" Padding="12,8">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="ANALYSIS REPORT" FontSize="11" FontWeight="Bold"
-                                   Foreground="#00E676" VerticalAlignment="Center"/>
+                                   Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Border x:Name="badgeProblems" Background="#B71C1C" CornerRadius="10"
+                            <Border x:Name="badgeProblems" Background="{DynamicResource CancelBrush}" CornerRadius="10"
                                     Padding="8,2" Margin="0,0,6,0" Visibility="Collapsed">
                                 <TextBlock x:Name="txtProblemCount" Text="0 problems"
-                                           Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                           Foreground="{DynamicResource ButtonTextBrush}" FontSize="10" FontWeight="Bold"/>
                             </Border>
                             <Border x:Name="badgeScore" Background="#1B5E20" CornerRadius="10"
                                     Padding="8,2" Visibility="Collapsed">
                                 <TextBlock x:Name="txtScoreLabel" Text="Score: —"
-                                           Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                           Foreground="{DynamicResource ButtonTextBrush}" FontSize="10" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
                     </Grid>
@@ -189,7 +189,7 @@
                                                    HorizontalAlignment="Center"/>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}"
-                                                       Foreground="White" FontWeight="Bold" FontSize="12"/>
+                                                       Foreground="{DynamicResource TextPrimary}" FontWeight="Bold" FontSize="12"/>
                                             <TextBlock Text="{Binding Description}"
                                                        Foreground="#BBBBBB" FontSize="11"
                                                        TextWrapping="Wrap"/>
@@ -198,7 +198,7 @@
                                                 Tag="{Binding TimeSeconds}"
                                                 Click="btnGoToTimestamp_Click"
                                                 Width="55" Height="24"
-                                                Background="#1565C0" Foreground="White"
+                                                Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}"
                                                 FontSize="10" Margin="8,0,0,0"
                                                 AutomationProperties.Name="{Binding GoToAcc}"
                                                 Visibility="{Binding CanNavigate}"/>
@@ -227,30 +227,30 @@
                          AutomationProperties.Name="Komentar za trening AI modela"/>
                 <Button Grid.Column="1" Content="💾 Save" Click="btnSaveFeedback_Click"
                         Width="80" Height="54" Margin="8,0,0,0"
-                        Background="#F57F17" Foreground="White" FontWeight="Bold"
+                        Background="#F57F17" Foreground="{DynamicResource ButtonTextBrush}" FontWeight="Bold"
                         AutomationProperties.Name="Save comment for training"/>
             </Grid>
         </Border>
 
         <!-- Dugmad -->
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-            <Button x:Name="btnAnalyze" Content="🔍 ANALIZIRAJ" Click="btnAnalyze_Click"
+            <Button x:Name="btnAnalyze" Content="🔍 ANALYZE" Click="btnAnalyze_Click"
                     Width="140" Height="36" Margin="0,0,10,0"
-                    Background="#2E7D32" Foreground="White" FontSize="13" FontWeight="Bold"
+                    Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontSize="13" FontWeight="Bold"
                     AutomationProperties.Name="Start AI video analysis"/>
             <Button x:Name="btnStop" Content="⏹ STOP" Click="btnStop_Click"
                     Width="90" Height="36" Margin="0,0,10,0"
-                    Background="#B71C1C" Foreground="White" FontSize="13" FontWeight="Bold"
+                    Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontSize="13" FontWeight="Bold"
                     IsEnabled="False"
                     AutomationProperties.Name="Zaustavi analizu"/>
             <Button x:Name="btnExport" Content="📄 Export report" Click="btnExport_Click"
                     Width="140" Height="36" Margin="0,0,10,0"
-                    Background="#1565C0" Foreground="White" FontSize="12"
+                    Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}" FontSize="12"
                     IsEnabled="False"
                     AutomationProperties.Name="Export report as text file"/>
             <Button x:Name="btnClose" Content="✖ Close" Click="btnClose_Click"
                     Width="90" Height="36"
-                    Background="#424242" Foreground="White" FontSize="12"
+                    Background="#424242" Foreground="{DynamicResource ButtonTextBrush}" FontSize="12"
                     AutomationProperties.Name="Close dialog"/>
         </StackPanel>
     </Grid>

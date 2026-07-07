@@ -23,7 +23,7 @@ namespace UltraVideoEditor
     public partial class VideoReviewDialog : Window
     {
         // ── Language helper ───────────────────────────────────────────────────
-        private string _lang => (WpfApplication.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _lang => (WpfApplication.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _lang);
 
         // ── State ─────────────────────────────────────────────────────────────
@@ -44,6 +44,13 @@ namespace UltraVideoEditor
         public VideoReviewDialog()
         {
             InitializeComponent();
+
+            // Non-modal window (opened with Show), so IsCancel can't be used —
+            // handle Escape directly instead so JAWS/NVDA users can close it easily.
+            this.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == System.Windows.Input.Key.Escape) { Close(); e.Handled = true; }
+            };
 
             _ffmpegPath  = FindFfmpegPath();
             _feedbackFile = Path.Combine(
@@ -111,7 +118,7 @@ namespace UltraVideoEditor
             bool ffmpegOk = File.Exists(_ffmpegPath);
             AddFinding(FindingItem.Info("—", ffmpegOk
                 ? $"✅ FFmpeg: {_ffmpegPath}"
-                : $"❌ FFmpeg nije pronaden! Ocekivana lokacija: {_ffmpegPath}"));
+                : $"❌ FFmpeg not found! Expected location: {_ffmpegPath}"));
 
             AddFinding(FindingItem.Info("—", "🔄 Provjera Ollama..."));
             SetStatus("Provjera Ollama...", "#FF9800");
@@ -127,7 +134,7 @@ namespace UltraVideoEditor
 
             if (!running)
             {
-                AddFinding(FindingItem.Info("—", "❌ Ollama nije pokrenuta — pokreni Ollama desktop app"));
+                AddFinding(FindingItem.Info("—", "❌ Ollama is not running — start the Ollama desktop app"));
                 SetStatus("⚠️ Ollama is not running — analysis will not work without it.", "#FF5722");
                 // Do NOT block the button — user can try anyway
                 return;
@@ -153,8 +160,8 @@ namespace UltraVideoEditor
 
             if (detectedModel != null)
             {
-                AddFinding(FindingItem.Info("—", $"🤖 Koristim model: {detectedModel}"));
-                SetStatus($"✅ {detectedModel} aktivan. Izaberi video i pritisni ANALIZIRAJ.", "#00E676");
+                AddFinding(FindingItem.Info("—", $"🤖 Using model: {detectedModel}"));
+                SetStatus($"✅ {detectedModel} active. Select a video and press ANALYZE.", "#00E676");
             }
             else
             {
@@ -168,8 +175,8 @@ namespace UltraVideoEditor
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Title  = "Izaberi video za analizu",
-                Filter = "Video fajlovi|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.webm|Svi fajlovi|*.*"
+                Title  = "Select video to analyze",
+                Filter = "Video files|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.webm|All files|*.*"
             };
             if (dlg.ShowDialog() == true)
                 LoadVideo(dlg.FileName);
@@ -216,8 +223,8 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrEmpty(_videoPath) || !File.Exists(_videoPath))
             {
-                SetStatus("Izaberi video fajl prije analize.", "#FF9800");
-                AddFinding(FindingItem.Info("—", "❌ Video fajl ne postoji ili nije izabran."));
+                SetStatus("Select a video file before analyzing.", "#FF9800");
+                AddFinding(FindingItem.Info("—", "❌ Video file does not exist or was not selected."));
                 return;
             }
             if (!File.Exists(_ffmpegPath))
@@ -259,8 +266,8 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                SetStatus("Analiza prekinuta.", "#FF9800");
-                AddFinding(FindingItem.Info("—", "Analiza prekinuta od strane korisnika."));
+                SetStatus("Analysis cancelled.", "#FF9800");
+                AddFinding(FindingItem.Info("—", "Analysis cancelled by the user."));
             }
             catch (Exception ex)
             {
@@ -294,7 +301,7 @@ namespace UltraVideoEditor
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
                 Title      = "Save report",
-                Filter     = "Tekstualni fajl|*.txt",
+                Filter     = "Text file|*.txt",
                 FileName   = $"VideoReview_{Path.GetFileNameWithoutExtension(_videoPath)}_{DateTime.Now:yyyyMMdd_HHmm}.txt"
             };
             if (dlg.ShowDialog() != true) return;
@@ -344,7 +351,7 @@ namespace UltraVideoEditor
 
             AddFinding(FindingItem.Info("—", $"   Reading duration: {_videoPath}"));
             double duration = await GetVideoDurationAsync(_videoPath, ct);
-            AddFinding(FindingItem.Info("—", $"   Trajanje: {duration:F1}s"));
+            AddFinding(FindingItem.Info("—", $"   Duration: {duration:F1}s"));
 
             if (duration <= 0)
             {
@@ -355,8 +362,8 @@ namespace UltraVideoEditor
 
             _totalFrames = (int)(duration / opts.IntervalSec);
 
-            SetStatus($"Analiziram {Path.GetFileName(_videoPath)} ({duration:F0}s) — {_totalFrames} frejmova...", "#FF9800");
-            AddFinding(FindingItem.Info("00:00", $"Video: {Path.GetFileName(_videoPath)} | Trajanje: {FormatTime(duration)} | Interval: {opts.IntervalSec}s"));
+            SetStatus($"Analyzing {Path.GetFileName(_videoPath)} ({duration:F0}s) — {_totalFrames} frames...", "#FF9800");
+            AddFinding(FindingItem.Info("00:00", $"Video: {Path.GetFileName(_videoPath)} | Duration: {FormatTime(duration)} | Interval: {opts.IntervalSec}s"));
 
             AddFinding(FindingItem.Info("—", "   Looking for Qwen model..."));
             string model = await DetectQwenModelAsync();
@@ -364,7 +371,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrEmpty(model))
             {
-                SetStatus("Qwen2-VL nije dostupan.", "#FF5722");
+                SetStatus("Qwen2-VL is not available.", "#FF5722");
                 return;
             }
 
@@ -417,7 +424,7 @@ namespace UltraVideoEditor
                     }
 
                     // Qwen analiza
-                    SetStatus($"Analiziram kadar {FormatTime(timestamp)} ({i + 1}/{_totalFrames})...", "#FF9800");
+                    SetStatus($"Analyzing frame {FormatTime(timestamp)} ({i + 1}/{_totalFrames})...", "#FF9800");
                     string prompt = BuildReviewPrompt(opts.CheckCuts, opts.CheckQuality, opts.CheckLogic,
                                                       opts.CheckRepeat, opts.CheckFreeze, prevDesc);
                     string raw = null;
@@ -427,8 +434,8 @@ namespace UltraVideoEditor
                     {
                         var (qwenResponse, qwenError) = await _ollama.VisionAsyncEx(framePath, prompt, model, qwenTimeout.Token);
                         raw = qwenResponse;
-                        if (!string.IsNullOrEmpty(qwenError) && qwenError != "Korisnik otkazao analizu")
-                            AddFinding(FindingItem.Info("—", $"   ⚠ Kadar {FormatTime(timestamp)}: {qwenError}"));
+                        if (!string.IsNullOrEmpty(qwenError) && qwenError != "User cancelled the analysis")
+                            AddFinding(FindingItem.Info("—", $"   ⚠ Frame {FormatTime(timestamp)}: {qwenError}"));
                     }
                     catch (OperationCanceledException)
                     {
@@ -506,13 +513,13 @@ namespace UltraVideoEditor
                         };
                         string title = allProblems[0].type switch
                         {
-                            "cut"         => "Rez / seckanje",
-                            "quality"     => "Kvalitet kadra",
-                            "logic"       => "Nelogican prelaz",
-                            "repeat"      => "Ponavljanje",
-                            "freeze"      => "Zamrznuti kadar",
-                            "composition" => "Losa kompozicija",
-                            "color"       => "Nedosledne boje",
+                            "cut"         => "Cut / jump cut",
+                            "quality"     => "Frame quality",
+                            "logic"       => "Illogical transition",
+                            "repeat"      => "Repetition",
+                            "freeze"      => "Frozen frame",
+                            "composition" => "Poor composition",
+                            "color"       => "Inconsistent colors",
                             _             => "Problem"
                         };
 
@@ -530,14 +537,14 @@ namespace UltraVideoEditor
                         AddFinding(new FindingItem
                         {
                             Timestamp      = tsRange,
-                            TimestampAcc   = $"Kadrovi {tsRange}",
+                            TimestampAcc   = $"Frames {tsRange}",
                             TimeSeconds    = group[0].ts,
                             Icon           = icon,
                             Title          = $"{title} — {sceneDesc} ({frameLabel})",
                             Description    = problemDesc,
                             Severity       = severity,
                             CanNavigate    = Visibility.Visible,
-                            GoToAcc        = $"Idi na {FormatTime(group[0].ts)}",
+                            GoToAcc        = $"Go to {FormatTime(group[0].ts)}",
                             BackgroundColor = new SolidColorBrush(severity == "high"
                                 ? Color.FromArgb(80, 183, 28, 28)
                                 : severity == "medium"
@@ -554,8 +561,8 @@ namespace UltraVideoEditor
                         {
                             problemCount++;
                             AddFinding(FindingItem.Problem(tsRange, group[0].ts,
-                                "🧊 Zamrznuti kadar",
-                                $"Kadrovi {tsRange} izgledaju identicno — moguca greska zamrznutog kadra."));
+                                "🧊 Frozen frame",
+                                $"Frames {tsRange} look identical — possible frozen frame error."));
                         }
                     }
                 }
@@ -566,29 +573,30 @@ namespace UltraVideoEditor
                     DetectRepetitions(forRepeat, ref problemCount);
 
                 // Zakljucak
-                SetProgress(100, "Analiza zavrsena.");
+                SetProgress(100, "Analysis complete.");
                 double avgScore = scoredFrames > 0 ? totalScore / scoredFrames : 0;
-                string grade    = avgScore >= 8 ? "Odlican" : avgScore >= 6 ? "Dobar" : avgScore >= 4 ? "Osrednji" : "Los";
+                string grade    = avgScore >= 8 ? "Excellent" : avgScore >= 6 ? "Good" : avgScore >= 4 ? "Average" : "Poor";
                 string gradeIcon = avgScore >= 8 ? "🏆" : avgScore >= 6 ? "👍" : avgScore >= 4 ? "⚠️" : "❌";
 
                 AddFinding(FindingItem.Summary(FormatTime(duration),
-                    $"{gradeIcon} Analiza zavrsena — {problemCount} problema u {sceneGroups.Count} scene\n" +
-                    $"   Prosecna ocena: {avgScore:F1}/10 ({grade}) | Analizirano: {scoredFrames}/{_totalFrames} kadrova"));
+                    $"{gradeIcon} Analysis complete — {problemCount} problems in {sceneGroups.Count} scenes\n" +
+                    $"   Average score: {avgScore:F1}/10 ({grade}) | Analyzed: {scoredFrames}/{_totalFrames} frames"));
 
                 // Ekstrakcija teksta iz videa putem Qwen OCR
                 await TryExtractLyricsWithQwen(_videoPath, model, duration, ct);
 
-                txtProblemCount.Text       = $"{problemCount} problema";
+                txtProblemCount.Text       = $"{problemCount} problems";
                 badgeProblems.Visibility   = problemCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-                txtScoreLabel.Text         = $"Ocjena: {avgScore:F1}/10";
+                txtScoreLabel.Text         = $"Score: {avgScore:F1}/10";
                 badgeScore.Visibility      = Visibility.Visible;
-                badgeScore.Background      = new SolidColorBrush(
-                    avgScore >= 7 ? Color.FromRgb(27, 94, 32) :
-                    avgScore >= 5 ? Color.FromRgb(230, 81, 0) :
-                                    Color.FromRgb(183, 28, 28));
+                badgeScore.Background      =
+                    avgScore >= 7 ? ThemeBrushes.ApplyBrush :
+                    avgScore >= 5 ? ThemeBrushes.WarningBrush :
+                                    ThemeBrushes.CancelBrush;
+                txtScoreLabel.Foreground   = ThemeBrushes.ButtonTextBrush;
 
                 SetStatus(
-                    $"Gotovo — {problemCount} problema | Ocjena: {avgScore:F1}/10 ({grade})",
+                    $"Done — {problemCount} problems | Score: {avgScore:F1}/10 ({grade})",
                     avgScore >= 7 ? "#00E676" : avgScore >= 5 ? "#FF9800" : "#FF5722");
             }
             finally
@@ -609,11 +617,11 @@ namespace UltraVideoEditor
             sb.AppendLine("  \"score\": 7,");
             sb.AppendLine("  \"scene\": \"Child runs through a sunny park\",");
             sb.AppendLine("  \"problems\": [");
-            sb.AppendLine("    {\"type\": \"quality\", \"severity\": \"high\", \"description\": \"Kadar je pretaman, lica se jedva razlikuju od pozadine\"},");
-            sb.AppendLine("    {\"type\": \"cut\", \"severity\": \"medium\", \"description\": \"Nagla promjena scene bez vizuelne logike\"}");
+            sb.AppendLine("    {\"type\": \"quality\", \"severity\": \"high\", \"description\": \"Frame is too dark, faces are barely distinguishable from the background\"},");
+            sb.AppendLine("    {\"type\": \"cut\", \"severity\": \"medium\", \"description\": \"Abrupt scene change with no visual logic\"}");
             sb.AppendLine("  ]");
             sb.AppendLine("}\n");
-            sb.AppendLine("OBAVEZNO za polje \"scene\":");
+            sb.AppendLine("REQUIRED for the \"scene\" field:");
             sb.AppendLine("- Describe WHO or WHAT is visible in the frame (e.g. 'Child sits on a bench in the park')");
             sb.AppendLine("- Mention the lighting and mood (e.g. 'sunny', 'dark', 'hazy')");
             sb.AppendLine("- If the frame is empty/black/technical, state it clearly (e.g. 'Black frame — intro')");
@@ -621,25 +629,25 @@ namespace UltraVideoEditor
             sb.AppendLine("\nProblems to check:");
             if (checkCuts)    sb.AppendLine("- cut: abrupt or illogical frame change, jump cut, disconnected motion");
             if (checkQuality) sb.AppendLine("- quality: blurriness, overexposure, darkness, poor focus, compression artifacts");
-            if (checkLogic)   sb.AppendLine("- logic: scena nema smisla u kontekstu (npr. unutra pa vani bez prijelaza)");
+            if (checkLogic)   sb.AppendLine("- logic: the scene makes no sense in context (e.g. indoors then outdoors with no transition)");
             if (checkRepeat)  sb.AppendLine("- repeat: visually identical or nearly identical to the previous scene");
             if (checkFreeze)  sb.AppendLine("- freeze: static image for too long — looks like a frozen frame error");
             sb.AppendLine("- composition: poor framing, face/body cut off, tilted horizon");
-            sb.AppendLine("- color: nedosljedna korekcija boja u odnosu na okolne kadrove");
+            sb.AppendLine("- color: inconsistent color correction compared to surrounding frames");
             sb.AppendLine("\nFor \"description\" of each problem: write in English, concretely explain WHAT the problem is in this frame.");
-            sb.AppendLine("Primjeri dobrog opisa:");
+            sb.AppendLine("Examples of good descriptions:");
             sb.AppendLine("  ✅ 'Subject is cut off on the right side of the frame, head not visible'");
             sb.AppendLine("  ✅ 'Scene is too dark, subject\'s face barely visible'");
             sb.AppendLine("  ✅ 'Identical frame as 4 seconds earlier — repetition'");
-            sb.AppendLine("  ❌ 'Frame is too dark' (engleski nije dozvoljen)");
+            sb.AppendLine("  ❌ 'Frame is too dark' (too generic)");
             sb.AppendLine("  ❌ 'Poor quality' (too generic)");
 
             if (!string.IsNullOrEmpty(prevSceneDesc))
                 sb.AppendLine($"\nThe previous frame was: \"{prevSceneDesc}\". Flag logical errors if this frame is not consistent.");
 
-            sb.AppendLine("\nAko nema problema, vrati prazan niz: \"problems\": []");
+            sb.AppendLine("\nIf there are no problems, return an empty array: \"problems\": []");
             sb.AppendLine("Problem severity: low (minor) / medium (noticeable) / high (serious problem)");
-            sb.AppendLine("score: 1-10 (ukupni kvalitet kadra za music video)");
+            sb.AppendLine("score: 1-10 (overall frame quality for a music video)");
 
             return sb.ToString();
         }
@@ -726,7 +734,7 @@ namespace UltraVideoEditor
         // Qwen cita tekst direktno iz frameova — ne treba spoljni SRT fajl
         private async Task TryExtractLyricsWithQwen(string videoPath, string model, double duration, CancellationToken ct)
         {
-            AddFinding(FindingItem.Info("—", "📝 Ekstraktujem tekst iz videa (Qwen cita stihove iz frameova)..."));
+            AddFinding(FindingItem.Info("—", "📝 Extracting text from video (Qwen reads lyrics from frames)..."));
 
             string tempDir2 = Path.Combine(Path.GetTempPath(), $"UVE_Lyrics_{Guid.NewGuid():N8}");
             Directory.CreateDirectory(tempDir2);
@@ -780,11 +788,11 @@ namespace UltraVideoEditor
                 if (detectedLines.Count == 0)
                 {
                     AddFinding(FindingItem.Info("—",
-                        "ℹ Qwen nije pronasao tekst u kadru. Video mozda nema titlove/stihove na slici."));
+                        "ℹ Qwen did not find any text in the frame. The video may not have on-screen captions/lyrics."));
                     return;
                 }
 
-                AddFinding(FindingItem.Info("—", $"📝 Pronadjen tekst u {detectedLines.Count} kadra:"));
+                AddFinding(FindingItem.Info("—", $"📝 Found text in {detectedLines.Count} frames:"));
                 foreach (string line in detectedLines)
                     AddFinding(FindingItem.Info("—", $"   {line}"));
             }
@@ -896,7 +904,7 @@ namespace UltraVideoEditor
                 using var proc = Process.Start(psi);
                 if (proc == null)
                 {
-                    AddFinding(FindingItem.Info("—", "   ❌ Process.Start vratio null — ffmpeg nije pokrenut"));
+                    AddFinding(FindingItem.Info("—", "   ❌ Process.Start returned null — ffmpeg did not start"));
                     return false;
                 }
 
@@ -937,14 +945,14 @@ namespace UltraVideoEditor
                              && new FileInfo(outputPath).Length > 512; // JPG < 512B = prazan/korumpiran
 
                 if (!valid && proc.ExitCode == 0 && File.Exists(outputPath))
-                    AddFinding(FindingItem.Info("—", $"   ⚠ Fajl postoji ali je premali ({new FileInfo(outputPath).Length}B) — ignorisem"));
+                    AddFinding(FindingItem.Info("—", $"   ⚠ File exists but is too small ({new FileInfo(outputPath).Length}B) — ignoring"));
 
                 return valid;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                AddFinding(FindingItem.Info("—", $"   ❌ ExtractFrame greska: {ex.Message}"));
+                AddFinding(FindingItem.Info("—", $"   ❌ ExtractFrame error: {ex.Message}"));
                 return false;
             }
         }
@@ -1055,7 +1063,7 @@ namespace UltraVideoEditor
                 txtETA.Text = "Calculating duration...";
             }
 
-            txtStatus.Text = $"🔍 Analiziram kadar na {FormatTime(currentTs)}...";
+            txtStatus.Text = $"🔍 Analyzing frame at {FormatTime(currentTs)}...";
         }
 
         private void SetProgress(int pct, string statusMsg = null)
@@ -1106,13 +1114,13 @@ namespace UltraVideoEditor
             };
             string title = p.type switch
             {
-                "cut"         => "Rez / seckanje",
-                "quality"     => "Kvalitet kadra",
+                "cut"         => "Cut / jump cut",
+                "quality"     => "Frame quality",
                 "logic"       => "Illogical transition",
-                "repeat"      => "Ponavljanje",
-                "freeze"      => "Zamrznuti kadar",
+                "repeat"      => "Repetition",
+                "freeze"      => "Frozen frame",
                 "composition" => "Poor composition",
-                "color"       => "Nedosljedno bojenje",
+                "color"       => "Inconsistent colors",
                 _             => "Problem"
             };
 
@@ -1145,7 +1153,7 @@ namespace UltraVideoEditor
                 Description    = allDesc,
                 Severity       = p.severity,
                 CanNavigate    = Visibility.Visible,
-                GoToAcc        = $"Idi na {FormatTime(Timestamp)}",
+                GoToAcc        = $"Go to {FormatTime(Timestamp)}",
                 BackgroundColor = new SolidColorBrush(p.severity == "high"
                     ? Color.FromArgb(80, 183, 28, 28)
                     : p.severity == "medium"
@@ -1189,14 +1197,14 @@ namespace UltraVideoEditor
         public static FindingItem Problem(string ts, double seconds, string title, string desc) => new()
         {
             Timestamp       = ts,
-            TimestampAcc    = $"Problem na {ts}",
+            TimestampAcc    = $"Problem at {ts}",
             TimeSeconds     = seconds,
             Icon            = "⚠️",
             Title           = title,
             Description     = desc,
             Severity        = "medium",
             CanNavigate     = Visibility.Visible,
-            GoToAcc         = $"Idi na {ts}",
+            GoToAcc         = $"Go to {ts}",
             BackgroundColor = new SolidColorBrush(Color.FromArgb(80, 183, 28, 28))
         };
 

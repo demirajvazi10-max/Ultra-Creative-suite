@@ -107,7 +107,7 @@ namespace UltraVideoEditor
 
         
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -221,7 +221,7 @@ namespace UltraVideoEditor
                     }
                 }
 
-                progress?.Report($"Whisper analizira audio (model: {modelSize})...");
+                progress?.Report($"Whisper is analyzing audio (model: {modelSize})...");
 
                 bool isFasterWhisper = whisperExe.ToLower().Contains("faster-whisper");
                 string whisperArgs = isFasterWhisper
@@ -312,7 +312,7 @@ namespace UltraVideoEditor
 
                 if (timedLines.Count == 0)
                 {
-                    result.ErrorMessage = "Whisper nije prepoznao nikakav tekst u audio fajlu.";
+                    result.ErrorMessage = "Whisper did not recognize any text in the audio file.";
                     return result;
                 }
 
@@ -370,7 +370,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                result.ErrorMessage = "Transkripcija otkazana.";
+                result.ErrorMessage = "Transcription cancelled.";
             }
             catch (Exception ex)
             {
@@ -418,7 +418,7 @@ namespace UltraVideoEditor
 
             if (userLines == null || userLines.Count == 0)
             {
-                result.ErrorMessage = "Nema teksta za poravnavanje.";
+                result.ErrorMessage = "No text to align.";
                 return result;
             }
 
@@ -506,7 +506,7 @@ namespace UltraVideoEditor
                 catch (OperationCanceledException) { try { proc.Kill(); } catch { } throw; }
 
                 ct.ThrowIfCancellationRequested();
-                progress?.Report("Mapiranje teksta na timestamps...");
+                progress?.Report("Mapping text to timestamps...");
 
                 // Try JSON (word-level) first, SRT as fallback
                 string jsonPath = Directory.GetFiles(tempDir, "*.json").FirstOrDefault();
@@ -566,7 +566,7 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    result.ErrorMessage = "Whisper alignment nije generisao ni JSON ni SRT fajl. " + stderr;
+                    result.ErrorMessage = "Whisper alignment did not generate a JSON or SRT file. " + stderr;
                     return result;
                 }
 
@@ -574,7 +574,7 @@ namespace UltraVideoEditor
                 result.Success  = true;
                 progress?.Report($"Alignment gotov — {result.Lines.Count} linija, {result.WordTimings.Count} word timestamps.");
             }
-            catch (OperationCanceledException) { result.ErrorMessage = "Alignment otkazan."; }
+            catch (OperationCanceledException) { result.ErrorMessage = "Alignment cancelled."; }
             catch (Exception ex) { result.ErrorMessage = $"Alignment error: {ex.Message}"; }
             finally { try { Directory.Delete(tempDir, true); } catch { } }
 

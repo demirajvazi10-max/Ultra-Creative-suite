@@ -12,7 +12,7 @@ namespace UltraVideoEditor
     public partial class DurationDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "sr";
+        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -38,7 +38,7 @@ namespace UltraVideoEditor
 
             Loaded += (s, e) => txtDuration.Focus();
 
-            AutomationProperties.SetName(this, "Dijalog za trajanje");
+            AutomationProperties.SetName(this, "Duration dialog");
         }
 
         private void Ok_Click(object sender, RoutedEventArgs e)

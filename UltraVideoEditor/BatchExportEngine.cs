@@ -45,7 +45,7 @@ namespace UltraVideoEditor
 
                     var items = projectData.TimelineItems ?? new List<TimelineItem>();
                     if (items.Count == 0)
-                        throw new InvalidOperationException("Projekat nema klipoiva.");
+                        throw new InvalidOperationException("Project has no clips.");
 
                     // Reconstruct timeline positions
                     double t = 0;

@@ -188,7 +188,7 @@ namespace UltraVideoEditor
                     ClipDuration = fallbackDur,
                     BeatsPerClip = 0,
                     SceneType = sceneType,
-                    Reason = "Beat sync nije dostupan - koristim fiksno trajanje"
+                    Reason = "Beat sync unavailable - using fixed duration"
                 };
             }
 
@@ -220,7 +220,7 @@ namespace UltraVideoEditor
             }
 
             double clipDuration = Math.Round(interval * beatsPerClip, 3);
-            string reason = $"{beats.BPM:F0} BPM, {beatsPerClip} beata po klipu = {clipDuration:F1}s po klipu ({sceneType}, vibe {vibeScore})";
+            string reason = $"{beats.BPM:F0} BPM, {beatsPerClip} beats per clip = {clipDuration:F1}s per clip ({sceneType}, vibe {vibeScore})";
 
             return new BeatSyncPlan
             {

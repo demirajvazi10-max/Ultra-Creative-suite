@@ -65,7 +65,7 @@ namespace UltraVideoEditor
             // WPF nema FolderBrowserDialog — koristimo SaveFileDialog trik
             var dlg = new SaveFileDialog
             {
-                Title            = "Odaberi output folder (unesi bilo koje ime fajla)",
+                Title            = "Select output folder (enter any file name)",
                 FileName         = "output_folder",
                 Filter           = "Folder|*.none",
                 CheckPathExists  = false,
@@ -82,8 +82,8 @@ namespace UltraVideoEditor
             if (_running) return;
             if (_result == null || !_result.Success)
             {
-                MessageBox.Show("Nema validnog HighlightResult-a.\n" +
-                                "Pokrenite Fazu 1 i 2 pre Faze 3.",
+                MessageBox.Show("No valid HighlightResult.\n" +
+                                "Run Phase 1 and 2 before Phase 3.",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -91,7 +91,7 @@ namespace UltraVideoEditor
             string outputFolder = TxtOutputFolder.Text.Trim();
             if (string.IsNullOrEmpty(outputFolder))
             {
-                MessageBox.Show("Odaberite output folder.",
+                MessageBox.Show("Please select an output folder.",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -120,7 +120,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                SetProgress(0, "Otkazano.");
+                SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
@@ -148,7 +148,7 @@ namespace UltraVideoEditor
             string baseName = $"highlight_{DateTime.Now:yyyyMMdd_HHmm}";
 
             // ── B: Tranzicije ─────────────────────────────────────────
-            progress.Report((5, "B — Analiziram prelaze…"));
+            progress.Report((5, "B — Analyzing transitions…"));
             List<TransitionDecision> transitions = null;
             if (ChkEnableTransitions.IsChecked == true)
             {
@@ -183,7 +183,7 @@ namespace UltraVideoEditor
 
                 if (!mixResult.Success)
                 {
-                    progress.Report((40, $"A — Audio miks nije uspio: {mixResult.Error}. Nastavljam bez mixa."));
+                    progress.Report((40, $"A — Audio mix failed: {mixResult.Error}. Continuing without the mix."));
                     mixedAudioPath = null;
                 }
                 else
@@ -233,7 +233,7 @@ namespace UltraVideoEditor
 
             if (formats.Count == 0)
             {
-                progress.Report((100, "Nema odabranih formata za export."));
+                progress.Report((100, "No export formats selected."));
             }
             else
             {

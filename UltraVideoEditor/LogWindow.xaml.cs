@@ -22,7 +22,13 @@ namespace UltraVideoEditor
             InitializeComponent();
             lstLog.ItemsSource = _logEntries;
             lstLog.KeyDown += LstLog_KeyDown;
-            AutomationProperties.SetName(this, "Log prozor");
+            AutomationProperties.SetName(this, "Log window");
+            // Non-modal window (opened with Show), so IsCancel can't be used —
+            // handle Escape directly instead so JAWS/NVDA users can close it easily.
+            this.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Escape) { Close(); e.Handled = true; }
+            };
         }
 
         public void AddMessage(string message, bool isAnnouncement = false)
@@ -49,7 +55,7 @@ namespace UltraVideoEditor
                 if (lstLog.SelectedItem is LogEntry entry)
                 {
                     WpfClipboard.SetText($"[{entry.Time}] {entry.Message}");
-                    AnnounceToJaws("Kopirana selektovana poruka");
+                    AnnounceToJaws("Selected message copied");
                 }
                 e.Handled = true;
             }
