@@ -1,5 +1,6 @@
 {
-  "version": "v1.0.0",
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
   "entity": {
     "type": "individual",
     "role": "maintainer",
@@ -32,9 +33,6 @@
         "ai",
         "whisper",
         "ffmpeg",
-        "dotnet",
-        "csharp",
-        "wpf",
         "open-source"
       ]
     }
@@ -43,13 +41,13 @@
     "channels": [
       {
         "guid": "github-sponsors",
-        "type": "github",
-        "address": "demirajvazi10-max",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/demirajvazi10-max",
         "description": "GitHub Sponsors — support directly on GitHub"
       },
       {
         "guid": "ko-fi",
-        "type": "other",
+        "type": "payment-provider",
         "address": "https://ko-fi.com/ultracreativesuite",
         "description": "Ko-fi — one-time or monthly support"
       }
