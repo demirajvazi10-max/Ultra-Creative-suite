@@ -1,0 +1,98 @@
+name: Build and Release Ultra Video Editor
+
+on:
+  push:
+    tags:
+      - 'v*'          # Pokretanje na svaki tag koji pocinje sa 'v' (v0.2, v1.0, itd.)
+                       # NAPOMENA: kad dodas audio editor kao poseban .iss/workflow,
+                       # ovaj filter ce pokupiti i njegove tagove ako i on koristi 'v*'.
+                       # Kada budes pravio taj workflow, razmisli o razlicitim
+                       # prefiksima (npr. 'video-v*' / 'audio-v*') da se ne sudare.
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout koda
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet paketa
+        run: dotnet restore UltraVideoEditor\UltraVideoEditor.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraVideoEditor\UltraVideoEditor.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      # Inno Setup nije unapred instaliran na windows-latest runneru, ali
+      # Chocolatey (choco.exe) jeste — standardan nacin da se instalira.
+      - name: Instaliraj Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      # Kljucni korak: kompajliramo installer/UltraVideoEditor.iss preko
+      # ISCC.exe (Inno Setup Compiler), sa /D flag-ovima koji PRESNIME
+      # verziju i izvorni folder iz .iss-a bez menjanja same skripte —
+      # lokalni default u .iss-u (Debug putanja) ostaje netaknut za rucno
+      # testiranje, a ovde eksplicitno gadjamo Release publish folder koji je
+      # dotnet publish korak upravo napravio.
+      - name: Kompajliraj installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ github.ref_name }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            installer\UltraVideoEditor.iss
+
+      - name: Kreiraj GitHub Release i uploaduj
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Video Editor ${{ github.ref_name }}"
+          body: |
+            ## Ultra Video Editor ${{ github.ref_name }}
+
+            **Preuzmi installer ispod i pokreni ga.** Windows ce traziti
+            dozvolu administratora - to je normalno i ocekivano.
+
+            Installer:
+            - Nudi izbor jezika na pocetku (Engleski/Nemacki/Srpski), koji
+              odmah postaje i podrazumevani jezik aplikacije
+            - Automatski preuzima i instalira: FFmpeg (video processing),
+              VLC (video preview), Ollama + AI modeli optimizovani za tvoj
+              hardver (GPU/RAM se automatski detektuju)
+            - Opciono (checkbox tokom instalacije): AI transkripcija/titlovi
+              (Faster-Whisper-XXL, ~1.3 GB download — ostavljen kao svestan
+              izbor zbog velicine)
+            - Pokrece aplikaciju na kraju, bez dodatnih koraka
+
+            ### Ambijentalni zvuci (opciono, zaseban download)
+            Biblioteka ambijentalnih zvukova/SFX NIJE ukljucena u installer
+            (znatno povecava velicinu, a nema uticaja na osnovno
+            uredjivanje). Ako ih zelis: **[TODO: link ka Assets paketu]**
+            — raspakuj u `Assets\` folder pored `.exe`-a posle instalacije.
+
+            ### Accessibility
+            Potpuno funkcionalno sa JAWS i NVDA screen readerima.
+            Sve funkcije dostupne iskljucivo tastaturom.
+
+            ### Sistemski zahtjevi
+            - Windows 10/11 (64-bit)
+            - 8GB RAM minimum, 16GB+ preporuceno
+            - NVIDIA GPU za NVENC (opciono)
+
+            ---
+            *Built with GitHub Actions | [Dokumentacija](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: installer/Output/UltraVideoEditorSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
