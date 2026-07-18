@@ -243,6 +243,7 @@ var
   RamGB: Integer;
   OllamaQueryModel: String;
   OllamaVisionModel: String;
+  CurlExitCode: Integer; // last curl.exe ResultCode, for diagnostic MsgBoxes below
 
 // ────────────────────────────────────────────────────────────────────────
 //  GPU/RAM detection
@@ -387,7 +388,24 @@ begin
   Exec(ExpandConstant('{sys}\curl.exe'),
        '-L -f -s --retry 3 --retry-delay 2 -o "' + DestPath + '" "' + Url + '"',
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  CurlExitCode := ResultCode;
   Result := FileExists(DestPath);
+end;
+
+// Turns curl's numeric exit code into a short, human-readable reason, so the
+// MsgBoxes below can tell the user (and us, when they screenshot it) whether
+// this was really "no internet" (exit 6/7/28) or something else entirely,
+// most commonly a stale/dead URL returning 404 (exit 22, since we pass -f).
+function CurlErrorReason(Code: Integer): String;
+begin
+  case Code of
+    6:  Result := 'could not resolve host — check your internet connection';
+    7:  Result := 'could not connect to server';
+    22: Result := 'server returned an HTTP error (e.g. the file was moved or no longer exists — this is a bug in the installer, please report it)';
+    28: Result := 'connection timed out';
+  else
+    Result := 'curl exit code ' + IntToStr(Code);
+  end;
 end;
 
 // Recursively searches RootDir for a file named FileNameToFind and returns
@@ -454,12 +472,57 @@ begin
   end;
 end;
 
+// VideoLAN does not publish a version-less direct download link (every
+// filename embeds the version, e.g. "vlc-3.0.23-win64.exe"), and that
+// version changes over time — which is exactly what broke the previous
+// hardcoded "vlc-3.0.21-win64.exe" link (real current version had already
+// moved to 3.0.23, so curl got a 404). Instead of hardcoding a version, we
+// download the "last/win64" folder's HTML directory listing and pull the
+// current filename out of it with plain Pos/Copy — no regex needed, and
+// this never goes stale again.
+function GetLatestVlcFilename(): String;
+var
+  ListingPath: String;
+  Content: AnsiString;
+  SearchFrom, StartPos, TailPos: Integer;
+begin
+  Result := '';
+  ListingPath := ExpandConstant('{tmp}\vlc_listing.html');
+  if DownloadFileCurl('https://get.videolan.org/vlc/last/win64/', ListingPath) then
+  begin
+    if LoadStringFromFile(ListingPath, Content) then
+    begin
+      // Walk through every "vlc-" occurrence in the listing, not just the
+      // first one — the directory is alphabetical, so the first "vlc-"
+      // entry is usually "vlc-<ver>-win64-debugsym.7z", not the .exe we
+      // want. Keep advancing until a "vlc-" is followed by "-win64.exe"
+      // within a short window (VLC version strings are always short, e.g.
+      // "3.0.23"), or we run out of content.
+      SearchFrom := 1;
+      while SearchFrom <= Length(Content) do
+      begin
+        StartPos := Pos('vlc-', Copy(Content, SearchFrom, Length(Content) - SearchFrom + 1));
+        if StartPos = 0 then Break;
+        StartPos := SearchFrom + StartPos - 1; // turn relative into absolute position
+        TailPos := Pos('-win64.exe', Copy(Content, StartPos, 30));
+        if TailPos > 0 then
+        begin
+          Result := Copy(Content, StartPos, TailPos + 9); // +9 = Length('-win64.exe') - 1
+          Break;
+        end;
+        SearchFrom := StartPos + 4; // move past this "vlc-" and keep looking
+      end;
+    end;
+  end;
+end;
+
 procedure InstallDependencies();
 var
   ResultCode: Integer;
   OllamaExe: String;
   FfmpegDestDir: String;
   VlcPath, VlcPath86: String;
+  VlcFilename: String;
   WhisperSrcFolder: String;
 begin
   FfmpegDestDir := ExpandConstant('{app}\Ffmpeg');
@@ -477,17 +540,29 @@ begin
     if not FileExists(FfmpegDestDir + '\ffmpeg.exe') then
     begin
       StatusPage.SetText('Downloading FFmpeg...', 'This may take a moment (~100 MB)');
-      if not DownloadFileCurl('https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2024-12-01-12-55/ffmpeg-n7.1-6-g4134007eb5-win64-gpl-7.1.zip',
+      // Uses BtbN's "latest" release tag with a fixed asset name — this URL
+      // is permanent and always points at the newest build, unlike a dated
+      // "autobuild-2024-12-01-12-55" tag, which gets purged after a while
+      // (BtbN only keeps the last 14 daily builds + one build per month for
+      // two years) and then 404s forever, which is exactly what happened.
+      if not DownloadFileCurl('https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
                                ExpandConstant('{tmp}\ffmpeg.zip')) then
-        MsgBox('Could not download FFmpeg (no internet connection?). Download it manually from ffmpeg.org and place ffmpeg.exe in: ' + FfmpegDestDir, mbInformation, MB_OK);
+        MsgBox('Could not download FFmpeg (' + CurlErrorReason(CurlExitCode) + '). Download it manually from ffmpeg.org and place ffmpeg.exe in: ' + FfmpegDestDir, mbInformation, MB_OK);
     end;
 
     if not (FileExists(VlcPath) or FileExists(VlcPath86)) then
     begin
       StatusPage.SetText('Downloading VLC...', 'This may take a moment (~45 MB)');
-      if not DownloadFileCurl('https://get.videolan.org/vlc/last/win64/vlc-3.0.21-win64.exe',
+      // VideoLAN doesn't offer a version-less direct link, so we resolve
+      // the current filename from the directory listing first (see
+      // GetLatestVlcFilename above) instead of hardcoding a version number
+      // that will eventually go stale, like "vlc-3.0.21-win64.exe" did.
+      VlcFilename := GetLatestVlcFilename();
+      if VlcFilename = '' then
+        VlcFilename := 'vlc-3.0.23-win64.exe'; // fallback if the listing couldn't be parsed
+      if not DownloadFileCurl('https://get.videolan.org/vlc/last/win64/' + VlcFilename,
                                ExpandConstant('{tmp}\vlc_installer.exe')) then
-        MsgBox('Could not download VLC (no internet connection?). You can install it manually from videolan.org afterwards.', mbInformation, MB_OK);
+        MsgBox('Could not download VLC (' + CurlErrorReason(CurlExitCode) + '). You can install it manually from videolan.org afterwards.', mbInformation, MB_OK);
     end;
 
     if not FileExists(OllamaExe) then
@@ -495,7 +570,7 @@ begin
       StatusPage.SetText('Downloading Ollama...', 'This may take a moment (~100 MB)');
       if not DownloadFileCurl('https://ollama.com/download/OllamaSetup.exe',
                                ExpandConstant('{tmp}\OllamaSetup.exe')) then
-        MsgBox('Could not download Ollama (no internet connection?). AI features will be unavailable until you install it manually from ollama.com.', mbInformation, MB_OK);
+        MsgBox('Could not download Ollama (' + CurlErrorReason(CurlExitCode) + '). AI features will be unavailable until you install it manually from ollama.com.', mbInformation, MB_OK);
     end;
 
     // ── Unpack/install what was just downloaded ──────────────────────────
