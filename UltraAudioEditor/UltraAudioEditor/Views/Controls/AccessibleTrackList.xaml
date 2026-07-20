@@ -1,7 +1,7 @@
 <UserControl x:Class="UltraAudioEditor.Views.Controls.AccessibleTrackList"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             AutomationProperties.Name="Ultra Audio Editor radni prostor">
+             AutomationProperties.Name="{DynamicResource L_acc_workspace}">
     <Grid Background="{StaticResource BrBgDark}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -26,7 +26,7 @@
         <!-- PLAYHEAD PANEL — slajder koji se pomjera strelicama -->
         <Border Grid.Row="1" Background="{StaticResource BrBgPanel}"
                 BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,0,1"
-                AutomationProperties.Name="Playhead kontrola. Tab za fokus na slajder, strelice za pomjeranje."
+                AutomationProperties.Name="{DynamicResource L_acc_playhead_help}"
                 AutomationProperties.LiveSetting="Polite">
             <StackPanel x:Name="PlayheadPanel"/>
         </Border>
@@ -48,9 +48,9 @@
 
                 <Border Grid.Row="0" Background="{StaticResource BrBgPanel}"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,1,1" Padding="8,4">
-                    <TextBlock Text="TRAKE" FontSize="10" FontWeight="Medium"
+                    <TextBlock Text="{DynamicResource L_tracks_header}" FontSize="10" FontWeight="Medium"
                                Foreground="{StaticResource BrTextMuted}"
-                               AutomationProperties.Name="Lista traka projekta"/>
+                               AutomationProperties.Name="{DynamicResource L_acc_track_list}"/>
                 </Border>
 
                 <ListBox x:Name="TrackListBox" Grid.Row="1"
@@ -59,7 +59,7 @@
                          BorderBrush="{StaticResource BrBorder}"
                          SelectionMode="Single"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         AutomationProperties.Name="Lista traka. Strelice gore dole za navigaciju, Enter za otvaranje, Shift+F10 za meni."
+                         AutomationProperties.Name="{DynamicResource L_acc_track_list_help}"
                          SelectionChanged="TrackListBox_SelectionChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
@@ -118,7 +118,7 @@
                 <Border Grid.Row="0" Background="{StaticResource BrBgPanel}"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,0,1" Padding="8,4">
                     <TextBlock x:Name="TxtWorkspaceTitle"
-                               Text="Odaberite traku sa lijevog panela"
+                               Text="{DynamicResource L_select_track_left}"
                                FontSize="11" FontWeight="Medium"
                                Foreground="{StaticResource BrTextMuted}"
                                AutomationProperties.LiveSetting="Polite"/>

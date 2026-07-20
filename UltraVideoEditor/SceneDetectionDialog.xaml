@@ -1,7 +1,7 @@
 <Window x:Class="UltraVideoEditor.SceneDetectionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Smart Scene Detection — Faza 4A"
+        Title="Smart Scene Detection — Phase 4A"
         Width="860" Height="720"
         MinWidth="620" MinHeight="500"
         WindowStartupLocation="CenterOwner"

@@ -3,7 +3,8 @@
 **Professional Windows audio editor with full screen reader accessibility.**  
 Built from the ground up so blind and sighted users have equal access to every feature.
 
-> Part of the **Ultra** platform — an open accessible engine for professional creative tools.
+> Part of the **Ultra** platform — an open accessible engine for professional creative tools.  
+> This tool lives in the `UltraAudioEditor` folder of the [Ultra Creative Suite](../README.md) repository and shares its [GPL-3.0 license](../LICENSE).
 
 ---
 
@@ -68,23 +69,28 @@ All effects update in real time while audio is playing.
 
 ## Getting Started
 
+Ultra Audio Editor lives inside the main Ultra Creative Suite repository, in the `UltraAudioEditor` folder.
+
 ### Run from source
 
 ```cmd
-git clone https://github.com/your-username/UltraAudioEditor.git
-cd UltraAudioEditor
-dotnet run --project UltraAudioEditor/UltraAudioEditor.csproj
+git clone https://github.com/demirajvazi10-max/Ultra-Creative-suite.git
+cd Ultra-Creative-suite/UltraAudioEditor
+dotnet run --project UltraAudioEditor.csproj
 ```
 
 ### Build a standalone .exe (no .NET required on target)
 
 ```cmd
-dotnet publish UltraAudioEditor/UltraAudioEditor.csproj -c Release -r win-x64 --self-contained -o publish
+cd Ultra-Creative-suite/UltraAudioEditor
+dotnet publish UltraAudioEditor.csproj -c Release -r win-x64 --self-contained -o publish
 ```
 
 ### Open in Visual Studio 2022
 
-Open `UltraAudioEditor.sln` and press F5.
+Open `UltraAudioEditor.sln` (inside the `UltraAudioEditor` folder) and press F5.
+
+> Note: adjust the paths above if your local folder layout differs — these assume the `.csproj`/`.sln` sit directly inside `UltraAudioEditor/`.
 
 ---
 
@@ -260,7 +266,7 @@ If you are from NLnet or NGI0, welcome. Feel free to open an issue or contact us
 
 ## License
 
-MIT — free to use, modify, and distribute.
+GPL-3.0 — see the repository's [LICENSE](../LICENSE) file. This tool shares its license with the rest of the Ultra Creative Suite repository.
 
 ---
 

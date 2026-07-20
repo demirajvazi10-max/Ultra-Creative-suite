@@ -8,7 +8,7 @@ namespace UltraAudioEditor.Models
     public class AudioClip : INotifyPropertyChanged
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Klip";
+        public string Name { get; set; } = Localization.Lang.T("default_clip_name");
         public string FilePath { get; set; } = "";
         public double StartTime { get; set; }      // offset u projektu (sekunde)
         public double Duration { get; set; }        // trajanje klipa (sekunde)
@@ -31,7 +31,7 @@ namespace UltraAudioEditor.Models
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        private string _name = "Traka";
+        private string _name = Localization.Lang.T("default_track_name");
         public string Name
         {
             get => _name;
@@ -140,7 +140,7 @@ namespace UltraAudioEditor.Models
 
     public class AudioProject : INotifyPropertyChanged
     {
-        public string Name { get; set; } = "Novi projekat";
+        public string Name { get; set; } = Localization.Lang.T("default_project_name");
         public string FilePath { get; set; } = "";
         public int SampleRate { get; set; } = 44100;
         public int BitDepth { get; set; } = 24;

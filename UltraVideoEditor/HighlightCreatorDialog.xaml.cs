@@ -63,6 +63,7 @@ namespace UltraVideoEditor
         public HighlightCreatorDialogV2()
         {
             InitializeComponent();
+            UiScaling.Register(this);
 
             // Default output path
             TxtOutputPath.Text = Path.Combine(
@@ -583,7 +584,7 @@ namespace UltraVideoEditor
             }
             if (string.IsNullOrEmpty(outputPath))
             {
-                ShowError("Odaberite putanju za output video.");
+                ShowError("Select the output video path.");
                 return;
             }
 

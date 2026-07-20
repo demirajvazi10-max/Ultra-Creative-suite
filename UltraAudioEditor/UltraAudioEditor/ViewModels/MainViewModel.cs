@@ -7,6 +7,8 @@ using System.Windows.Input;
 using UltraAudioEditor.Models;
 using UltraAudioEditor.Services;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.ViewModels
 {
     public class RelayCommand : ICommand
@@ -73,16 +75,16 @@ namespace UltraAudioEditor.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasSelectedClip));
                 if (value != null)
-                    Announce($"Odabran klip: {value.Name}, pozicija {value.StartTime:F2}s, trajanje {value.Duration:F2}s. Pritisni Enter za postavljanje pozicije, Ctrl+strelice za pomjeranje.");
+                    Announce(string.Format(Lang.T("clip_selected"), value.Name, value.StartTime, value.Duration));
             }
         }
 
         // --- Status ---
-        private string _statusMessage = "Spreman. Pritisnite Ctrl+I da uvezete audio fajl.";
+        private string _statusMessage = Lang.T("ready_hint");
         public string StatusMessage { get => _statusMessage; set { _statusMessage = value; OnPropertyChanged(); } }
 
         // --- AI Panel ---
-        private string _aiResult = "Ovdje će se pojaviti AI rezultati.";
+        private string _aiResult = Lang.T("ai_results_placeholder");
         public string AiResult { get => _aiResult; set { _aiResult = value; OnPropertyChanged(); } }
         private int _aiProgress; public int AiProgress { get => _aiProgress; set { _aiProgress = value; OnPropertyChanged(); } }
         private bool _isAiBusy; public bool IsAiBusy { get => _isAiBusy; set { _isAiBusy = value; OnPropertyChanged(); } }
@@ -106,8 +108,8 @@ namespace UltraAudioEditor.ViewModels
         }
         public bool UseAnthropic { get => !_useGroq; set => UseGroq = !value; }
         public string ApiKeyHint => _useGroq
-            ? "Groq API ključ — besplatno na console.groq.com"
-            : "Anthropic API ključ — console.anthropic.com";
+            ? Lang.T("groq_key_hint")
+            : Lang.T("anthropic_key_hint");
         public string ApiKeyLink => _useGroq
             ? "https://console.groq.com/keys"
             : "https://console.anthropic.com";
@@ -175,7 +177,7 @@ namespace UltraAudioEditor.ViewModels
             _engine.PositionChanged += (_, pos) =>
                 Application.Current?.Dispatcher.Invoke(() => PlayheadPosition = pos);
             _engine.PlaybackStopped += (_, __) =>
-                Application.Current?.Dispatcher.Invoke(() => { IsPlaying = false; StatusMessage = "Reprodukcija završena."; });
+                Application.Current?.Dispatcher.Invoke(() => { IsPlaying = false; StatusMessage = Lang.T("playback_finished"); });
 
             NewProjectCommand = new RelayCommand(NewProject);
             ImportAudioCommand = new RelayCommand(ImportAudio);
@@ -185,9 +187,9 @@ namespace UltraAudioEditor.ViewModels
             PlayPauseCommand = new RelayCommand(PlayPause);
             StopCommand = new RelayCommand(Stop);
             RecordCommand = new RelayCommand(Record);
-            ToStartCommand = new RelayCommand(() => { PlayheadPosition = 0; Announce("Na početak."); });
+            ToStartCommand = new RelayCommand(() => { PlayheadPosition = 0; Announce(Lang.T("to_start")); });
             ToEndCommand = new RelayCommand(() => { PlayheadPosition = Project.Duration; Announce("Na kraj."); });
-            LoopCommand = new RelayCommand(() => { IsLooping = !IsLooping; Announce(IsLooping ? "Loop uključen." : "Loop isključen."); });
+            LoopCommand = new RelayCommand(() => { IsLooping = !IsLooping; Announce(IsLooping ? Lang.T("loop_on") : Lang.T("loop_off")); });
             UndoCommand = new RelayCommand(Undo, () => _undoStack.Count > 0);
             RedoCommand = new RelayCommand(Redo, () => _redoStack.Count > 0);
             NormalizeCommand = new RelayCommand(NormalizeSelected, () => HasSelectedTrack);
@@ -207,7 +209,7 @@ namespace UltraAudioEditor.ViewModels
             MoveTrackUpCommand = new RelayCommand(MoveTrackUp, () => HasSelectedTrack && Project.Tracks.IndexOf(SelectedTrack!) > 0);
             MoveTrackDownCommand = new RelayCommand(MoveTrackDown, () => HasSelectedTrack && Project.Tracks.IndexOf(SelectedTrack!) < Project.Tracks.Count - 1);
             DuplicateTrackCommand = new RelayCommand(DuplicateTrack, () => HasSelectedTrack);
-            MuteAllCommand = new RelayCommand(() => { foreach (var t in Project.Tracks) t.IsMuted = true; Announce("Sve trake utišane."); });
+            MuteAllCommand = new RelayCommand(() => { foreach (var t in Project.Tracks) t.IsMuted = true; Announce(Lang.T("all_muted")); });
             UnmuteAllCommand = new RelayCommand(() => { foreach (var t in Project.Tracks) t.IsMuted = false; Announce("Sve trake aktivirane."); });
             MoveClipLeftCommand      = new RelayCommand(() => MoveClip(-1.0),  () => HasSelectedClip);
             MoveClipLeftFineCommand  = new RelayCommand(() => MoveClip(-0.1),  () => HasSelectedClip);
@@ -232,10 +234,10 @@ namespace UltraAudioEditor.ViewModels
             // Inicijalne demo trake
             AddTrackInternal("Vokal 1", "#378ADD", TrackType.Vocal);
             AddTrackInternal("Instrumental", "#1D9E75", TrackType.Instrumental);
-            AddTrackInternal("Efekti", "#D85A30", TrackType.Effects);
+            AddTrackInternal(Lang.T("effects_header"), "#D85A30", TrackType.Effects);
         }
 
-        string GetTrackInfo() => Project.Tracks.Count == 0 ? "Nema traka." :
+        string GetTrackInfo() => Project.Tracks.Count == 0 ? Lang.T("no_tracks") :
             string.Join("; ", Project.Tracks.Select(t =>
                 $"{t.Name} ({t.Type}, {t.Clips.Count} klipova, ~{t.Clips.Sum(c => c.Duration):F1}s)"));
 
@@ -254,20 +256,20 @@ namespace UltraAudioEditor.ViewModels
 
         private void NewProject()
         {
-            if (MessageBox.Show("Novi projekat? Sve nesnimljene izmjene biti će izgubljene.",
+            if (MessageBox.Show(Lang.T("new_project_confirm"),
                     "Ultra Audio Editor", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
             Stop();
             Project.Tracks.Clear();
             PlayheadPosition = 0;
-            Announce("Novi projekat kreiran.");
+            Announce(Lang.T("new_project_created"));
         }
 
         private void ImportAudio()
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Title = "Uvezi audio fajl - Ultra Audio Editor",
-                Filter = "Audio fajlovi|*.wav;*.mp3;*.ogg;*.flac;*.m4a;*.aiff;*.aif|WAV|*.wav|MP3|*.mp3|Svi fajlovi|*.*",
+                Title = Lang.T("dlg_import_audio"),
+                Filter = Lang.T("audio_filter"),
                 Multiselect = true
             };
             if (dlg.ShowDialog() != true) return;
@@ -287,7 +289,7 @@ namespace UltraAudioEditor.ViewModels
                     WaveformData = waveData
                 };
                 track.Clips.Add(clip);
-                Announce($"Uvezen fajl: {clip.Name}, trajanje {dur:F1} sekundi. Waveform prikazan.");
+                Announce(string.Format(Lang.T("imported_file"), clip.Name, dur));
                 OnRebuildTrackList?.Invoke();
             }
         }
@@ -296,7 +298,7 @@ namespace UltraAudioEditor.ViewModels
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Title = "Izvezi audio - Ultra Audio Editor",
+                Title = Lang.T("dlg_export_audio"),
                 Filter = "WAV|*.wav|MP3|*.mp3|OGG|*.ogg|FLAC|*.flac|M4A|*.m4a|AIFF|*.aiff",
                 FileName = Project.Name
             };
@@ -317,8 +319,8 @@ namespace UltraAudioEditor.ViewModels
                     pct => Application.Current?.Dispatcher.Invoke(() => AiProgress = pct));
                 Application.Current?.Dispatcher.Invoke(() =>
                 {
-                    Announce($"Izvoz završen: {dlg.FileName}");
-                    MessageBox.Show($"Audio uspješno izvezen:\n{dlg.FileName}", "Izvoz završen",
+                    Announce(string.Format(Lang.T("export_done_announce"), dlg.FileName));
+                    MessageBox.Show(string.Format(Lang.T("export_done_msg"), dlg.FileName), Lang.T("export_done_title"),
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 });
             });
@@ -332,13 +334,13 @@ namespace UltraAudioEditor.ViewModels
             var wc = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color);
             var track = new AudioTrack
             {
-                Name = name ?? $"Traka {idx + 1}",
+                Name = name ?? string.Format(Lang.T("track_n"), idx + 1),
                 Color = wc,
                 Type = type
             };
             Project.Tracks.Add(track);
             SelectedTrack = track;
-            Announce($"Dodana traka: {track.Name}. Ukupno {Project.Tracks.Count} traka.");
+            Announce(string.Format(Lang.T("track_added"), track.Name, Project.Tracks.Count));
             return track;
         }
 
@@ -351,7 +353,7 @@ namespace UltraAudioEditor.ViewModels
             string name = SelectedTrack.Name;
             Project.Tracks.Remove(SelectedTrack);
             SelectedTrack = Project.Tracks.LastOrDefault();
-            Announce($"Traka '{name}' obrisana. Preostalo {Project.Tracks.Count} traka.");
+            Announce(string.Format(Lang.T("track_deleted"), name, Project.Tracks.Count));
         }
 
         private void PlayPause()
@@ -370,33 +372,33 @@ namespace UltraAudioEditor.ViewModels
             _engine.Stop();
             IsPlaying = false;
             PlayheadPosition = 0;
-            Announce("Zaustavljeno. Pozicija na početku.");
+            Announce(Lang.T("stopped"));
         }
 
         private void Record()
         {
-            Announce("Snimanje: ova funkcija zahtijeva podešavanje audio ulaza. Koristite Settings da odaberete mikrofon.");
+            Announce(Lang.T("record_hint"));
         }
 
         private void Undo()
         {
-            if (_undoStack.Count == 0) { Announce("Ništa za poništiti."); return; }
+            if (_undoStack.Count == 0) { Announce(Lang.T("nothing_to_undo")); return; }
             _redoStack.Push(_undoStack.Pop());
-            Announce("Poništeno.");
+            Announce(Lang.T("undone"));
         }
 
         private void Redo()
         {
-            if (_redoStack.Count == 0) { Announce("Ništa za ponavljati."); return; }
+            if (_redoStack.Count == 0) { Announce(Lang.T("nothing_to_redo")); return; }
             _undoStack.Push(_redoStack.Pop());
-            Announce("Ponovljeno.");
+            Announce(Lang.T("redone"));
         }
 
         private void NormalizeSelected()
         {
-            if (SelectedTrack?.Clips.Count == 0) { Announce("Nema audio sadržaja za normalizaciju."); return; }
+            if (SelectedTrack?.Clips.Count == 0) { Announce(Lang.T("no_audio_normalize")); return; }
             var clip = SelectedTrack!.Clips.First();
-            if (!System.IO.File.Exists(clip.FilePath)) { Announce("Fajl nije pronađen."); return; }
+            if (!System.IO.File.Exists(clip.FilePath)) { Announce(Lang.T("file_not_found")); return; }
             Announce("Normalizacija u toku...");
             Task.Run(() =>
             {
@@ -404,7 +406,7 @@ namespace UltraAudioEditor.ViewModels
                 AudioEngine.NormalizeFile(clip.FilePath, temp);
                 clip.FilePath = temp;
                 clip.WaveformData = AudioEngine.LoadWaveformData(temp);
-                Application.Current?.Dispatcher.Invoke(() => Announce("Normalizacija završena."));
+                Application.Current?.Dispatcher.Invoke(() => Announce(Lang.T("normalize_done")));
             });
         }
 
@@ -436,14 +438,14 @@ namespace UltraAudioEditor.ViewModels
         {
             if (SelectedTrack == null) return;
             int i = Project.Tracks.IndexOf(SelectedTrack);
-            if (i > 0) { Project.Tracks.Move(i, i - 1); Announce($"Traka '{SelectedTrack.Name}' premještena gore."); }
+            if (i > 0) { Project.Tracks.Move(i, i - 1); Announce(string.Format(Lang.T("track_moved_up"), SelectedTrack.Name)); }
         }
 
         private void MoveTrackDown()
         {
             if (SelectedTrack == null) return;
             int i = Project.Tracks.IndexOf(SelectedTrack);
-            if (i < Project.Tracks.Count - 1) { Project.Tracks.Move(i, i + 1); Announce($"Traka '{SelectedTrack.Name}' premještena dole."); }
+            if (i < Project.Tracks.Count - 1) { Project.Tracks.Move(i, i + 1); Announce(string.Format(Lang.T("track_moved_down"), SelectedTrack.Name)); }
         }
 
         private void DuplicateTrack()
@@ -455,7 +457,7 @@ namespace UltraAudioEditor.ViewModels
             dup.Pan = orig.Pan;
             foreach (var c in orig.Clips)
                 dup.Clips.Add(new AudioClip { Name = c.Name, FilePath = c.FilePath, StartTime = c.StartTime, Duration = c.Duration, WaveformData = c.WaveformData });
-            Announce($"Traka '{orig.Name}' duplicirana.");
+            Announce(string.Format(Lang.T("track_duplicated"), orig.Name));
         }
 
         private async Task RunAI(Func<Task> aiFunc)
@@ -464,16 +466,16 @@ namespace UltraAudioEditor.ViewModels
             {
                 string providerName = UseGroq ? "Groq (besplatno)" : "Anthropic";
                 string link = UseGroq ? "console.groq.com" : "console.anthropic.com";
-                Announce($"Unesite {providerName} API ključ u AI panelu.");
+                Announce(string.Format(Lang.T("need_api_key_announce"), providerName));
                 MessageBox.Show(
-                    $"Molimo unesite {providerName} API ključ u polju 'API Ključ' u desnom panelu.\n\nDobijte besplatni ključ na: {link}",
-                    "API ključ potreban", MessageBoxButton.OK, MessageBoxImage.Information);
+                    string.Format(Lang.T("need_api_key_msg"), providerName, link),
+                    Lang.T("need_api_key_title"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             IsAiBusy = true;
             AiProgress = 0;
             try { await aiFunc(); }
-            catch (Exception ex) { AiResult = $"Greška: {ex.Message}"; Announce("AI greška. Pogledaj AI panel."); }
+            catch (Exception ex) { AiResult = string.Format(Lang.T("error_prefix"), ex.Message); Announce(Lang.T("ai_error")); }
             finally { IsAiBusy = false; }
         }
 
@@ -482,15 +484,15 @@ namespace UltraAudioEditor.ViewModels
             Announce("AI transkripcija pokrenuta...");
             var prog = new Progress<int>(p => { AiProgress = p; });
             AiResult = await AI.TranscribeAudioAsync(GetTrackInfo(), SelectedLanguage, prog);
-            Announce("Transkripcija završena. Rezultati u AI panelu.");
+            Announce(Lang.T("transcription_done"));
         }
 
         private async Task AiNoiseRemove()
         {
-            Announce("AI analiza šuma pokrenuta...");
+            Announce(Lang.T("noise_started"));
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.AnalyzeNoiseAsync(GetTrackInfo(), SelectedNoiseLevel, prog);
-            Announce("Analiza šuma završena. Rezultati u AI panelu.");
+            Announce(Lang.T("noise_done"));
         }
 
         private async Task AiSmartCut()
@@ -498,7 +500,7 @@ namespace UltraAudioEditor.ViewModels
             Announce("AI SmartCut analiza pokrenuta...");
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.SmartCutAnalysisAsync(GetTrackInfo(), SilenceThreshold, prog);
-            Announce("SmartCut analiza završena. Prijedlozi u AI panelu.");
+            Announce(Lang.T("smartcut_done"));
         }
 
         private async Task AiVocalSep()
@@ -506,42 +508,42 @@ namespace UltraAudioEditor.ViewModels
             Announce("AI savjeti za vokalnu separaciju...");
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.VocalSeparationAdviceAsync(GetTrackInfo(), prog);
-            Announce("Savjeti za vokalnu separaciju dostupni u AI panelu.");
+            Announce(Lang.T("vocal_tips_done"));
         }
 
         private async Task AiDescribe()
         {
-            Announce("AI kreira verbalni opis projekta...");
+            Announce(Lang.T("describe_started"));
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.DescribeAudioAsync(GetTrackInfo(), $"Projekat: {Project.Name}, {Project.Tracks.Count} traka, {Project.SampleRate}Hz/{Project.BitDepth}bit", prog);
-            Announce("Audio opis kreiran. Dostupan u AI panelu.");
+            Announce(Lang.T("describe_done"));
         }
 
         private async Task AiVocalMix()
         {
             var vocals = string.Join(", ", Project.Tracks.Where(t => t.Type == TrackType.Vocal).Select(t => t.Name));
             var inst = string.Join(", ", Project.Tracks.Where(t => t.Type == TrackType.Instrumental).Select(t => t.Name));
-            Announce("AI preporuke za vocal mix...");
+            Announce(Lang.T("vocalmix_started"));
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.VocalMixAdviceAsync(vocals.Length > 0 ? vocals : "nije definirano", inst.Length > 0 ? inst : "nije definirano", prog);
-            Announce("Vocal mix preporuke dostupne u AI panelu.");
+            Announce(Lang.T("vocalmix_done"));
         }
 
         private async Task AiEqRecommend()
         {
-            if (SelectedTrack == null) { Announce("Odaberite traku za EQ preporuke."); return; }
-            Announce($"AI EQ preporuke za traku: {SelectedTrack.Name}...");
+            if (SelectedTrack == null) { Announce(Lang.T("eq_select_track")); return; }
+            Announce(string.Format(Lang.T("eq_started"), SelectedTrack.Name));
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.EqRecommendationsAsync(SelectedTrack.Name, SelectedTrack.Type.ToString(), prog);
-            Announce("EQ preporuke dostupne u AI panelu.");
+            Announce(Lang.T("eq_done"));
         }
 
         private async Task AiAutoLevel()
         {
-            Announce("AI analiza nivoa...");
+            Announce(Lang.T("autolevel_started"));
             var prog = new Progress<int>(p => AiProgress = p);
             AiResult = await AI.AutoLevelAnalysisAsync(GetTrackInfo(), prog);
-            Announce("Analiza nivoa završena. Preporuke u AI panelu.");
+            Announce(Lang.T("autolevel_done"));
         }
 
 
@@ -553,7 +555,7 @@ namespace UltraAudioEditor.ViewModels
             if (_selectedClip == null) return;
             SaveState();
             _selectedClip.StartTime = Math.Max(0, _selectedClip.StartTime + deltaSec);
-            Announce($"Klip '{_selectedClip.Name}' pomjeren na {_selectedClip.StartTime:F2} sekundi.");
+            Announce(string.Format(Lang.T("clip_moved"), _selectedClip.Name, _selectedClip.StartTime));
             // Osvježi waveform prikaz
             foreach (var track in Project.Tracks)
                 track.Clips = track.Clips; // trigger PropertyChanged
@@ -569,7 +571,7 @@ namespace UltraAudioEditor.ViewModels
                 SaveState();
                 double newPos = dlg.ResultSeconds;
                 _selectedClip.StartTime = Math.Max(0, newPos);
-                Announce($"Klip '{_selectedClip.Name}' postavljen na {_selectedClip.StartTime:F2} sekundi.");
+                Announce(string.Format(Lang.T("clip_set"), _selectedClip.Name, _selectedClip.StartTime));
             }
         }
 
@@ -581,7 +583,7 @@ namespace UltraAudioEditor.ViewModels
             foreach (var track in Project.Tracks)
                 track.Clips.Remove(_selectedClip);
             SelectedClip = null;
-            Announce($"Klip '{name}' obrisan.");
+            Announce(string.Format(Lang.T("clip_deleted"), name));
         }
 
 
@@ -599,8 +601,8 @@ namespace UltraAudioEditor.ViewModels
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Title = "Sačuvaj projekat — Ultra Audio Editor",
-                Filter = "Ultra Audio projekat|*.paproj|Svi fajlovi|*.*",
+                Title = Lang.T("dlg_save_project"),
+                Filter = Lang.T("project_filter"),
                 FileName = Project.Name,
                 DefaultExt = ".paproj"
             };
@@ -673,7 +675,7 @@ namespace UltraAudioEditor.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greska pri cuvanju:\n{ex.Message}", "Greska", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(string.Format(Lang.T("save_error"), ex.Message), Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -681,15 +683,15 @@ namespace UltraAudioEditor.ViewModels
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Title = "Otvori projekat — Ultra Audio Editor",
-                Filter = "Ultra Audio projekat|*.paproj|Svi fajlovi|*.*"
+                Title = Lang.T("dlg_open_project"),
+                Filter = Lang.T("project_filter")
             };
             if (dlg.ShowDialog() != true) return;
             try
             {
                 string json = System.IO.File.ReadAllText(dlg.FileName, System.Text.Encoding.UTF8);
                 var data = Newtonsoft.Json.JsonConvert.DeserializeObject<ProjectSaveData>(json);
-                if (data == null) throw new Exception("Neispravan format fajla.");
+                if (data == null) throw new Exception(Lang.T("invalid_file_format"));
                 Stop();
                 Project.Tracks.Clear();
                 Project.Name     = data.Name;
@@ -742,11 +744,11 @@ namespace UltraAudioEditor.ViewModels
                     Project.Tracks.Add(track);
                 }
                 PlayheadPosition = 0;
-                Announce($"Projekat otvoren: {Project.Name}. {Project.Tracks.Count} traka ucitano.");
+                Announce(string.Format(Lang.T("project_opened"), Project.Name, Project.Tracks.Count));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Greska pri otvaranju:\n{ex.Message}", "Greska", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(string.Format(Lang.T("open_error"), ex.Message), Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -757,18 +759,18 @@ namespace UltraAudioEditor.ViewModels
         public void AnnounceProjectStatus()
         {
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"PROJEKAT: {Project.Name}");
+            sb.AppendLine(string.Format(Lang.T("st_project"), Project.Name));
             sb.AppendLine($"Playhead: {TimeDisplay} ({PlayheadPosition:F3}s)");
-            sb.AppendLine($"Trake: {Project.Tracks.Count}");
+            sb.AppendLine(string.Format(Lang.T("st_tracks"), Project.Tracks.Count));
             foreach (var track in Project.Tracks)
             {
                 sb.AppendLine($"");
-                sb.AppendLine($"TRAKA: {track.Name} | Vol: {track.Volume:P0} | Mute: {(track.IsMuted?"Da":"Ne")} | Solo: {(track.IsSolo?"Da":"Ne")}");
+                sb.AppendLine(string.Format(Lang.T("st_track_line"), track.Name, track.Volume, track.IsMuted ? Lang.T("yes") : Lang.T("no"), track.IsSolo ? Lang.T("yes") : Lang.T("no")));
                 if (track.Clips.Count == 0)
-                    sb.AppendLine("  Nema klipova.");
+                    sb.AppendLine(Lang.T("st_no_clips"));
                 else
                     foreach (var clip in track.Clips)
-                        sb.AppendLine($"  Klip: {clip.Name} | Pocinje: {clip.StartTime:F3}s | Traje: {clip.Duration:F3}s | Kraj: {(clip.StartTime+clip.Duration):F3}s");
+                        sb.AppendLine(string.Format(Lang.T("st_clip_line"), clip.Name, clip.StartTime, clip.Duration, clip.StartTime + clip.Duration));
             }
             var msg = sb.ToString();
             Announce(msg);

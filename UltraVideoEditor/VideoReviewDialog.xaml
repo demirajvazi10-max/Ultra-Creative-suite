@@ -242,7 +242,7 @@
                     Width="90" Height="36" Margin="0,0,10,0"
                     Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" FontSize="13" FontWeight="Bold"
                     IsEnabled="False"
-                    AutomationProperties.Name="Zaustavi analizu"/>
+                    AutomationProperties.Name="Stop analysis"/>
             <Button x:Name="btnExport" Content="📄 Export report" Click="btnExport_Click"
                     Width="140" Height="36" Margin="0,0,10,0"
                     Background="#1565C0" Foreground="{DynamicResource ButtonTextBrush}" FontSize="12"

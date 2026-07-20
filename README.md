@@ -27,6 +27,17 @@ Every feature works for blind, low-vision, and sighted users equally. Blind user
 
 ---
 
+## Repository Structure
+
+This repository hosts the full Ultra platform:
+
+- **`/` (this folder)** — Ultra Video Editor (Ultra Creative Suite)
+- **`/UltraAudioEditor`** — Ultra Audio Editor, a companion professional audio editor with the same accessibility standard
+
+Both tools share this repository's single [GPL-3.0 license](./LICENSE).
+
+---
+
 ## Current Status
 
 **Fully functional.** Source code is provided as-is — the application works and is actively used in real-world production by the author.

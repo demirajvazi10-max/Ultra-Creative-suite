@@ -5,6 +5,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using UltraAudioEditor.Models;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Views
 {
     // Definicija jednog parametra efekta
@@ -63,7 +65,7 @@ namespace UltraAudioEditor.Views
             // ── Enable checkbox ───────────────────────────────────────────
             var cb = new CheckBox
             {
-                Content   = "Efekat uključen",
+                Content   = Lang.T("effect_enabled"),
                 IsChecked = isOn(),
                 FontSize  = 13,
                 Foreground = (Brush)Application.Current.Resources["BrText"],
@@ -116,7 +118,7 @@ namespace UltraAudioEditor.Views
                     TextAlignment = TextAlignment.Right
                 };
                 box.SetValue(AutomationProperties.NameProperty,
-                    $"{param.Label}, unesi broj od {Fmt(param.Min, param.Unit)} do {Fmt(param.Max, param.Unit)}");
+                    string.Format(Lang.T("fx_enter_number"), param.Label, Fmt(param.Min, param.Unit), Fmt(param.Max, param.Unit)));
 
                 // Slider → model + box
                 bool busy = false;
@@ -165,24 +167,24 @@ namespace UltraAudioEditor.Views
 
             var btnReset = new Button
             {
-                Content = "Resetuj na default",
+                Content = Lang.T("fx_reset"),
                 Style   = (Style)Application.Current.Resources["StdButton"],
                 Height  = 30, Padding = new Thickness(10, 0, 10, 0),
                 Margin  = new Thickness(0, 0, 8, 0)
             };
             btnReset.SetValue(AutomationProperties.NameProperty,
-                "Resetuj sve parametre na podrazumijevane vrijednosti");
+                Lang.T("fx_reset_help"));
             btnReset.Click += (_, __) => ResetDefaults(fx, effectType);
 
             var btnClose = new Button
             {
-                Content = "Zatvori",
+                Content = Lang.T("btn_close"),
                 Style   = (Style)Application.Current.Resources["AIButton"],
                 Height  = 30, Padding = new Thickness(10, 0, 10, 0),
                 IsDefault = true
             };
             btnClose.SetValue(AutomationProperties.NameProperty,
-                "Zatvori dijalog. Efekat ostaje primijenjen.");
+                Lang.T("fx_close_hint"));
             btnClose.Click += (_, __) => Close();
 
             btnPanel.Children.Add(btnReset);
@@ -197,12 +199,11 @@ namespace UltraAudioEditor.Views
         // ── Helpers ───────────────────────────────────────────────────────
         private static void UpdateCbAria(CheckBox cb, string title, bool on) =>
             cb.SetValue(AutomationProperties.NameProperty,
-                $"{title} {(on ? "uključen" : "isključen")}. Pritisnite Space da promijenite.");
+                string.Format(Lang.T("fx_toggle_state"), title, on ? Lang.T("state_on") : Lang.T("state_off")));
 
         private static void UpdateSliderAria(Slider s, EffectParam p) =>
             s.SetValue(AutomationProperties.NameProperty,
-                $"{p.Label}, trenutno {Fmt(p.Get(), p.Unit)}, " +
-                $"od {Fmt(p.Min, p.Unit)} do {Fmt(p.Max, p.Unit)}. Strelice za podešavanje.");
+                string.Format(Lang.T("fx_param_state"), p.Label, Fmt(p.Get(), p.Unit), Fmt(p.Min, p.Unit), Fmt(p.Max, p.Unit)));
 
         public static string Fmt(double v, string unit) => unit switch
         {
@@ -245,9 +246,9 @@ namespace UltraAudioEditor.Views
                 v  => fx.EqEnabled = v,
                 new EffectParam[]
                 {
-                    new("Bas (200 Hz)",    -12, 12, 0.5,  "dB", () => fx.EqLow,  v => fx.EqLow  = (float)v),
-                    new("Srednji (1 kHz)", -12, 12, 0.5,  "dB", () => fx.EqMid,  v => fx.EqMid  = (float)v),
-                    new("Visoki (8 kHz)",  -12, 12, 0.5,  "dB", () => fx.EqHigh, v => fx.EqHigh = (float)v),
+                    new(Lang.T("fx_eq_low"),    -12, 12, 0.5,  "dB", () => fx.EqLow,  v => fx.EqLow  = (float)v),
+                    new(Lang.T("fx_eq_mid"), -12, 12, 0.5,  "dB", () => fx.EqMid,  v => fx.EqMid  = (float)v),
+                    new(Lang.T("fx_eq_high"),  -12, 12, 0.5,  "dB", () => fx.EqHigh, v => fx.EqHigh = (float)v),
                 }),
 
             EffectType.Reverb => (
@@ -255,8 +256,8 @@ namespace UltraAudioEditor.Views
                 v  => fx.ReverbEnabled = v,
                 new EffectParam[]
                 {
-                    new("Mix (suho/mokro)", 0, 1, 0.01, "%", () => fx.ReverbMix,  v => fx.ReverbMix  = (float)v),
-                    new("Veličina sobe",    0, 1, 0.01, "%", () => fx.ReverbRoom, v => fx.ReverbRoom = (float)v),
+                    new(Lang.T("fx_reverb_mix"), 0, 1, 0.01, "%", () => fx.ReverbMix,  v => fx.ReverbMix  = (float)v),
+                    new(Lang.T("fx_room_size"),    0, 1, 0.01, "%", () => fx.ReverbRoom, v => fx.ReverbRoom = (float)v),
                 }),
 
             EffectType.Delay => (
@@ -264,8 +265,8 @@ namespace UltraAudioEditor.Views
                 v  => fx.DelayEnabled = v,
                 new EffectParam[]
                 {
-                    new("Kašnjenje",  0, 1,   0.01, "s", () => fx.DelayTime,     v => fx.DelayTime     = (float)v),
-                    new("Povratnost", 0, 0.9, 0.01, "%", () => fx.DelayFeedback, v => fx.DelayFeedback = (float)v),
+                    new(Lang.T("fx_delay"),  0, 1,   0.01, "s", () => fx.DelayTime,     v => fx.DelayTime     = (float)v),
+                    new(Lang.T("fx_feedback"), 0, 0.9, 0.01, "%", () => fx.DelayFeedback, v => fx.DelayFeedback = (float)v),
                 }),
 
             EffectType.Compressor => (
@@ -273,10 +274,10 @@ namespace UltraAudioEditor.Views
                 v  => fx.CompressorEnabled = v,
                 new EffectParam[]
                 {
-                    new("Prag (Threshold)", -60, 0,   1,   "dB", () => fx.CompThreshold, v => fx.CompThreshold = (float)v),
-                    new("Omjer (Ratio)",      1, 20,  0.5, "",   () => fx.CompRatio,     v => fx.CompRatio     = (float)v),
-                    new("Napad (Attack ms)",  1, 200, 1,   "",   () => fx.CompAttack,    v => fx.CompAttack    = (float)v),
-                    new("Otpust (Release ms)",10, 500, 10, "",   () => fx.CompRelease,   v => fx.CompRelease   = (float)v),
+                    new(Lang.T("fx_threshold"), -60, 0,   1,   "dB", () => fx.CompThreshold, v => fx.CompThreshold = (float)v),
+                    new(Lang.T("fx_ratio"),      1, 20,  0.5, "",   () => fx.CompRatio,     v => fx.CompRatio     = (float)v),
+                    new(Lang.T("fx_attack"),  1, 200, 1,   "",   () => fx.CompAttack,    v => fx.CompAttack    = (float)v),
+                    new(Lang.T("fx_release"),10, 500, 10, "",   () => fx.CompRelease,   v => fx.CompRelease   = (float)v),
                 }),
 
             EffectType.NoiseGate => (
@@ -284,7 +285,7 @@ namespace UltraAudioEditor.Views
                 v  => fx.NoiseGateEnabled = v,
                 new EffectParam[]
                 {
-                    new("Prag (Threshold)", -80, 0, 1, "dB", () => fx.GateThreshold, v => fx.GateThreshold = (float)v),
+                    new(Lang.T("fx_threshold"), -80, 0, 1, "dB", () => fx.GateThreshold, v => fx.GateThreshold = (float)v),
                 }),
 
             EffectType.BassBoost => (
@@ -292,7 +293,7 @@ namespace UltraAudioEditor.Views
                 v  => fx.BassBostEnabled = v,
                 new EffectParam[]
                 {
-                    new("Pojačanje", 0, 24, 0.5, "dB", () => fx.BassGain, v => fx.BassGain = (float)v),
+                    new(Lang.T("fx_gain"), 0, 24, 0.5, "dB", () => fx.BassGain, v => fx.BassGain = (float)v),
                 }),
 
             EffectType.PitchShift => (
@@ -300,7 +301,7 @@ namespace UltraAudioEditor.Views
                 v  => fx.PitchEnabled = v,
                 new EffectParam[]
                 {
-                    new("Polutonovi", -12, 12, 0.5, "st", () => fx.PitchSemitones, v => fx.PitchSemitones = (float)v),
+                    new(Lang.T("fx_semitones"), -12, 12, 0.5, "st", () => fx.PitchSemitones, v => fx.PitchSemitones = (float)v),
                 }),
 
             EffectType.Chorus => (
@@ -308,7 +309,7 @@ namespace UltraAudioEditor.Views
                 v  => fx.ChorusEnabled = v,
                 new EffectParam[]
                 {
-                    new("Dubina", 0, 1, 0.01, "%", () => fx.ChorusDepth, v => fx.ChorusDepth = (float)v),
+                    new(Lang.T("fx_depth"), 0, 1, 0.01, "%", () => fx.ChorusDepth, v => fx.ChorusDepth = (float)v),
                 }),
 
             _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)

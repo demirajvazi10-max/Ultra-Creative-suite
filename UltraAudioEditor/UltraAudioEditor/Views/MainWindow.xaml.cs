@@ -6,6 +6,7 @@ using System.Windows.Input;
 using UltraAudioEditor.ViewModels;
 using UltraAudioEditor.Controls;
 using UltraAudioEditor.Views.Controls;
+using UltraAudioEditor.Localization;
 
 namespace UltraAudioEditor.Views
 {
@@ -47,12 +48,13 @@ namespace UltraAudioEditor.Views
             // PreviewKeyDown hvata Space/S/R prije nego List kontrole progutaju event
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
             this.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
-            VM.Announce("Ultra Audio Editor ucitan. Alt+W za JAWS mod, F6 za status, Ctrl+I za uvoz.");
+            UpdateLanguageChecks();
+            VM.Announce(Lang.T("app_loaded"));
         }
 
         private void MenuItem_Exit(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("Izaći iz Ultra Audio Editora?", "Izlaz",
+            if (MessageBox.Show(Lang.T("exit_confirm"), Lang.T("exit_title"),
                     MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 Application.Current.Shutdown();
         }
@@ -83,7 +85,7 @@ namespace UltraAudioEditor.Views
                             Duration = dur,
                             WaveformData = Services.AudioEngine.LoadWaveformData(file)
                         });
-                        VM.Announce($"Prevučen fajl: {System.IO.Path.GetFileName(file)}, trajanje {dur:F1}s.");
+                        VM.Announce(string.Format(Lang.T("dropped_file"), System.IO.Path.GetFileName(file), dur));
                     }
                 }
             }
@@ -127,61 +129,16 @@ namespace UltraAudioEditor.Views
                     // Klik na prazno — postavi playhead
                     VM.SelectedClip = null;
                     VM.PlayheadPosition = Math.Max(0, clickTime);
-                    VM.Announce($"Pozicija: {VM.TimeDisplay}.");
+                    VM.Announce(string.Format(Lang.T("position_is"), VM.TimeDisplay));
                 }
             }
         }
 
         private void ShowShortcuts_Click(object sender, RoutedEventArgs e)
         {
-            var msg = @"TASTATURNE PREČICE - Ultra Audio Editor
+            var msg = Lang.T("shortcuts_text");
 
-TRANSPORT:
-  Space          — Reprodukuj / Pauziraj
-  S              — Zaustavi
-  R              — Snimi
-  L              — Loop uključi/isključi
-  Home           — Na početak
-  End            — Na kraj
-
-FAJL:
-  Ctrl+N         — Novi projekat
-  Ctrl+I         — Uvezi audio
-  Ctrl+E         — Izvezi audio
-
-UREĐIVANJE:
-  Ctrl+Z         — Poništi
-  Ctrl+Y         — Ponovi
-  Ctrl+D         — Dupliraj traku
-
-TRAKE:
-  Ctrl+Alt+T     — Nova traka
-  Alt+Up         — Traka gore
-  Alt+Down       — Traka dole
-
-PRIKAZ:
-  Ctrl++         — Uvećaj
-  Ctrl+-         — Umanji
-  Ctrl+0         — Podesi na ekran
-
-KLIPOVI:
-  Klik na klip      — Odaberi klip
-  Dvostruki klik    — Postavi poziciju (dialog)
-  F2                — Postavi poziciju odabranog klipa
-  Ctrl+Lijevo       — Pomjeri klip lijevo 1s
-  Ctrl+Desno        — Pomjeri klip desno 1s
-  Ctrl+Shift+Lijevo — Pomjeri klip lijevo 0.1s
-  Ctrl+Shift+Desno  — Pomjeri klip desno 0.1s
-  Shift+Delete      — Obriši klip
-  Desni klik        — Kontekst meni klipa
-
-NAVIGACIJA (JAWS):
-  Tab            — Sledeći element
-  Shift+Tab      — Prethodni element
-  Enter/Space    — Aktiviraj dugme
-  Alt+F4         — Izlaz";
-
-            MessageBox.Show(msg, "Tastaturne prečice - Ultra Audio Editor",
+            MessageBox.Show(msg, Lang.T("shortcuts_title"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -251,24 +208,24 @@ NAVIGACIJA (JAWS):
         {
             VisualWorkspace.Visibility     = System.Windows.Visibility.Visible;
             AccessibleTrackList.Visibility = System.Windows.Visibility.Collapsed;
-            CurrentModeLabel.Text      = "● VIZUALNI MOD";
+            CurrentModeLabel.Text      = Lang.T("visual_mode_indicator");
             BtnVisualMode.Style        = (System.Windows.Style)FindResource("AIButton");
             BtnJawsMode.Style          = (System.Windows.Style)FindResource("StdButton");
             VM.IsJawsMode = false;
-            VM.Announce("Vizualni mod aktiviran. Waveform prikaz.");
+            VM.Announce(Lang.T("visual_mode_on"));
         }
 
         private void SetJawsMode()
         {
             VisualWorkspace.Visibility      = System.Windows.Visibility.Collapsed;
             AccessibleTrackList.Visibility  = System.Windows.Visibility.Visible;
-            CurrentModeLabel.Text           = "● JAWS MOD";
+            CurrentModeLabel.Text           = Lang.T("jaws_mode_indicator");
             BtnJawsMode.Style               = (System.Windows.Style)FindResource("AIButton");
             BtnVisualMode.Style             = (System.Windows.Style)FindResource("StdButton");
             VM.IsJawsMode = true;
             AccessibleTrackList.Rebuild();
             AccessibleTrackList.FocusFirstTrack();
-            VM.Announce("JAWS mod aktiviran. Tab za navigaciju, Shift+F10 za meni trake, F6 za status.");
+            VM.Announce(Lang.T("jaws_mode_on"));
         }
 
         private void RefreshJawsSummary()
@@ -300,18 +257,28 @@ NAVIGACIJA (JAWS):
 
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Ultra Audio Editor v1.0\n\n" +
-                "Profesionalni Windows audio editor sa punom pristupačnošću.\n" +
-                "Kompatibilan sa JAWS for Windows čitačem ekrana.\n\n" +
-                "Tehnologije:\n" +
-                "• WPF (.NET 8)\n" +
-                "• NAudio — audio engine\n" +
-                "• Anthropic Claude AI — AI funkcije\n\n" +
-                "AI funkcije zahtijevaju Anthropic API ključ.\n" +
-                "Dobijte ga na: console.anthropic.com",
-                "O Ultra Audio Editoru",
+            MessageBox.Show(Lang.T("about_text"), Lang.T("about_title"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        // ─── Odabir jezika ────────────────────────────────────────────────
+        private void LangEn_Click(object sender, RoutedEventArgs e) => SwitchLanguage("en");
+        private void LangSr_Click(object sender, RoutedEventArgs e) => SwitchLanguage("sr");
+
+        private void SwitchLanguage(string code)
+        {
+            Lang.SetLanguage(code);
+            UpdateLanguageChecks();
+            // Osvezi tekstove koji se postavljaju iz koda
+            CurrentModeLabel.Text = VM.IsJawsMode ? Lang.T("jaws_mode_indicator") : Lang.T("visual_mode_indicator");
+            AccessibleTrackList.Rebuild();
+            AccessibleTrackList.UpdateStatus();
+            VM.Announce(Lang.T("language_changed"));
+        }
+
+        private void UpdateLanguageChecks()
+        {
+            MenuLangEn.IsChecked = Lang.Current == "en";
+            MenuLangSr.IsChecked = Lang.Current == "sr";
         }
     }
 }

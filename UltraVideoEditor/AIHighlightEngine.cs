@@ -612,7 +612,7 @@ namespace UltraVideoEditor
             sb.AppendLine();
             sb.AppendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             sb.AppendLine($"Generisan: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
-            sb.AppendLine("Ultra Creative Suite — AI Highlight Engine v2 (Faza 2)");
+            sb.AppendLine("Ultra Creative Suite — AI Highlight Engine v2 (Phase 2)");
             return sb.ToString();
         }
 

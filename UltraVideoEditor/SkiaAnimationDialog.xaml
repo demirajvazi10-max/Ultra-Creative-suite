@@ -71,7 +71,7 @@
             <TextBlock Text="Background color:" Foreground="{DynamicResource TextPrimary}" Width="160" VerticalAlignment="Center"/>
             <ComboBox x:Name="cmbBgColor" Width="140" Height="30" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"
                       AutomationProperties.Name="Background color, selected from list">
-                <ComboBoxItem Content="⚫ Crna" Tag="#000000" IsSelected="True"/>
+                <ComboBoxItem Content="⚫ Black" Tag="#000000" IsSelected="True"/>
                 <ComboBoxItem Content="⚪ White" Tag="#FFFFFF"/>
                 <ComboBoxItem Content="🔴 Red" Tag="#FF0000"/>
                 <ComboBoxItem Content="🟢 Green" Tag="#00FF00"/>

@@ -232,7 +232,7 @@ namespace UltraVideoEditor
 
             sb.AppendLine();
             sb.AppendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            sb.AppendLine("Ultra Creative Suite (Iskra) — AI Highlight Engine Faza 3");
+            sb.AppendLine("Ultra Creative Suite (Iskra) — AI Highlight Engine Phase 3");
 
             return sb.ToString();
         }
@@ -247,7 +247,7 @@ namespace UltraVideoEditor
 
             sb.AppendLine(sr
                 ? $"Highlight video. {opts.ProjectName}. " +
-                  $"Trajanje {FormatTimeSpeech(result.TotalDuration)}. " +
+                  $"Duration {FormatTimeSpeech(result.TotalDuration)}. " +
                   $"{result.Segments.Count} segmenata."
                 : $"Highlight video. {opts.ProjectName}. " +
                   $"Duration {FormatTimeSpeech(result.TotalDuration)}. " +
@@ -266,7 +266,7 @@ namespace UltraVideoEditor
                 sb.AppendLine(sr
                     ? $"Segment {seg.Order}. {FormatTimeSpeech(cursor)}. " +
                       $"{BuildSegmentDescription(seg, sr)} " +
-                      $"Trajanje {seg.Duration:F0} sekundi."
+                      $"Duration {seg.Duration:F0} seconds."
                     : $"Segment {seg.Order}. {FormatTimeSpeech(cursor)}. " +
                       $"{BuildSegmentDescription(seg, sr)} " +
                       $"Duration {seg.Duration:F0} seconds.");

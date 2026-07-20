@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Views
 {
     public partial class SetClipPositionDialog : Window
@@ -10,7 +12,7 @@ namespace UltraAudioEditor.Views
         public SetClipPositionDialog(double currentSeconds, string clipName)
         {
             InitializeComponent();
-            TitleBlock.Text = $"Postavi poziciju: {clipName}";
+            TitleBlock.Text = string.Format(Lang.T("setpos_for"), clipName);
             ResultSeconds = currentSeconds;
             SecondsBox.Text = currentSeconds.ToString("F2");
             TimeBox.Text = SecondsToMmSs(currentSeconds);
@@ -78,8 +80,8 @@ namespace UltraAudioEditor.Views
                 return;
             }
             MessageBox.Show(
-                "Unesite valjanu poziciju.\n\nPrimjeri:\n  15        (15 sekundi)\n  15.5      (15 i po sekundi)\n  1:30      (1 minuta i 30 sekundi)\n  0:15      (15 sekundi)",
-                "Neispravan unos", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Lang.T("setpos_invalid_msg"),
+                Lang.T("setpos_invalid_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
             SecondsBox.Focus();
             SecondsBox.SelectAll();
         }

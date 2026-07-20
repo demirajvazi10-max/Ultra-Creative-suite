@@ -233,7 +233,7 @@
                     Style="{StaticResource SecBtn}" Padding="12,7" Margin="0,0,8,0"
                     Click="BtnImportTemplate_Click"
                     AutomationProperties.Name="Import template from file"/>
-            <Button x:Name="BtnExportTemplate" Content="📤 Izvezi"
+            <Button x:Name="BtnExportTemplate" Content="📤 Export"
                     Style="{StaticResource SecBtn}" Padding="12,7"
                     IsEnabled="False" Click="BtnExportTemplate_Click"
                     AutomationProperties.Name="Export template to file"/>

@@ -2,6 +2,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Views
 {
     public partial class SetValueDialog : Window
@@ -60,18 +62,18 @@ namespace UltraAudioEditor.Views
             };
             var cancelBtn = new System.Windows.Controls.Button
             {
-                Content = "Otkaži", Width = 80, Height = 30, Margin = new Thickness(0, 0, 8, 0),
+                Content = Lang.T("btn_cancel"), Width = 80, Height = 30, Margin = new Thickness(0, 0, 8, 0),
                 Style = (System.Windows.Style)Application.Current.Resources["StdButton"]
             };
-            cancelBtn.SetValue(AutomationProperties.NameProperty, "Otkaži");
+            cancelBtn.SetValue(AutomationProperties.NameProperty, Lang.T("btn_cancel"));
             cancelBtn.Click += (_, __) => DialogResult = false;
 
             var okBtn = new System.Windows.Controls.Button
             {
-                Content = "Potvrdi", Width = 80, Height = 30, IsDefault = true,
+                Content = Lang.T("btn_confirm"), Width = 80, Height = 30, IsDefault = true,
                 Style = (System.Windows.Style)Application.Current.Resources["AIButton"]
             };
-            okBtn.SetValue(AutomationProperties.NameProperty, "Potvrdi unos");
+            okBtn.SetValue(AutomationProperties.NameProperty, Lang.T("acc_confirm_input"));
             okBtn.Click += (_, __) => { ResultValue = input.Text; DialogResult = true; };
 
             btnPanel.Children.Add(cancelBtn);

@@ -28,6 +28,7 @@ namespace UltraVideoEditor
         public ProjectTemplateDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             PopulateExportProfiles();
             PopulateGradePresets();
             LoadTemplates();
@@ -255,7 +256,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Uvezi template",
+                Title  = "Import template",
                 Filter = "Iskra Template|*.iskrat|All files|*.*",
             };
             if (dlg.ShowDialog() != true) return;
@@ -284,7 +285,7 @@ namespace UltraVideoEditor
             if (_current == null) return;
             var dlg = new SaveFileDialog
             {
-                Title      = "Izvezi template",
+                Title      = "Export template",
                 Filter     = "Iskra Template|*.iskrat",
                 FileName   = _current.Name,
                 DefaultExt = "iskrat",

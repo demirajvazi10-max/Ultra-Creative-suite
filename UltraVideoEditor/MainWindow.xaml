@@ -60,6 +60,9 @@
                     <MenuItem x:Name="mnuModeSighted" Tag="mode_sighted" IsCheckable="True" Click="SetModeSighted_Click"/>
                     <MenuItem x:Name="mnuModeAccessibility" Tag="mode_accessibility" InputGestureText="Ctrl+Shift+A" IsCheckable="True" Click="SetModeAccessibility_Click"/>
                     <MenuItem x:Name="mnuModeLowVision" Tag="mode_low_vision" IsCheckable="True" Click="SetModeLowVision_Click"/>
+                    <Separator/>
+                    <MenuItem x:Name="mnuLowVisionTextInc" Tag="mode_low_vision_text_inc" InputGestureText="Ctrl+Shift+Plus" Click="IncreaseLowVisionTextSize_Click"/>
+                    <MenuItem x:Name="mnuLowVisionTextDec" Tag="mode_low_vision_text_dec" InputGestureText="Ctrl+Shift+Minus" Click="DecreaseLowVisionTextSize_Click"/>
                 </MenuItem>
                 <MenuItem x:Name="mnuLogWindow" Tag="mnu_log_window" InputGestureText="Ctrl+Shift+L" Click="ShowLogWindow_Click"/>
                 <Separator/>
@@ -119,7 +122,7 @@
                           FontWeight="Bold"
                           AutomationProperties.Name="Open AI Highlight Engine — automatically extracts the most interesting moments and syncs cuts to beat"/>
                 <MenuItem x:Name="mnuPhase3"
-                          Header="🚀 AI Suite Faza 3"
+                          Header="🚀 AI Suite Phase 3"
                           InputGestureText="Ctrl+Shift+3"
                           Click="OpenPhase3_Click"
                           FontWeight="Bold"

@@ -40,6 +40,7 @@ namespace UltraVideoEditor
             string          musicPath)
         {
             InitializeComponent();
+            UiScaling.Register(this);
 
             _result          = result;
             _sourceVideoPath = sourceVideoPath;
@@ -133,7 +134,7 @@ namespace UltraVideoEditor
                 _cts?.Dispose();
                 _cts             = null;
                 BtnRun.IsEnabled = true;
-                BtnClose.Content = "Zatvori";
+                BtnClose.Content = "Close";
                 BtnClose.Click  -= BtnCancelRun_Click;
                 BtnClose.Click  += BtnClose_Click;
             }

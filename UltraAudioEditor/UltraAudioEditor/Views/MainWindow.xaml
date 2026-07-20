@@ -5,7 +5,7 @@
         xmlns:ctrl="clr-namespace:UltraAudioEditor.Controls"
         xmlns:vc="clr-namespace:UltraAudioEditor.Views.Controls"
         xmlns:models="clr-namespace:UltraAudioEditor.Models"
-        Title="Ultra Audio Editor — Profesionalni Audio Editor"
+        Title="{DynamicResource L_app_title}"
         Height="820" Width="1280" MinHeight="600" MinWidth="900"
         Background="{StaticResource BrBgDark}"
         WindowStartupLocation="CenterScreen">
@@ -53,124 +53,128 @@
 
         <!-- ═══════════ MENU BAR ═══════════ -->
         <Menu Grid.Row="0" Background="{StaticResource BrBgPanel}" Foreground="{StaticResource BrText}"
-              AutomationProperties.Name="Glavni meni aplikacije">
-            <MenuItem Header="_Fajl" AutomationProperties.Name="Fajl meni">
-                <MenuItem Header="_Novi projekat (Ctrl+N)" Command="{Binding NewProjectCommand}"
-                          AutomationProperties.Name="Novi projekat"/>
-                <MenuItem Header="_Otvori projekat (Ctrl+O)" Command="{Binding OpenProjectCommand}"
-                          AutomationProperties.Name="Otvori sacuvani projekat"/>
-                <MenuItem Header="_Sačuvaj (Ctrl+S)" Command="{Binding SaveProjectCommand}"
-                          AutomationProperties.Name="Sacuvaj projekat"/>
-                <MenuItem Header="Sačuvaj _kao (Ctrl+Shift+S)" Command="{Binding SaveProjectAsCommand}"
-                          AutomationProperties.Name="Sacuvaj projekat pod novim imenom"/>
+              AutomationProperties.Name="{DynamicResource L_acc_main_menu}">
+            <MenuItem Header="{DynamicResource L_menu_file}" AutomationProperties.Name="{DynamicResource L_acc_file_menu}">
+                <MenuItem Header="{DynamicResource L_menu_new_project}" Command="{Binding NewProjectCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_new_project}"/>
+                <MenuItem Header="{DynamicResource L_menu_open_project}" Command="{Binding OpenProjectCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_open_project}"/>
+                <MenuItem Header="{DynamicResource L_menu_save}" Command="{Binding SaveProjectCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_save}"/>
+                <MenuItem Header="{DynamicResource L_menu_save_as}" Command="{Binding SaveProjectAsCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_save_as}"/>
                 <Separator/>
-                <MenuItem Header="_Uvezi audio (Ctrl+I)" Command="{Binding ImportAudioCommand}"
-                          AutomationProperties.Name="Uvezi audio fajl"/>
+                <MenuItem Header="{DynamicResource L_menu_import_audio}" Command="{Binding ImportAudioCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_import_file}"/>
                 <Separator/>
-                <MenuItem Header="_Izvezi audio (Ctrl+E)" Command="{Binding ExportCommand}"
-                          AutomationProperties.Name="Izvezi audio"/>
+                <MenuItem Header="{DynamicResource L_menu_export_audio}" Command="{Binding ExportCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_export_audio}"/>
                 <Separator/>
-                <MenuItem Header="I_zlaz" Click="MenuItem_Exit"
-                          AutomationProperties.Name="Izlaz iz programa"/>
+                <MenuItem Header="{DynamicResource L_menu_exit}" Click="MenuItem_Exit"
+                          AutomationProperties.Name="{DynamicResource L_acc_exit}"/>
             </MenuItem>
-            <MenuItem Header="_Uređivanje" AutomationProperties.Name="Meni za uređivanje">
-                <MenuItem Header="_Poništi (Ctrl+Z)" Command="{Binding UndoCommand}" AutomationProperties.Name="Poništi"/>
-                <MenuItem Header="_Ponovi (Ctrl+Y)" Command="{Binding RedoCommand}" AutomationProperties.Name="Ponovi"/>
+            <MenuItem Header="{DynamicResource L_menu_edit}" AutomationProperties.Name="{DynamicResource L_acc_menu_edit}">
+                <MenuItem Header="{DynamicResource L_menu_undo}" Command="{Binding UndoCommand}" AutomationProperties.Name="{DynamicResource L_acc_undo}"/>
+                <MenuItem Header="{DynamicResource L_menu_redo}" Command="{Binding RedoCommand}" AutomationProperties.Name="{DynamicResource L_acc_redo}"/>
                 <Separator/>
-                <MenuItem Header="_Normalizuj" Command="{Binding NormalizeCommand}" AutomationProperties.Name="Normalizuj glasnoću odabrane trake"/>
-                <MenuItem Header="Fade _In" Command="{Binding FadeInCommand}" AutomationProperties.Name="Primijeni fade in"/>
-                <MenuItem Header="Fade _Out" Command="{Binding FadeOutCommand}" AutomationProperties.Name="Primijeni fade out"/>
+                <MenuItem Header="{DynamicResource L_menu_normalize}" Command="{Binding NormalizeCommand}" AutomationProperties.Name="{DynamicResource L_acc_normalize_track}"/>
+                <MenuItem Header="{DynamicResource L_menu_fade_in}" Command="{Binding FadeInCommand}" AutomationProperties.Name="{DynamicResource L_acc_fade_in}"/>
+                <MenuItem Header="{DynamicResource L_menu_fade_out}" Command="{Binding FadeOutCommand}" AutomationProperties.Name="{DynamicResource L_acc_fade_out}"/>
             </MenuItem>
-            <MenuItem Header="_Klip" AutomationProperties.Name="Meni za upravljanje klipovima">
-                <MenuItem Header="Postavi _poziciju... (F2)" Command="{Binding SetClipPositionCommand}"
-                          AutomationProperties.Name="Postavi poziciju odabranog klipa"/>
-                <MenuItem Header="Pomjeri lijevo 1s (Ctrl+Lijevo)" Command="{Binding MoveClipLeftCommand}"
-                          AutomationProperties.Name="Pomjeri klip lijevo za jednu sekundu"/>
-                <MenuItem Header="Pomjeri desno 1s (Ctrl+Desno)" Command="{Binding MoveClipRightCommand}"
-                          AutomationProperties.Name="Pomjeri klip desno za jednu sekundu"/>
-                <MenuItem Header="Pomjeri lijevo 0.1s (Ctrl+Shift+Lijevo)" Command="{Binding MoveClipLeftFineCommand}"
-                          AutomationProperties.Name="Fino pomjeranje klipa lijevo"/>
-                <MenuItem Header="Pomjeri desno 0.1s (Ctrl+Shift+Desno)" Command="{Binding MoveClipRightFineCommand}"
-                          AutomationProperties.Name="Fino pomjeranje klipa desno"/>
+            <MenuItem Header="{DynamicResource L_menu_clip}" AutomationProperties.Name="{DynamicResource L_acc_menu_clips}">
+                <MenuItem Header="{DynamicResource L_menu_set_position}" Command="{Binding SetClipPositionCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_set_clip_pos}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_left_1s}" Command="{Binding MoveClipLeftCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_clip_left_1s}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_right_1s}" Command="{Binding MoveClipRightCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_clip_right_1s}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_left_01s}" Command="{Binding MoveClipLeftFineCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_fine_left}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_right_01s}" Command="{Binding MoveClipRightFineCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_fine_right}"/>
                 <Separator/>
-                <MenuItem Header="_Obriši klip (Shift+Del)" Command="{Binding DeleteClipCommand}"
-                          AutomationProperties.Name="Obriši odabrani klip"/>
+                <MenuItem Header="{DynamicResource L_menu_delete_clip}" Command="{Binding DeleteClipCommand}"
+                          AutomationProperties.Name="{DynamicResource L_acc_delete_clip}"/>
             </MenuItem>
-            <MenuItem Header="_Trake" AutomationProperties.Name="Meni za trake">
-                <MenuItem Header="_Dodaj traku (Ctrl+Alt+T)" Command="{Binding AddTrackCommand}" AutomationProperties.Name="Dodaj novu traku"/>
-                <MenuItem Header="_Obriši traku" Command="{Binding RemoveTrackCommand}" AutomationProperties.Name="Obriši odabranu traku"/>
-                <MenuItem Header="D_upliraj traku (Ctrl+D)" Command="{Binding DuplicateTrackCommand}" AutomationProperties.Name="Dupliraj odabranu traku"/>
+            <MenuItem Header="{DynamicResource L_menu_tracks}" AutomationProperties.Name="{DynamicResource L_acc_menu_tracks}">
+                <MenuItem Header="{DynamicResource L_menu_add_track}" Command="{Binding AddTrackCommand}" AutomationProperties.Name="{DynamicResource L_acc_add_track}"/>
+                <MenuItem Header="{DynamicResource L_menu_delete_track}" Command="{Binding RemoveTrackCommand}" AutomationProperties.Name="{DynamicResource L_acc_delete_track}"/>
+                <MenuItem Header="{DynamicResource L_menu_duplicate_track}" Command="{Binding DuplicateTrackCommand}" AutomationProperties.Name="{DynamicResource L_acc_duplicate_track}"/>
                 <Separator/>
-                <MenuItem Header="Pomjeri gore (Alt+Up)" Command="{Binding MoveTrackUpCommand}" AutomationProperties.Name="Pomjeri traku gore"/>
-                <MenuItem Header="Pomjeri dole (Alt+Down)" Command="{Binding MoveTrackDownCommand}" AutomationProperties.Name="Pomjeri traku dole"/>
+                <MenuItem Header="{DynamicResource L_menu_move_up}" Command="{Binding MoveTrackUpCommand}" AutomationProperties.Name="{DynamicResource L_acc_track_up}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_down}" Command="{Binding MoveTrackDownCommand}" AutomationProperties.Name="{DynamicResource L_acc_track_down}"/>
                 <Separator/>
-                <MenuItem Header="_Utišaj sve" Command="{Binding MuteAllCommand}" AutomationProperties.Name="Utišaj sve trake"/>
-                <MenuItem Header="Aktiviraj _sve" Command="{Binding UnmuteAllCommand}" AutomationProperties.Name="Aktiviraj sve trake"/>
+                <MenuItem Header="{DynamicResource L_menu_mute_all}" Command="{Binding MuteAllCommand}" AutomationProperties.Name="{DynamicResource L_acc_mute_all}"/>
+                <MenuItem Header="{DynamicResource L_menu_unmute_all}" Command="{Binding UnmuteAllCommand}" AutomationProperties.Name="{DynamicResource L_acc_unmute_all}"/>
             </MenuItem>
-            <MenuItem Header="A_I Funkcije" AutomationProperties.Name="Meni za AI funkcije">
-                <MenuItem Header="AI _Transkripcija" Command="{Binding AiTranscribeCommand}" AutomationProperties.Name="AI transkripcija govora u tekst"/>
-                <MenuItem Header="AI _Uklanjanje šuma" Command="{Binding AiNoiseRemoveCommand}" AutomationProperties.Name="AI uklanjanje pozadinskog šuma"/>
-                <MenuItem Header="AI _SmartCut" Command="{Binding AiSmartCutCommand}" AutomationProperties.Name="AI detekcija tišine i pametno rezanje"/>
-                <MenuItem Header="AI _Vocal Separator" Command="{Binding AiVocalSepCommand}" AutomationProperties.Name="AI odvajanje glasa od instrumentala"/>
-                <MenuItem Header="AI _Opis projekta" Command="{Binding AiDescribeCommand}" AutomationProperties.Name="AI verbalni opis audio projekta"/>
-                <MenuItem Header="AI Vocal _Mixer" Command="{Binding AiVocalMixCommand}" AutomationProperties.Name="AI preporuke za miksovanje glasa"/>
-                <MenuItem Header="AI E_Q preporuke" Command="{Binding AiEqRecommendCommand}" AutomationProperties.Name="AI EQ preporuke za odabranu traku"/>
-                <MenuItem Header="AI Auto _Level" Command="{Binding AiAutoLevelCommand}" AutomationProperties.Name="AI analiza i preporuke za nivoe glasnoće"/>
+            <MenuItem Header="{DynamicResource L_menu_ai}" AutomationProperties.Name="{DynamicResource L_acc_menu_ai}">
+                <MenuItem Header="{DynamicResource L_menu_ai_transcription}" Command="{Binding AiTranscribeCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_transcribe_full}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_noise}" Command="{Binding AiNoiseRemoveCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_noise_full}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_smartcut}" Command="{Binding AiSmartCutCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_silence}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_vocal_sep}" Command="{Binding AiVocalSepCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_vocalsep}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_describe}" Command="{Binding AiDescribeCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_describe_full}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_vocal_mixer}" Command="{Binding AiVocalMixCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_vocalmix}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_eq}" Command="{Binding AiEqRecommendCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_eq_track}"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_autolevel}" Command="{Binding AiAutoLevelCommand}" AutomationProperties.Name="{DynamicResource L_acc_ai_levels}"/>
             </MenuItem>
-            <MenuItem Header="_Pogled" AutomationProperties.Name="Meni za pogled">
-                <MenuItem Header="Uvećaj (Ctrl++)" Command="{Binding ZoomInCommand}" AutomationProperties.Name="Uvećaj prikaz"/>
-                <MenuItem Header="Umanji (Ctrl+-)" Command="{Binding ZoomOutCommand}" AutomationProperties.Name="Umanji prikaz"/>
-                <MenuItem Header="Podesi na ekran (Ctrl+0)" Command="{Binding ZoomFitCommand}" AutomationProperties.Name="Podesi zoom na ekran"/>
+            <MenuItem Header="{DynamicResource L_menu_view}" AutomationProperties.Name="{DynamicResource L_acc_menu_view}">
+                <MenuItem Header="{DynamicResource L_menu_zoom_in}" Command="{Binding ZoomInCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_in}"/>
+                <MenuItem Header="{DynamicResource L_menu_zoom_out}" Command="{Binding ZoomOutCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_out}"/>
+                <MenuItem Header="{DynamicResource L_menu_zoom_fit}" Command="{Binding ZoomFitCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_fit}"/>
             </MenuItem>
-            <MenuItem Header="_Pomoć" AutomationProperties.Name="Meni za pomoć">
-                <MenuItem Header="_Tastaturne prečice" Click="ShowShortcuts_Click" AutomationProperties.Name="Prikaži tastaturne prečice"/>
-                <MenuItem Header="_O programu" Click="ShowAbout_Click" AutomationProperties.Name="O Ultra Audio Editor programu"/>
+            <MenuItem Header="{DynamicResource L_menu_language}" AutomationProperties.Name="{DynamicResource L_acc_lang_menu}">
+                <MenuItem x:Name="MenuLangEn" Header="{DynamicResource L_menu_lang_en}" IsCheckable="True" Click="LangEn_Click" AutomationProperties.Name="English"/>
+                <MenuItem x:Name="MenuLangSr" Header="{DynamicResource L_menu_lang_sr}" IsCheckable="True" Click="LangSr_Click" AutomationProperties.Name="Srpski"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_help}" AutomationProperties.Name="{DynamicResource L_acc_menu_help}">
+                <MenuItem Header="{DynamicResource L_menu_shortcuts}" Click="ShowShortcuts_Click" AutomationProperties.Name="{DynamicResource L_acc_show_shortcuts}"/>
+                <MenuItem Header="{DynamicResource L_menu_about}" Click="ShowAbout_Click" AutomationProperties.Name="{DynamicResource L_acc_about}"/>
             </MenuItem>
         </Menu>
 
         <!-- ═══════════ TOOLBAR ═══════════ -->
         <ToolBar Grid.Row="1" Background="{StaticResource BrBgPanel}" Band="0"
-                 AutomationProperties.Name="Toolbar sa alatima">
-            <Button Command="{Binding NewProjectCommand}" ToolTip="Novi projekat (Ctrl+N)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Novi projekat">Novi</Button>
-            <Button Command="{Binding ImportAudioCommand}" ToolTip="Uvezi audio (Ctrl+I)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Uvezi audio">Uvezi</Button>
-            <Button Command="{Binding ExportCommand}" ToolTip="Izvezi (Ctrl+E)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Izvezi audio">Izvezi</Button>
+                 AutomationProperties.Name="{DynamicResource L_acc_toolbar}">
+            <Button Command="{Binding NewProjectCommand}" ToolTip="{DynamicResource L_tt_new_project}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_new_project}">Novi</Button>
+            <Button Command="{Binding ImportAudioCommand}" ToolTip="{DynamicResource L_tt_import}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_import}">Uvezi</Button>
+            <Button Command="{Binding ExportCommand}" ToolTip="{DynamicResource L_tt_export}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_export_audio}">Izvezi</Button>
             <Separator/>
-            <Button Command="{Binding UndoCommand}" ToolTip="Poništi (Ctrl+Z)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Poništi">↩ Undo</Button>
-            <Button Command="{Binding RedoCommand}" ToolTip="Ponovi (Ctrl+Y)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Ponovi">↪ Redo</Button>
+            <Button Command="{Binding UndoCommand}" ToolTip="{DynamicResource L_tt_undo}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_undo}">↩ Undo</Button>
+            <Button Command="{Binding RedoCommand}" ToolTip="{DynamicResource L_tt_redo}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_redo}">↪ Redo</Button>
             <Separator/>
-            <Button Command="{Binding NormalizeCommand}" ToolTip="Normalizuj glasnoću"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Normalizuj glasnoću odabrane trake">Normalizuj</Button>
-            <Button Command="{Binding FadeInCommand}" ToolTip="Fade In"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Primijeni fade in">Fade In</Button>
-            <Button Command="{Binding FadeOutCommand}" ToolTip="Fade Out"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Primijeni fade out">Fade Out</Button>
+            <Button Command="{Binding NormalizeCommand}" ToolTip="{DynamicResource L_tt_normalize}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_normalize_track}">Normalizuj</Button>
+            <Button Command="{Binding FadeInCommand}" ToolTip="{DynamicResource L_tt_fade_in}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_fade_in}">Fade In</Button>
+            <Button Command="{Binding FadeOutCommand}" ToolTip="{DynamicResource L_tt_fade_out}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_fade_out}">Fade Out</Button>
             <Separator/>
-            <Button Command="{Binding ZoomOutCommand}" ToolTip="Umanji (Ctrl+-)"
-                    Style="{StaticResource StdButton}" Width="28" AutomationProperties.Name="Umanji prikaz">−</Button>
+            <Button Command="{Binding ZoomOutCommand}" ToolTip="{DynamicResource L_tt_zoom_out}"
+                    Style="{StaticResource StdButton}" Width="28" AutomationProperties.Name="{DynamicResource L_acc_zoom_out}">−</Button>
             <TextBlock VerticalAlignment="Center" Foreground="{StaticResource BrTextSec}" FontSize="11" Margin="4,0"
-                       AutomationProperties.Name="Trenutni nivo zuma">
+                       AutomationProperties.Name="{DynamicResource L_acc_zoom_level}">
                 <TextBlock.Text>
                     <Binding Path="ZoomLevel" StringFormat="{}{0:F0}x" Mode="OneWay"/>
                 </TextBlock.Text>
             </TextBlock>
-            <Button Command="{Binding ZoomInCommand}" ToolTip="Uvećaj (Ctrl++)"
-                    Style="{StaticResource StdButton}" Width="28" AutomationProperties.Name="Uvećaj prikaz">+</Button>
-            <Button Command="{Binding ZoomFitCommand}" ToolTip="Fit (Ctrl+0)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Podesi zoom na cijeli projekat">Fit</Button>
+            <Button Command="{Binding ZoomInCommand}" ToolTip="{DynamicResource L_tt_zoom_in}"
+                    Style="{StaticResource StdButton}" Width="28" AutomationProperties.Name="{DynamicResource L_acc_zoom_in}">+</Button>
+            <Button Command="{Binding ZoomFitCommand}" ToolTip="{DynamicResource L_tt_zoom_fit}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_zoom_fit_all}">Fit</Button>
             <Separator/>
-            <Button Command="{Binding AddTrackCommand}" ToolTip="Nova traka (Ctrl+Alt+T)"
-                    Style="{StaticResource StdButton}" AutomationProperties.Name="Dodaj novu traku">+ Traka</Button>
+            <Button Command="{Binding AddTrackCommand}" ToolTip="{DynamicResource L_tt_new_track}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_add_track}">+ Traka</Button>
         </ToolBar>
 
         <!-- ═══════════ TRANSPORT BAR ═══════════ -->
         <Border Grid.Row="2" Background="{StaticResource BrBgPanel}"
                 BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,0,1"
-                AutomationProperties.Name="Transport kontrole za reprodukciju">
+                AutomationProperties.Name="{DynamicResource L_acc_transport}">
             <Grid Margin="8,4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -185,40 +189,40 @@
                            FontFamily="Consolas" FontSize="20" FontWeight="SemiBold"
                            Foreground="{StaticResource BrText}"
                            VerticalAlignment="Center" Margin="0,0,16,0"
-                           AutomationProperties.Name="Trenutna pozicija reproducije"
+                           AutomationProperties.Name="{DynamicResource L_acc_current_pos}"
                            AutomationProperties.LiveSetting="Polite"/>
 
                 <!-- Transport dugmad -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                            AutomationProperties.Name="Dugmad za transport">
+                            AutomationProperties.Name="{DynamicResource L_acc_transport_buttons}">
                     <Button Command="{Binding ToStartCommand}" Style="{StaticResource TransportButton}"
-                            ToolTip="Na početak (Home)" AutomationProperties.Name="Na početak" Margin="0,0,4,0">⏮</Button>
+                            ToolTip="{DynamicResource L_tt_to_start}" AutomationProperties.Name="{DynamicResource L_acc_to_start}" Margin="0,0,4,0">⏮</Button>
                     <Button Command="{Binding PlayPauseCommand}" Style="{StaticResource TransportButton}" Margin="0,0,4,0"
-                            ToolTip="Reprodukuj/Pauziraj (Space)"
-                            AutomationProperties.Name="Reprodukuj ili pauziraj"
+                            ToolTip="{DynamicResource L_tt_play_pause}"
+                            AutomationProperties.Name="{DynamicResource L_acc_play_pause}"
                             Width="44" Height="44" FontSize="18">
                         <TextBlock Text="{Binding PlayPauseLabel, Mode=OneWay}" FontSize="14"/>
                     </Button>
                     <Button Command="{Binding StopCommand}" Style="{StaticResource TransportButton}"
-                            ToolTip="Zaustavi (S)" AutomationProperties.Name="Zaustavi reprodukciju" Margin="0,0,4,0">■</Button>
+                            ToolTip="{DynamicResource L_tt_stop}" AutomationProperties.Name="{DynamicResource L_acc_stop}" Margin="0,0,4,0">■</Button>
                     <Button Command="{Binding RecordCommand}" Style="{StaticResource TransportButton}"
-                            ToolTip="Snimi (R)" AutomationProperties.Name="Pokreni snimanje"
+                            ToolTip="{DynamicResource L_tt_record}" AutomationProperties.Name="{DynamicResource L_acc_start_record}"
                             Foreground="{StaticResource BrDanger}" Margin="0,0,4,0">●</Button>
                     <Button Command="{Binding ToEndCommand}" Style="{StaticResource TransportButton}"
-                            ToolTip="Na kraj (End)" AutomationProperties.Name="Na kraj projekta" Margin="0,0,4,0">⏭</Button>
+                            ToolTip="{DynamicResource L_tt_to_end}" AutomationProperties.Name="{DynamicResource L_acc_to_end}" Margin="0,0,4,0">⏭</Button>
                     <Button Command="{Binding LoopCommand}" Style="{StaticResource TransportButton}"
-                            ToolTip="Loop (L)" AutomationProperties.Name="Uključi loop reprodukciju">⟳</Button>
+                            ToolTip="{DynamicResource L_tt_loop}" AutomationProperties.Name="{DynamicResource L_acc_loop}">⟳</Button>
                 </StackPanel>
 
                 <!-- Master Volume -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <Label Content="Master:" Foreground="{StaticResource BrTextSec}" FontSize="11"
-                           AutomationProperties.Name="Master glasnoća"/>
+                    <Label Content="{DynamicResource L_master_label}" Foreground="{StaticResource BrTextSec}" FontSize="11"
+                           AutomationProperties.Name="{DynamicResource L_acc_master_volume}"/>
                     <Slider Width="100" Minimum="0" Maximum="1" Value="{Binding MasterVolume}"
                             TickFrequency="0.1" IsSnapToTickEnabled="False"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="Master glasnoća klizač"
-                            AutomationProperties.HelpText="Podesi master glasnoću od 0 do 100 posto"/>
+                            AutomationProperties.Name="{DynamicResource L_acc_master_slider}"
+                            AutomationProperties.HelpText="{DynamicResource L_master_help}"/>
                     <TextBlock VerticalAlignment="Center" Margin="4,0" FontSize="11"
                                Foreground="{StaticResource BrTextSec}"
                                AutomationProperties.LiveSetting="Polite">
@@ -255,23 +259,23 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
                             <Button x:Name="BtnVisualMode"
-                                    Content="Vizualni mod"
+                                    Content="{DynamicResource L_visual_mode_btn}"
                                     Style="{StaticResource StdButton}"
                                     Click="BtnVisualMode_Click"
                                     Margin="4,2,0,2"
-                                    AutomationProperties.Name="Prebaci na vizualni waveform prikaz"
-                                    ToolTip="Vizualni mod — waveform prikaz (Alt+W)"/>
+                                    AutomationProperties.Name="{DynamicResource L_acc_switch_visual}"
+                                    ToolTip="{DynamicResource L_visual_mode_tt}"/>
                             <Button x:Name="BtnJawsMode"
-                                    Content="JAWS mod (Alt+W)"
+                                    Content="{DynamicResource L_jaws_mode_btn}"
                                     Style="{StaticResource AIButton}"
                                     Click="BtnJawsMode_Click"
                                     Margin="4,2,0,2"
-                                    AutomationProperties.Name="Prebaci na JAWS pristupacni tekstualni prikaz"
-                                    ToolTip="JAWS mod — tekstualni pristupacni prikaz (Alt+W)"/>
+                                    AutomationProperties.Name="{DynamicResource L_acc_switch_jaws}"
+                                    ToolTip="{DynamicResource L_jaws_mode_tt}"/>
                         </StackPanel>
                         <TextBlock Grid.Column="1"
                                    x:Name="CurrentModeLabel"
-                                   Text="● VIZUALNI MOD"
+                                   Text="{DynamicResource L_visual_mode_indicator}"
                                    FontSize="10" VerticalAlignment="Center"
                                    Foreground="{StaticResource BrTextMuted}"
                                    Margin="0,0,8,0"
@@ -291,13 +295,13 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Grid.Column="0" BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,1,1">
-                            <TextBlock Text="TRAKE" FontSize="10" Foreground="{StaticResource BrTextMuted}"
+                            <TextBlock Text="{DynamicResource L_tracks_header}" FontSize="10" Foreground="{StaticResource BrTextMuted}"
                                        VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <Canvas Grid.Column="1" x:Name="RulerCanvas" Background="{StaticResource BrBgPanel}" ClipToBounds="True"/>
                     </Grid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                  AutomationProperties.Name="Lista audio traka vizualni prikaz">
+                                  AutomationProperties.Name="{DynamicResource L_acc_track_list_visual}">
                         <ItemsControl ItemsSource="{Binding Project.Tracks}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:AudioTrack}">
@@ -315,20 +319,20 @@
                                                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                                         <ToggleButton Content="M" Width="24" Height="20" FontSize="10" Margin="0,0,3,0"
                                                                       IsChecked="{Binding IsMuted}"
-                                                                      AutomationProperties.Name="Mute dugme"
+                                                                      AutomationProperties.Name="{DynamicResource L_acc_mute_btn}"
                                                                       Background="{Binding IsMuted, Converter={StaticResource BoolToMuteBrush}}"/>
                                                         <ToggleButton Content="S" Width="24" Height="20" FontSize="10" Margin="0,0,3,0"
                                                                       IsChecked="{Binding IsSolo}"
-                                                                      AutomationProperties.Name="Solo dugme"
+                                                                      AutomationProperties.Name="{DynamicResource L_acc_solo_btn}"
                                                                       Background="{Binding IsSolo, Converter={StaticResource BoolToSoloBrush}}"/>
                                                         <TextBlock Text="{Binding Type}" FontSize="9"
                                                                    Foreground="{StaticResource BrTextMuted}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                                        <TextBlock Text="Vol" FontSize="10" Foreground="{StaticResource BrTextMuted}"
+                                                        <TextBlock Text="{DynamicResource L_vol_short}" FontSize="10" Foreground="{StaticResource BrTextMuted}"
                                                                    Width="24" VerticalAlignment="Center"/>
                                                         <Slider Width="100" Minimum="0" Maximum="1" Value="{Binding Volume}"
-                                                                AutomationProperties.Name="Glasnoća trake"/>
+                                                                AutomationProperties.Name="{DynamicResource L_acc_track_volume}"/>
                                                         <TextBlock FontSize="10" Foreground="{StaticResource BrTextSec}" Margin="3,0" VerticalAlignment="Center">
                                                             <TextBlock.Text><Binding Path="Volume" StringFormat="{}{0:P0}" Mode="OneWay"/></TextBlock.Text>
                                                         </TextBlock>
@@ -348,13 +352,13 @@
                                                 MouseLeftButtonDown="WaveformArea_MouseDown">
                                                 <ctrl:WaveformControl.ContextMenu>
                                                     <ContextMenu>
-                                                        <MenuItem Header="Postavi poziciju klipa... (F2)"
+                                                        <MenuItem Header="{DynamicResource L_ctx_set_clip_pos}"
                                                                   Command="{Binding DataContext.SetClipPositionCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                        <MenuItem Header="Pomjeri lijevo 1s (Ctrl+Lijevo)"
+                                                        <MenuItem Header="{DynamicResource L_menu_move_left_1s}"
                                                                   Command="{Binding DataContext.MoveClipLeftCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                        <MenuItem Header="Pomjeri desno 1s (Ctrl+Desno)"
+                                                        <MenuItem Header="{DynamicResource L_menu_move_right_1s}"
                                                                   Command="{Binding DataContext.MoveClipRightCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                        <MenuItem Header="Obriši klip (Shift+Delete)"
+                                                        <MenuItem Header="{DynamicResource L_ctx_delete_clip}"
                                                                   Command="{Binding DataContext.DeleteClipCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                                                     </ContextMenu>
                                                 </ctrl:WaveformControl.ContextMenu>
@@ -370,35 +374,35 @@
                 <!-- ══ JAWS MOD ══ -->
                 <vc:AccessibleTrackList Grid.Row="1" x:Name="AccessibleTrackList"
                     Visibility="Collapsed"
-                    AutomationProperties.Name="JAWS pristupacni prikaz traka i klipova"/>
+                    AutomationProperties.Name="{DynamicResource L_acc_jaws_view}"/>
 
             </Grid>
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
                           Background="{StaticResource BrBorder}"
-                          AutomationProperties.Name="Razdjelnik panela"/>
+                          AutomationProperties.Name="{DynamicResource L_acc_splitter}"/>
 
             <!-- ─── RIGHT PANEL ─── -->
             <Grid Grid.Column="2" Background="{StaticResource BrBgPanel}">
                 <TabControl Background="{StaticResource BrBgPanel}"
                             Foreground="{StaticResource BrText}"
-                            AutomationProperties.Name="Desni panel sa efektima i AI funkcijama">
-                    <TabItem Header="Efekti" AutomationProperties.Name="Kartica efekti">
-                        <TextBlock Text="Odaberite traku da vidite efekte." Margin="8"
+                            AutomationProperties.Name="{DynamicResource L_acc_right_panel}">
+                    <TabItem Header="{DynamicResource L_effects_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_effects}">
+                        <TextBlock Text="{DynamicResource L_select_track_effects}" Margin="8"
                                    Foreground="{StaticResource BrTextSec}" FontSize="12"/>
                     </TabItem>
-                    <TabItem Header="AI Funkcije" AutomationProperties.Name="Kartica AI funkcije">
+                    <TabItem Header="{DynamicResource L_ai_panel_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_ai}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="8">
-                                <TextBlock Text="Anthropic API Ključ" FontSize="11" FontWeight="Medium"
+                                <TextBlock Text="{DynamicResource L_api_key_label}" FontSize="11" FontWeight="Medium"
                                            Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <RadioButton Content="Groq (BESPLATNO)" IsChecked="{Binding UseGroq}"
+                                    <RadioButton Content="{DynamicResource L_groq_free}" IsChecked="{Binding UseGroq}"
                                                  Foreground="#4ECFA0" FontWeight="Medium" Margin="0,0,12,0"
-                                                 AutomationProperties.Name="Koristi Groq AI, besplatno"/>
-                                    <RadioButton Content="Anthropic Claude" IsChecked="{Binding UseAnthropic}"
+                                                 AutomationProperties.Name="{DynamicResource L_acc_use_groq}"/>
+                                    <RadioButton Content="{DynamicResource L_anthropic_claude}" IsChecked="{Binding UseAnthropic}"
                                                  Foreground="{StaticResource BrText}"
-                                                 AutomationProperties.Name="Koristi Anthropic Claude AI"/>
+                                                 AutomationProperties.Name="{DynamicResource L_acc_use_anthropic}"/>
                                 </StackPanel>
                                 <TextBlock Text="{Binding ApiKeyHint, Mode=OneWay}" FontSize="11" FontWeight="Medium"
                                            Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
@@ -408,66 +412,66 @@
                                              BorderBrush="{StaticResource BrBorder}"
                                              BorderThickness="1"
                                              PasswordChanged="ApiKeyBox_PasswordChanged"
-                                             AutomationProperties.Name="Unesi API ključ"/>
+                                             AutomationProperties.Name="{DynamicResource L_acc_enter_api_key}"/>
                                 <Button Click="OpenApiKeyLink_Click"
                                         Style="{StaticResource StdButton}"
                                         HorizontalAlignment="Left"
                                         Margin="0,4,0,0" Height="22" Padding="4,2"
-                                        AutomationProperties.Name="Otvori stranicu za API ključ">
+                                        AutomationProperties.Name="{DynamicResource L_acc_open_api_page}">
                                     <TextBlock Text="{Binding ApiKeyLink, Mode=OneWay}" FontSize="10" Foreground="#4ECFA0"/>
                                 </Button>
                                 <TextBlock FontSize="10" Foreground="{StaticResource BrTextMuted}" Margin="0,2,0,8"
-                                           Text="Groq: 14.400 besplatnih zahtjeva/dan"/>
+                                           Text="{DynamicResource L_groq_quota}"/>
                                 <Separator Margin="0,4,0,8" Background="{StaticResource BrBorder}"/>
-                                <Label Content="Jezik transkripcije:" AutomationProperties.Name="Odabir jezika"/>
-                                <ComboBox SelectedItem="{Binding SelectedLanguage}" AutomationProperties.Name="Jezik transkripcije">
+                                <Label Content="{DynamicResource L_transcription_lang}" AutomationProperties.Name="{DynamicResource L_acc_lang_select}"/>
+                                <ComboBox SelectedItem="{Binding SelectedLanguage}" AutomationProperties.Name="{DynamicResource L_acc_transcription_lang}">
                                     <ComboBoxItem>Srpski</ComboBoxItem>
                                     <ComboBoxItem>Engleski</ComboBoxItem>
                                     <ComboBoxItem>Njemacki</ComboBoxItem>
                                     <ComboBoxItem>Francuski</ComboBoxItem>
                                     <ComboBoxItem>Auto-detect</ComboBoxItem>
                                 </ComboBox>
-                                <Label Content="Nivo uklanjanja suma:" Margin="0,6,0,0"/>
-                                <ComboBox SelectedItem="{Binding SelectedNoiseLevel}" AutomationProperties.Name="Nivo noise removal">
+                                <Label Content="{DynamicResource L_noise_level}" Margin="0,6,0,0"/>
+                                <ComboBox SelectedItem="{Binding SelectedNoiseLevel}" AutomationProperties.Name="{DynamicResource L_acc_noise_level}">
                                     <ComboBoxItem>Blag</ComboBoxItem>
                                     <ComboBoxItem>Srednji</ComboBoxItem>
                                     <ComboBoxItem>Agresivan</ComboBoxItem>
                                 </ComboBox>
-                                <Label Content="Prag tisine (SmartCut):" Margin="0,6,0,0"/>
+                                <Label Content="{DynamicResource L_silence_threshold}" Margin="0,6,0,0"/>
                                 <StackPanel Orientation="Horizontal">
                                     <Slider Width="160" Minimum="-60" Maximum="-20" Value="{Binding SilenceThreshold}"
-                                            AutomationProperties.Name="Prag tisine klizac"/>
+                                            AutomationProperties.Name="{DynamicResource L_acc_silence_slider}"/>
                                     <TextBlock Margin="4,0" VerticalAlignment="Center" Foreground="{StaticResource BrText}">
                                         <TextBlock.Text><Binding Path="SilenceThreshold" StringFormat="{}{0:F0} dB" Mode="OneWay"/></TextBlock.Text>
                                     </TextBlock>
                                 </StackPanel>
                                 <Separator Margin="0,8" Background="{StaticResource BrBorder}"/>
-                                <Button Command="{Binding AiTranscribeCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI transkripcija">Transkripcija govora</Button>
-                                <Button Command="{Binding AiNoiseRemoveCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI uklanjanje suma">Ukloni sum (Denoise)</Button>
-                                <Button Command="{Binding AiSmartCutCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI SmartCut">SmartCut (detekcija tisine)</Button>
-                                <Button Command="{Binding AiVocalSepCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI vocal separator">Vocal Separator (savjeti)</Button>
-                                <Button Command="{Binding AiVocalMixCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI vocal mix">Glas na Instrumental (mix)</Button>
-                                <Button Command="{Binding AiEqRecommendCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI EQ preporuke">EQ Preporuke (odabrana traka)</Button>
-                                <Button Command="{Binding AiAutoLevelCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI auto level">Auto Level (LUFS analiza)</Button>
-                                <Button Command="{Binding AiDescribeCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="AI opis projekta">Opis projekta (pristupacnost)</Button>
+                                <Button Command="{Binding AiTranscribeCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_transcribe}">Transkripcija govora</Button>
+                                <Button Command="{Binding AiNoiseRemoveCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_noise}">Ukloni sum (Denoise)</Button>
+                                <Button Command="{Binding AiSmartCutCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_smartcut}">SmartCut (detekcija tisine)</Button>
+                                <Button Command="{Binding AiVocalSepCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_vocalsep_short}">Vocal Separator (savjeti)</Button>
+                                <Button Command="{Binding AiVocalMixCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_vocalmix_short}">Glas na Instrumental (mix)</Button>
+                                <Button Command="{Binding AiEqRecommendCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_eq}">EQ Preporuke (odabrana traka)</Button>
+                                <Button Command="{Binding AiAutoLevelCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_autolevel}">Auto Level (LUFS analiza)</Button>
+                                <Button Command="{Binding AiDescribeCommand}" Style="{StaticResource AIButton}" Margin="0,0,0,4" HorizontalAlignment="Stretch" AutomationProperties.Name="{DynamicResource L_acc_ai_describe}">Opis projekta (pristupacnost)</Button>
                                 <Separator Margin="0,8" Background="{StaticResource BrBorder}"/>
-                                <TextBlock Text="Napredak AI obrade:" FontSize="10" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,2"/>
+                                <TextBlock Text="{DynamicResource L_ai_progress}" FontSize="10" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,2"/>
                                 <ProgressBar Height="8" Value="{Binding AiProgress, Mode=OneWay}" Maximum="100"
                                              Background="{StaticResource BrBgMid}" Foreground="{StaticResource BrAccentAI}"
-                                             AutomationProperties.Name="AI napredak"/>
-                                <TextBlock Text="Rezultati:" FontSize="10" Foreground="{StaticResource BrTextMuted}" Margin="0,8,0,2"/>
+                                             AutomationProperties.Name="{DynamicResource L_acc_ai_progress}"/>
+                                <TextBlock Text="{DynamicResource L_ai_results}" FontSize="10" Foreground="{StaticResource BrTextMuted}" Margin="0,8,0,2"/>
                                 <TextBox Text="{Binding AiResult, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
                                          MinHeight="150" MaxHeight="300" VerticalScrollBarVisibility="Auto"
                                          FontSize="11" FontFamily="Consolas"
-                                         AutomationProperties.Name="AI rezultati"
+                                         AutomationProperties.Name="{DynamicResource L_acc_ai_results}"
                                          AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
-                    <TabItem Header="Izvoz" AutomationProperties.Name="Kartica izvoz">
+                    <TabItem Header="{DynamicResource L_export_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_export}">
                         <StackPanel Margin="8">
-                            <TextBlock Text="Format izvoza" FontSize="11" FontWeight="Medium" Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
-                            <ComboBox SelectedItem="{Binding ExportFormat}" AutomationProperties.Name="Format za izvoz">
+                            <TextBlock Text="{DynamicResource L_export_format}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
+                            <ComboBox SelectedItem="{Binding ExportFormat}" AutomationProperties.Name="{DynamicResource L_acc_export_format}">
                                 <ComboBoxItem>WAV</ComboBoxItem>
                                 <ComboBoxItem>MP3</ComboBoxItem>
                                 <ComboBoxItem>OGG</ComboBoxItem>
@@ -477,7 +481,7 @@
                             </ComboBox>
                             <Button Command="{Binding ExportCommand}" Style="{StaticResource AIButton}"
                                     Margin="0,16,0,0" HorizontalAlignment="Stretch" Height="36"
-                                    AutomationProperties.Name="Pokreni izvoz audio fajla">Izvezi audio</Button>
+                                    AutomationProperties.Name="{DynamicResource L_acc_start_export}">Izvezi audio</Button>
                         </StackPanel>
                     </TabItem>
                 </TabControl>
@@ -486,11 +490,11 @@
 
         <!-- ═══════════ STATUS BAR ═══════════ -->
         <StatusBar Grid.Row="4" Background="{StaticResource BrBgPanel}"
-                   AutomationProperties.Name="Status traka programa">
+                   AutomationProperties.Name="{DynamicResource L_acc_status_bar}">
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
                            Foreground="{StaticResource BrText}" FontSize="11"
-                           AutomationProperties.Name="Poruka statusa"
+                           AutomationProperties.Name="{DynamicResource L_acc_status_message}"
                            AutomationProperties.LiveSetting="Polite"/>
             </StatusBarItem>
             <Separator/>
@@ -511,7 +515,7 @@
                 </TextBlock>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="Ultra Audio Editor v1.0 | JAWS pristupacno"
+                <TextBlock Text="{DynamicResource L_statusbar_ready}"
                            Foreground="{StaticResource BrTextMuted}" FontSize="10"/>
             </StatusBarItem>
         </StatusBar>

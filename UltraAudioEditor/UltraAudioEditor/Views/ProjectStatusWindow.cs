@@ -2,13 +2,15 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Views
 {
     public class ProjectStatusWindow : Window
     {
         public ProjectStatusWindow(string statusText)
         {
-            Title = "Status projekta — Ultra Audio Editor";
+            Title = Lang.T("status_title");
             Width = 600; Height = 500;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = (System.Windows.Media.Brush)Application.Current.Resources["BrBgDark"];
@@ -20,7 +22,7 @@ namespace UltraAudioEditor.Views
 
             var title = new TextBlock
             {
-                Text = "Status projekta (F6)",
+                Text = Lang.T("status_header"),
                 FontSize = 14, FontWeight = FontWeights.Medium,
                 Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"],
                 Margin = new Thickness(12, 10, 12, 8)

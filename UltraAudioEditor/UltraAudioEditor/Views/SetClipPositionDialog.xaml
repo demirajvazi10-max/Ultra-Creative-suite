@@ -1,7 +1,7 @@
 <Window x:Class="UltraAudioEditor.Views.SetClipPositionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Postavi poziciju klipa"
+        Title="{DynamicResource L_setpos_title}"
         Width="420" Height="280"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
@@ -29,10 +29,10 @@
 
         <!-- Uputstvo -->
         <TextBlock Grid.Row="1"
-                   Text="Unesite novu startnu poziciju klipa u sekundama:"
+                   Text="{DynamicResource L_setpos_intro}"
                    Foreground="{StaticResource BrTextSec}" FontSize="12"
                    Margin="0,0,0,8"
-                   AutomationProperties.Name="Uputstvo: unesite poziciju u sekundama"/>
+                   AutomationProperties.Name="{DynamicResource L_acc_pos_help}"/>
 
         <!-- Input u sekundama -->
         <Grid Grid.Row="2" Margin="0,0,0,12">
@@ -44,8 +44,8 @@
                      Grid.Column="0"
                      FontSize="18" Height="40"
                      TextAlignment="Right"
-                     AutomationProperties.Name="Pozicija u sekundama"
-                     AutomationProperties.HelpText="Unesite broj sekundi, npr. 15 ili 15.5"
+                     AutomationProperties.Name="{DynamicResource L_acc_pos_seconds}"
+                     AutomationProperties.HelpText="{DynamicResource L_setpos_sec_help}"
                      KeyDown="SecondsBox_KeyDown"/>
             <TextBlock Grid.Column="1" Text=" s"
                        VerticalAlignment="Center"
@@ -55,7 +55,7 @@
 
         <!-- Format MM:SS alternativa -->
         <TextBlock Grid.Row="3"
-                   Text="ili u formatu MM:SS (npr. 0:15 ili 1:30):"
+                   Text="{DynamicResource L_setpos_mmss_intro}"
                    Foreground="{StaticResource BrTextSec}" FontSize="12"
                    Margin="0,0,0,8"/>
 
@@ -67,8 +67,8 @@
             <TextBox x:Name="TimeBox"
                      Grid.Column="0"
                      FontSize="16" Height="38"
-                     AutomationProperties.Name="Pozicija u formatu minuti i sekundi"
-                     AutomationProperties.HelpText="Unesite u formatu MM:SS, npr. 0:15 za 15 sekundi"
+                     AutomationProperties.Name="{DynamicResource L_acc_pos_mmss}"
+                     AutomationProperties.HelpText="{DynamicResource L_setpos_mmss_help}"
                      KeyDown="TimeBox_KeyDown"/>
             <TextBlock Grid.Column="1" Text=" MM:SS"
                        VerticalAlignment="Center"
@@ -79,17 +79,17 @@
         <!-- Dugmad -->
         <StackPanel Grid.Row="6" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="BtnCancel" Margin="0,0,8,0" Content="Otkaži"
+            <Button x:Name="BtnCancel" Margin="0,0,8,0" Content="{DynamicResource L_btn_cancel}"
                     Style="{StaticResource StdButton}"
                     Width="90" Height="32"
                     Click="BtnCancel_Click"
-                    AutomationProperties.Name="Otkaži postavljanje pozicije"/>
-            <Button x:Name="BtnOk" Content="Postavi"
+                    AutomationProperties.Name="{DynamicResource L_acc_cancel_pos}"/>
+            <Button x:Name="BtnOk" Content="{DynamicResource L_btn_set}"
                     Style="{StaticResource AIButton}"
                     Width="90" Height="32"
                     IsDefault="True"
                     Click="BtnOk_Click"
-                    AutomationProperties.Name="Potvrdi i postavi novu poziciju klipa"/>
+                    AutomationProperties.Name="{DynamicResource L_acc_confirm_pos}"/>
         </StackPanel>
     </Grid>
 </Window>

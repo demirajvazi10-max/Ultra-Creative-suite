@@ -2,6 +2,8 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Services
 {
     public enum AiProvider { Groq, Anthropic }
@@ -98,7 +100,7 @@ namespace UltraAudioEditor.Services
             progress?.Report(90);
 
             if (!response.IsSuccessStatusCode)
-                throw new Exception($"API greška {(int)response.StatusCode}: {responseJson}");
+                throw new Exception(string.Format(Lang.T("api_error"), (int)response.StatusCode, responseJson));
 
             using var doc = JsonDocument.Parse(responseJson);
 
@@ -110,7 +112,7 @@ namespace UltraAudioEditor.Services
                     .GetProperty("choices")[0]
                     .GetProperty("message")
                     .GetProperty("content")
-                    .GetString() ?? "Nema odgovora.";
+                    .GetString() ?? Lang.T("no_response");
             }
             else
             {
@@ -118,7 +120,7 @@ namespace UltraAudioEditor.Services
                 result = doc.RootElement
                     .GetProperty("content")[0]
                     .GetProperty("text")
-                    .GetString() ?? "Nema odgovora.";
+                    .GetString() ?? Lang.T("no_response");
             }
 
             progress?.Report(100);
@@ -128,7 +130,7 @@ namespace UltraAudioEditor.Services
         public async Task<string> TranscribeAudioAsync(string trackInfo, string language,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si AI asistent u profesionalnom audio editoru. Odgovaraj na srpskom jeziku. Budi koncizan i stručan.";
+            string sys = Lang.T("sys_general");
             string prompt = $@"Korisnik ima audio projekat sa sljedećim trakama: {trackInfo}
 Jezik: {language}
 
@@ -172,7 +174,7 @@ Dodaj: ukupno trajanje za rezanje, postotak kompresije projekta, upozorenja.";
         public async Task<string> VocalSeparationAdviceAsync(string trackInfo,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si audio inžinjer specijalizovan za stem separation. Odgovaraj na srpskom jeziku.";
+            string sys = Lang.T("sys_stem");
             string prompt = $@"Korisnik želi AI separaciju vokalnih i instrumentalnih stemova. Trake: {trackInfo}
 
 Daj uputstva:
@@ -188,7 +190,7 @@ Daj uputstva:
         public async Task<string> DescribeAudioAsync(string trackInfo, string projectInfo,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si audio opisivač za osobe sa oštećenjem vida. Odgovaraj na srpskom jeziku. Budi detaljan.";
+            string sys = Lang.T("sys_describe");
             string prompt = $@"Kreiraj verbalni opis audio projekta za JAWS korisnika.
 Projekat: {projectInfo}
 Trake: {trackInfo}
@@ -209,7 +211,7 @@ Koristi jasne opise bez vizualnih metafora.";
         public async Task<string> VocalMixAdviceAsync(string vocalTracks, string instTracks,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si profesionalni mix inžinjer. Odgovaraj na srpskom jeziku.";
+            string sys = Lang.T("sys_mix");
             string prompt = $@"Preporuke za miksovanje glasa na instrumental.
 Vokalne trake: {vocalTracks}
 Instrumentalne: {instTracks}
@@ -226,7 +228,7 @@ PROSTORNI EFEKTI: Reverb tip, pre-delay, stereo width";
         public async Task<string> EqRecommendationsAsync(string trackName, string trackType,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si mastering inžinjer. Odgovaraj na srpskom jeziku sa konkretnim frekvencijama.";
+            string sys = Lang.T("sys_mastering");
             string prompt = $@"EQ preporuke za traku: '{trackName}' (Tip: {trackType})
 
 NISKOFREKVENTNI DIO (20-250 Hz): [frekvencija]: [akcija] - [razlog]
@@ -241,7 +243,7 @@ Budi konkretan sa dB vrijednostima.";
         public async Task<string> AutoLevelAnalysisAsync(string trackInfo,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
-            string sys = "Ti si loudness normalizacijski stručnjak. Odgovaraj na srpskom jeziku.";
+            string sys = Lang.T("sys_loudness");
             string prompt = $@"Analiziraj nivoe glasnoće za: {trackInfo}
 
 Daj preporuke:

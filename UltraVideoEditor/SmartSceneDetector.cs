@@ -287,7 +287,7 @@ namespace UltraVideoEditor
             }
             sb.AppendLine();
             sb.AppendLine($"Generisan: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
-            sb.AppendLine("Ultra Creative Suite — Smart Scene Detector (Faza 4A)");
+            sb.AppendLine("Ultra Creative Suite — Smart Scene Detector (Phase 4A)");
             return sb.ToString();
         }
 

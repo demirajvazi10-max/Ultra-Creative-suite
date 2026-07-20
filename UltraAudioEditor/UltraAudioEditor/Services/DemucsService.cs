@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 
+using UltraAudioEditor.Localization;
+
 namespace UltraAudioEditor.Services
 {
     /// <summary>
@@ -33,7 +35,7 @@ namespace UltraAudioEditor.Services
             string? python = FindPython();
             if (python == null)
             {
-                StatusMessage = "Python nije pronađen. Instalirajte Python 3.8+ sa python.org";
+                StatusMessage = Lang.T("demucs_no_python");
                 return false;
             }
             try
@@ -65,10 +67,10 @@ namespace UltraAudioEditor.Services
         {
             string? python = FindPython();
             if (python == null)
-                throw new Exception("Python nije pronađen. Instalirajte Python 3.8+ sa python.org.");
+                throw new Exception(Lang.T("demucs_no_python"));
 
             if (!File.Exists(inputFilePath))
-                throw new FileNotFoundException("Audio fajl nije pronađen.", inputFilePath);
+                throw new FileNotFoundException(Lang.T("demucs_no_audio"), inputFilePath);
 
             Directory.CreateDirectory(outputDirectory);
 
@@ -81,13 +83,13 @@ namespace UltraAudioEditor.Services
             var result = await RunCommandAsync(python, args, outputDirectory, progress, ct);
 
             if (result.ExitCode != 0)
-                throw new Exception($"Demucs greška:\n{result.StdErr}");
+                throw new Exception(string.Format(Lang.T("demucs_error"), result.StdErr));
 
             // Pronađi outpute — Demucs kreira: outputDir/model/track_name/*.wav
             string trackName = Path.GetFileNameWithoutExtension(inputFilePath);
             string stemDir   = Path.Combine(outputDirectory, model, trackName);
 
-            progress?.Report((90, "Tražim izlazne fajlove..."));
+            progress?.Report((90, Lang.T("demucs_searching")));
 
             if (!Directory.Exists(stemDir))
             {

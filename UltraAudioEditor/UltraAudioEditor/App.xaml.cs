@@ -1,4 +1,5 @@
 using System.Windows;
+using UltraAudioEditor.Localization;
 
 namespace UltraAudioEditor
 {
@@ -7,10 +8,13 @@ namespace UltraAudioEditor
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            // Ucitaj sacuvani jezik i primeni prevode pre otvaranja glavnog prozora
+            Lang.Load();
+            Lang.ApplyToResources();
             DispatcherUnhandledException += (s, ex) =>
             {
-                MessageBox.Show($"Neočekivana greška: {ex.Exception.Message}\n\n{ex.Exception.StackTrace}",
-                    "Ultra Audio Editor - Greška", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(string.Format(Lang.T("unexpected_error"), ex.Exception.Message, ex.Exception.StackTrace),
+                    Lang.T("unexpected_error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
                 ex.Handled = true;
             };
         }
