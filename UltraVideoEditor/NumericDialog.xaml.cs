@@ -17,6 +17,7 @@ namespace UltraVideoEditor
         public NumericDialog(int maxValue)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _maxValue = maxValue;
             lblInstruction.Text = $"Pozicija (1 - {maxValue}):";
             txtNumber.Focus();

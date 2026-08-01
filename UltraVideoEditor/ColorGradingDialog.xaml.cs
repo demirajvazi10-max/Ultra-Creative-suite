@@ -36,6 +36,7 @@ namespace UltraVideoEditor
         public ColorGradingDialog(List<TimelineItem> timelineItems)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _items = timelineItems.Where(i => i.IsVideoTrack && File.Exists(i.Path)).ToList();
             BuildPresetButtons();
             TxtClipCount.Text = $"{_items.Count} video clips on the timeline";

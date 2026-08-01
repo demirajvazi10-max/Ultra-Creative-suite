@@ -39,6 +39,7 @@ namespace UltraVideoEditor
         public TimelineAIAssistantDialog(List<TimelineItem> timelineItems)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _originalItems = new List<TimelineItem>(timelineItems);
             _workingItems  = new List<TimelineItem>(timelineItems);
             TxtSubtitle.Text = $"Timeline: {timelineItems.Count} clips  ·  Ollama (local AI) + rule-based fallback";
@@ -124,12 +125,12 @@ namespace UltraVideoEditor
         {
             if (!File.Exists(_recordingPath)) return;
 
-            BtnMic.IsEnabled     = false;
-            BtnExecute.IsEnabled = false;
-            ShowStatus("⏳ Transkribujem snimak (Whisper large-v3)…", null, true, false);
-
             try
             {
+                BtnMic.IsEnabled     = false;
+                BtnExecute.IsEnabled = false;
+                ShowStatus("⏳ Transkribujem snimak (Whisper large-v3)…", null, true, false);
+
                 string ffmpegPath = System.IO.Path.Combine(
                     AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
 

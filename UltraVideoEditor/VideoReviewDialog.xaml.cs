@@ -44,6 +44,7 @@ namespace UltraVideoEditor
         public VideoReviewDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
 
             // Non-modal window (opened with Show), so IsCancel can't be used —
             // handle Escape directly instead so JAWS/NVDA users can close it easily.

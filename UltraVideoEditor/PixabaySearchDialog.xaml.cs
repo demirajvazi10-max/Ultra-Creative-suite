@@ -32,6 +32,7 @@ namespace UltraVideoEditor
         public PixabaySearchDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             LoadSavedApiKey();
         }
 

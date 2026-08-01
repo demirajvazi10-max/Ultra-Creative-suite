@@ -36,6 +36,7 @@ namespace UltraVideoEditor
         public SceneDetectionDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
         }
 
         // ── Odabir fajla ──────────────────────────────────────────────

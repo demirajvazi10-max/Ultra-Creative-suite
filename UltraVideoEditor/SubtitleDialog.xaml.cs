@@ -16,6 +16,7 @@ namespace UltraVideoEditor
         public SubtitleDialog(TimelineItem clip)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             this.Title = $"Add subtitle to: {clip.Name}";
         }
 

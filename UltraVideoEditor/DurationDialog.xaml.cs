@@ -21,6 +21,7 @@ namespace UltraVideoEditor
         public DurationDialog(double currentDuration = 5.0)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Duration = currentDuration;
             txtDuration.Text = currentDuration.ToString(CultureInfo.InvariantCulture);
 

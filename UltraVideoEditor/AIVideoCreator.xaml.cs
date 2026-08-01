@@ -208,6 +208,7 @@ namespace UltraVideoEditor
         public AIVideoCreator()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Loaded += AIVideoCreator_Loaded;
             _pixabayApiKey = GetPixabayApiKey();
         }

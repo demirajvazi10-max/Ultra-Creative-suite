@@ -45,6 +45,7 @@ namespace UltraVideoEditor
         public VideoEngineDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _pixabayApiKey = ReadPixabayKey();
             Loaded += OnLoaded;
         }

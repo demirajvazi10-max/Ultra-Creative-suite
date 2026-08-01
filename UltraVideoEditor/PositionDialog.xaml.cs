@@ -26,6 +26,7 @@ namespace UltraVideoEditor
         public PositionDialog(TimelineItem currentItem, List<TimelineItem> allItems, double audioDuration)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _currentItem = currentItem;
             _allItems = allItems;
             _audioDuration = audioDuration;

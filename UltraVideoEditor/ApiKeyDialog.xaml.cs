@@ -30,6 +30,7 @@ namespace UltraVideoEditor
             string existingAzureDeploy   = null)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Title = LF("akd_service_title", service);
             txtApiKey.ToolTip = message;
 

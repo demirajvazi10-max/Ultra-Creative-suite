@@ -9,6 +9,7 @@ namespace UltraVideoEditor
         public ResolutionDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             cmbResolution.SelectedIndex = 1; // Full HD default
         }
 

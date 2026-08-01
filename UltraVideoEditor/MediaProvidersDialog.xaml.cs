@@ -25,6 +25,7 @@ namespace UltraVideoEditor
         public MediaProvidersDialog(AIVideoCreator creator = null)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             _creator = creator;
             Loaded += OnLoaded;
         }

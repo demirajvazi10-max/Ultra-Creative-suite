@@ -28,6 +28,7 @@ namespace UltraVideoEditor
         public TextOverlayDialog(string title = "Add text to image")
         {
             InitializeComponent();
+            UiScaling.Register(this);
             this.Title = title;
             AutomationProperties.SetName(this, title);
             txtText.Focus();

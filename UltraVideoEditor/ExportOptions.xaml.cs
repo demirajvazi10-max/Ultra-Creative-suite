@@ -10,6 +10,7 @@ namespace UltraVideoEditor
         public ExportOptions(ExportSettingsData defaultSettings = null)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Settings = defaultSettings ?? new ExportSettingsData();
             LoadSettings();
         }

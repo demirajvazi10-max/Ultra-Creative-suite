@@ -14,6 +14,7 @@ namespace UltraVideoEditor
         public HelpWindow()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             AutomationProperties.SetName(this, L("helpwnd_acc"));
 
             this.Loaded += (s, e) => { this.Focus(); };

@@ -17,6 +17,7 @@ namespace UltraVideoEditor
         public VolumeControl(double currentVolume = 100)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Volume = currentVolume;
             sldVolume.Value = currentVolume;
             txtVolumeValue.Text = $"{currentVolume:F0}%";

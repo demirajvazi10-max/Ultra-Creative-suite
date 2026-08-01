@@ -61,6 +61,7 @@ namespace UltraVideoEditor
         public AutoArrangeDialog(double audioDuration, int imageCount)
         {
             InitializeComponent();
+            UiScaling.Register(this);
 
             _audioDuration = audioDuration;
             _imageCount = imageCount;

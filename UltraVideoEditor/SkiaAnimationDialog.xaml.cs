@@ -17,6 +17,7 @@ namespace UltraVideoEditor
         public SkiaAnimationDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             cmbStyle.SelectedIndex = 0;
 
             cmbStyle.KeyDown += (s, e) =>

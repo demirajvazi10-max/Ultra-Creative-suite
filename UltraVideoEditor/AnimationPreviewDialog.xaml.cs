@@ -11,6 +11,7 @@ namespace UltraVideoEditor
         public AnimationPreviewDialog(List<AnimationScene> scenes, List<string> availableImages)
         {
             InitializeComponent();
+            UiScaling.Register(this);
 
             // Postavi dostupne slike za svaku scenu
             foreach (var scene in scenes)

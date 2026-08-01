@@ -24,6 +24,7 @@ namespace UltraVideoEditor
         public BatchExportDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             JobsList.ItemsSource = _jobs;
         }
 

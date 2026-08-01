@@ -16,6 +16,7 @@ namespace UltraVideoEditor
         public TransitionDialog(int totalClips)
         {
             InitializeComponent();
+            UiScaling.Register(this);
             txtMaxClips.Text = totalClips.ToString();
             txtClipNumber.Text = "1";
         }

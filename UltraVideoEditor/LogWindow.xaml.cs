@@ -20,6 +20,7 @@ namespace UltraVideoEditor
         public LogWindow()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             lstLog.ItemsSource = _logEntries;
             lstLog.KeyDown += LstLog_KeyDown;
             AutomationProperties.SetName(this, "Log window");

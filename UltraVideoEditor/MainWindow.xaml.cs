@@ -85,6 +85,19 @@ namespace UltraVideoEditor
         private UIMode _uiMode = UIMode.Sighted;
         private bool accessibilityMode => _uiMode == UIMode.Accessibility;
 
+        // ── Low Vision text/UI scale ──────────────────────────────────────
+        // Applies to every WPF window via UiScaling (LayoutTransform-based).
+        // The native timelineListView (WindowsFormsHost) ignores WPF
+        // LayoutTransform, so it's rescaled separately in
+        // ApplyNativeListViewScale() using its own base font/column sizes.
+        private const double LowVisionScaleMin = 1.0;
+        private const double LowVisionScaleMax = 2.5;
+        private const double LowVisionScaleStep = 0.25;
+        private double _lowVisionScale = 1.5;
+
+        private static readonly int[] TimelineColumnBaseWidths = { 50, 350, 60, 80, 80, 80, 300 };
+        private const float TimelineBaseFontSize = 10f;
+
         private System.Windows.Forms.Timer _selectionDebounceTimer;
         private bool _selectionProcessing = false;
         private TimelineItem _pendingPlaybackItem = null;
@@ -142,6 +155,7 @@ namespace UltraVideoEditor
             try
             {
                 InitializeComponent();
+                UiScaling.Register(this);
                 _logWindow = new LogWindow();
                 _renderEngine = new RenderEngine(useGPUAcceleration);
 
@@ -2866,12 +2880,14 @@ namespace UltraVideoEditor
 
                 case UIMode.LowVision:
                     borderAccessibilityStatus.Visibility = Visibility.Visible;
-                    txtAccessibilityStatus.Text = "🔍 LOW VISION MODE ON";
+                    txtAccessibilityStatus.Text = $"🔍 LOW VISION MODE ON ({_lowVisionScale:0.##}x)";
                     try { positionAnnounceTimer?.Stop(); } catch { }
-                    // Low vision needs strong contrast as a baseline; font/control
-                    // scaling is planned separately and will hook in here too.
+                    // Low vision needs strong contrast as a baseline, plus
+                    // enlarged text/controls across every window.
                     _currentTheme = "contrast";
                     ApplyTheme();
+                    UiScaling.SetScale(_lowVisionScale);
+                    ApplyNativeListViewScale(_lowVisionScale);
                     if (announce) LogMessage("Low vision mode on", true);
                     break;
 
@@ -2879,6 +2895,11 @@ namespace UltraVideoEditor
                 default:
                     borderAccessibilityStatus.Visibility = Visibility.Collapsed;
                     try { positionAnnounceTimer?.Stop(); } catch { }
+                    // Defensive reset: whatever mode we're coming from, Sighted
+                    // and Accessibility both use normal (1.0x) scale. Without
+                    // this, leaving Low Vision would leave everything enlarged.
+                    UiScaling.SetScale(1.0);
+                    ApplyNativeListViewScale(1.0);
                     if (announce) LogMessage(L("accessibility_off"), true);
                     break;
             }
@@ -2985,6 +3006,16 @@ namespace UltraVideoEditor
                 else if (e.Key == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
                     ToggleAccessibilityMode_Click(null, null);
+                    e.Handled = true;
+                }
+                else if ((e.Key == Key.OemPlus || e.Key == Key.Add) && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    IncreaseLowVisionTextSize_Click(null, null);
+                    e.Handled = true;
+                }
+                else if ((e.Key == Key.OemMinus || e.Key == Key.Subtract) && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    DecreaseLowVisionTextSize_Click(null, null);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.R && Keyboard.Modifiers == ModifierKeys.Control)
@@ -4154,6 +4185,76 @@ namespace UltraVideoEditor
             {
                 // Opcionalno
             }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        // Base row height (px) the timeline ListView uses at scale 1.0.
+        // Rows in LVS_REPORT (Details) view size to the taller of the font
+        // and the small-image-list icon height, so an invisible 1px-wide
+        // image list is the standard trick to control row height directly.
+        private const int TimelineBaseRowHeight = 20;
+        private System.Windows.Forms.ImageList _timelineRowHeightImageList;
+
+        /// <summary>
+        /// Rescales the native WinForms timeline ListView for Low Vision mode.
+        /// WPF's LayoutTransform (used everywhere else via UiScaling) does not
+        /// reach into a WindowsFormsHost, so the font, column widths, and row
+        /// height are resized here by hand, from the same base sizes
+        /// InitNativeListView uses. Safe to call before the list view exists
+        /// (e.g. during startup ordering) — it just no-ops.
+        /// </summary>
+        private void ApplyNativeListViewScale(double scale)
+        {
+            if (nativeListView == null) return;
+
+            try
+            {
+                nativeListView.Font = new System.Drawing.Font("Segoe UI", TimelineBaseFontSize * (float)scale);
+
+                var columns = nativeListView.Columns;
+                for (int i = 0; i < columns.Count && i < TimelineColumnBaseWidths.Length; i++)
+                    columns[i].Width = (int)Math.Round(TimelineColumnBaseWidths[i] * scale);
+
+                // Font alone won't grow the row height enough to feel
+                // comfortably "enlarged" at 1.5x+, so drive it explicitly
+                // via a 1px-wide image list whose height sets the row height.
+                var oldImageList = _timelineRowHeightImageList;
+                var newImageList = new System.Windows.Forms.ImageList
+                {
+                    ImageSize = new System.Drawing.Size(1, (int)Math.Round(TimelineBaseRowHeight * scale)),
+                    ColorDepth = System.Windows.Forms.ColorDepth.Depth32Bit
+                };
+                nativeListView.SmallImageList = newImageList;
+                _timelineRowHeightImageList = newImageList;
+                oldImageList?.Dispose(); // avoid leaking the GDI handle on repeated scale changes
+            }
+            catch (Exception ex)
+            {
+                LogMessage("Failed to scale timeline list view: " + ex.Message, false);
+            }
+        }
+
+        /// <summary>
+        /// Increases the Low Vision scale factor by one step (up to 2.5x) and
+        /// re-applies it immediately if Low Vision mode is currently active.
+        /// Bound to the View menu and Ctrl+Shift+OemPlus.
+        /// </summary>
+        private void IncreaseLowVisionTextSize_Click(object sender, RoutedEventArgs e)
+        {
+            _lowVisionScale = Math.Min(LowVisionScaleMax, _lowVisionScale + LowVisionScaleStep);
+            if (_uiMode == UIMode.LowVision) SetUIMode(UIMode.LowVision, announce: false);
+            LogMessage($"Low vision text size: {_lowVisionScale:0.##}x", true);
+        }
+
+        /// <summary>
+        /// Decreases the Low Vision scale factor by one step (down to 1.0x)
+        /// and re-applies it immediately if Low Vision mode is currently
+        /// active. Bound to the View menu and Ctrl+Shift+OemMinus.
+        /// </summary>
+        private void DecreaseLowVisionTextSize_Click(object sender, RoutedEventArgs e)
+        {
+            _lowVisionScale = Math.Max(LowVisionScaleMin, _lowVisionScale - LowVisionScaleStep);
+            if (_uiMode == UIMode.LowVision) SetUIMode(UIMode.LowVision, announce: false);
+            LogMessage($"Low vision text size: {_lowVisionScale:0.##}x", true);
         }
 
         private void InitNativeListView()

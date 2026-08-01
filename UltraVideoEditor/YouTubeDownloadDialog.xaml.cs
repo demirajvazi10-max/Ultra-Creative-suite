@@ -46,6 +46,7 @@ namespace UltraVideoEditor
         public YouTubeDownloadDialog()
         {
             InitializeComponent();
+            UiScaling.Register(this);
             Directory.CreateDirectory(DownloadFolder);
             Loaded += (_, _) => txtUrl.Focus();
         }

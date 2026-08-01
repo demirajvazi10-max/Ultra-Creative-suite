@@ -151,6 +151,8 @@ namespace UltraVideoEditor
             sr["mode_sighted"] = "Standardni (za osobe koje vide)";
             sr["mode_accessibility"] = "Pristupačnost (čitač ekrana)";
             sr["mode_low_vision"] = "Slabovidost";
+            sr["mode_low_vision_text_inc"] = "Uvećaj tekst i kontrole";
+            sr["mode_low_vision_text_dec"] = "Umanji tekst i kontrole";
             sr["menu_set_volume"] = "Podesi jačinu zvuka...";
             sr["preview_duration_sec"] = "Dužina pregleda: {0} sekundi";
             sr["playback_done"] = "Reprodukcija završena";
@@ -732,6 +734,8 @@ namespace UltraVideoEditor
             en["mode_sighted"] = "Sighted (default)";
             en["mode_accessibility"] = "Accessibility (screen reader)";
             en["mode_low_vision"] = "Low Vision";
+            en["mode_low_vision_text_inc"] = "Increase text/control size";
+            en["mode_low_vision_text_dec"] = "Decrease text/control size";
             en["menu_set_volume"] = "Set volume...";
             en["preview_duration_sec"] = "Preview duration: {0} seconds";
             en["playback_done"] = "Playback finished";
@@ -1290,6 +1294,8 @@ namespace UltraVideoEditor
             de["mode_sighted"] = "Sehend (Standard)";
             de["mode_accessibility"] = "Barrierefreiheit (Screenreader)";
             de["mode_low_vision"] = "Sehbehinderung";
+            de["mode_low_vision_text_inc"] = "Text und Bedienelemente vergrößern";
+            de["mode_low_vision_text_dec"] = "Text und Bedienelemente verkleinern";
             de["menu_set_volume"] = "Lautstärke einstellen...";
             de["mw_file_menu"] = "Datei";
             de["mnu_export_options"] = "Exportoptionen...";

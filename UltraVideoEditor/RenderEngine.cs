@@ -17,6 +17,21 @@ namespace UltraVideoEditor
     {
         private string _ffmpegPath;
 
+        // Ne menja ponašanje (i dalje se "gutaju" ove greške, namerno — nisu
+        // dovoljno kritične da prekinu render), ali barem ostavljaju trag da
+        // se sledeći put ne nagađa u mraku ako se nešto ponavlja.
+        private static void LogSwallowedError(string context, Exception ex)
+        {
+            try
+            {
+                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UltraVideoEditor");
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, "render_errors.log"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{context}] {ex.GetType().Name}: {ex.Message}\n");
+            }
+            catch { /* ako i samo logovanje pukne, nema šta drugo da se uradi */ }
+        }
+
         private static string _LangCode => (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
@@ -588,7 +603,7 @@ namespace UltraVideoEditor
                                         : $"{kenBurnsGpu},{baseNormalize},{moodFilter}{colorMatchFilter}{wwbFilter}{seasonalGradeFilter}{childrenContrastFilter}{gradeFilter}{fpsNormalize}{DENOISE_FILTER}";
                                 }
                             }
-                            catch { }
+                            catch (Exception exKenBurns) { LogSwallowedError("KenBurns filter build", exKenBurns); }
                         }
 
                         bool isZoompan = videoVf.Contains("zoompan");
@@ -1100,7 +1115,7 @@ namespace UltraVideoEditor
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception exPost) { LogSwallowedError("Post-processing file swap", exPost); }
                 }
 
                 progress?.Report(100);
@@ -1112,7 +1127,7 @@ namespace UltraVideoEditor
                     if (Directory.Exists(tempDir))
                         Directory.Delete(tempDir, true);
                 }
-                catch { }
+                catch (Exception exCleanup) { LogSwallowedError("Temp dir cleanup", exCleanup); }
             }
         }
 
@@ -1168,7 +1183,7 @@ namespace UltraVideoEditor
                          + int.Parse(m.Groups[2].Value) * 60
                          + double.Parse(m.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture);
             }
-            catch { }
+            catch (Exception exDuration) { LogSwallowedError("FFmpeg duration parse", exDuration); }
             return 0.0;
         }
 
