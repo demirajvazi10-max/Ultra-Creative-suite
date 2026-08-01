@@ -35,23 +35,33 @@ namespace UltraAudioEditor.Services
             string? python = FindPython();
             if (python == null)
             {
-                StatusMessage = Lang.T("demucs_no_python");
+                StatusMessage = Lang.T("demucs_no_python") + "\n\n" + LastDiagnostics;
                 return false;
             }
             try
             {
-                var result = await RunCommandAsync(python, "-m demucs --help", "", null, CancellationToken.None);
+                // Prvi put kad se Demucs proveri, Python učitava PyTorch što može
+                // potrajati i po pola minuta na sporijem hardveru — zato 90s, ne
+                // par sekundi. Ako ni to ne prođe, nešto je stvarno zaglavljeno.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+                var result = await RunCommandAsync(python, "-m demucs --help", "", null, cts.Token);
                 if (result.ExitCode != 0)
                 {
-                    StatusMessage = "Demucs nije instaliran. Pokrenite: pip install demucs";
+                    StatusMessage = Lang.T("demucs_not_found_msg") +
+                        $"\n\n[koristi: {python}]\nexit={result.ExitCode}\n{result.StdErr}";
                     return false;
                 }
-                StatusMessage = "Demucs je dostupan.";
+                StatusMessage = Lang.T("demucs_available");
                 return true;
+            }
+            catch (OperationCanceledException)
+            {
+                StatusMessage = Lang.T("demucs_timeout");
+                return false;
             }
             catch
             {
-                StatusMessage = "Demucs nije instaliran. Pokrenite: pip install demucs";
+                StatusMessage = Lang.T("demucs_not_found_msg");
                 return false;
             }
         }
@@ -154,22 +164,41 @@ namespace UltraAudioEditor.Services
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();
 
-            await Task.Run(() => proc.WaitForExit(), ct);
+            try
+            {
+                await proc.WaitForExitAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Vreme isteklo (ili je pozivalac otkazao) — ubij proces da ne ostane
+                // da visi u pozadini, i prosledi grešku dalje umesto da zaglavimo zauvek.
+                try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); } catch { }
+                throw;
+            }
 
             return (proc.ExitCode, stdout.ToString(), stderr.ToString());
         }
 
+        public static string LastDiagnostics { get; private set; } = "";
+
         // ── Pronalaženje Pythona ───────────────────────────────────────────
         private static string? FindPython()
         {
-            string[] candidates = { "python", "python3", "py",
-                @"C:\Python312\python.exe", @"C:\Python311\python.exe",
-                @"C:\Python310\python.exe", @"C:\Python39\python.exe",
+            string[] candidates = {
+                "py",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     @"Programs\Python\Python312\python.exe"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     @"Programs\Python\Python311\python.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    @"Programs\Python\Python310\python.exe"),
+                @"C:\Python312\python.exe", @"C:\Python311\python.exe",
+                @"C:\Python310\python.exe", @"C:\Python39\python.exe",
+                "python", "python3",
             };
+
+            var log = new System.Text.StringBuilder();
+            log.AppendLine($"LocalAppData resolved to: {Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)}");
 
             foreach (var candidate in candidates)
             {
@@ -182,11 +211,22 @@ namespace UltraAudioEditor.Services
                         UseShellExecute = false, CreateNoWindow = true
                     };
                     using var p = Process.Start(psi);
+                    string outp = p?.StandardOutput.ReadToEnd() ?? "";
+                    string errp = p?.StandardError.ReadToEnd() ?? "";
                     p?.WaitForExit(2000);
-                    if (p?.ExitCode == 0) return candidate;
+                    log.AppendLine($"  [{candidate}] exit={p?.ExitCode} out=\"{outp.Trim()}\" err=\"{errp.Trim()}\"");
+                    if (p?.ExitCode == 0)
+                    {
+                        LastDiagnostics = log.ToString();
+                        return candidate;
+                    }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    log.AppendLine($"  [{candidate}] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                }
             }
+            LastDiagnostics = log.ToString();
             return null;
         }
     }

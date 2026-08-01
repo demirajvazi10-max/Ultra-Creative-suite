@@ -92,27 +92,35 @@ namespace UltraAudioEditor.ViewModels
         public bool IsJawsMode { get => _isJawsMode; set { _isJawsMode = value; OnPropertyChanged(); } }
         private string _aiApiKey = ""; public string AiApiKey { get => _aiApiKey; set { _aiApiKey = value; AI.SetApiKey(value); OnPropertyChanged(); } }
 
-        private bool _useGroq = true;
-        public bool UseGroq
+        // Ollama (lokalno) je podrazumevani provajder — bez API ključa, bez cloud-a.
+        private AiProvider _providerChoice = AiProvider.Ollama;
+        private void SetProvider(AiProvider p)
         {
-            get => _useGroq;
-            set
-            {
-                _useGroq = value;
-                AI.Provider = value ? AiProvider.Groq : AiProvider.Anthropic;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(UseAnthropic));
-                OnPropertyChanged(nameof(ApiKeyHint));
-                OnPropertyChanged(nameof(ApiKeyLink));
-            }
+            _providerChoice = p;
+            AI.Provider = p;
+            OnPropertyChanged(nameof(UseOllama));
+            OnPropertyChanged(nameof(UseGroq));
+            OnPropertyChanged(nameof(UseAnthropic));
+            OnPropertyChanged(nameof(ApiKeyHint));
+            OnPropertyChanged(nameof(ApiKeyLink));
+            OnPropertyChanged(nameof(NeedsApiKey));
         }
-        public bool UseAnthropic { get => !_useGroq; set => UseGroq = !value; }
-        public string ApiKeyHint => _useGroq
-            ? Lang.T("groq_key_hint")
-            : Lang.T("anthropic_key_hint");
-        public string ApiKeyLink => _useGroq
-            ? "https://console.groq.com/keys"
-            : "https://console.anthropic.com";
+        public bool UseOllama { get => _providerChoice == AiProvider.Ollama; set { if (value) SetProvider(AiProvider.Ollama); } }
+        public bool UseGroq { get => _providerChoice == AiProvider.Groq; set { if (value) SetProvider(AiProvider.Groq); } }
+        public bool UseAnthropic { get => _providerChoice == AiProvider.Anthropic; set { if (value) SetProvider(AiProvider.Anthropic); } }
+        public bool NeedsApiKey => _providerChoice != AiProvider.Ollama;
+        public string ApiKeyHint => _providerChoice switch
+        {
+            AiProvider.Groq      => Lang.T("groq_key_hint"),
+            AiProvider.Anthropic => Lang.T("anthropic_key_hint"),
+            _                    => Lang.T("ollama_key_hint")
+        };
+        public string ApiKeyLink => _providerChoice switch
+        {
+            AiProvider.Groq      => "https://console.groq.com/keys",
+            AiProvider.Anthropic => "https://console.anthropic.com",
+            _                    => "https://ollama.com/download"
+        };
 
         private string _selectedLanguage = "Srpski"; public string SelectedLanguage { get => _selectedLanguage; set { _selectedLanguage = value; OnPropertyChanged(); } }
         private string _selectedNoiseLevel = "Srednji"; public string SelectedNoiseLevel { get => _selectedNoiseLevel; set { _selectedNoiseLevel = value; OnPropertyChanged(); } }

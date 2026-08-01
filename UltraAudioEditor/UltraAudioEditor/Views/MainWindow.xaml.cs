@@ -44,6 +44,20 @@ namespace UltraAudioEditor.Views
                 if (args.PropertyName is nameof(VM.PlayheadPosition) or nameof(VM.TimeDisplay)
                     or nameof(VM.SelectedClip) or nameof(VM.SelectedTrack))
                     Dispatcher.Invoke(() => AccessibleTrackList.UpdateStatus());
+
+                // AutomationProperties.LiveSetting="Polite" u XAML-u SAMO OZNAČAVA element
+                // kao live region — ne garantuje da će JAWS/NVDA stvarno pročitati promenu.
+                // Mora se eksplicitno dići UIA LiveRegionChanged event svaki put kad se
+                // tekst promeni, inače promene (npr. napredak Demucs-a) prolaze nečujno.
+                if (args.PropertyName == nameof(VM.StatusMessage))
+                    Dispatcher.Invoke(() =>
+                    {
+                        var peer = System.Windows.Automation.Peers.UIElementAutomationPeer
+                            .FromElement(TxtStatusMessage)
+                            ?? System.Windows.Automation.Peers.UIElementAutomationPeer
+                                .CreatePeerForElement(TxtStatusMessage);
+                        peer?.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
+                    });
             };
             // PreviewKeyDown hvata Space/S/R prije nego List kontrole progutaju event
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;

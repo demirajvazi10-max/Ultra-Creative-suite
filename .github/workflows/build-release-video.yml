@@ -3,11 +3,9 @@ name: Build and Release Ultra Video Editor
 on:
   push:
     tags:
-      - 'v*'          # Pokretanje na svaki tag koji pocinje sa 'v' (v0.2, v1.0, itd.)
-                       # NAPOMENA: kad dodas audio editor kao poseban .iss/workflow,
-                       # ovaj filter ce pokupiti i njegove tagove ako i on koristi 'v*'.
-                       # Kada budes pravio taj workflow, razmisli o razlicitim
-                       # prefiksima (npr. 'video-v*' / 'audio-v*') da se ne sudare.
+      - 'video-v*'     # Simetricno sa audio editorom (koji koristi 'audio-v*') —
+                       # jasno razdvojeni prefiksi, nema šanse da tag jednog
+                       # slucajno pokrene build drugog.
 
 jobs:
   build:
@@ -21,6 +19,17 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      # Tag u gitu je "video-v1.0.0" (zbog jasnog prefiksa protiv sudara sa
+      # audio editorom), ali u imenu release-a i u samom instaleru hocemo
+      # da se vidi cisto "v1.0.0", bez ponavljanja "video-" dva puta u nazivu
+      # kao "Ultra Video Editor video-v1.0.0". Ovaj korak to skida jednom,
+      # pa ga svi naredni koraci koriste preko env.CLEAN_VERSION.
+      - name: Izvuci cistu verziju iz taga
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^video-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
 
       - name: Restore NuGet paketa
         run: dotnet restore UltraVideoEditor\UltraVideoEditor.csproj
@@ -45,20 +54,21 @@ jobs:
       # verziju i izvorni folder iz .iss-a bez menjanja same skripte —
       # lokalni default u .iss-u (Debug putanja) ostaje netaknut za rucno
       # testiranje, a ovde eksplicitno gadjamo Release publish folder koji je
-      # dotnet publish korak upravo napravio.
+      # dotnet publish korak upravo napravio. Koristi se CLEAN_VERSION (bez
+      # "video-" prefiksa), pa fajl ispadne "UltraVideoEditorSetup-v1.0.0.exe".
       - name: Kompajliraj installer (Inno Setup)
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            "/DMyAppVersion=${{ github.ref_name }}" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
             "/DMyAppSourceDir=${{ github.workspace }}\publish" `
             installer\UltraVideoEditor.iss
 
       - name: Kreiraj GitHub Release i uploaduj
         uses: softprops/action-gh-release@v2
         with:
-          name: "Ultra Video Editor ${{ github.ref_name }}"
+          name: "Ultra Video Editor ${{ env.CLEAN_VERSION }}"
           body: |
-            ## Ultra Video Editor ${{ github.ref_name }}
+            ## Ultra Video Editor ${{ env.CLEAN_VERSION }}
 
             **Preuzmi installer ispod i pokreni ga.** Windows ce traziti
             dozvolu administratora - to je normalno i ocekivano.

@@ -1,0 +1,99 @@
+name: Build and Release Ultra Audio Editor
+
+on:
+  push:
+    tags:
+      - 'audio-v*'    # Razlicit prefiks od video editora (koji koristi 'v*') —
+                       # da tagovi jednog ne pokrenu build drugog. Vidi napomenu
+                       # u build-release-video.yml.
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout koda
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Tag u gitu je "audio-v1.0.0" (jasan prefiks protiv sudara sa video
+      # editorom), ali u imenu release-a i instaleru hocemo cisto "v1.0.0" —
+      # ne "Ultra Audio Editor audio-v1.0.0". Ovaj korak to skida jednom.
+      - name: Izvuci cistu verziju iz taga
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^audio-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet paketa
+        run: dotnet restore UltraAudioEditor\UltraAudioEditor\UltraAudioEditor.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraAudioEditor\UltraAudioEditor\UltraAudioEditor.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      # Inno Setup nije unapred instaliran na windows-latest runneru, ali
+      # Chocolatey (choco.exe) jeste — standardan nacin da se instalira.
+      - name: Instaliraj Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      # ${{ github.ref_name }} ovde je npr. "audio-v1.0.0" (ceo tag, sa
+      # prefiksom) — koristi se i za MyAppVersion i za ime release-a, sto je
+      # OK jer Inno samo ubacuje taj string u OutputBaseFilename/AppVersion,
+      # ne parsira ga kao broj.
+      - name: Kompajliraj installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            installer\UltraAudioEditor.iss
+
+      - name: Kreiraj GitHub Release i uploaduj
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Audio Editor ${{ env.CLEAN_VERSION }}"
+          body: |
+            ## Ultra Audio Editor ${{ env.CLEAN_VERSION }}
+
+            **Preuzmi installer ispod i pokreni ga.** Windows ce traziti
+            dozvolu administratora - to je normalno i ocekivano.
+
+            Installer automatski, bez dodatnih koraka:
+            - Nudi izbor jezika na pocetku (Engleski/Nemacki/Srpski), koji
+              odmah postaje i podrazumevani jezik aplikacije
+            - Preuzima i instalira Ollama + AI model optimizovan za tvoj
+              hardver (GPU/RAM se automatski detektuju)
+            - Preuzima i instalira Python (sa pip i PATH podesenim
+              ispravno, automatski) ako vec nije prisutan
+            - Instalira Demucs i sve njegove zavisnosti (ukljucujuci
+              PyTorch — veci download, 1-2 GB, ali potpuno automatski) za
+              razdvajanje vokala/instrumentala
+            - Pokrece aplikaciju na kraju
+
+            ### Accessibility
+            Potpuno funkcionalno sa JAWS i NVDA screen readerima. Sve
+            funkcije dostupne iskljucivo tastaturom, kroz jedinstvenu
+            navigabilnu listu traka i klipova.
+
+            ### Sistemski zahtjevi
+            - Windows 10/11 (64-bit)
+            - 8GB RAM minimum
+            - ~3GB slobodnog prostora (zbog PyTorch/Demucs)
+
+            ---
+            *Built with GitHub Actions | [Dokumentacija](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: installer/Output/UltraAudioEditorSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

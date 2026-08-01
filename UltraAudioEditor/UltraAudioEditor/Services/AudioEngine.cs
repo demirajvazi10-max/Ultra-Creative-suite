@@ -358,6 +358,7 @@ namespace UltraAudioEditor.Services
                         // ── LIVE DSP LANAC ── svaki provider drži referencu na track.Effects
                         src = new NoiseGateSampleProvider(src, track.Effects);
                         src = new CompressorSampleProvider(src, track.Effects);
+                        src = new PitchShiftSampleProvider(src, track.Effects);
                         src = new EqualizerSampleProvider(src, track.Effects);
                         src = new BassBoostSampleProvider(src, track.Effects);
                         src = new ChorusSampleProvider(src, track.Effects);
@@ -485,7 +486,12 @@ namespace UltraAudioEditor.Services
             ExportFormat format, int bitRate = 192, Action<int>? progress = null)
         {
             var waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(project.SampleRate, 2);
-            var mixer = new MixingSampleProvider(waveFormat) { ReadFully = true };
+            // ReadFully = false: mikser MORA da javi kraj (Read vrati 0) čim sve trake završe.
+            // Sa ReadFully = true, mikser zauvijek vraća tišinu i WaveFileWriter piše u nedogled
+            // dok ne probije limit veličine WAV chunk-a -> "WAV file too large".
+            // (NAPOMENA: mikser za LIVE reprodukciju u Play() gore ostaje ReadFully=true namjerno —
+            // tamo treba da nastavi da vraća tišinu da WaveOutEvent ne prekine plejbek naglo.)
+            var mixer = new MixingSampleProvider(waveFormat) { ReadFully = false };
             bool anySolo = project.Tracks.Any(t => t.IsSolo);
             var readers = new List<AudioFileReader>();
 
@@ -507,6 +513,7 @@ namespace UltraAudioEditor.Services
                             src = new WdlResamplingSampleProvider(src, project.SampleRate);
                         src = new NoiseGateSampleProvider(src, track.Effects);
                         src = new CompressorSampleProvider(src, track.Effects);
+                        src = new PitchShiftSampleProvider(src, track.Effects);
                         src = new EqualizerSampleProvider(src, track.Effects);
                         src = new BassBoostSampleProvider(src, track.Effects);
                         src = new ChorusSampleProvider(src, track.Effects);
@@ -551,6 +558,243 @@ namespace UltraAudioEditor.Services
     }
 
     // Live volume — čita Volume i MasterVolume u realnom vremenu
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PITCH SHIFT — nije postojao u lancu efekata ranije (samo UI dugme koje nije
+    // radilo ništa). NAudio nema ugrađen pitch shifter, pa je ovo samostalna
+    // implementacija klasičnog FFT phase vocoder algoritma (Stephan M. Bernsee,
+    // "smbPitchShift" — javno dostupan algoritam, korišćen u bezbroj audio alata
+    // poslednjih 20+ godina). Radi po kanalu (stereo = dve nezavisne instance),
+    // strimuje po Read() pozivu, bez potrebe za spoljnom FFT bibliotekom.
+    // ═══════════════════════════════════════════════════════════════════════════
+    internal class SmbPitchShifter
+    {
+        private const int MAX_FRAME_LENGTH = 8192;
+        private readonly float[] _inFifo = new float[MAX_FRAME_LENGTH];
+        private readonly float[] _outFifo = new float[MAX_FRAME_LENGTH];
+        private readonly float[] _fftWorksp = new float[2 * MAX_FRAME_LENGTH];
+        private readonly float[] _lastPhase = new float[MAX_FRAME_LENGTH / 2 + 1];
+        private readonly float[] _sumPhase = new float[MAX_FRAME_LENGTH / 2 + 1];
+        private readonly float[] _outputAccum = new float[2 * MAX_FRAME_LENGTH];
+        private readonly float[] _anaFreq = new float[MAX_FRAME_LENGTH];
+        private readonly float[] _anaMagn = new float[MAX_FRAME_LENGTH];
+        private readonly float[] _synFreq = new float[MAX_FRAME_LENGTH];
+        private readonly float[] _synMagn = new float[MAX_FRAME_LENGTH];
+        private long _rover = -1;
+
+        public void PitchShift(float pitchShift, int numSampsToProcess, int fftFrameSize, int osamp,
+            float sampleRate, float[] indata, float[] outdata)
+        {
+            int fftFrameSize2 = fftFrameSize / 2;
+            int stepSize = fftFrameSize / osamp;
+            double freqPerBin = sampleRate / (double)fftFrameSize;
+            double expct = 2.0 * Math.PI * stepSize / fftFrameSize;
+            int inFifoLatency = fftFrameSize - stepSize;
+            if (_rover < 0) _rover = inFifoLatency;
+
+            for (int i = 0; i < numSampsToProcess; i++)
+            {
+                _inFifo[_rover] = indata[i];
+                outdata[i] = _outFifo[_rover - inFifoLatency];
+                _rover++;
+
+                if (_rover >= fftFrameSize)
+                {
+                    _rover = inFifoLatency;
+
+                    for (int k = 0; k < fftFrameSize; k++)
+                    {
+                        double window = -0.5 * Math.Cos(2.0 * Math.PI * k / fftFrameSize) + 0.5;
+                        _fftWorksp[2 * k] = (float)(_inFifo[k] * window);
+                        _fftWorksp[2 * k + 1] = 0f;
+                    }
+
+                    Fft(_fftWorksp, fftFrameSize, -1);
+
+                    for (int k = 0; k <= fftFrameSize2; k++)
+                    {
+                        double real = _fftWorksp[2 * k], imag = _fftWorksp[2 * k + 1];
+                        double magn = 2.0 * Math.Sqrt(real * real + imag * imag);
+                        double phase = Math.Atan2(imag, real);
+                        double tmp = phase - _lastPhase[k];
+                        _lastPhase[k] = (float)phase;
+                        tmp -= k * expct;
+                        long qpd = (long)(tmp / Math.PI);
+                        if (qpd >= 0) qpd += qpd & 1; else qpd -= qpd & 1;
+                        tmp -= Math.PI * qpd;
+                        tmp = osamp * tmp / (2.0 * Math.PI);
+                        tmp = k * freqPerBin + tmp * freqPerBin;
+                        _anaMagn[k] = (float)magn;
+                        _anaFreq[k] = (float)tmp;
+                    }
+
+                    Array.Clear(_synMagn, 0, fftFrameSize);
+                    Array.Clear(_synFreq, 0, fftFrameSize);
+                    for (int k = 0; k <= fftFrameSize2; k++)
+                    {
+                        int index = (int)(k * pitchShift);
+                        if (index <= fftFrameSize2)
+                        {
+                            _synMagn[index] += _anaMagn[k];
+                            _synFreq[index] = _anaFreq[k] * pitchShift;
+                        }
+                    }
+
+                    for (int k = 0; k <= fftFrameSize2; k++)
+                    {
+                        double magn = _synMagn[k];
+                        double tmp = _synFreq[k];
+                        tmp -= k * freqPerBin;
+                        tmp /= freqPerBin;
+                        tmp = 2.0 * Math.PI * tmp / osamp;
+                        tmp += k * expct;
+                        _sumPhase[k] += (float)tmp;
+                        double phase = _sumPhase[k];
+                        _fftWorksp[2 * k] = (float)(magn * Math.Cos(phase));
+                        _fftWorksp[2 * k + 1] = (float)(magn * Math.Sin(phase));
+                    }
+
+                    for (int k = fftFrameSize + 2; k < 2 * fftFrameSize; k++) _fftWorksp[k] = 0f;
+
+                    Fft(_fftWorksp, fftFrameSize, 1);
+
+                    for (int k = 0; k < fftFrameSize; k++)
+                    {
+                        double window = -0.5 * Math.Cos(2.0 * Math.PI * k / fftFrameSize) + 0.5;
+                        _outputAccum[k] += (float)(2.0 * window * _fftWorksp[2 * k] / (fftFrameSize2 * osamp));
+                    }
+                    for (int k = 0; k < stepSize; k++) _outFifo[k] = _outputAccum[k];
+                    Array.Copy(_outputAccum, stepSize, _outputAccum, 0, fftFrameSize);
+                    for (int k = 0; k < inFifoLatency; k++) _inFifo[k] = _inFifo[k + stepSize];
+                }
+            }
+        }
+
+        private static void Fft(float[] fftBuffer, int fftFrameSize, int sign)
+        {
+            for (int i = 2; i < 2 * fftFrameSize - 2; i += 2)
+            {
+                int j = 0;
+                for (int bitm = 2; bitm < 2 * fftFrameSize; bitm <<= 1)
+                {
+                    if ((i & bitm) != 0) j++;
+                    j <<= 1;
+                }
+                if (i < j)
+                {
+                    (fftBuffer[j], fftBuffer[i]) = (fftBuffer[i], fftBuffer[j]);
+                    (fftBuffer[j + 1], fftBuffer[i + 1]) = (fftBuffer[i + 1], fftBuffer[j + 1]);
+                }
+            }
+            int logN = (int)(Math.Log(fftFrameSize) / Math.Log(2.0) + 0.5);
+            int le = 2;
+            for (int k = 0; k < logN; k++)
+            {
+                le <<= 1;
+                int le2 = le >> 1;
+                double ur = 1.0, ui = 0.0;
+                double arg = Math.PI / (le2 >> 1);
+                double wr = Math.Cos(arg), wi = sign * Math.Sin(arg);
+                for (int j = 0; j < le2; j += 2)
+                {
+                    int p1r = j, p1i = j + 1, p2r = j + le2, p2i = j + le2 + 1;
+                    for (int i = j; i < 2 * fftFrameSize; i += le)
+                    {
+                        double tr = fftBuffer[p2r] * ur - fftBuffer[p2i] * ui;
+                        double ti = fftBuffer[p2r] * ui + fftBuffer[p2i] * ur;
+                        fftBuffer[p2r] = (float)(fftBuffer[p1r] - tr);
+                        fftBuffer[p2i] = (float)(fftBuffer[p1i] - ti);
+                        fftBuffer[p1r] += (float)tr;
+                        fftBuffer[p1i] += (float)ti;
+                        p1r += le; p1i += le; p2r += le; p2i += le;
+                    }
+                    double tr2 = ur * wr - ui * wi;
+                    ui = ur * wi + ui * wr;
+                    ur = tr2;
+                }
+            }
+        }
+    }
+
+    public class PitchShiftSampleProvider : ISampleProvider
+    {
+        private readonly ISampleProvider _source;
+        private readonly TrackEffects _fx;
+        private readonly SmbPitchShifter[] _shifters;
+        private readonly float[] _channelIn;
+        private readonly float[] _channelOut;
+        private const int FFT_SIZE = 2048, OVERSAMPLE = 8;
+
+        public WaveFormat WaveFormat => _source.WaveFormat;
+
+        public PitchShiftSampleProvider(ISampleProvider source, TrackEffects fx)
+        {
+            _source = source; _fx = fx;
+            int ch = source.WaveFormat.Channels;
+            _shifters = new SmbPitchShifter[ch];
+            for (int i = 0; i < ch; i++) _shifters[i] = new SmbPitchShifter();
+            _channelIn = new float[16384];
+            _channelOut = new float[16384];
+        }
+
+        private bool _errored;
+        public static string? LastError { get; private set; }
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            int read = _source.Read(buffer, offset, count);
+            if (!_fx.PitchEnabled || _fx.PitchSemitones == 0 || _errored) return read;
+
+            try
+            {
+                int ch = WaveFormat.Channels;
+                int framesRead = read / ch;
+                if (framesRead > _channelIn.Length)
+                {
+                    // Neočekivano velik blok (retko) — obradi u komadima od najviše
+                    // kapaciteta bafera umesto da pretpostavljamo fiksnu gornju granicu.
+                    int done = 0;
+                    while (done < framesRead)
+                    {
+                        int chunk = Math.Min(_channelIn.Length, framesRead - done);
+                        ProcessChunk(buffer, offset + done * ch, chunk, ch);
+                        done += chunk;
+                    }
+                }
+                else
+                {
+                    ProcessChunk(buffer, offset, framesRead, ch);
+                }
+            }
+            catch (Exception ex)
+            {
+                // NE rušimo plejbek zbog bug-a u pitch shift-u — nastavljamo sa
+                // neizmenjenim zvukom i zapisujemo tačan uzrok u log fajl da se
+                // sledeći put popravi precizno, umesto nagađanja.
+                _errored = true;
+                LastError = ex.ToString();
+                try
+                {
+                    var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UltraAudioEditor");
+                    Directory.CreateDirectory(dir);
+                    File.WriteAllText(Path.Combine(dir, "pitch_shift_error.log"),
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{ex}\n");
+                }
+                catch { }
+            }
+            return read;
+        }
+
+        private void ProcessChunk(float[] buffer, int offset, int frames, int ch)
+        {
+            float ratio = (float)Math.Pow(2.0, _fx.PitchSemitones / 12.0);
+            for (int c = 0; c < ch; c++)
+            {
+                for (int f = 0; f < frames; f++) _channelIn[f] = buffer[offset + f * ch + c];
+                _shifters[c].PitchShift(ratio, frames, FFT_SIZE, OVERSAMPLE, WaveFormat.SampleRate, _channelIn, _channelOut);
+                for (int f = 0; f < frames; f++) buffer[offset + f * ch + c] = _channelOut[f];
+            }
+        }
+    }
     public class LiveVolumeSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider _source;

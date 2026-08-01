@@ -6,18 +6,26 @@ using UltraAudioEditor.Localization;
 
 namespace UltraAudioEditor.Services
 {
-    public enum AiProvider { Groq, Anthropic }
+    // Ollama je PODRAZUMEVANI provajder — radi lokalno, bez API ključa.
+    // Groq/Anthropic ostaju dostupni kao opcioni cloud provajderi za onoga ko ima ključ.
+    public enum AiProvider { Ollama, Groq, Anthropic }
 
     public class AnthropicService
     {
         private readonly HttpClient _http;
         private string _apiKey = "";
-        private AiProvider _provider = AiProvider.Groq;
+        private AiProvider _provider = AiProvider.Ollama;
 
+        private const string OLLAMA_URL = "http://localhost:11434/api/chat";
+        // Isti model koji koristi Ultra Video Editor (qwen2.5:14b) — drži dosledno
+        // kroz ceo Ultra Suite. Promeni preko SetOllamaModel(...) ako treba manji model.
+        private string OLLAMA_MODEL = "qwen2.5:14b";
         private const string GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
         private const string GROQ_MODEL = "llama-3.3-70b-versatile";
         private const string ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
         private const string ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+
+        private static readonly HttpClient _pingClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
 
         public AiProvider Provider
         {
@@ -28,13 +36,18 @@ namespace UltraAudioEditor.Services
         public AnthropicService()
         {
             _http = new HttpClient();
-            _http.Timeout = TimeSpan.FromSeconds(120);
+            _http.Timeout = TimeSpan.FromSeconds(180); // Ollama prvo učitavanje modela može biti sporo
         }
 
         public void SetApiKey(string key)
         {
             _apiKey = key;
             RebuildHeaders();
+        }
+
+        public void SetOllamaModel(string model)
+        {
+            if (!string.IsNullOrWhiteSpace(model)) OLLAMA_MODEL = model;
         }
 
         private void RebuildHeaders()
@@ -44,24 +57,57 @@ namespace UltraAudioEditor.Services
             {
                 _http.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
             }
-            else
+            else if (_provider == AiProvider.Anthropic)
             {
                 _http.DefaultRequestHeaders.Add("x-api-key", _apiKey);
                 _http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
             }
+            // Ollama ne treba header — lokalni poziv, bez autentifikacije
         }
 
-        public bool HasApiKey => !string.IsNullOrWhiteSpace(_apiKey);
+        public bool HasApiKey => _provider == AiProvider.Ollama || !string.IsNullOrWhiteSpace(_apiKey);
+
+        public async Task<bool> IsOllamaRunningAsync()
+        {
+            try
+            {
+                var response = await _pingClient.GetAsync("http://localhost:11434/api/tags");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         private async Task<string> SendAsync(string systemPrompt, string userPrompt,
             IProgress<int>? progress = null, CancellationToken ct = default)
         {
             progress?.Report(10);
 
+            if (_provider == AiProvider.Ollama && !await IsOllamaRunningAsync())
+                throw new Exception(Lang.T("ollama_not_running"));
+
             string json;
             string url;
 
-            if (_provider == AiProvider.Groq)
+            if (_provider == AiProvider.Ollama)
+            {
+                var payload = new
+                {
+                    model = OLLAMA_MODEL,
+                    messages = new[]
+                    {
+                        new { role = "system", content = systemPrompt },
+                        new { role = "user", content = userPrompt }
+                    },
+                    stream = false,
+                    options = new { temperature = 0.7, num_predict = 2048 }
+                };
+                json = JsonSerializer.Serialize(payload);
+                url = OLLAMA_URL;
+            }
+            else if (_provider == AiProvider.Groq)
             {
                 // OpenAI-compatible format (Groq)
                 var payload = new
@@ -105,7 +151,15 @@ namespace UltraAudioEditor.Services
             using var doc = JsonDocument.Parse(responseJson);
 
             string result;
-            if (_provider == AiProvider.Groq)
+            if (_provider == AiProvider.Ollama)
+            {
+                // Ollama /api/chat format: message.content
+                result = doc.RootElement
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString() ?? Lang.T("no_response");
+            }
+            else if (_provider == AiProvider.Groq)
             {
                 // OpenAI format: choices[0].message.content
                 result = doc.RootElement

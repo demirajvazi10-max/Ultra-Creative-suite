@@ -3,12 +3,24 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>UltraAudioEditor</AssemblyName>
     <RootNamespace>UltraAudioEditor</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- UseWindowsForms + UseWPF zajedno navode SDK da automatski doda GLOBALNI
+         "using System.Windows.Forms;" u SVAKI fajl projekta (jer je ImplicitUsings
+         enable), što se sudara sa WPF-ovim sopstvenim globalnim using-ima
+         (Color, Application, UserControl, KeyEventArgs, TextBox, CheckBox...).
+         Uklanjamo TAJ globalni using — AccessibleTrackList.xaml.cs i dalje ima
+         pristup WinForms tipovima preko sopstvenog "using WF = System.Windows.Forms;"
+         alias-a na vrhu fajla, pa mu ovo ne smeta. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
   <ItemGroup>
     <!-- Audio engine -->
     <PackageReference Include="NAudio" Version="2.2.1" />

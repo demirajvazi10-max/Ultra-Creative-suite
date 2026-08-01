@@ -394,15 +394,20 @@
                     <TabItem Header="{DynamicResource L_ai_panel_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_ai}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="8">
-                                <TextBlock Text="{DynamicResource L_api_key_label}" FontSize="11" FontWeight="Medium"
+                                <TextBlock Text="{DynamicResource L_ai_provider_label}" FontSize="11" FontWeight="Medium"
                                            Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <RadioButton Content="{DynamicResource L_groq_free}" IsChecked="{Binding UseGroq}"
-                                                 Foreground="#4ECFA0" FontWeight="Medium" Margin="0,0,12,0"
-                                                 AutomationProperties.Name="{DynamicResource L_acc_use_groq}"/>
-                                    <RadioButton Content="{DynamicResource L_anthropic_claude}" IsChecked="{Binding UseAnthropic}"
-                                                 Foreground="{StaticResource BrText}"
-                                                 AutomationProperties.Name="{DynamicResource L_acc_use_anthropic}"/>
+                                <StackPanel Orientation="Vertical" Margin="0,0,0,4">
+                                    <RadioButton Content="{DynamicResource L_ollama_local}" IsChecked="{Binding UseOllama}"
+                                                 Foreground="#4ECFA0" FontWeight="Medium" Margin="0,0,0,4"
+                                                 AutomationProperties.Name="{DynamicResource L_acc_use_ollama}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Content="{DynamicResource L_groq_free}" IsChecked="{Binding UseGroq}"
+                                                     Foreground="{StaticResource BrText}" Margin="0,0,12,0"
+                                                     AutomationProperties.Name="{DynamicResource L_acc_use_groq}"/>
+                                        <RadioButton Content="{DynamicResource L_anthropic_claude}" IsChecked="{Binding UseAnthropic}"
+                                                     Foreground="{StaticResource BrText}"
+                                                     AutomationProperties.Name="{DynamicResource L_acc_use_anthropic}"/>
+                                    </StackPanel>
                                 </StackPanel>
                                 <TextBlock Text="{Binding ApiKeyHint, Mode=OneWay}" FontSize="11" FontWeight="Medium"
                                            Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
@@ -411,6 +416,8 @@
                                              Foreground="{StaticResource BrText}"
                                              BorderBrush="{StaticResource BrBorder}"
                                              BorderThickness="1"
+                                             IsEnabled="{Binding NeedsApiKey}"
+                                             Visibility="{Binding NeedsApiKey, Converter={StaticResource BoolToVisibility}}"
                                              PasswordChanged="ApiKeyBox_PasswordChanged"
                                              AutomationProperties.Name="{DynamicResource L_acc_enter_api_key}"/>
                                 <Button Click="OpenApiKeyLink_Click"
@@ -492,9 +499,9 @@
         <StatusBar Grid.Row="4" Background="{StaticResource BrBgPanel}"
                    AutomationProperties.Name="{DynamicResource L_acc_status_bar}">
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
+                <TextBlock x:Name="TxtStatusMessage" Text="{Binding StatusMessage, Mode=OneWay}"
                            Foreground="{StaticResource BrText}" FontSize="11"
-                           AutomationProperties.Name="{DynamicResource L_acc_status_message}"
+                           AutomationProperties.Name="{Binding StatusMessage, Mode=OneWay}"
                            AutomationProperties.LiveSetting="Polite"/>
             </StatusBarItem>
             <Separator/>
