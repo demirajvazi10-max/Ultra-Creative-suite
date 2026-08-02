@@ -8,7 +8,11 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AssemblyName>UltraVideoEditor</AssemblyName>
-		<RootNamespace>UltraVideoEditor</RootNamespace>	
+		<RootNamespace>UltraVideoEditor</RootNamespace>
+		<Product>Ultra Video Editor</Product>
+		<Company>Demir Ajvazi</Company>
+		<Authors>Demir Ajvazi</Authors>
+		<Copyright>© 2025 Demir Ajvazi</Copyright>	
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -1,0 +1,155 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows;
+
+namespace UltraStudio.Localization
+{
+    // Isti mehanizam kao Ultra Audio Editor: XAML koristi {DynamicResource L_kljuc},
+    // kod koristi Lang.T("kljuc"). Engleski je DEFAULT od prvog dana — naučeno
+    // večeras da to nikad ne bude naknadna zakrpa.
+    public static class Lang
+    {
+        public static string Current { get; private set; } = "en";
+        public static event Action? LanguageChanged;
+
+        private static readonly string SettingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "UltraStudio", "language.txt");
+
+        // key -> (english, serbian)
+        private static readonly Dictionary<string, (string en, string sr)> Table = new()
+        {
+            // ===== Main window =====
+            ["app_title"] = ("Ultra Studio — Accessible Photo Editor", "Ultra Studio — Pristupačan Photo Editor"),
+            ["statusbar_ready"] = ("Ultra Studio v0.1 | JAWS accessible", "Ultra Studio v0.1 | JAWS pristupačno"),
+
+            // ===== Menu: File =====
+            ["menu_file"] = ("_File", "_Fajl"),
+            ["menu_open_image"] = ("_Open image... (Ctrl+O)", "_Otvori sliku... (Ctrl+O)"),
+            ["menu_save"] = ("_Save (Ctrl+S)", "_Sačuvaj (Ctrl+S)"),
+            ["menu_save_as"] = ("Save _as... (Ctrl+Shift+S)", "Sačuvaj _kao... (Ctrl+Shift+S)"),
+            ["menu_exit"] = ("E_xit", "I_zlaz"),
+
+            // ===== Menu: Edit =====
+            ["menu_edit"] = ("_Edit", "_Uređivanje"),
+            ["menu_undo"] = ("_Undo (Ctrl+Z)", "_Poništi (Ctrl+Z)"),
+            ["menu_redo"] = ("_Redo (Ctrl+Y)", "_Ponovi (Ctrl+Y)"),
+            ["menu_reset"] = ("_Reset to original", "_Vrati na original"),
+
+            // ===== Visual/JAWS mode toggle =====
+            ["visual_mode_btn"] = ("Visual Mode", "Vizuelni mod"),
+            ["jaws_mode_btn"] = ("JAWS Mode", "JAWS mod"),
+            ["visual_mode_indicator"] = ("Current: Visual Mode (Alt+W to switch)", "Trenutno: Vizuelni mod (Alt+W za promenu)"),
+            ["jaws_mode_indicator"] = ("Current: JAWS Mode (Alt+W to switch)", "Trenutno: JAWS mod (Alt+W za promenu)"),
+            ["acc_switch_visual"] = ("Switch to Visual Mode, with mouse-friendly sliders", "Prebaci na Vizuelni mod, sa sliderima za miš"),
+            ["acc_switch_jaws"] = ("Switch to JAWS Mode, with a keyboard-accessible list", "Prebaci na JAWS mod, sa listom pristupačnom tastaturi"),
+            ["visual_mode_tt"] = ("Mouse-friendly sliders for sighted users", "Slideri za miš, za korisnike koji vide"),
+            ["jaws_mode_tt"] = ("Keyboard-accessible list for screen readers", "Lista pristupačna tastaturi, za čitače ekrana"),
+            ["menu_extract_object"] = ("_Extract object... (AI)", "_Izdvoji objekat... (AI)"),
+
+            // ===== Menu: Help =====
+            ["menu_help"] = ("_Help", "_Pomoć"),
+            ["menu_about"] = ("_About", "_O programu"),
+            ["about_title"] = ("About Ultra Studio", "O Ultra Studio programu"),
+            ["about_text"] = ("Ultra Studio v0.1\n\nAccessible photo editor\nMade for all users\n\nCreated by Demir Ajvazi\n© 2026",
+                               "Ultra Studio v0.1\n\nPristupačni photo editor\nNapravljen za sve korisnike\n\nAutor: Demir Ajvazi\n© 2026"),
+
+            ["extract_prompt_title"] = ("Extract object", "Izdvoji objekat"),
+            ["extract_prompt"] = ("Describe what to extract (e.g. \"the child\", \"the car\"):", "Opiši šta da izdvojim (npr. \"dete\", \"auto\"):"),
+            ["extract_locating"] = ("Locating object with AI...", "Tražim objekat pomoću AI-ja..."),
+            ["extract_not_found"] = ("AI couldn't locate \"{0}\" in this image. Try a more specific description.", "AI nije uspeo da pronađe \"{0}\" na slici. Probaj precizniji opis."),
+            ["extract_segmenting"] = ("Segmenting object...", "Izdvajam objekat..."),
+            ["extract_done"] = ("Object extracted and saved to {0}. Open it as the new image?", "Objekat izdvojen i sačuvan u {0}. Otvoriti kao novu sliku?"),
+            ["sam_models_missing"] = ("SAM model files are not installed.\n\nExpected at:\n{0}\n{1}\n\nSee the app documentation for download instructions.", "SAM model fajlovi nisu instalirani.\n\nOčekuju se u:\n{0}\n{1}\n\nPogledaj dokumentaciju programa za uputstvo za preuzimanje."),
+
+            ["ai_apply_suggestion"] = ("AI suggests: {0} ({1}). Apply this?", "AI predlaže: {0} ({1}). Primeniti?"),
+            ["ai_apply_btn"] = ("Apply", "Primeni"),
+            ["ai_suggestion_applied"] = ("Applied: {0}", "Primenjeno: {0}"),
+
+            // ===== Accessible list =====
+            ["acc_list_help"] = ("Image adjustments list. Use arrow keys to navigate. Enter to edit a value. Shift+F10 for menu.",
+                                  "Lista podešavanja slike. Strelice za kretanje. Enter za izmenu vrednosti. Shift+F10 za meni."),
+            ["col_adjustment"] = ("Adjustment", "Podešavanje"),
+            ["col_value"] = ("Value", "Vrednost"),
+
+            // ===== Adjustments (rows in the accessible list) =====
+            ["adj_brightness"] = ("Brightness", "Svetlina"),
+            ["adj_contrast"] = ("Contrast", "Kontrast"),
+            ["adj_saturation"] = ("Saturation", "Zasićenost"),
+            ["adj_sharpen"] = ("Sharpen", "Izoštravanje"),
+            ["adj_blur"] = ("Blur", "Zamućenje"),
+            ["adj_rotate"] = ("Rotate", "Rotacija"),
+            ["adj_grayscale"] = ("Grayscale", "Crno-belo"),
+            ["adj_sepia"] = ("Sepia", "Sepija"),
+            ["adj_flip_h"] = ("Flip horizontal", "Obrni horizontalno"),
+            ["adj_flip_v"] = ("Flip vertical", "Obrni vertikalno"),
+            ["adj_crop"] = ("Crop...", "Iseci..."),
+
+            // ===== AI description panel =====
+            ["ai_panel_header"] = ("AI Image Description", "AI Opis Slike"),
+            ["ai_describe_btn"] = ("Describe this image", "Opiši ovu sliku"),
+            ["ai_describing"] = ("Analyzing image, please wait...", "Analiziram sliku, sačekaj trenutak..."),
+            ["ai_no_image"] = ("Open an image first.", "Prvo otvori sliku."),
+            ["ai_result_placeholder"] = ("AI description will appear here.", "AI opis će se pojaviti ovde."),
+            ["ai_error"] = ("AI error: {0}", "AI greška: {0}"),
+            ["ollama_not_running"] = ("Ollama is not running on this computer (localhost:11434).\n\nStart the Ollama app and make sure a vision model is installed (ollama pull qwen2.5vl:latest).",
+                                       "Ollama nije pokrenuta na ovom računaru (localhost:11434).\n\nPokreni Ollama aplikaciju i proveri da li je instaliran vision model (ollama pull qwen2.5vl:latest)."),
+
+            // ===== Status / dialogs =====
+            ["error_title"] = ("Error", "Greška"),
+            ["error_prefix"] = ("Error: {0}", "Greška: {0}"),
+            ["done_title"] = ("Done", "Gotovo"),
+            ["btn_cancel"] = ("Cancel", "Otkaži"),
+            ["btn_close"] = ("Close", "Zatvori"),
+            ["btn_apply"] = ("Apply", "Primeni"),
+            ["img_loaded"] = ("Image loaded: {0}, {1}x{2} pixels", "Slika učitana: {0}, {1}x{2} piksela"),
+            ["img_saved"] = ("Image saved to {0}", "Slika sačuvana u {0}"),
+        };
+
+        public static string T(string key)
+        {
+            if (!Table.TryGetValue(key, out var v)) return key;
+            return Current == "sr" ? v.sr : v.en;
+        }
+
+        public static void ApplyToResources()
+        {
+            var res = Application.Current?.Resources;
+            if (res == null) return;
+            foreach (var kvp in Table)
+                res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
+        }
+
+        public static void SetLanguage(string code, bool persist = true)
+        {
+            Current = code == "sr" ? "sr" : "en";
+            ApplyToResources();
+            if (persist) Save();
+            LanguageChanged?.Invoke();
+        }
+
+        public static void Load()
+        {
+            try
+            {
+                if (File.Exists(SettingsPath))
+                {
+                    var code = File.ReadAllText(SettingsPath).Trim();
+                    Current = code == "sr" ? "sr" : "en";
+                }
+            }
+            catch { Current = "en"; }
+        }
+
+        private static void Save()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+                File.WriteAllText(SettingsPath, Current);
+            }
+            catch { }
+        }
+    }
+}

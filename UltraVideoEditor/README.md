@@ -283,6 +283,10 @@ The project is active. Planned features:
 
 ---
 
+## Author
+
+Created by **Demir Ajvazi**.
+
 ## License
 
 Private project. All rights reserved.

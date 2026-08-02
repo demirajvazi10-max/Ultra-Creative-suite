@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>UltraStudio</AssemblyName>
+    <RootNamespace>UltraStudio</RootNamespace>
+    <Product>Ultra Studio</Product>
+    <Company>Demir Ajvazi</Company>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2026 Demir Ajvazi</Copyright>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Isti razlog kao u UltraAudioEditor.csproj: UseWindowsForms + UseWPF
+         zajedno navode SDK da doda globalne "using System.Windows.Forms;" i
+         "using System.Drawing;" u SVAKI fajl, što se sudara sa WPF-ovim
+         Color/Application/UserControl/itd. Naučeno sinoć — ovde primenjeno
+         od prvog dana, ne kao naknadna zakrpa. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Obrada slika — isti Magick.NET koji Video Editor već koristi, dokazano radi -->
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.15.0" />
+    <!-- SAM (Segment Anything) — precizno izdvajanje objekata, isti ONNX Runtime
+         koji Video Editor već koristi za MobileNet analizu kadrova -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
+    <!-- HTTP za Ollama (opis slike preko Qwen2-VL) -->
+    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Folder/fajl dijalozi bez WinForms konflikta -->
+    <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+  </ItemGroup>
+</Project>

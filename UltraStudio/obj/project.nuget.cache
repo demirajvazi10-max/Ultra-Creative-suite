@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "dgSpecHash": "VdojRg2E8BA=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\UltraStudio.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\magick.net-q16-anycpu\\14.15.0\\magick.net-q16-anycpu.14.15.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\magick.net.core\\14.15.0\\magick.net.core.14.15.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.ml.onnxruntime\\1.19.0\\microsoft.ml.onnxruntime.1.19.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.ml.onnxruntime.managed\\1.19.0\\microsoft.ml.onnxruntime.managed.1.19.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\ookii.dialogs.wpf\\5.0.1\\ookii.dialogs.wpf.5.0.1.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\system.memory\\4.5.5\\system.memory.4.5.5.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\system.net.http.json\\8.0.0\\system.net.http.json.8.0.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\system.text.encodings.web\\8.0.0\\system.text.encodings.web.8.0.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\system.text.json\\8.0.0\\system.text.json.8.0.0.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.29\\microsoft.windowsdesktop.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.29\\microsoft.netcore.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.29\\microsoft.aspnetcore.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Ajvazi\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.29\\microsoft.netcore.app.host.win-x64.8.0.29.nupkg.sha512"
+  ],
+  "logs": []
+}

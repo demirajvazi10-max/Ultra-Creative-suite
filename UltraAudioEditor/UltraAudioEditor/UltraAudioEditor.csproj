@@ -6,6 +6,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>UltraAudioEditor</AssemblyName>
     <RootNamespace>UltraAudioEditor</RootNamespace>
+    <Product>Ultra Audio Editor</Product>
+    <Company>Demir Ajvazi</Company>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2025 Demir Ajvazi</Copyright>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
