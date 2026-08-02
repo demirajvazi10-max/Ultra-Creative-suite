@@ -33,8 +33,11 @@ This repository hosts the full Ultra platform:
 
 - **`/` (this folder)** — Ultra Video Editor (Ultra Creative Suite)
 - **`/UltraAudioEditor`** — Ultra Audio Editor, a companion professional audio editor with the same accessibility standard
+- **`/UltraStudio`** — Ultra Studio, an AI-assisted photo editor with the same accessibility standard: a dual JAWS Mode / Visual Mode interface, local AI image description and editing suggestions, and AI-guided precise object extraction (Segment Anything)
 
-Both tools share this repository's single [GPL-3.0 license](./LICENSE).
+Each companion app has its own README with full details.
+
+All three tools share this repository's single [GPL-3.0 license](./LICENSE).
 
 ---
 

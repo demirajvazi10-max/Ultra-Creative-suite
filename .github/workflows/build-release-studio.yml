@@ -1,0 +1,85 @@
+name: Build and Release Ultra Studio
+
+on:
+  push:
+    tags:
+      - 'studio-v*'   # Isti obrazac kao video-v*/audio-v* — jasan prefiks
+                       # da tagovi razlicitih programa ne pokrenu jedan drugi.
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout koda
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Izvuci cistu verziju iz taga
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^studio-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet paketa
+        run: dotnet restore UltraStudio\UltraStudio.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraStudio\UltraStudio.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Instaliraj Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Kompajliraj installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            UltraStudio\installer\UltraStudio.iss
+
+      - name: Kreiraj GitHub Release i uploaduj
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Studio ${{ env.CLEAN_VERSION }}"
+          body: |
+            ## Ultra Studio ${{ env.CLEAN_VERSION }}
+
+            **Download the installer below and run it.** Windows will ask for administrator permission — that's normal and expected.
+
+            Installer automatically, no extra steps:
+            - Offers a language choice at the start (English/German/Serbian), which also becomes the app's default language
+            - Downloads and installs Ollama + an AI vision model matched to your hardware (GPU/RAM detected automatically) — for AI image description and editing suggestions
+            - Optional checkbox: downloads AI object-extraction models (SAM) for the "Extract Object" feature — unchecked by default since it's a large, single-feature download; everything else works without it
+            - Launches the app at the end
+
+            ### Features
+            - Non-destructive photo adjustments (Brightness, Contrast, Saturation, Sharpen, Blur, Rotate, Grayscale, Sepia, Flip)
+            - AI image description and per-adjustment editing suggestions, each confirmed with a native Yes/No dialog before applying
+            - AI-guided precise object extraction (describe it in plain text, get a pixel-accurate cutout)
+            - Dual interface: JAWS Mode (native accessible list) and Visual Mode (mouse-friendly sliders) — switch anytime with Alt+W
+
+            ### Accessibility
+            Fully functional with JAWS and NVDA screen readers. Every feature reachable by keyboard alone in JAWS Mode.
+
+            ### System requirements
+            - Windows 10/11 (64-bit)
+            - 8 GB RAM minimum
+
+            ---
+            *Built with GitHub Actions | [Documentation](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: UltraStudio/installer/Output/UltraStudioSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
