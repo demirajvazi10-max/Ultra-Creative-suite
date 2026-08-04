@@ -44,6 +44,13 @@ namespace UltraStudio
         private readonly Dictionary<AdjustmentRow, Slider> _sliderByRow = new();
         private readonly Dictionary<AdjustmentRow, CheckBox> _checkByRow = new();
 
+        // Trenutno selektovan sloj — jedan izvor istine za JAWS listu I
+        // vizuelni panel (isti princip kao _project za podešavanja), tako da
+        // Layers meni (Properties/Delete/Move/Duplicate) radi identično bez
+        // obzira u kom je modu korisnik.
+        private Layer? _selectedLayer;
+        private readonly Dictionary<Layer, Border> _visualRowByLayer = new();
+
         public MainWindow()
         {
             InitializeComponent();
@@ -51,6 +58,7 @@ namespace UltraStudio
             BuildAdjustmentRows();
             SetupNativeList();
             BuildVisualPanel();
+            SetupNativeLayerList();
             SetJawsMode(); // podrazumevani mod — isti izbor kao ostatak Ultra paketa
             UpdateImageInfo();
             SetStatus(Lang.T("statusbar_ready"));
@@ -195,6 +203,9 @@ namespace UltraStudio
             SyncVisualPanelFromProject();
             wfhAdjustments.Visibility = Visibility.Collapsed;
             VisualAdjustPanel.Visibility = Visibility.Visible;
+            wfhLayers.Visibility = Visibility.Collapsed;
+            VisualLayerPanel.Visibility = Visibility.Visible;
+            RefreshVisualLayerPanel();
             CurrentModeLabel.Text = Lang.T("visual_mode_indicator");
         }
 
@@ -204,6 +215,9 @@ namespace UltraStudio
             RefreshList();
             VisualAdjustPanel.Visibility = Visibility.Collapsed;
             wfhAdjustments.Visibility = Visibility.Visible;
+            VisualLayerPanel.Visibility = Visibility.Collapsed;
+            wfhLayers.Visibility = Visibility.Visible;
+            RefreshLayerList();
             CurrentModeLabel.Text = Lang.T("jaws_mode_indicator");
         }
 
@@ -252,6 +266,329 @@ namespace UltraStudio
         }
 
         // ════════════════════════════════════════════════════════════════
+        // SLOJEVI (grafički dizajn deo) — JAWS lista + vizuelni panel, isti
+        // dual-mod obrazac kao podešavanja gore, ali nad _project.Layers.
+        // Redosled u listi = redosled crtanja (poslednji = najviše, kao
+        // Photoshop/Canva "layer stack").
+        // ════════════════════════════════════════════════════════════════
+        private void SetupNativeLayerList()
+        {
+            nativeLayerList.Columns.Clear();
+            nativeLayerList.Columns.Add(Lang.T("col_layer_name"), 150, WF.HorizontalAlignment.Left);
+            nativeLayerList.Columns.Add(Lang.T("col_layer_type"), 70, WF.HorizontalAlignment.Left);
+            nativeLayerList.Columns.Add(Lang.T("col_layer_visible"), 60, WF.HorizontalAlignment.Left);
+            nativeLayerList.Columns.Add(Lang.T("col_layer_opacity"), 60, WF.HorizontalAlignment.Left);
+
+            nativeLayerList.BackColor = System.Drawing.Color.FromArgb(20, 20, 34);
+            nativeLayerList.ForeColor = System.Drawing.Color.White;
+            nativeLayerList.Font = new System.Drawing.Font("Segoe UI", 10);
+            nativeLayerList.AccessibleName = Lang.T("acc_layer_list_help");
+
+            nativeLayerList.KeyDown += NativeLayerList_KeyDown;
+            nativeLayerList.SelectedIndexChanged += (_, __) =>
+            {
+                _selectedLayer = nativeLayerList.SelectedItems.Count > 0
+                    ? (Layer)nativeLayerList.SelectedItems[0].Tag!
+                    : null;
+                HighlightSelectedVisualRow();
+            };
+            RefreshLayerList();
+        }
+
+        private void RefreshLayerList()
+        {
+            nativeLayerList.BeginUpdate();
+            int selectedIndex = nativeLayerList.SelectedIndices.Count > 0 ? nativeLayerList.SelectedIndices[0] : -1;
+            nativeLayerList.Items.Clear();
+            foreach (var layer in _project.Layers)
+            {
+                var lvi = new WF.ListViewItem(new[]
+                {
+                    layer.Name,
+                    Lang.T(layer.TypeLabelKey),
+                    layer.Visible ? Lang.T("layer_on") : Lang.T("layer_off"),
+                    $"{layer.Opacity:0}%"
+                })
+                { Tag = layer };
+                nativeLayerList.Items.Add(lvi);
+            }
+            nativeLayerList.EndUpdate();
+
+            if (nativeLayerList.Items.Count > 0)
+            {
+                int idx = selectedIndex >= 0 ? Math.Min(selectedIndex, nativeLayerList.Items.Count - 1) : nativeLayerList.Items.Count - 1;
+                nativeLayerList.Items[idx].Selected = true;
+                _selectedLayer = (Layer)nativeLayerList.Items[idx].Tag!;
+            }
+            else
+            {
+                _selectedLayer = null;
+            }
+        }
+
+        private void NativeLayerList_KeyDown(object? sender, WF.KeyEventArgs e)
+        {
+            if (_selectedLayer == null) return;
+
+            if (e.KeyCode == WF.Keys.Enter || e.KeyCode == WF.Keys.F2)
+            {
+                OpenLayerProperties(_selectedLayer);
+                e.Handled = true;
+            }
+            else if (e.KeyCode == WF.Keys.Space)
+            {
+                _selectedLayer.Visible = !_selectedLayer.Visible;
+                RefreshLayersUi();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == WF.Keys.Delete)
+            {
+                DeleteLayer_Click(sender!, new RoutedEventArgs());
+                e.Handled = true;
+            }
+        }
+
+        // Vizuelni panel: jedan "red" po sloju sa checkbox-om vidljivosti,
+        // sliderom providnosti i dugmetom za svojstva — bira se klikom bilo
+        // gde na red (isto ponašanje kao selekcija u JAWS listi).
+        private void RefreshVisualLayerPanel()
+        {
+            VisualLayerStack.Children.Clear();
+            _visualRowByLayer.Clear();
+
+            foreach (var layer in _project.Layers)
+            {
+                var border = new Border
+                {
+                    BorderBrush = (System.Windows.Media.Brush)Resources["BrBorder"],
+                    BorderThickness = new Thickness(1),
+                    Background = (System.Windows.Media.Brush)Resources["BrBgPanel"],
+                    Margin = new Thickness(0, 0, 0, 8),
+                    Padding = new Thickness(8),
+                    Cursor = System.Windows.Input.Cursors.Hand
+                };
+                var stack = new StackPanel();
+
+                var header = new Grid();
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var nameLbl = new TextBlock
+                {
+                    Text = $"{layer.Name} ({Lang.T(layer.TypeLabelKey)})",
+                    Foreground = (System.Windows.Media.Brush)Resources["BrText"], FontSize = 12, FontWeight = FontWeights.Bold
+                };
+                var visCheck = new CheckBox { IsChecked = layer.Visible, VerticalAlignment = VerticalAlignment.Center,
+                    Content = Lang.T("layer_field_visible") };
+                visCheck.Checked += (_, __) => { layer.Visible = true; RefreshLayersUi(); };
+                visCheck.Unchecked += (_, __) => { layer.Visible = false; RefreshLayersUi(); };
+                Grid.SetColumn(nameLbl, 0); Grid.SetColumn(visCheck, 1);
+                header.Children.Add(nameLbl); header.Children.Add(visCheck);
+                stack.Children.Add(header);
+
+                var opacitySlider = new Slider
+                {
+                    Minimum = 0, Maximum = 100, Value = layer.Opacity, SmallChange = 5, LargeChange = 20,
+                    Margin = new Thickness(0, 6, 0, 0)
+                };
+                opacitySlider.SetValue(AutomationProperties.NameProperty, Lang.T("layer_field_opacity") + " — " + layer.Name);
+                opacitySlider.ValueChanged += (_, e) => { layer.Opacity = e.NewValue; RefreshPreview(); };
+                stack.Children.Add(opacitySlider);
+
+                var editBtn = new Button
+                {
+                    Content = Lang.T("btn_layer_properties"), Style = (Style)Resources["StdButton"],
+                    HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 0)
+                };
+                editBtn.Click += (_, __) => { _selectedLayer = layer; OpenLayerProperties(layer); };
+                stack.Children.Add(editBtn);
+
+                border.Child = stack;
+                border.MouseLeftButtonDown += (_, __) => { _selectedLayer = layer; HighlightSelectedVisualRow(); };
+                _visualRowByLayer[layer] = border;
+                VisualLayerStack.Children.Add(border);
+            }
+
+            HighlightSelectedVisualRow();
+        }
+
+        private void HighlightSelectedVisualRow()
+        {
+            foreach (var kv in _visualRowByLayer)
+                kv.Value.BorderBrush = (System.Windows.Media.Brush)Resources[kv.Key == _selectedLayer ? "BrAccent" : "BrBorder"];
+        }
+
+        /// <summary>Osvežava OBA prikaza slojeva + preview — jedina tačka posle bilo koje izmene liste slojeva.</summary>
+        private void RefreshLayersUi()
+        {
+            RefreshLayerList();
+            RefreshVisualLayerPanel();
+            RefreshPreview();
+        }
+
+        private void OpenLayerProperties(Layer layer)
+        {
+            var dlg = new LayerPropertiesDialog(layer) { Owner = this };
+            if (dlg.ShowDialog() == true) RefreshLayersUi();
+        }
+
+        private string NextLayerName(string prefix)
+        {
+            string name = $"{prefix} {_project.NextLayerNumber}";
+            _project.NextLayerNumber++;
+            return name;
+        }
+
+        private void AddTextLayer_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new SetValueDialog(Lang.T("menu_add_text_layer"), Lang.T("layer_field_text"), Lang.T("layer_default_text"), "") { Owner = this };
+            if (dlg.ShowDialog() != true || string.IsNullOrWhiteSpace(dlg.ResultValue)) return;
+
+            var layer = new TextLayer
+            {
+                Name = NextLayerName("Text"),
+                Text = dlg.ResultValue.Trim(),
+                X = 40, Y = 40, Width = 400, Height = 60
+            };
+            _project.Layers.Add(layer);
+            _selectedLayer = layer;
+            RefreshLayersUi();
+        }
+
+        private void AddShapeLayer(ShapeKind kind, string namePrefix)
+        {
+            var layer = new ShapeLayer
+            {
+                Name = NextLayerName(namePrefix),
+                ShapeKind = kind,
+                X = 60, Y = 60,
+                Width = 200,
+                Height = kind == ShapeKind.Line ? 0 : 140
+            };
+            if (kind == ShapeKind.Line) { layer.FillEnabled = false; layer.StrokeEnabled = true; }
+            _project.Layers.Add(layer);
+            _selectedLayer = layer;
+            RefreshLayersUi();
+            OpenLayerProperties(layer);
+        }
+
+        private void AddRectangleLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Rectangle, "Rectangle");
+        private void AddEllipseLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Ellipse, "Ellipse");
+        private void AddLineLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Line, "Line");
+
+        private void AddImageLayer_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = Lang.T("menu_add_image_layer"),
+                Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.webp|All files|*.*"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var (w, h) = ImageEngine.GetDimensions(dlg.FileName);
+                // Uklopi u platno ako je veća od njega — isto ponašanje kao
+                // "fit to canvas" u standardnim dizajn alatima.
+                double scale = Math.Min(1.0, Math.Min((double)_project.CanvasWidth / w, (double)_project.CanvasHeight / h));
+
+                var layer = new ImageLayer
+                {
+                    Name = NextLayerName("Image"),
+                    SourcePath = dlg.FileName,
+                    X = 20, Y = 20,
+                    Width = Math.Max(1, w * scale),
+                    Height = Math.Max(1, h * scale)
+                };
+                _project.Layers.Add(layer);
+                _selectedLayer = layer;
+                RefreshLayersUi();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LayerProperties_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
+            OpenLayerProperties(_selectedLayer);
+        }
+
+        private void DuplicateLayer_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
+
+            Layer copy = _selectedLayer switch
+            {
+                TextLayer t => new TextLayer { Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Bold = t.Bold, Italic = t.Italic, ColorHex = t.ColorHex },
+                ShapeLayer s => new ShapeLayer { ShapeKind = s.ShapeKind, FillEnabled = s.FillEnabled, FillColorHex = s.FillColorHex, StrokeEnabled = s.StrokeEnabled, StrokeColorHex = s.StrokeColorHex, StrokeWidth = s.StrokeWidth },
+                ImageLayer i => new ImageLayer { SourcePath = i.SourcePath },
+                _ => throw new InvalidOperationException()
+            };
+            copy.Name = _selectedLayer.Name + " " + Lang.T("layer_copy_suffix");
+            copy.X = _selectedLayer.X + 20;
+            copy.Y = _selectedLayer.Y + 20;
+            copy.Width = _selectedLayer.Width;
+            copy.Height = _selectedLayer.Height;
+            copy.Opacity = _selectedLayer.Opacity;
+            copy.Visible = _selectedLayer.Visible;
+
+            int idx = _project.Layers.IndexOf(_selectedLayer);
+            _project.Layers.Insert(idx + 1, copy);
+            _selectedLayer = copy;
+            RefreshLayersUi();
+        }
+
+        private void DeleteLayer_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
+            _project.Layers.Remove(_selectedLayer);
+            _selectedLayer = null;
+            RefreshLayersUi();
+        }
+
+        private void MoveLayerUp_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLayer == null) return;
+            int idx = _project.Layers.IndexOf(_selectedLayer);
+            if (idx < _project.Layers.Count - 1) _project.Layers.Move(idx, idx + 1);
+            RefreshLayersUi();
+        }
+
+        private void MoveLayerDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedLayer == null) return;
+            int idx = _project.Layers.IndexOf(_selectedLayer);
+            if (idx > 0) _project.Layers.Move(idx, idx - 1);
+            RefreshLayersUi();
+        }
+
+        private void NewCanvas_Click(object sender, RoutedEventArgs e)
+        {
+            var wDlg = new SetValueDialog(Lang.T("menu_new_canvas"), Lang.T("canvas_width_prompt"), _project.CanvasWidth.ToString(), "px") { Owner = this };
+            if (wDlg.ShowDialog() != true || !int.TryParse(wDlg.ResultValue, out int newW) || newW < 1) return;
+
+            var hDlg = new SetValueDialog(Lang.T("menu_new_canvas"), Lang.T("canvas_height_prompt"), _project.CanvasHeight.ToString(), "px") { Owner = this };
+            if (hDlg.ShowDialog() != true || !int.TryParse(hDlg.ResultValue, out int newH) || newH < 1) return;
+
+            _project.OriginalPath = null;
+            _project.OriginalWidth = 0;
+            _project.OriginalHeight = 0;
+            _project.ResetAdjustments();
+            _project.Layers.Clear();
+            _project.CanvasWidth = newW;
+            _project.CanvasHeight = newH;
+            _lastSavePath = null;
+            _selectedLayer = null;
+
+            UpdateImageInfo();
+            RefreshLayersUi();
+            SetStatus(string.Format(Lang.T("canvas_created"), newW, newH));
+        }
+
+        // ════════════════════════════════════════════════════════════════
         // OTVARANJE / ČUVANJE SLIKE
         // ════════════════════════════════════════════════════════════════
         private void OpenImage_Click(object sender, RoutedEventArgs e)
@@ -269,11 +606,19 @@ namespace UltraStudio
                 _project.OriginalPath = dlg.FileName;
                 _project.OriginalWidth = w;
                 _project.OriginalHeight = h;
+                _project.CanvasWidth = w;
+                _project.CanvasHeight = h;
                 _project.ResetAdjustments();
+                // Nova fotografija = novi projekat — slojevi od PRETHODNE slike
+                // (tekst/oblici pozicionirani za drugu veličinu platna) se ne
+                // prenose automatski, isto kao što File > Open u drugim
+                // editorima ne čuva stari canvas.
+                _project.Layers.Clear();
+                _selectedLayer = null;
                 _lastSavePath = null;
 
                 UpdateImageInfo();
-                RefreshPreview();
+                RefreshLayersUi();
                 SetStatus(string.Format(Lang.T("img_loaded"), Path.GetFileName(dlg.FileName), w, h));
             }
             catch (Exception ex)
@@ -285,18 +630,18 @@ namespace UltraStudio
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
+            if (!_project.HasCanvasContent) { SetStatus(Lang.T("status_no_canvas")); return; }
             if (_lastSavePath == null) { SaveAs_Click(sender, e); return; }
             DoExport(_lastSavePath);
         }
 
         private void SaveAs_Click(object sender, RoutedEventArgs e)
         {
-            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
+            if (!_project.HasCanvasContent) { SetStatus(Lang.T("status_no_canvas")); return; }
             var dlg = new SaveFileDialog
             {
                 Filter = "PNG|*.png|JPEG|*.jpg|BMP|*.bmp|TIFF|*.tiff",
-                FileName = Path.GetFileNameWithoutExtension(_project.OriginalPath) + "_edited.png"
+                FileName = (_project.HasImage ? Path.GetFileNameWithoutExtension(_project.OriginalPath) : "design") + "_edited.png"
             };
             if (dlg.ShowDialog() != true) return;
             _lastSavePath = dlg.FileName;
@@ -307,7 +652,7 @@ namespace UltraStudio
         {
             try
             {
-                ImageEngine.Export(_project.OriginalPath!, _project, path);
+                CanvasEngine.Export(_project, path);
                 SetStatus(string.Format(Lang.T("img_saved"), path));
             }
             catch (Exception ex)
@@ -338,11 +683,11 @@ namespace UltraStudio
         // ════════════════════════════════════════════════════════════════
         private void RefreshPreview()
         {
-            if (!_project.HasImage) { TxtNoImage.Visibility = Visibility.Visible; ImgPreview.Source = null; return; }
+            if (!_project.HasCanvasContent) { TxtNoImage.Visibility = Visibility.Visible; ImgPreview.Source = null; return; }
 
             try
             {
-                var bytes = ImageEngine.RenderPreviewJpeg(_project.OriginalPath!, _project);
+                var bytes = CanvasEngine.RenderPreviewJpeg(_project);
                 var bmp = new BitmapImage();
                 using (var ms = new MemoryStream(bytes))
                 {
@@ -365,7 +710,7 @@ namespace UltraStudio
         {
             TxtImageInfo.Text = _project.HasImage
                 ? $"{Path.GetFileName(_project.OriginalPath)} — {_project.OriginalWidth}x{_project.OriginalHeight}px"
-                : "No image open";
+                : string.Format(Lang.T("canvas_info_blank"), _project.CanvasWidth, _project.CanvasHeight);
         }
 
         // ════════════════════════════════════════════════════════════════
