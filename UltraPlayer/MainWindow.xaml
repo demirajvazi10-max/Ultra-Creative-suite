@@ -1,0 +1,116 @@
+<Window x:Class="UltraPlayer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:theming="clr-namespace:UltraAccessibleKit.Theming;assembly=UltraAccessibleKit"
+        Title="Ultra Player"
+        Height="600" Width="820"
+        Background="{DynamicResource MainWindowBg}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+            <RowDefinition Height="*"/>      <!-- Playlist -->
+            <RowDefinition Height="Auto"/>   <!-- Playback controls -->
+            <RowDefinition Height="Auto"/>   <!-- Speed / sleep timer -->
+            <RowDefinition Height="Auto"/>   <!-- Status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="AddFilesButton"
+                    Content="Add Files..."
+                    AutomationProperties.Name="Add audio files to playlist"
+                    Click="AddFilesButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="RemoveButton"
+                    Content="Remove"
+                    AutomationProperties.Name="Remove selected track from playlist"
+                    Click="RemoveButton_Click"
+                    Margin="0,0,20,0" Padding="8,4"/>
+            <theming:ThemeSwitcher/>
+            <Button x:Name="AboutButton"
+                    Content="About"
+                    AutomationProperties.Name="About Ultra Player"
+                    Click="AboutButton_Click"
+                    Margin="20,0,0,0" Padding="8,4"/>
+        </StackPanel>
+
+        <!-- Playlist -->
+        <ListBox x:Name="PlaylistListBox"
+                 Grid.Row="1"
+                 AutomationProperties.Name="Playlist"
+                 DisplayMemberPath="Title"
+                 SelectionChanged="PlaylistListBox_SelectionChanged"
+                 MouseDoubleClick="PlaylistListBox_MouseDoubleClick"
+                 Background="{DynamicResource PanelBg}"
+                 Foreground="{DynamicResource TextPrimary}"
+                 BorderBrush="{DynamicResource ThemeBorderBrush}"
+                 BorderThickness="1"/>
+
+        <!-- Playback controls -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+            <Button x:Name="PreviousButton" Content="Previous"
+                    AutomationProperties.Name="Previous track"
+                    Click="PreviousButton_Click" Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="PlayPauseButton" Content="Play (Space)"
+                    AutomationProperties.Name="Play or pause"
+                    Click="PlayPauseButton_Click" Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="StopButton" Content="Stop"
+                    AutomationProperties.Name="Stop playback"
+                    Click="StopButton_Click" Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="NextButton" Content="Next"
+                    AutomationProperties.Name="Next track"
+                    Click="NextButton_Click" Margin="0,0,20,0" Padding="8,4"/>
+
+            <Slider x:Name="PositionSlider"
+                    AutomationProperties.Name="Playback position"
+                    Width="320" Minimum="0"
+                    PreviewMouseDown="PositionSlider_PreviewMouseDown"
+                    PreviewMouseUp="PositionSlider_PreviewMouseUp"/>
+            <TextBlock x:Name="PositionText" Text="00:00 / 00:00"
+                       Foreground="{DynamicResource TextPrimary}"
+                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Speed / sleep timer -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+            <TextBlock Text="Speed:" Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox x:Name="SpeedComboBox"
+                      AutomationProperties.Name="Playback speed"
+                      Width="100" SelectionChanged="SpeedComboBox_SelectionChanged"
+                      Margin="0,0,20,0">
+                <ComboBoxItem Content="0.75x"/>
+                <ComboBoxItem Content="1.0x" IsSelected="True"/>
+                <ComboBoxItem Content="1.25x"/>
+                <ComboBoxItem Content="1.5x"/>
+                <ComboBoxItem Content="1.75x"/>
+                <ComboBoxItem Content="2.0x"/>
+            </ComboBox>
+
+            <TextBlock Text="Sleep timer:" Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox x:Name="SleepTimerComboBox"
+                      AutomationProperties.Name="Sleep timer"
+                      Width="120" SelectionChanged="SleepTimerComboBox_SelectionChanged">
+                <ComboBoxItem Content="Off" IsSelected="True"/>
+                <ComboBoxItem Content="15 minutes"/>
+                <ComboBoxItem Content="30 minutes"/>
+                <ComboBoxItem Content="45 minutes"/>
+                <ComboBoxItem Content="60 minutes"/>
+                <ComboBoxItem Content="End of track"/>
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Status bar -->
+        <TextBlock x:Name="StatusText" Grid.Row="4" Text="Add files to build a playlist."
+                   AutomationProperties.LiveSetting="Polite"
+                   Foreground="{DynamicResource TextSecondary}"
+                   Margin="0,10,0,0"/>
+
+        <!-- Hidden media element, driven via a clock so playback speed can change without restarting the track -->
+        <MediaElement x:Name="Player" Width="0" Height="0" LoadedBehavior="Manual" UnloadedBehavior="Manual"
+                      MediaOpened="Player_MediaOpened" MediaEnded="Player_MediaEnded"/>
+    </Grid>
+</Window>

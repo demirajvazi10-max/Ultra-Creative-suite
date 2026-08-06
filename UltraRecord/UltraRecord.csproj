@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraRecord</RootNamespace>
+    <AssemblyName>UltraRecord</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Demir Ajvazi</Company>
+    <Product>Ultra Record</Product>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2026 Demir Ajvazi</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared accessibility layer -->
+    <PackageReference Include="UltraAccessibleKit" Version="1.1.0" />
+    <!-- Audio capture - same version already used in Ultra Audio Editor -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- Folder picker without the WinForms conflict (same as Audio Editor) -->
+    <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+  </ItemGroup>
+
+</Project>

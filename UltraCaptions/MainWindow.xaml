@@ -1,0 +1,145 @@
+<Window x:Class="UltraCaptions.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:theming="clr-namespace:UltraAccessibleKit.Theming;assembly=UltraAccessibleKit"
+        Title="Ultra Captions"
+        Height="650" Width="950"
+        Background="{DynamicResource MainWindowBg}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+            <RowDefinition Height="*"/>      <!-- Captions list + details -->
+            <RowDefinition Height="Auto"/>   <!-- Playback controls -->
+            <RowDefinition Height="Auto"/>   <!-- Status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="OpenMediaButton"
+                    Content="Open Media..."
+                    AutomationProperties.Name="Open media file"
+                    Click="OpenMediaButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="TranscribeButton"
+                    Content="Transcribe with Whisper"
+                    AutomationProperties.Name="Transcribe media with Whisper"
+                    Click="TranscribeButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="ImportSrtButton"
+                    Content="Import .srt"
+                    AutomationProperties.Name="Import SRT file"
+                    Click="ImportSrtButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="ExportSrtButton"
+                    Content="Export .srt"
+                    AutomationProperties.Name="Export SRT file"
+                    Click="ExportSrtButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="NewLineButton"
+                    Content="New Line (Ctrl+N)"
+                    AutomationProperties.Name="Add new caption line"
+                    Click="NewLineButton_Click"
+                    Margin="0,0,6,0" Padding="8,4"/>
+            <Button x:Name="DeleteLineButton"
+                    Content="Delete Line"
+                    AutomationProperties.Name="Delete selected caption line"
+                    Click="DeleteLineButton_Click"
+                    Margin="0,0,20,0" Padding="8,4"/>
+            <theming:ThemeSwitcher/>
+            <Button x:Name="AboutButton"
+                    Content="About"
+                    AutomationProperties.Name="About Ultra Captions"
+                    Click="AboutButton_Click"
+                    Margin="20,0,0,0" Padding="8,4"/>
+        </StackPanel>
+
+        <!-- Captions list + details panel -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Caption list: native ListView + GridView, same pattern as the
+                 Video Editor timeline, so JAWS/NVDA read each row (start, end,
+                 text) as one item without extra configuration. -->
+            <ListView x:Name="CaptionsListView"
+                      Grid.Column="0"
+                      AutomationProperties.Name="Caption lines"
+                      SelectionChanged="CaptionsListView_SelectionChanged"
+                      Background="{DynamicResource PanelBg}"
+                      Foreground="{DynamicResource TextPrimary}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Start" Width="90" DisplayMemberBinding="{Binding StartDisplay}"/>
+                        <GridViewColumn Header="End" Width="90" DisplayMemberBinding="{Binding EndDisplay}"/>
+                        <GridViewColumn Header="Text" Width="380" DisplayMemberBinding="{Binding Text}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+
+            <!-- Selected-line detail / manual timing panel -->
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Selected line" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+
+                <TextBlock Text="Text:" Foreground="{DynamicResource TextSecondary}"/>
+                <TextBox x:Name="LineTextBox"
+                         AutomationProperties.Name="Caption text for selected line"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="80"
+                         Background="{DynamicResource ControlBg}"
+                         Foreground="{DynamicResource TextPrimary}"
+                         TextChanged="LineTextBox_TextChanged"
+                         Margin="0,4,0,12"/>
+
+                <TextBlock Text="Start:" Foreground="{DynamicResource TextSecondary}"/>
+                <TextBlock x:Name="StartValueText" Text="--:--.--"
+                           Foreground="{DynamicResource TextPrimary}" Margin="0,2,0,4"/>
+                <Button x:Name="MarkStartButton"
+                        Content="Mark Start at current position ( [ )"
+                        AutomationProperties.Name="Mark start time at current playback position"
+                        Click="MarkStartButton_Click"
+                        Margin="0,0,0,12" Padding="6,4"/>
+
+                <TextBlock Text="End:" Foreground="{DynamicResource TextSecondary}"/>
+                <TextBlock x:Name="EndValueText" Text="--:--.--"
+                           Foreground="{DynamicResource TextPrimary}" Margin="0,2,0,4"/>
+                <Button x:Name="MarkEndButton"
+                        Content="Mark End at current position ( ] )"
+                        AutomationProperties.Name="Mark end time at current playback position"
+                        Click="MarkEndButton_Click"
+                        Margin="0,0,0,12" Padding="6,4"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Playback controls -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+            <MediaElement x:Name="Player"
+                          LoadedBehavior="Manual" UnloadedBehavior="Manual"
+                          Width="0" Height="0"
+                          MediaOpened="Player_MediaOpened"/>
+            <Button x:Name="PlayPauseButton"
+                    Content="Play / Pause (Space)"
+                    AutomationProperties.Name="Play or pause playback"
+                    Click="PlayPauseButton_Click"
+                    Margin="0,0,10,0" Padding="8,4"/>
+            <Slider x:Name="PositionSlider"
+                    AutomationProperties.Name="Playback position"
+                    Width="400" Minimum="0"
+                    PreviewMouseUp="PositionSlider_PreviewMouseUp"/>
+            <TextBlock x:Name="PositionText" Text="00:00.00 / 00:00.00"
+                       Foreground="{DynamicResource TextPrimary}"
+                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Status bar -->
+        <TextBlock x:Name="StatusText" Grid.Row="3" Text="Ready."
+                   Foreground="{DynamicResource TextSecondary}"
+                   Margin="0,8,0,0"/>
+    </Grid>
+</Window>

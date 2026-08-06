@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraCaptions</RootNamespace>
+    <AssemblyName>UltraCaptions</AssemblyName>
+    <ApplicationIcon></ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Demir Ajvazi</Company>
+    <Product>Ultra Captions</Product>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2026 Demir Ajvazi</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Screen-reader detection, themes, Bootstrap auto-labeling, and MVVM base -->
+    <PackageReference Include="UltraAccessibleKit" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>

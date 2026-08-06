@@ -1,0 +1,102 @@
+name: Build and Release Ultra Captions
+
+on:
+  push:
+    tags:
+      - 'captions-v*'   # Own prefix, so it never collides with tag patterns
+                        # used by other Ultra repos or other tools in this
+                        # same repo (e.g. the NuGet-publish tag pattern used
+                        # in Ultra-Accessible-Kit).
+
+jobs:
+  build:
+    runs-on: windows-latest
+    # Without this, the default GITHUB_TOKEN is read-only in many repos,
+    # and softprops/action-gh-release fails with "Resource not accessible
+    # by integration" when it tries to create the release.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # The git tag is "captions-v0.1.0" (clear prefix against collisions),
+      # but the release name and installer filename should just say
+      # "v0.1.0" - this strips the prefix once.
+      - name: Extract clean version from tag
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^captions-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet packages
+        run: dotnet restore UltraCaptions\UltraCaptions.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraCaptions\UltraCaptions.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      # Inno Setup isn't preinstalled on the windows-latest runner, but
+      # Chocolatey (choco.exe) is - the standard way to install it.
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            installer\UltraCaptions.iss
+
+      - name: Create GitHub Release and upload
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Captions ${{ env.CLEAN_VERSION }}"
+          body: |
+            ## Ultra Captions ${{ env.CLEAN_VERSION }}
+
+            **Download the installer below and run it.** Windows will ask
+            for administrator permission - that's normal and expected.
+
+            Ultra Captions is an accessible subtitle/caption editor:
+            - **Auto-transcription** - local Whisper generates a first-draft
+              caption list with timestamps (no internet, no API key;
+              requires a local Whisper install)
+            - **Manual keyboard timing** - listen and mark exact start/end
+              points with `[` and `]`, no mouse or waveform required
+            - **Import/export** standard `.srt` files
+
+            ### Accessibility
+            Native WPF list control for the caption list (same technology
+            behind Windows Explorer, so JAWS/NVDA read each line without
+            extra configuration), full keyboard control, and shared theming
+            (Light/Dark/High Contrast) via Ultra Accessible Kit.
+
+            ### System requirements
+            - Windows 10/11 (64-bit)
+            - Manual timing works out of the box. Auto-transcription needs
+              a local Whisper install (`pip install openai-whisper` +
+              ffmpeg) - see the README for details.
+
+            **Note:** this is an early release - core functionality works
+            and has been tested, but expect rough edges.
+
+            ---
+            *Built with GitHub Actions | [Documentation](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: installer/Output/UltraCaptionsSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

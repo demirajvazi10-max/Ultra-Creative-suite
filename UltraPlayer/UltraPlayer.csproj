@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraPlayer</RootNamespace>
+    <AssemblyName>UltraPlayer</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Demir Ajvazi</Company>
+    <Product>Ultra Player</Product>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2026 Demir Ajvazi</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="UltraAccessibleKit" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>

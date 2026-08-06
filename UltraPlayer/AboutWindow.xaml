@@ -1,0 +1,38 @@
+<Window x:Class="UltraPlayer.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About Ultra Player"
+        Height="320" Width="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource WindowBg}"
+        AutomationProperties.Name="About Ultra Player">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Ultra Player" FontSize="22" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Text="Version 0.1 (early skeleton)"
+                       Foreground="{DynamicResource TextSecondary}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1">
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,14"
+                       Foreground="{DynamicResource TextPrimary}"
+                       Text="An accessible podcast/audiobook player - playlist, adjustable playback speed, and a sleep timer, all fully keyboard controlled. Part of the Ultra suite of accessible software."/>
+            <TextBlock Text="Created by Demir Ajvazi" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
+            <TextBlock Text="© 2026 Demir Ajvazi" Foreground="{DynamicResource TextSecondary}"/>
+        </StackPanel>
+
+        <Button Grid.Row="2" Content="Close" Click="CloseButton_Click"
+                HorizontalAlignment="Right" Margin="0,16,0,0"
+                AutomationProperties.Name="Close about dialog"
+                IsDefault="True" IsCancel="True" Padding="12,4"/>
+    </Grid>
+</Window>

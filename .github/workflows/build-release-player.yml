@@ -1,0 +1,85 @@
+name: Build and Release Ultra Player
+
+on:
+  push:
+    tags:
+      - 'player-v*'   # Own prefix, so it never collides with tag patterns
+                      # used by other Ultra repos.
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # needed for softprops/action-gh-release to create the release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract clean version from tag
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^player-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet packages
+        run: dotnet restore UltraPlayer\UltraPlayer.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraPlayer\UltraPlayer.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            installer\UltraPlayer.iss
+
+      - name: Create GitHub Release and upload
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Player ${{ env.CLEAN_VERSION }}"
+          body: |
+            ## Ultra Player ${{ env.CLEAN_VERSION }}
+
+            **Download the installer below and run it.** Windows will ask
+            for administrator permission - that's normal and expected.
+
+            Ultra Player is an accessible podcast/audiobook player:
+            - **Playlist** of audio files
+            - **Adjustable playback speed** (0.75x-2.0x)
+            - **Sleep timer** (15/30/45/60 min, or end of track)
+            - Fully keyboard controlled
+
+            ### Accessibility
+            Full keyboard control, shared theming (Light/Dark/High Contrast)
+            via Ultra Accessible Kit, live-announced status.
+
+            ### System requirements
+            - Windows 10/11 (64-bit)
+
+            **Note:** this is an early release - expect rough edges. Chapter
+            navigation is not yet included.
+
+            ---
+            *Built with GitHub Actions | [Documentation](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: installer/Output/UltraPlayerSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
