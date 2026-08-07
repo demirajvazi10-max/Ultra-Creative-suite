@@ -48,6 +48,9 @@
                 <MenuItem Header="{DynamicResource L_menu_move_layer_up}" Click="MoveLayerUp_Click"/>
                 <MenuItem Header="{DynamicResource L_menu_move_layer_down}" Click="MoveLayerDown_Click"/>
             </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_proofread}">
+                <MenuItem Header="{DynamicResource L_menu_proofread_document}" Click="ProofreadDocument_Click"/>
+            </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_help}">
                 <MenuItem Header="{DynamicResource L_menu_about}" Click="ShowAbout_Click"/>
             </MenuItem>

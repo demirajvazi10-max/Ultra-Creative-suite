@@ -21,6 +21,7 @@ Ultra Studio is a WPF desktop application (.NET 8) for editing photos — adjust
 - **AI image description** (Qwen2.5-VL via Ollama, 100% local, no API key, no cloud) — detailed, accurate descriptions for anyone who can't see the image
 - **AI editing suggestions** — the AI reviews the image adjustment-by-adjustment and proposes specific, concrete changes (e.g. "increase contrast by 15 — the sky looks flat"), each presented as a native Yes/No dialog, applied only on confirmation
 - **AI-guided object extraction (SAM)** — describe what to extract ("the child", "the car") in plain text; the AI locates it, then Meta's Segment Anything model produces a pixel-precise cutout — not a rough approximation
+- **Layers (graphic design)** — text, shape (rectangle/ellipse/line), and image layers composited on top of the base photo, or on a blank canvas of any size (**Layers > New canvas...**). Each layer has position, size, opacity and visibility, edited through the same JAWS-list / visual-panel duality as the adjustments above: a native ListView (**Enter** for properties, **Space** to toggle visibility, **Delete** to remove) in JAWS Mode, and a mouse-friendly stacked panel with per-layer sliders and an Edit button in Visual Mode. Reorder with **Layers > Move layer up/down**, duplicate with **Layers > Duplicate layer**.
 
 ---
 

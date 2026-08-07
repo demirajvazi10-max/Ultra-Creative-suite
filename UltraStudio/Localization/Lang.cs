@@ -169,6 +169,30 @@ namespace UltraStudio.Localization
             ["canvas_height_prompt"] = ("Canvas height (px):", "Visina platna (px):"),
             ["canvas_created"] = ("New blank canvas: {0}x{1} pixels", "Novo prazno platno: {0}x{1} piksela"),
             ["canvas_info_blank"] = ("Blank canvas — {0}x{1}px, no image open", "Prazno platno — {0}x{1}px, nema otvorene slike"),
+
+            // ===== Lektura (proofreading) =====
+            ["menu_proofread"] = ("Pro_ofreading", "_Lektura"),
+            ["menu_proofread_document"] = ("Proofread a _document... (.txt/.docx)", "Lekturiši _dokument... (.txt/.docx)"),
+            ["menu_layer_proofread"] = ("Proofread text...", "Lektura teksta..."),
+            ["proof_title_layer"] = ("Proofreading — text layer", "Lektura — tekst sloja"),
+            ["proof_title_document"] = ("Proofreading — {0}", "Lektura — {0}"),
+            ["proof_text_label"] = ("Text", "Tekst"),
+            ["proof_run"] = ("Run proofreading", "Pokreni lekturu"),
+            ["proof_running"] = ("Analyzing text with AI...", "AI analizira tekst..."),
+            ["proof_found_issues"] = ("Found {0} suggestion(s) below.", "Pronađeno {0} predloga ispod."),
+            ["proof_no_issues"] = ("No issues found — text looks good.", "Nema primedbi — tekst izgleda dobro."),
+            ["proof_issues_label"] = ("Suggestions", "Predlozi"),
+            ["proof_col_type"] = ("Type", "Tip"),
+            ["proof_col_original"] = ("Original", "Original"),
+            ["proof_col_suggestion"] = ("Suggestion", "Predlog"),
+            ["proof_col_explanation"] = ("Explanation", "Objašnjenje"),
+            ["proof_apply_selected"] = ("Apply selected", "Primeni izabrano"),
+            ["proof_apply_all"] = ("Apply all", "Primeni sve"),
+            ["proof_use_rewrite"] = ("Use AI's full rewrite", "Koristi AI prepis celog teksta"),
+            ["proof_type_spelling"] = ("Spelling", "Pravopis"),
+            ["proof_type_grammar"] = ("Grammar", "Gramatika"),
+            ["proof_type_style"] = ("Style", "Stil"),
+            ["proof_saved"] = ("Proofread text saved to {0}", "Lektorisan tekst sačuvan u {0}"),
         };
 
         public static string T(string key)

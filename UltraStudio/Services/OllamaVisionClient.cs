@@ -25,7 +25,6 @@ namespace UltraStudio.Services
     public class OllamaVisionClient
     {
         private const string OLLAMA_URL = "http://localhost:11434/api/chat";
-        private const string VISION_MODEL = "qwen2.5vl:latest";
 
         private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(120) };
         private static readonly HttpClient _pingClient = new() { Timeout = TimeSpan.FromSeconds(3) };
@@ -47,7 +46,7 @@ namespace UltraStudio.Services
 
             var payload = new
             {
-                model = VISION_MODEL,
+                model = OllamaModelConfig.VisionModel,
                 messages = new[]
                 {
                     new { role = "user", content = prompt, images = new[] { base64Image } }

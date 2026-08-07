@@ -69,6 +69,18 @@ namespace UltraStudio.Views
                     Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
                 stack.Children.Add(_bold);
                 stack.Children.Add(_italic);
+
+                var proofBtn = new Button
+                {
+                    Content = Lang.T("menu_layer_proofread"), Style = (Style)Application.Current.Resources["AIButton"],
+                    HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 14)
+                };
+                proofBtn.Click += (_, __) =>
+                {
+                    var pdlg = new ProofreadingDialog(_text!.Text, Lang.T("proof_title_layer")) { Owner = this };
+                    if (pdlg.ShowDialog() == true) _text!.Text = pdlg.ResultText;
+                };
+                stack.Children.Add(proofBtn);
             }
             else if (layer is ShapeLayer s)
             {

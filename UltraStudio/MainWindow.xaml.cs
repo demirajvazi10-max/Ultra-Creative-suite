@@ -589,6 +589,48 @@ namespace UltraStudio
         }
 
         // ════════════════════════════════════════════════════════════════
+        // LEKTURA DOKUMENTA — samostalni alat, odvojen od tekst-slojeva, za
+        // duže tekstove uvezene iz .txt/.docx (isti ProofreadingDialog kao
+        // za tekst-slojeve, samo pozvan bez veze sa platnom).
+        // ════════════════════════════════════════════════════════════════
+        private void ProofreadDocument_Click(object sender, RoutedEventArgs e)
+        {
+            var openDlg = new OpenFileDialog
+            {
+                Title = Lang.T("menu_proofread_document"),
+                Filter = "Text/Word|*.txt;*.docx|Text (*.txt)|*.txt|Word (*.docx)|*.docx"
+            };
+            if (openDlg.ShowDialog() != true) return;
+
+            string text;
+            try
+            {
+                text = Path.GetExtension(openDlg.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase)
+                    ? DocxTextExtractor.ExtractPlainText(openDlg.FileName)
+                    : File.ReadAllText(openDlg.FileName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var dlg = new ProofreadingDialog(text, string.Format(Lang.T("proof_title_document"), Path.GetFileName(openDlg.FileName))) { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+
+            var saveDlg = new SaveFileDialog
+            {
+                Filter = "Text (*.txt)|*.txt",
+                FileName = Path.GetFileNameWithoutExtension(openDlg.FileName) + "_lektorisano.txt"
+            };
+            if (saveDlg.ShowDialog() != true) return;
+
+            File.WriteAllText(saveDlg.FileName, dlg.ResultText);
+            SetStatus(string.Format(Lang.T("proof_saved"), saveDlg.FileName));
+        }
+
+        // ════════════════════════════════════════════════════════════════
         // OTVARANJE / ČUVANJE SLIKE
         // ════════════════════════════════════════════════════════════════
         private void OpenImage_Click(object sender, RoutedEventArgs e)

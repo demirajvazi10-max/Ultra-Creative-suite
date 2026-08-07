@@ -1,11 +1,3 @@
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio.csproj.AssemblyReference.cache
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\MainWindow.baml
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\Themes\Dark.baml
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\MainWindow.g.cs
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\App.g.cs
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio_MarkupCompile.cache
-C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio_MarkupCompile.lref
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\UltraStudio.exe
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\UltraStudio.deps.json
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\UltraStudio.runtimeconfig.json
@@ -44,6 +36,14 @@ C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\runtimes\win-x
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\runtimes\win-x86\native\onnxruntime.lib
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\runtimes\win-x86\native\onnxruntime_providers_shared.dll
 C:\Users\Ajvazi\source\repos\UltraStudio\bin\Debug\net8.0-windows\runtimes\win-x86\native\onnxruntime_providers_shared.lib
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio.csproj.AssemblyReference.cache
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\MainWindow.baml
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\Themes\Dark.baml
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\MainWindow.g.cs
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\App.g.cs
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio_MarkupCompile.cache
+C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio_MarkupCompile.lref
 C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\App.baml
 C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio.g.resources
 C:\Users\Ajvazi\source\repos\UltraStudio\obj\Debug\net8.0-windows\UltraStudio.GeneratedMSBuildEditorConfig.editorconfig
