@@ -571,7 +571,10 @@ namespace UltraVideoEditor
                 if (txtJawsLog != null)
                 {
                     txtJawsLog.Text = message;
-                    var peer = UIElementAutomationPeer.FromElement(txtJawsLog);
+                    // CreatePeerForElement umjesto FromElement: FromElement vraca null
+                    // dok neki AT klijent (NVDA/JAWS) sam ne "dodirne" element bar jednom,
+                    // pa najava dotad tiho ne radi. CreatePeerForElement kreira peer odmah.
+                    var peer = UIElementAutomationPeer.CreatePeerForElement(txtJawsLog) ?? UIElementAutomationPeer.FromElement(txtJawsLog);
                     peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
                 }
                 // ── Ghost live region — JAWS trick: NVDA/JAWS pouzdanije cita
@@ -579,7 +582,7 @@ namespace UltraVideoEditor
                 if (txtJawsGhost != null && accessibilityMode)
                 {
                     txtJawsGhost.Text = message;
-                    var peer2 = UIElementAutomationPeer.FromElement(txtJawsGhost);
+                    var peer2 = UIElementAutomationPeer.CreatePeerForElement(txtJawsGhost) ?? UIElementAutomationPeer.FromElement(txtJawsGhost);
                     peer2?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
                 }
             });
@@ -4492,6 +4495,14 @@ namespace UltraVideoEditor
                 {
                     // Ako je obrisan zadnji, selektuj novi zadnji
                     nativeListView.Items[nativeListView.Items.Count - 1].Selected = true;
+                }
+                else if (selectedIndex == -1 && nativeListView.Items.Count > 0)
+                {
+                    // Ranije ništa nije bilo selektovano (npr. tek dodat prvi klip na
+                    // praznu traku) — bez ovoga Cut i slične komande koje traže
+                    // selektovan klip tiho ne rade dok korisnik ručno ne selektuje klip.
+                    nativeListView.Items[0].Selected = true;
+                    nativeListView.Items[0].EnsureVisible();
                 }
 
                 nativeListView.EndUpdate();

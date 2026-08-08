@@ -38,7 +38,9 @@
         </ListBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Name="txtStatus" Text="Ready" Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
+            <TextBlock x:Name="txtStatus" Text="Ready" Foreground="{DynamicResource AccentBrush}" FontSize="11"
+                       AutomationProperties.Name="Status message"
+                       AutomationProperties.LiveSetting="Assertive"/>
             <Button x:Name="btnClose" Content="❌ CLOSE" Click="Close_Click"
                     Width="100" Height="30" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="20,0,0,0"/>
         </StackPanel>

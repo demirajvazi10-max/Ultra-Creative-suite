@@ -7111,7 +7111,8 @@ namespace UltraVideoEditor
                     prgProgress.Value = progressPercent;
                     txtProgress.Text = $"{progressPercent}% - {message}";
                 }
-                var peer = UIElementAutomationPeer.FromElement(txtOllamaStatus);
+                // CreatePeerForElement umjesto FromElement — vidi napomenu u MainWindow.LogMessage
+                var peer = UIElementAutomationPeer.CreatePeerForElement(txtOllamaStatus) ?? UIElementAutomationPeer.FromElement(txtOllamaStatus);
                 peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             });
         }

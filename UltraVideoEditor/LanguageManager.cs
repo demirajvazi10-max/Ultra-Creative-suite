@@ -191,7 +191,7 @@ namespace UltraVideoEditor
             sr["up_to_date"] = "Trenutno koristite najnoviju verziju.";
             sr["updates_title"] = "Ažuriranja";
             sr["no_updates"] = "Nema novih ažuriranja";
-            sr["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nPristupačni video editor\nNapravljen za sve korisnike\n\nAutor: Demir Ajvazi\n© 2025";
+            sr["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nPristupačni video editor\nNapravljen za sve korisnike\n\n© 2025";
             sr["about_title"] = "O programu";
             sr["no_drag_data"] = "Nema podataka za prevlačenje";
             sr["unsupported_file"] = "Nijedan fajl nije podržan.";
@@ -774,7 +774,7 @@ namespace UltraVideoEditor
             en["up_to_date"] = "You are using the latest version.";
             en["updates_title"] = "Updates";
             en["no_updates"] = "No new updates";
-            en["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nAccessible video editor\nMade for all users\n\nCreated by Demir Ajvazi\n© 2025";
+            en["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nAccessible video editor\nMade for all users\n\n© 2025";
             en["about_title"] = "About";
             en["no_drag_data"] = "No drag data available";
             en["unsupported_file"] = "No files supported.";
@@ -1523,7 +1523,7 @@ namespace UltraVideoEditor
             de["up_to_date"] = "Aktuell";
             de["updates_title"] = "Updates";
             de["about_title"] = "Über Ultra Video Editor";
-            de["about_text"] = "Ultra Video Editor\nAccessibility-freundlicher Video-Editor\nVersion 1.0\n\nErstellt von Demir Ajvazi\n© 2025";
+            de["about_text"] = "Ultra Video Editor\nAccessibility-freundlicher Video-Editor\nVersion 1.0";
             de["settings_title"] = "Einstellungen";
             de["settings_wip"] = "Einstellungen in Entwicklung";
             de["manual_title"] = "Benutzerhandbuch";

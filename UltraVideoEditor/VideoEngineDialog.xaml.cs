@@ -546,8 +546,10 @@ namespace UltraVideoEditor
                     prgProgress.Visibility = Visibility.Visible;
                     txtProgress.Text       = $"{pct}% — {msg}";
                 }
+                // CreatePeerForElement umjesto FromElement — vidi napomenu u MainWindow.LogMessage
                 var peer = System.Windows.Automation.Peers
-                    .UIElementAutomationPeer.FromElement(txtStatus);
+                    .UIElementAutomationPeer.CreatePeerForElement(txtStatus)
+                    ?? System.Windows.Automation.Peers.UIElementAutomationPeer.FromElement(txtStatus);
                 peer?.RaiseAutomationEvent(
                     System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
             });

@@ -87,9 +87,12 @@ namespace UltraVideoEditor
 
         private void AnnounceToJaws(string message)
         {
-            var peer = UIElementAutomationPeer.FromElement(lstLog);
-            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            // Ranije se LiveRegionChanged dizao na lstLog, koji uopste nije live region
+            // (nema AutomationProperties.LiveSetting), pa poruka nikad nije bila najavljena.
+            // txtStatus je taj koji nosi tekst poruke i sad ima LiveSetting u xaml-u.
             txtStatus.Text = message;
+            var peer = UIElementAutomationPeer.CreatePeerForElement(txtStatus) ?? UIElementAutomationPeer.FromElement(txtStatus);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
