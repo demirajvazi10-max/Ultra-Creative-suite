@@ -27,10 +27,11 @@
 
         <!-- Status -->
         <Border Grid.Row="1" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+            <!-- Bez static AutomationProperties.Name namerno - vidi napomenu u
+                 LogWindow.xaml / MainWindow txtJawsLog. -->
             <TextBlock x:Name="txtStatus" Text="Initializing..."
                        Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" FontSize="12"
-                       AutomationProperties.LiveSetting="Assertive"
-                       AutomationProperties.Name="AI engine status"/>
+                       AutomationProperties.LiveSetting="Assertive"/>
         </Border>
 
         <!-- Opcije -->

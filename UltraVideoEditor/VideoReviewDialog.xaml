@@ -108,10 +108,11 @@
         <!-- Status / progress -->
         <Border Grid.Row="3" Background="{DynamicResource PanelBg}" CornerRadius="6" Padding="10" Margin="0,0,0,8">
             <StackPanel>
+                <!-- Bez static AutomationProperties.Name namerno - vidi napomenu kod
+                     txtJawsLog u MainWindow.xaml. -->
                 <TextBlock x:Name="txtStatus" Text="Ready. Select a video and press ANALYZE."
                            Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" FontSize="12"
-                           AutomationProperties.LiveSetting="Polite"
-                           AutomationProperties.Name="Analysis status"/>
+                           AutomationProperties.LiveSetting="Polite"/>
                 <ProgressBar x:Name="pbProgress" Height="10" Margin="0,8,0,4"
                              Minimum="0" Maximum="100" Value="0"
                              Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBg}"

@@ -134,10 +134,11 @@
                          Height="10" Minimum="0" Maximum="100" Value="0"
                          Background="{DynamicResource ControlBg}" Foreground="#0078D4"
                          AutomationProperties.Name="Download progress"/>
+            <!-- Bez static AutomationProperties.Name namerno - vidi napomenu kod
+                 txtJawsLog u MainWindow.xaml. -->
             <TextBlock x:Name="txbProgress"
                        Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
-                       AutomationProperties.LiveSetting="Polite"
-                       AutomationProperties.Name="Download status"/>
+                       AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
 
         <!-- Dugmici -->

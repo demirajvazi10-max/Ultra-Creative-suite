@@ -14,7 +14,7 @@
 	<ItemGroup>
 		<PackageReference Include="LibVLCSharp" Version="3.9.6" />
 		<PackageReference Include="LibVLCSharp.WPF" Version="3.9.6" />
-		<PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.14.0" />
+		<PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.16.0" />
 		<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.6" />
 		<PackageReference Include="NAudio" Version="2.3.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

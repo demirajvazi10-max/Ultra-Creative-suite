@@ -26,10 +26,12 @@
             <TextBlock Text="200%" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
         </StackPanel>
 
+        <!-- Bez static AutomationProperties.Name namerno - vidi napomenu kod txtJawsLog
+             u MainWindow.xaml. Sa fiksnim Name, JAWS/NVDA bi na svaku promenu citao
+             "Current volume value" umesto stvarnog procenta (npr. "73%"). -->
         <TextBlock x:Name="txtVolumeValue" Grid.Row="2" Text="100%" 
                    Foreground="{DynamicResource AccentBrush}" FontSize="16" FontWeight="Bold"
                    HorizontalAlignment="Center" Margin="0,0,0,15"
-                   AutomationProperties.Name="Current volume value"
                    AutomationProperties.LiveSetting="Polite"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,40,0,0">

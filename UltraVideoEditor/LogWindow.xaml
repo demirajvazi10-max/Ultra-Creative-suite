@@ -38,8 +38,11 @@
         </ListBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <!-- Bez static AutomationProperties.Name namerno: kod TextBlock-a se Text
+                 automatski koristi kao UIA Name, sto je bas ono sto zelimo da se cita
+                 pri live-region najavi. Fiksni Name bi tu automatsku vezu prekinuo
+                 (ista greska ispravljena u MainWindow txtJawsLog). -->
             <TextBlock x:Name="txtStatus" Text="Ready" Foreground="{DynamicResource AccentBrush}" FontSize="11"
-                       AutomationProperties.Name="Status message"
                        AutomationProperties.LiveSetting="Assertive"/>
             <Button x:Name="btnClose" Content="❌ CLOSE" Click="Close_Click"
                     Width="100" Height="30" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="20,0,0,0"/>

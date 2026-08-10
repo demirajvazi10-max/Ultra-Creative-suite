@@ -83,6 +83,14 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
+; Bez ovoga Inno Setup po difoltu radi u 32-bitnom instalacionom rezimu,
+; pa {pf}/{autopf} pokazuju na "Program Files (x86)" - a nas app je
+; win-x64 self-contained build, i VLC se skida kao win64 build koji se
+; instalira u pravi (64-bitni) Program Files. Bez ovog reda, {pf} u
+; InstallDependencies dole gleda pogresan folder, pa instaler ni ne vidi
+; vec instaliran VLC, ni ne moze da potvrdi da ga je upravo instalirao.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 OutputBaseFilename=UltraVideoEditorSetup-{#MyAppVersion}
 OutputDir=Output
 Compression=lzma2
@@ -526,7 +534,12 @@ var
   WhisperSrcFolder: String;
 begin
   FfmpegDestDir := ExpandConstant('{app}\Ffmpeg');
-  VlcPath   := ExpandConstant('{pf}\VideoLAN\VLC\vlc.exe');
+  // Eksplicitno {pf64}/{pf32} umesto {pf} - {pf} zavisi od instalacionog
+  // rezima (vidi ArchitecturesInstallIn64BitMode gore) i ranije je, bez
+  // tog podesavanja, bio isti kao {pf32}, pa se instaler nikad nije
+  // obazirao na pravi (64-bitni) Program Files gde stvarno zavrsi
+  // preuzeti win64 VLC installer.
+  VlcPath   := ExpandConstant('{pf64}\VideoLAN\VLC\vlc.exe');
   VlcPath86 := ExpandConstant('{pf32}\VideoLAN\VLC\vlc.exe');
   OllamaExe := ExpandConstant('{localappdata}\Programs\Ollama\ollama.exe');
 

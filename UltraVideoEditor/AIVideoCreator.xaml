@@ -29,9 +29,10 @@
 
         <!-- Status Ollama -->
         <Border Grid.Row="1" Background="{DynamicResource PanelBg2}" CornerRadius="4" Padding="8" Margin="0,0,0,10">
+            <!-- Bez static AutomationProperties.Name namerno - vidi napomenu u
+                 LogWindow.xaml / MainWindow txtJawsLog. -->
             <TextBlock x:Name="txtOllamaStatus" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"
                        Text="🔍 Checking Ollama..."
-                       AutomationProperties.Name="Status message"
                        AutomationProperties.LiveSetting="Assertive"/>
         </Border>
 

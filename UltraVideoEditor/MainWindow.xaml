@@ -607,19 +607,22 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- Glavna statusna poruka — JAWS cita svaku promjenu odmah (Assertive) -->
-                <TextBox x:Name="txtJawsLog"
+                <!-- Glavna statusna poruka — JAWS cita svaku promjenu odmah (Assertive).
+                     TextBlock, ne TextBox: kod TextBox-a se Text izlaze kao UIA Value, a
+                     Name ostaje odvojeno svojstvo (ovde je ranije bilo fiksirano na
+                     "Status message" i nikad se nije menjalo, pa je NVDA/JAWS na svaku
+                     najavu citao bas taj fiksni naziv umesto stvarne poruke). Kod
+                     TextBlock-a se Text automatski koristi kao Name, pa najava sad prati
+                     stvarni sadrzaj. -->
+                <TextBlock x:Name="txtJawsLog"
                          Grid.Column="0"
-                         IsReadOnly="True"
                          Background="Transparent"
-                         BorderThickness="0"
                          Foreground="#00FF00"
                          Text="System ready..."
                          TextWrapping="Wrap"
                          FontSize="11"
                          VerticalAlignment="Center"
                          AutomationProperties.LiveSetting="Assertive"
-                         AutomationProperties.Name="Status message"
                          ToolTip="Status messages. JAWS reads automatically. Ctrl+Shift+L for detailed log."/>
                 <!-- Desni info: pozicija / trajanje -->
                 <TextBlock x:Name="txtStatus"
@@ -632,14 +635,16 @@
                            FontSize="10"/>
             </Grid>
         </Border>
-        <!-- Nevidljiv element koji drzi JAWS ghost za duple poruke — zadrzano radi kompatibilnosti -->
-        <TextBox x:Name="txtJawsGhost" Grid.Row="4" Height="1" Width="1" Opacity="0" IsReadOnly="True"
-                 Background="Transparent" BorderThickness="0" IsTabStop="False"
-                 AutomationProperties.LiveSetting="Assertive" AutomationProperties.Name=""/>
+        <!-- Nevidljiv element koji drzi JAWS ghost za duple poruke — zadrzano radi kompatibilnosti.
+             TextBlock iz istog razloga kao txtJawsLog gore - Name treba da prati Text. -->
+        <TextBlock x:Name="txtJawsGhost" Grid.Row="4" Height="1" Width="1" Opacity="0"
+                 Background="Transparent"
+                 AutomationProperties.LiveSetting="Assertive"/>
 
         <ProgressBar x:Name="prgRender" Grid.Row="4" Height="8" VerticalAlignment="Bottom" Margin="0,0,0,0" Visibility="Collapsed"/>
+        <!-- Bez static AutomationProperties.Name namerno - vidi napomenu kod txtJawsLog gore. -->
         <TextBlock x:Name="txtRenderStatus" Grid.Row="4" Foreground="Yellow" TextAlignment="Center" FontSize="10" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,20"
-                   AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="Render status"/>
+                   AutomationProperties.LiveSetting="Polite"/>
 
         <!-- txtStatus preseljen unutar statusBarBorder -->
     </Grid>
