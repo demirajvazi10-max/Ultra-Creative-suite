@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraCast</RootNamespace>
+    <AssemblyName>UltraCast</AssemblyName>
+    <!-- Needed for System.Drawing.Common screen capture (Graphics.CopyFromScreen) -->
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Demir Ajvazi</Company>
+    <Product>Ultra Cast</Product>
+    <Authors>Demir Ajvazi</Authors>
+    <Copyright>© 2026 Demir Ajvazi</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared accessibility layer -->
+    <PackageReference Include="UltraAccessibleKit" Version="1.1.0" />
+    <!-- System audio loopback + microphone capture/mixing (same version already used elsewhere in the suite) -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- Folder picker without the WinForms conflict (same as Audio Editor / Record) -->
+    <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+    <!-- Raw frame grabbing via Graphics.CopyFromScreen - Windows-only, matches TargetFramework -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
+  </ItemGroup>
+
+</Project>

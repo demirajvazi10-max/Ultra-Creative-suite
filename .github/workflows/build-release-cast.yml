@@ -1,0 +1,90 @@
+name: Build and Release Ultra Cast
+
+on:
+  push:
+    tags:
+      - 'cast-v*'   # Own prefix, so it never collides with tag patterns
+                    # used by other Ultra repos.
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # needed for softprops/action-gh-release to create the release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract clean version from tag
+        shell: pwsh
+        run: |
+          $clean = "${{ github.ref_name }}" -replace '^cast-', ''
+          echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet packages
+        run: dotnet restore UltraCast\UltraCast.csproj
+
+      - name: Build (Release, self-contained)
+        run: |
+          dotnet publish UltraCast\UltraCast.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ env.CLEAN_VERSION }}" `
+            "/DMyAppSourceDir=${{ github.workspace }}\publish" `
+            installer\UltraCast.iss
+
+      - name: Create GitHub Release and upload
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Cast ${{ env.CLEAN_VERSION }}"
+          body: |
+            ## Ultra Cast ${{ env.CLEAN_VERSION }}
+
+            **Download the installer below and run it.** Windows will ask
+            for administrator permission - that's normal and expected.
+            The installer also downloads FFmpeg automatically if it isn't
+            already on your system.
+
+            Ultra Cast is an accessible screen recorder:
+            - **Screen recording** to MP4, with **system audio** (which
+              naturally includes screen-reader speech) and an optional
+              **microphone track** for narration
+            - **Global hotkeys** (Ctrl+Alt+R start/stop, Ctrl+Alt+P
+              pause/resume) that work from any window, not just when
+              Ultra Cast is focused
+            - **Non-visual confirmation sounds** when recording
+              starts/stops/pauses
+
+            ### Accessibility
+            Full keyboard control, shared theming (Light/Dark/High Contrast)
+            via Ultra Accessible Kit, and live-announced status.
+
+            ### System requirements
+            - Windows 10/11 (64-bit)
+
+            **Note:** this is an early release - expect rough edges.
+
+            ---
+            *Built with GitHub Actions | [Documentation](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
+          files: installer/Output/UltraCastSetup-*.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

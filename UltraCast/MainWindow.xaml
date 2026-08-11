@@ -1,0 +1,125 @@
+<Window x:Class="UltraCast.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:theming="clr-namespace:UltraAccessibleKit.Theming;assembly=UltraAccessibleKit"
+        Title="Ultra Cast"
+        Height="620" Width="700"
+        Background="{DynamicResource MainWindowBg}">
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>   <!-- Output folder -->
+            <RowDefinition Height="Auto"/>   <!-- Audio sources -->
+            <RowDefinition Height="Auto"/>   <!-- Recording controls -->
+            <RowDefinition Height="Auto"/>   <!-- Hotkey hint -->
+            <RowDefinition Height="Auto"/>   <!-- Status bar -->
+            <RowDefinition Height="*"/>      <!-- Log panel -->
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+            <TextBlock Text="Ultra Cast"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       VerticalAlignment="Center"/>
+            <theming:ThemeSwitcher Margin="20,0,0,0"/>
+            <Button x:Name="AboutButton"
+                    Content="About"
+                    AutomationProperties.Name="About Ultra Cast"
+                    Click="AboutButton_Click"
+                    Margin="20,0,0,0" Padding="8,4"/>
+        </StackPanel>
+
+        <!-- Output folder -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button x:Name="ChooseFolderButton"
+                    Content="Choose Output Folder..."
+                    AutomationProperties.Name="Choose output folder for recordings"
+                    Click="ChooseFolderButton_Click"
+                    Padding="8,4" Margin="0,0,10,0"/>
+            <TextBlock x:Name="OutputFolderText"
+                       Text="No output folder chosen"
+                       AutomationProperties.Name="Selected output folder"
+                       Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Audio sources -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <CheckBox x:Name="SystemAudioCheckBox"
+                      Content="Record system audio (includes screen reader speech)"
+                      IsChecked="True"
+                      AutomationProperties.Name="Record system audio, including screen reader speech"
+                      Foreground="{DynamicResource TextPrimary}"
+                      Margin="0,0,20,0"
+                      Checked="AudioOption_Changed" Unchecked="AudioOption_Changed"/>
+            <CheckBox x:Name="MicrophoneCheckBox"
+                      Content="Record microphone (narration)"
+                      IsChecked="True"
+                      AutomationProperties.Name="Record microphone for narration"
+                      Foreground="{DynamicResource TextPrimary}"
+                      Checked="AudioOption_Changed" Unchecked="AudioOption_Changed"/>
+        </StackPanel>
+
+        <!-- Recording controls -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button x:Name="StartButton"
+                    Content="Start Recording"
+                    AutomationProperties.Name="Start recording the screen"
+                    Click="StartButton_Click"
+                    Padding="12,6" Margin="0,0,10,0"/>
+            <Button x:Name="PauseButton"
+                    Content="Pause"
+                    AutomationProperties.Name="Pause or resume recording"
+                    Click="PauseButton_Click"
+                    Padding="12,6" Margin="0,0,10,0"/>
+            <Button x:Name="StopButton"
+                    Content="Stop Recording"
+                    AutomationProperties.Name="Stop recording and save"
+                    Click="StopButton_Click"
+                    Padding="12,6"/>
+        </StackPanel>
+
+        <!-- Hotkey hint -->
+        <TextBlock Grid.Row="4"
+                    Text="Global hotkeys (work from any window): Ctrl+Alt+R = start/stop, Ctrl+Alt+P = pause/resume."
+                    Foreground="{DynamicResource TextSecondary}"
+                    Margin="0,0,0,8" TextWrapping="Wrap"/>
+
+        <!-- Status bar -->
+        <TextBlock x:Name="StatusText"
+                   Grid.Row="5"
+                   Text="Ready."
+                   AutomationProperties.Name="Status"
+                   AutomationProperties.LiveSetting="Assertive"
+                   Foreground="{DynamicResource TextSecondary}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"/>
+
+        <!-- Log panel: read-only, scrollable, plain text so both a screen
+             reader and a sighted user can read exactly what happened -
+             especially useful when running from Visual Studio rather than
+             the installed app, where dependencies like ffmpeg.exe aren't
+             automatically in place yet. Also mirrored to a log file on disk
+             (see AppLogger.LogFilePath) so it survives after the app closes. -->
+        <DockPanel Grid.Row="6">
+            <TextBlock DockPanel.Dock="Top"
+                       Text="Log"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       Margin="0,0,0,4"/>
+            <TextBox x:Name="LogTextBox"
+                     IsReadOnly="True"
+                     IsReadOnlyCaretVisible="True"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Consolas"
+                     AutomationProperties.Name="Activity log"
+                     Background="{DynamicResource ControlBg}"
+                     Foreground="{DynamicResource TextPrimary}"/>
+        </DockPanel>
+    </Grid>
+</Window>
