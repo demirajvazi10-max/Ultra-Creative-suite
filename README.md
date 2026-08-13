@@ -29,15 +29,19 @@ Every feature works for blind, low-vision, and sighted users equally. Blind user
 
 ## Repository Structure
 
-This repository hosts the full Ultra platform:
+This repository hosts the full Ultra Creative Suite as a monorepo. Every app lives in its own sibling subfolder — none of them is "the root project":
 
-- **`/` (this folder)** — Ultra Video Editor (Ultra Creative Suite)
+- **`/UltraVideoEditor`** — Ultra Video Editor, the flagship AI-assisted video editor
 - **`/UltraAudioEditor`** — Ultra Audio Editor, a companion professional audio editor with the same accessibility standard
 - **`/UltraStudio`** — Ultra Studio, an AI-assisted photo editor with the same accessibility standard: a dual JAWS Mode / Visual Mode interface, local AI image description and editing suggestions, and AI-guided precise object extraction (Segment Anything)
+- **`/UltraCaptions`** — Ultra Captions, an accessible subtitle/caption editor combining Whisper auto-transcription with manual keyboard-driven timing
+- **`/UltraCast`** — Ultra Cast, an accessible screen recorder for tutorials, demos, and walkthroughs
+- **`/UltraRecord`** — Ultra Record, a multi-track audio recorder with audio-based clipping alerts instead of visual VU meters
+- **`/UltraPlayer`** — Ultra Player, an accessible podcast/audiobook player with adjustable playback speed and sleep timer
 
-Each companion app has its own README with full details.
+Each app has its own README with full details.
 
-All three tools share this repository's single [GPL-3.0 license](./LICENSE).
+All apps share this repository's single [GPL-3.0 license](./LICENSE).
 
 ---
 
