@@ -97,6 +97,7 @@ namespace UltraStudio
             nativeAdjustList.ForeColor = System.Drawing.Color.White;
             nativeAdjustList.Font = new System.Drawing.Font("Segoe UI", 10);
             nativeAdjustList.AccessibleName = Lang.T("acc_list_help");
+            nativeAdjustList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeAdjustList);
 
             nativeAdjustList.KeyDown += NativeAdjustList_KeyDown;
             RefreshList();
@@ -283,6 +284,7 @@ namespace UltraStudio
             nativeLayerList.ForeColor = System.Drawing.Color.White;
             nativeLayerList.Font = new System.Drawing.Font("Segoe UI", 10);
             nativeLayerList.AccessibleName = Lang.T("acc_layer_list_help");
+            nativeLayerList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeLayerList);
 
             nativeLayerList.KeyDown += NativeLayerList_KeyDown;
             nativeLayerList.SelectedIndexChanged += (_, __) =>

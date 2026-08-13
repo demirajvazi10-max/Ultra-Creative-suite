@@ -155,10 +155,134 @@
         <Setter Property="FontSize" Value="12"/>
     </Style>
 
-    <!-- ScrollBar slim -->
+    <!-- MenuItem Style — pokriva i vrh menija i podmenije (dropdown-ove).
+         Bez ovoga, WPF podrazumevano crta pozadinu podmenija belom bez
+         obzira na Menu.Background, dok tekst nasleđuje svetlu boju iz teme
+         — rezultat je bezbojan/nevidljiv tekst na beloj pozadini kad god se
+         otvori bilo koji meni (File/Edit/Layers/itd). Ovo je bio glavni
+         uzrok "sve je belo, ne mogu da kliknem" prijave. -->
+    <Style TargetType="MenuItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource BrText}"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Border" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Grid.Column="0" Margin="{TemplateBinding Padding}"
+                                               VerticalAlignment="Center"
+                                               ContentSource="Header" RecognizesAccessKey="True"/>
+                            <TextBlock x:Name="Gesture" Grid.Column="1" Text="{TemplateBinding InputGestureText}"
+                                       Margin="16,0,10,0" VerticalAlignment="Center"
+                                       Foreground="{StaticResource BrTextMuted}" FontSize="11"/>
+                            <Path x:Name="Arrow" Grid.Column="2" Data="M0,0 L0,8 L4,4 Z"
+                                  Fill="{StaticResource BrTextSec}" Margin="4,0,8,0"
+                                  VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                                <Border Background="{StaticResource BrBgPanel}" BorderBrush="{StaticResource BrBorder}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Opacity="0.4" BlurRadius="10" ShadowDepth="2"/>
+                                    </Border.Effect>
+                                    <StackPanel IsItemsHost="True" Orientation="Vertical"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="Popup" Property="Placement" Value="Bottom"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Popup" Property="Placement" Value="Right"/>
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource BrBgMid}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Separator (linije u menijima) -->
+    <Style TargetType="Separator">
+        <Setter Property="Background" Value="{StaticResource BrBorder}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border BorderBrush="{StaticResource BrBorder}" BorderThickness="0,1,0,0" Margin="6,4"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Thumb za scrollbar -->
+    <Style x:Key="UltraScrollThumb" TargetType="Thumb">
+        <Setter Property="Background" Value="{StaticResource BrBorder}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="4"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource BrAccent}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ScrollBar slim, tamna tema (ranije je bila stilizovana samo pozadina
+         trake, dok su dugmici/klizač ostajali na svetloj/sistemskoj temi) -->
     <Style TargetType="ScrollBar">
         <Setter Property="Background" Value="{StaticResource BrBgDark}"/>
-        <Setter Property="Width" Value="8"/>
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="MinWidth" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource UltraScrollThumb}" Margin="2,0"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto"/>
+                <Setter Property="Height" Value="10"/>
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="MinHeight" Value="10"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
 </ResourceDictionary>

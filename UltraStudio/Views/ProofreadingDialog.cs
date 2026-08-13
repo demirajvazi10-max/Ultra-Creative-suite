@@ -79,6 +79,7 @@ namespace UltraStudio.Views
             _issueList.Columns.Add(Lang.T("proof_col_suggestion"), 150);
             _issueList.Columns.Add(Lang.T("proof_col_explanation"), 160);
             _issueList.AccessibleName = Lang.T("proof_issues_label");
+            _issueList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(_issueList);
 
             var wfHost = new WFI.WindowsFormsHost { Height = 200, Margin = new Thickness(0, 0, 0, 8), Child = _issueList };
             Grid.SetRow(wfHost, 4);
