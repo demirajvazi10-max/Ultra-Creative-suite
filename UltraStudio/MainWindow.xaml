@@ -1,8 +1,8 @@
 <Window x:Class="UltraStudio.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:wf="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
         xmlns:wfhost="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
+        xmlns:ctrl="clr-namespace:UltraStudio.Controls"
         Title="{DynamicResource L_app_title}" Height="720" Width="1200"
         Background="{StaticResource BrBgDark}"
         WindowStartupLocation="CenterScreen"
@@ -119,7 +119,7 @@
                 <!-- JAWS MOD: pristupacna lista podesavanja (native Win32 ListView —
                      isti dokazan obrazac kao Audio Editor-ova lista traka) -->
                 <wfhost:WindowsFormsHost Grid.Row="1" x:Name="wfhAdjustments" Margin="2">
-                    <wf:ListView x:Name="nativeAdjustList"
+                    <ctrl:TabAwareListView x:Name="nativeAdjustList"
                                  View="Details"
                                  FullRowSelect="True"
                                  GridLines="False"
@@ -144,7 +144,7 @@
 
                 <!-- JAWS MOD: pristupacna lista slojeva -->
                 <wfhost:WindowsFormsHost Grid.Row="3" x:Name="wfhLayers" Margin="2">
-                    <wf:ListView x:Name="nativeLayerList"
+                    <ctrl:TabAwareListView x:Name="nativeLayerList"
                                  View="Details"
                                  FullRowSelect="True"
                                  GridLines="False"
@@ -210,5 +210,28 @@
                            AutomationProperties.LiveSetting="Polite"/>
             </StatusBarItem>
         </StatusBar>
+
+        <!-- BANER MODA — kratka, animirana, samonestajuća potvrda pri pokretanju
+             ("JAWS Mode active" / "Visual Mode active"). Čisto vizuelna potvrda;
+             najava za čitače ekrana ide odvojeno preko statusne trake (live
+             region), pa se ova dva ne preklapaju/ne dupliraju u govoru JAWS-a.
+             IsHitTestVisible="False" da nikad ne smeta klikovima ispod sebe. -->
+        <Border x:Name="ModeToast" Grid.Row="0" Grid.RowSpan="4"
+                VerticalAlignment="Top" HorizontalAlignment="Center"
+                Margin="0,66,0,0" Padding="16,10"
+                Background="{StaticResource BrBgPanel}"
+                BorderBrush="{StaticResource BrBorder}" BorderThickness="1"
+                CornerRadius="8" Opacity="0" Visibility="Collapsed"
+                IsHitTestVisible="False">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.5" BlurRadius="16" ShadowDepth="3"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <Ellipse x:Name="ModeToastDot" Width="9" Height="9" Fill="{StaticResource BrAccent}"
+                         VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock x:Name="ModeToastText" FontSize="12.5" Foreground="{StaticResource BrText}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

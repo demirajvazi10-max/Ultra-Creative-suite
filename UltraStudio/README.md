@@ -11,6 +11,7 @@ Ultra Studio is a WPF desktop application (.NET 8) for editing photos — adjust
 - **JAWS Mode**: every adjustment lives in a single keyboard-navigable list (native Win32 ListView), Enter/F2 to edit a value, Space to toggle on/off options, Shift+F10 for menus.
 - **Visual Mode**: the same adjustments as real, mouse-friendly WPF sliders and checkboxes — for sighted users who expect a standard photo-editor feel. Toggle between the two anytime with **Alt+W**.
 - Both modes write to the same underlying project — nothing is duplicated, they're just two views onto the same data.
+- **Startup mode is auto-detected**: on launch, Ultra Studio checks whether a screen reader (JAWS, NVDA, Narrator, etc.) is actually running and opens directly into the matching mode — JAWS Mode if one is detected, Visual Mode if not. No one has to know the toggle exists just to get a usable screen.
 
 ---
 

@@ -28,6 +28,8 @@
     <!-- SAM (Segment Anything) — precizno izdvajanje objekata, isti ONNX Runtime
          koji Video Editor već koristi za MobileNet analizu kadrova -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
+    <PackageReference Include="NPOI" Version="2.7.2" />
+    <PackageReference Include="PdfPig" Version="0.1.17-alpha-202608250026-fd3a9" />
     <!-- HTTP za Ollama (opis slike preko Qwen2-VL) -->
     <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

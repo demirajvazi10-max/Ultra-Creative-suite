@@ -23,6 +23,10 @@ namespace UltraStudio.Localization
             // ===== Main window =====
             ["app_title"] = ("Ultra Studio — Accessible Photo Editor", "Ultra Studio — Pristupačan Photo Editor"),
             ["statusbar_ready"] = ("Ultra Studio v0.1 | JAWS accessible", "Ultra Studio v0.1 | JAWS pristupačno"),
+            ["statusbar_ready_sr_detected"] = ("Ultra Studio v0.1 | Screen reader detected — JAWS Mode active", "Ultra Studio v0.1 | Detektovan čitač ekrana — aktivan JAWS mod"),
+            ["statusbar_ready_visual"] = ("Ultra Studio v0.1 | No screen reader detected — Visual Mode active", "Ultra Studio v0.1 | Čitač ekrana nije detektovan — aktivan Vizuelni mod"),
+            ["mode_toast_jaws"] = ("JAWS Mode active — screen reader detected", "JAWS mod aktivan — detektovan čitač ekrana"),
+            ["mode_toast_visual"] = ("Visual Mode active — no screen reader detected", "Vizuelni mod aktivan — čitač ekrana nije detektovan"),
 
             // ===== Menu: File =====
             ["menu_file"] = ("_File", "_Fajl"),
@@ -103,6 +107,11 @@ namespace UltraStudio.Localization
             ["btn_cancel"] = ("Cancel", "Otkaži"),
             ["btn_close"] = ("Close", "Zatvori"),
             ["btn_apply"] = ("Apply", "Primeni"),
+            ["log_window_title"] = ("Diagnostic Log", "Dnevnik dijagnostike"),
+            ["log_window_path"] = ("Also written to disk at: {0}", "Takođe se upisuje na disk: {0}"),
+            ["log_window_refresh"] = ("Refresh", "Osveži"),
+            ["log_window_copy"] = ("Copy All", "Kopiraj sve"),
+            ["log_window_copied"] = ("Diagnostic Log — copied!", "Dnevnik dijagnostike — kopirano!"),
             ["img_loaded"] = ("Image loaded: {0}, {1}x{2} pixels", "Slika učitana: {0}, {1}x{2} piksela"),
             ["img_saved"] = ("Image saved to {0}", "Slika sačuvana u {0}"),
             ["status_no_canvas"] = ("Nothing to save yet — open a photo, start a new canvas, or add a layer.", "Nema šta da se sačuva — otvori fotografiju, napravi novo platno ili dodaj sloj."),
@@ -172,7 +181,11 @@ namespace UltraStudio.Localization
 
             // ===== Lektura (proofreading) =====
             ["menu_proofread"] = ("Pro_ofreading", "_Lektura"),
-            ["menu_proofread_document"] = ("Proofread a _document... (.txt/.docx)", "Lekturiši _dokument... (.txt/.docx)"),
+            ["menu_proofread_document"] = ("Proofread a _document...", "Lekturiši _dokument..."),
+            ["proof_open_filter"] = (
+                "All Supported Documents|*.pdf;*.docx;*.doc;*.rtf;*.odt;*.epub;*.html;*.htm;*.xhtml;*.srt;*.vtt;*.txt;*.md|PDF (*.pdf)|*.pdf|Word 2007+ (*.docx)|*.docx|Word 97-2003 (*.doc)|*.doc|Rich Text (*.rtf)|*.rtf|OpenDocument (*.odt)|*.odt|EPUB (*.epub)|*.epub|HTML (*.html;*.htm;*.xhtml)|*.html;*.htm;*.xhtml|Subtitles (*.srt;*.vtt)|*.srt;*.vtt|Text (*.txt;*.md)|*.txt;*.md",
+                "Svi podržani dokumenti|*.pdf;*.docx;*.doc;*.rtf;*.odt;*.epub;*.html;*.htm;*.xhtml;*.srt;*.vtt;*.txt;*.md|PDF (*.pdf)|*.pdf|Word 2007+ (*.docx)|*.docx|Word 97-2003 (*.doc)|*.doc|Rich Text (*.rtf)|*.rtf|OpenDocument (*.odt)|*.odt|EPUB (*.epub)|*.epub|HTML (*.html;*.htm;*.xhtml)|*.html;*.htm;*.xhtml|Titlovi (*.srt;*.vtt)|*.srt;*.vtt|Tekst (*.txt;*.md)|*.txt;*.md"),
+            ["proof_save_filter"] = ("Text (*.txt)|*.txt|Word 2007+ (*.docx)|*.docx|Rich Text (*.rtf)|*.rtf", "Tekst (*.txt)|*.txt|Word 2007+ (*.docx)|*.docx|Rich Text (*.rtf)|*.rtf"),
             ["menu_layer_proofread"] = ("Proofread text...", "Lektura teksta..."),
             ["proof_title_layer"] = ("Proofreading — text layer", "Lektura — tekst sloja"),
             ["proof_title_document"] = ("Proofreading — {0}", "Lektura — {0}"),

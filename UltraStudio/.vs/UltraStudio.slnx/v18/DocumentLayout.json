@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|c:\\users\\ajvazi\\source\\repos\\ultrastudio\\services\\samsegmenter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|solutionrelative:services\\samsegmenter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|c:\\users\\ajvazi\\source\\repos\\ultrastudio\\services\\ollamavisionclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|solutionrelative:services\\ollamavisionclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|c:\\users\\ajvazi\\source\\repos\\ultrastudio\\services\\canvasengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{9699BD32-DE41-E5AF-5D18-617C7FF9B8E8}|UltraStudio.csproj|solutionrelative:services\\canvasengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -23,15 +31,39 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "SamSegmenter.cs",
+              "DocumentMoniker": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\SamSegmenter.cs",
+              "RelativeDocumentMoniker": "Services\\SamSegmenter.cs",
+              "ToolTip": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\SamSegmenter.cs",
+              "RelativeToolTip": "Services\\SamSegmenter.cs",
+              "ViewState": "AgIAAMMAAAAAAAAAAAAowNsAAAAQAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T00:28:18.871Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "OllamaVisionClient.cs",
+              "DocumentMoniker": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\OllamaVisionClient.cs",
+              "RelativeDocumentMoniker": "Services\\OllamaVisionClient.cs",
+              "ToolTip": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\OllamaVisionClient.cs",
+              "RelativeToolTip": "Services\\OllamaVisionClient.cs",
+              "ViewState": "AgIAAA0AAAAAAAAAAAA9wB8AAAAwAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-21T00:41:43.514Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "CanvasEngine.cs",
               "DocumentMoniker": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\CanvasEngine.cs",
               "RelativeDocumentMoniker": "Services\\CanvasEngine.cs",
               "ToolTip": "C:\\Users\\Ajvazi\\source\\repos\\UltraStudio\\Services\\CanvasEngine.cs",
               "RelativeToolTip": "Services\\CanvasEngine.cs",
-              "ViewState": "AgIAADkAAAAAAAAAAAAqwD4AAAAcAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-04T01:26:52.78Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-04T01:26:52.78Z"
             }
           ]
         }

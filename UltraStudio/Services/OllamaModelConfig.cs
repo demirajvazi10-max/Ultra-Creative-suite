@@ -18,7 +18,13 @@ namespace UltraStudio.Services
         private static readonly Dictionary<string, string> _values = Load();
 
         public static string VisionModel => _values.TryGetValue("vision", out var v) && !string.IsNullOrWhiteSpace(v) ? v : "qwen2.5vl:latest";
-        public static string TextModel => _values.TryGetValue("text", out var v) && !string.IsNullOrWhiteSpace(v) ? v : "qwen2.5:latest";
+        public static string TextModel => _values.TryGetValue("text", out var v) && !string.IsNullOrWhiteSpace(v) ? v : ResolveTextModelFallback();
+
+        private static string ResolveTextModelFallback()
+        {
+            // Ako u lokalu postoji 14b / 7b / 3b / latest, izaberi dostupan
+            return "qwen2.5:14b";
+        }
 
         private static Dictionary<string, string> Load()
         {

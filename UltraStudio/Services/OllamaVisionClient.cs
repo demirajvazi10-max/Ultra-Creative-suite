@@ -26,7 +26,7 @@ namespace UltraStudio.Services
     {
         private const string OLLAMA_URL = "http://localhost:11434/api/chat";
 
-        private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(120) };
+        private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(300) };
         private static readonly HttpClient _pingClient = new() { Timeout = TimeSpan.FromSeconds(3) };
 
         public async Task<bool> IsRunningAsync()
@@ -136,19 +136,53 @@ namespace UltraStudio.Services
                 "in the original image's pixel coordinates (0,0 is top-left).";
 
             string raw = await ChatWithImageAsync(prompt, base64Image, ct);
+            DebugLog.Write($"OllamaVisionClient: FindPoint raw response = {raw}");
             string jsonPart = ExtractJson(raw);
 
             try
             {
                 using var doc = JsonDocument.Parse(jsonPart);
                 var root = doc.RootElement;
-                bool found = root.TryGetProperty("found", out var f) && f.GetBoolean();
+                bool found = true;
+                if (root.TryGetProperty("found", out var f))
+                {
+                    if (f.ValueKind == JsonValueKind.True) found = true;
+                    else if (f.ValueKind == JsonValueKind.False) found = false;
+                    else if (f.ValueKind == JsonValueKind.String)
+                    {
+                        string s = f.GetString()?.Trim().ToLowerInvariant() ?? "";
+                        found = s is "true" or "yes" or "1";
+                    }
+                }
                 if (!found) return null;
-                int x = root.GetProperty("x").GetInt32();
-                int y = root.GetProperty("y").GetInt32();
-                return (Math.Clamp(x, 0, origWidth - 1), Math.Clamp(y, 0, origHeight - 1));
+
+                int? x = GetCoord(root, "x");
+                int? y = GetCoord(root, "y");
+                if (x == null || y == null) return null;
+
+                return (Math.Clamp(x.Value, 0, origWidth - 1), Math.Clamp(y.Value, 0, origHeight - 1));
             }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                DebugLog.Write($"OllamaVisionClient: greška pri parsiranju tačke — {ex.Message}");
+                return null;
+            }
+        }
+
+        private static int? GetCoord(JsonElement root, string propName)
+        {
+            if (!root.TryGetProperty(propName, out var p)) return null;
+            if (p.ValueKind == JsonValueKind.Number)
+            {
+                if (p.TryGetInt32(out int i)) return i;
+                if (p.TryGetDouble(out double d)) return (int)Math.Round(d);
+            }
+            if (p.ValueKind == JsonValueKind.String && double.TryParse(p.GetString()?.Replace(',', '.'),
+                System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double s))
+            {
+                return (int)Math.Round(s);
+            }
+            return null;
         }
 
         private static string ExtractJson(string raw)

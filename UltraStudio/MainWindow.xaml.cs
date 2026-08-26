@@ -38,6 +38,7 @@ namespace UltraStudio
     {
         private readonly ImageProject _project = new();
         private readonly OllamaVisionClient _ai = new();
+        private bool _describeBusy; // zamena za BtnDescribe.IsEnabled=false — videti BtnDescribe_Click
         private List<AdjustmentRow> _rows = new();
         private string? _lastSavePath;
         private bool _isVisualMode;
@@ -54,14 +55,87 @@ namespace UltraStudio
         public MainWindow()
         {
             InitializeComponent();
+
+            // Bez ovoga, Tab/Shift+Tab ostaje "zarobljen" unutar liste čim
+            // fokus uđe u nju — videti komentar u Controls/TabAwareListView.cs.
+            nativeAdjustList.Host = wfhAdjustments;
+            nativeLayerList.Host = wfhLayers;
+            DebugLog.Write("MainWindow: TabAwareListView.Host povezan za nativeAdjustList i nativeLayerList.");
+
             Lang.ApplyToResources();
             BuildAdjustmentRows();
             SetupNativeList();
             BuildVisualPanel();
             SetupNativeLayerList();
-            SetJawsMode(); // podrazumevani mod — isti izbor kao ostatak Ultra paketa
+
+            // Automatska detekcija čitača ekrana umesto fiksnog podrazumevanog
+            // moda. JAWS/NVDA/Narrator aktivan -> JAWS mod (native, pristupačna
+            // lista). Ništa detektovano -> Vizuelni mod (WPF slideri/checkbox-ovi),
+            // jer native WinForms lista iz JAWS moda ne prati temu aplikacije
+            // pouzdano za sighted korisnike (to je bio uzrok "sve mi je belo"
+            // prijave — app je uvek kretao u JAWS modu, bez obzira ko ga pokrene).
+            // Ručni prekidač (dugmad i Alt+W) i dalje uvek radi u oba smera.
+            _screenReaderDetected = ScreenReaderDetector.IsScreenReaderRunning();
+            if (_screenReaderDetected) SetJawsMode(); else SetVisualMode();
+
             UpdateImageInfo();
-            SetStatus(Lang.T("statusbar_ready"));
+
+            // Najava moda se NE šalje ovde u konstruktoru — u tom trenutku
+            // prozor još nije prikazan, pa JAWS nije ni stigao da se "zakači"
+            // na njega, i live-region najava bi tiho propala. Umesto toga,
+            // čekamo Loaded, pa dodatno ubacujemo mali razmak preko Dispatcher-a
+            // (ApplicationIdle) da damo JAWS-u vremena da preuzme fokus na novi
+            // prozor pre nego što probamo da nešto najavimo.
+            Loaded += MainWindow_Loaded;
+        }
+
+        // Detektovano stanje čitača ekrana pri pokretanju — čuvamo ga da bismo
+        // znali šta da najavimo/prikažemo posle Loaded, bez ponovnog pozivanja
+        // (relativno spor) provere procesa.
+        private readonly bool _screenReaderDetected;
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded; // samo jednom, ne na svaki naknadni Loaded
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // INFORMATIVNO (za JAWS/čitače ekrana): status bar tekst + live-region
+                // AutomationEvent — isti, već proveren obrazac kao SetAiResult/SetStatus
+                // svugde drugde u appu.
+                SetStatus(Lang.T(_screenReaderDetected ? "statusbar_ready_sr_detected" : "statusbar_ready_visual"));
+
+                // ESTETSKI (za sve, posebno vizuelne korisnike): kratak animirani
+                // baner koji se pojavi, ostane par sekundi, pa nestane sam.
+                ShowModeToast(_screenReaderDetected);
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // BANER MODA — kratka, animirana, samonestajuća potvrda pri pokretanju
+        // (vizuelna potvrda uz audio najavu preko SetStatus iznad).
+        // ════════════════════════════════════════════════════════════════
+        private void ShowModeToast(bool jawsMode)
+        {
+            ModeToastText.Text = Lang.T(jawsMode ? "mode_toast_jaws" : "mode_toast_visual");
+            ModeToastDot.Fill = (System.Windows.Media.Brush)Resources[jawsMode ? "BrAccentAI" : "BrAccent"];
+            ModeToast.Visibility = Visibility.Visible;
+            ModeToast.Opacity = 0;
+
+            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(280));
+            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(600))
+            {
+                BeginTime = TimeSpan.FromMilliseconds(3000)
+            };
+            var storyboard = new System.Windows.Media.Animation.Storyboard();
+            System.Windows.Media.Animation.Storyboard.SetTarget(fadeIn, ModeToast);
+            System.Windows.Media.Animation.Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+            System.Windows.Media.Animation.Storyboard.SetTarget(fadeOut, ModeToast);
+            System.Windows.Media.Animation.Storyboard.SetTargetProperty(fadeOut, new PropertyPath(UIElement.OpacityProperty));
+            storyboard.Children.Add(fadeIn);
+            storyboard.Children.Add(fadeOut);
+            storyboard.Completed += (_, __) => ModeToast.Visibility = Visibility.Collapsed;
+            storyboard.Begin();
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -153,8 +227,8 @@ namespace UltraStudio
                         Foreground = (System.Windows.Media.Brush)Resources["BrText"],
                         FontSize = 13
                     };
-                    check.Checked += (_, __) => { row.SetBool(_project, true); RefreshList(); RefreshPreview(); };
-                    check.Unchecked += (_, __) => { row.SetBool(_project, false); RefreshList(); RefreshPreview(); };
+                    check.Checked += (_, __) => { if (_syncingVisualPanel) return; row.SetBool(_project, true); RefreshList(); RefreshPreview(); };
+                    check.Unchecked += (_, __) => { if (_syncingVisualPanel) return; row.SetBool(_project, false); RefreshList(); RefreshPreview(); };
                     _checkByRow[row] = check;
                     container.Children.Add(check);
                 }
@@ -177,6 +251,18 @@ namespace UltraStudio
                     slider.SetValue(AutomationProperties.NameProperty, Lang.T(row.Key));
                     slider.ValueChanged += (_, e) =>
                     {
+                        // _syncingVisualPanel štiti od beskonačne petlje: RefreshList()
+                        // ispod poziva SyncVisualPanelFromProject(), koja postavlja
+                        // slider.Value nazad iz _project — to SAMO PO SEBI ponovo
+                        // okida ovaj isti ValueChanged (jer se GetNum() vrednost skoro
+                        // nikad ne poklopi bit-za-bit sa onim što je slider upravo
+                        // javio, naročito posle AI predloga), što je ponovo zvalo
+                        // RefreshList()... i tako u krug, sinhrono, bez izlaza — to je
+                        // bio pravi uzrok potpunog zamrzavanja (log se prekidao usred
+                        // RefreshPreview poziva koji se nikad nije vratio). Kad je ova
+                        // zastavica podignuta, znači da MI upravo pišemo u slider
+                        // programski, ne korisnik — pa ovaj handler tad ništa ne radi.
+                        if (_syncingVisualPanel) return;
                         row.SetNum(_project, e.NewValue);
                         valueLabel.Text = $"{e.NewValue:0.#}{row.Unit}";
                         RefreshList();
@@ -189,18 +275,33 @@ namespace UltraStudio
             }
         }
 
+        // Videti komentar u slider.ValueChanged iznad — ova zastavica postoji
+        // ISKLJUČIVO da spreči RefreshList -> SyncVisualPanelFromProject ->
+        // slider.Value= -> ValueChanged -> RefreshList -> ... beskonačnu petlju.
+        private bool _syncingVisualPanel;
+
         // Prepiše trenutne vrednosti iz _project u slidere/checkbox-ove BEZ
         // ponovnog pokretanja ImageEngine obrade za svaku stavku pojedinačno
         // (obrada se svakako radi jednom preko RefreshPreview posle).
         private void SyncVisualPanelFromProject()
         {
-            foreach (var kv in _sliderByRow) kv.Value.Value = kv.Key.GetNum(_project);
-            foreach (var kv in _checkByRow) kv.Value.IsChecked = kv.Key.GetBool(_project);
+            _syncingVisualPanel = true;
+            try
+            {
+                foreach (var kv in _sliderByRow) kv.Value.Value = kv.Key.GetNum(_project);
+                foreach (var kv in _checkByRow) kv.Value.IsChecked = kv.Key.GetBool(_project);
+            }
+            finally
+            {
+                _syncingVisualPanel = false;
+            }
         }
 
         private void SetVisualMode()
         {
             _isVisualMode = true;
+            BtnVisualMode.Style = (Style)Resources["AIButton"];
+            BtnJawsMode.Style = (Style)Resources["StdButton"];
             SyncVisualPanelFromProject();
             wfhAdjustments.Visibility = Visibility.Collapsed;
             VisualAdjustPanel.Visibility = Visibility.Visible;
@@ -213,6 +314,8 @@ namespace UltraStudio
         private void SetJawsMode()
         {
             _isVisualMode = false;
+            BtnVisualMode.Style = (Style)Resources["StdButton"];
+            BtnJawsMode.Style = (Style)Resources["AIButton"];
             RefreshList();
             VisualAdjustPanel.Visibility = Visibility.Collapsed;
             wfhAdjustments.Visibility = Visibility.Visible;
@@ -507,7 +610,7 @@ namespace UltraStudio
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -600,20 +703,18 @@ namespace UltraStudio
             var openDlg = new OpenFileDialog
             {
                 Title = Lang.T("menu_proofread_document"),
-                Filter = "Text/Word|*.txt;*.docx|Text (*.txt)|*.txt|Word (*.docx)|*.docx"
+                Filter = Lang.T("proof_open_filter")
             };
             if (openDlg.ShowDialog() != true) return;
 
             string text;
             try
             {
-                text = Path.GetExtension(openDlg.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase)
-                    ? DocxTextExtractor.ExtractPlainText(openDlg.FileName)
-                    : File.ReadAllText(openDlg.FileName);
+                text = DocumentTextExtractor.ExtractText(openDlg.FileName);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -621,14 +722,17 @@ namespace UltraStudio
             var dlg = new ProofreadingDialog(text, string.Format(Lang.T("proof_title_document"), Path.GetFileName(openDlg.FileName))) { Owner = this };
             if (dlg.ShowDialog() != true) return;
 
+            // Nudi čuvanje u istom formatu kao otvoreni fajl, plus TXT i DOCX
+            string inExt = Path.GetExtension(openDlg.FileName).ToLowerInvariant();
             var saveDlg = new SaveFileDialog
             {
-                Filter = "Text (*.txt)|*.txt",
-                FileName = Path.GetFileNameWithoutExtension(openDlg.FileName) + "_lektorisano.txt"
+                Filter = Lang.T("proof_save_filter"),
+                FileName = Path.GetFileNameWithoutExtension(openDlg.FileName) + "_lektorisano" + (inExt is ".docx" or ".rtf" ? inExt : ".txt"),
+                FilterIndex = inExt switch { ".docx" => 2, ".rtf" => 3, _ => 1 }
             };
             if (saveDlg.ShowDialog() != true) return;
 
-            File.WriteAllText(saveDlg.FileName, dlg.ResultText);
+            DocumentTextExtractor.SaveDocument(dlg.ResultText, saveDlg.FileName);
             SetStatus(string.Format(Lang.T("proof_saved"), saveDlg.FileName));
         }
 
@@ -667,7 +771,7 @@ namespace UltraStudio
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -701,7 +805,7 @@ namespace UltraStudio
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
+                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -718,7 +822,7 @@ namespace UltraStudio
 
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(Lang.T("about_text"), Lang.T("about_title"),
+            MessageBox.Show(this, Lang.T("about_text"), Lang.T("about_title"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -727,10 +831,15 @@ namespace UltraStudio
         // ════════════════════════════════════════════════════════════════
         private void RefreshPreview()
         {
-            if (!_project.HasCanvasContent) { TxtNoImage.Visibility = Visibility.Visible; ImgPreview.Source = null; return; }
+            if (!_project.HasCanvasContent)
+            {
+                DebugLog.Write("RefreshPreview: HasCanvasContent=false, prikazujem 'no image' poruku.");
+                TxtNoImage.Visibility = Visibility.Visible; ImgPreview.Source = null; return;
+            }
 
             try
             {
+                DebugLog.Write($"RefreshPreview: renderujem preview za OriginalPath={_project.OriginalPath}...");
                 var bytes = CanvasEngine.RenderPreviewJpeg(_project);
                 var bmp = new BitmapImage();
                 using (var ms = new MemoryStream(bytes))
@@ -743,18 +852,31 @@ namespace UltraStudio
                 bmp.Freeze();
                 ImgPreview.Source = bmp;
                 TxtNoImage.Visibility = Visibility.Collapsed;
+                DebugLog.Write($"RefreshPreview: gotovo, {bytes.Length} bajtova prikazano.");
             }
             catch (Exception ex)
             {
+                DebugLog.Write($"RefreshPreview: GREŠKA — {ex}");
                 SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
             }
         }
 
         private void UpdateImageInfo()
         {
+            DebugLog.Write($"UpdateImageInfo: HasImage={_project.HasImage}, OriginalPath={_project.OriginalPath}");
             TxtImageInfo.Text = _project.HasImage
                 ? $"{Path.GetFileName(_project.OriginalPath)} — {_project.OriginalWidth}x{_project.OriginalHeight}px"
                 : string.Format(Lang.T("canvas_info_blank"), _project.CanvasWidth, _project.CanvasHeight);
+
+            // AutomationProperties.LiveSetting u XAML-u SAM ne najavljuje ništa —
+            // on samo OBELEŽAVA element kao live region; automatsko najavljivanje
+            // se dešava tek kad se eksplicitno podigne LiveRegionChanged event
+            // (isti obrazac kao SetStatus/ShowModeToast). Bez ovoga, otvaranje
+            // novoizdvojene slike menja tekst tiho — JAWS korisnik nema NIKAKVU
+            // potvrdu da se slika promenila, što je tačno ono što je prijavljeno.
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.FromElement(TxtImageInfo)
+                       ?? System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(TxtImageInfo);
+            peer?.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -768,8 +890,17 @@ namespace UltraStudio
         private async void BtnDescribe_Click(object sender, RoutedEventArgs e)
         {
             if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
+            // NAMERNO se ne koristi BtnDescribe.IsEnabled=false ovde: onesposobljavanje
+            // dugmeta koje TRENUTNO ima fokus tera WPF da SAM premesti fokus na sledeći
+            // element po redu — a to programsko premeštanje umelo je da uđe u
+            // WindowsFormsHost (adjustments/layers lista) na način koji ostavlja Tab
+            // zarobljenim posle toga (prijavljeno: pre Describe-a Shift+Tab normalno
+            // vodi kroz mod-dugmad, posle Describe-a upada u listu i zaglavi). Obična
+            // bool zastavica daje isti "spreči duplo pokretanje" efekat bez ikakvog
+            // dodirivanja fokusa.
+            if (_describeBusy) return;
+            _describeBusy = true;
 
-            BtnDescribe.IsEnabled = false;
             SetAiResult(Lang.T("ai_describing"));
 
             try
@@ -781,17 +912,35 @@ namespace UltraStudio
 
                 string description = await _ai.DescribeImageAsync(base64);
                 SetAiResult(description);
-                BtnDescribe.IsEnabled = true; // ponovo dostupno odmah — predlozi mogu potrajati
+                DebugLog.Write($"BtnDescribe: opis dobijen ({description.Length} znakova).");
+                _describeBusy = false; // ponovo dostupno odmah — predlozi mogu potrajati
 
                 var suggestions = await _ai.SuggestEditsAsync(base64);
+                DebugLog.Write($"BtnDescribe: {suggestions.Count} predloga vraćeno.");
                 foreach (var sug in suggestions)
                 {
                     var result = MessageBox.Show(
+                        this,
                         string.Format(Lang.T("ai_apply_suggestion"),
                             $"{sug.Action} {sug.Value:+0.#;-0.#}", sug.Reason),
                         Lang.T("ai_panel_header"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                     if (result == MessageBoxResult.Yes)
                         ApplySuggestion(sug);
+                }
+
+                if (suggestions.Count > 0)
+                {
+                    // Posle niza modalnih MessageBox dijaloga, Windows-ova aktivacija/
+                    // fokus mogu ostati u nepredvidivom stanju za WindowsFormsHost
+                    // kontrole (dokumentovana zamka: native modalni dijalog + hostovana
+                    // WinForms kontrola koja je PRE toga imala fokus). Umesto da se
+                    // oslonimo na to gde je Windows "ostavio" fokus, eksplicitno ga
+                    // vraćamo na poznat, siguran WPF element — isto dugme koje je
+                    // pokrenulo Describe. Bez ovoga, sledeći ulazak u nativnu listu
+                    // (Tab) je taj koji se zaglavljivao.
+                    DebugLog.Write("BtnDescribe: eksplicitno vraćam fokus na BtnDescribe posle dijaloga predloga.");
+                    this.Activate();
+                    Keyboard.Focus(BtnDescribe);
                 }
             }
             catch (Exception ex)
@@ -800,7 +949,7 @@ namespace UltraStudio
             }
             finally
             {
-                BtnDescribe.IsEnabled = true;
+                _describeBusy = false;
             }
         }
 
@@ -815,8 +964,10 @@ namespace UltraStudio
             if (row.IsBoolean) row.SetBool(_project, true);
             else row.SetNum(_project, Math.Clamp(sug.Value, row.Min, row.Max));
 
+            DebugLog.Write($"ApplySuggestion: {row.Key} = {(row.IsBoolean ? "true" : row.GetNum(_project).ToString())}, pozivam RefreshList/RefreshPreview...");
             RefreshList();
             RefreshPreview();
+            DebugLog.Write($"ApplySuggestion: {row.Key} gotovo.");
             SetStatus(string.Format(Lang.T("ai_suggestion_applied"), Lang.T(row.Key)));
         }
 
@@ -830,6 +981,7 @@ namespace UltraStudio
             if (!SamSegmenter.ModelsAvailable)
             {
                 MessageBox.Show(
+                    this,
                     string.Format(Lang.T("sam_models_missing"), SamSegmenter.EncoderPath, SamSegmenter.DecoderPath),
                     Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
@@ -839,9 +991,20 @@ namespace UltraStudio
             if (dlg.ShowDialog() != true || string.IsNullOrWhiteSpace(dlg.ResultValue)) return;
             string description = dlg.ResultValue.Trim();
 
+            // Non-modalni progress dijalog — bez ovoga, spor korak (AI lociranje
+            // + SAM enkodiranje/dekodiranje na CPU-u) delovao je kao da se app
+            // zamrzao, jer status traka sama po sebi nije dovoljno upadljiva.
+            // Svaki korak se ISTOVREMENO piše i u DebugLog fajl na disku — ako
+            // dođe do native pada unutar ONNX Runtime-a (koji zaobilazi ovaj
+            // try/catch potpuno), poslednji red u tom fajlu pokazuje tačno gde.
+            var progress = new ProgressDialog(Lang.T("extract_prompt_title"), this);
+            progress.Show();
+
             try
             {
+                progress.SetStage(Lang.T("extract_locating"));
                 SetStatus(Lang.T("extract_locating"));
+                DebugLog.Write($"ExtractObject: lociram \"{description}\"...");
                 var bytes = ImageEngine.RenderPreviewJpeg(_project.OriginalPath!, _project, maxDimension: 1280);
                 string base64 = Convert.ToBase64String(bytes);
                 var point = await _ai.FindPointForDescriptionAsync(
@@ -849,25 +1012,35 @@ namespace UltraStudio
 
                 if (point == null)
                 {
+                    progress.Close();
                     SetStatus(string.Format(Lang.T("extract_not_found"), description));
+                    MessageBox.Show(this, string.Format(Lang.T("extract_not_found"), description),
+                        Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
+                progress.SetStage(Lang.T("extract_segmenting"));
                 SetStatus(Lang.T("extract_segmenting"));
+                DebugLog.Write($"ExtractObject: tačka ({point.Value.x},{point.Value.y}) pronađena, pokrećem SAM...");
                 using var sam = new SamSegmenter();
                 await sam.EnsureEmbeddingAsync(_project.OriginalPath!);
-                var mask = await sam.SegmentFromPointAsync(point.Value.x, point.Value.y);
+                var (mask, maskScale) = await sam.SegmentFromPointAsync(point.Value.x, point.Value.y);
 
                 string outPath = Path.Combine(
                     Path.GetDirectoryName(_project.OriginalPath!)!,
                     Path.GetFileNameWithoutExtension(_project.OriginalPath!) + $"_{description.Replace(' ', '_')}_cutout.png");
-                SamSegmenter.ExportCutout(_project.OriginalPath!, mask, outPath);
+                SamSegmenter.ExportCutout(_project.OriginalPath!, mask, maskScale, outPath);
+                DebugLog.Write("ExtractObject: gotovo, bez grešaka.");
 
-                var open = MessageBox.Show(string.Format(Lang.T("extract_done"), outPath),
+                progress.Close();
+
+                var open = MessageBox.Show(this, string.Format(Lang.T("extract_done"), outPath),
                     Lang.T("done_title"), MessageBoxButton.YesNo, MessageBoxImage.Information);
+                DebugLog.Write($"ExtractObject: korisnik izabrao '{open}' na 'otvori novu sliku?' dijalogu.");
                 if (open == MessageBoxResult.Yes)
                 {
                     var (w, h) = ImageEngine.GetDimensions(outPath);
+                    DebugLog.Write($"ExtractObject: menjam _project.OriginalPath na {outPath} ({w}x{h}).");
                     _project.OriginalPath = outPath;
                     _project.OriginalWidth = w;
                     _project.OriginalHeight = h;
@@ -875,11 +1048,24 @@ namespace UltraStudio
                     _lastSavePath = null;
                     UpdateImageInfo();
                     RefreshPreview();
+                    RefreshList();
+                    DebugLog.Write("ExtractObject: UpdateImageInfo/RefreshPreview/RefreshList pozvani.");
                 }
             }
             catch (Exception ex)
             {
+                DebugLog.Write($"ExtractObject: GREŠKA — {ex}");
                 SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
+                // MessageBox pored SetStatus — status traka je lako previdljiva
+                // (ili, u ivičnim slučajevima, JAWS ne stigne da je pokupi ako
+                // je fokus negde drugde); modalni dijalog garantovano zaustavi
+                // korisnika i JAWS ga garantovano pročita.
+                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message),
+                    Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (progress.IsVisible) progress.Close();
             }
         }
 
@@ -905,6 +1091,13 @@ namespace UltraStudio
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Namerno PRVI red u handleru, pre svega ostalog — ako se app ikad
+            // ponovo zamrzne na Tab-u, ovo je test da li taster UOPŠTE stiže do
+            // WPF-a: ako se ovaj red ne pojavi u logu pre zamrzavanja, znači da
+            // je zaglavljivanje na nižem, Windows/interop nivou (van našeg C#
+            // koda), a ne u WPF-ovoj obradi tastature.
+            DebugLog.Write($"Window_PreviewKeyDown: Key={e.Key}, Modifiers={Keyboard.Modifiers}");
+
             bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
             bool ctrlShift = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
             bool alt = Keyboard.Modifiers == ModifierKeys.Alt;
@@ -912,6 +1105,12 @@ namespace UltraStudio
             if (ctrl && e.Key == Key.O) { OpenImage_Click(sender, e); e.Handled = true; }
             else if (ctrlShift && e.Key == Key.S) { SaveAs_Click(sender, e); e.Handled = true; }
             else if (ctrl && e.Key == Key.S) { Save_Click(sender, e); e.Handled = true; }
+            else if (ctrlShift && e.Key == Key.L)
+            {
+                DebugLog.Write("MainWindow: otvaram LogWindow (Ctrl+Shift+L).");
+                new Views.LogWindow(this).Show();
+                e.Handled = true;
+            }
             else if (alt && e.Key == Key.W)
             {
                 if (_isVisualMode) SetJawsMode(); else SetVisualMode();

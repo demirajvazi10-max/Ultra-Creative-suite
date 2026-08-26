@@ -16,7 +16,14 @@ namespace UltraStudio.Services
     /// </summary>
     public static class CanvasEngine
     {
-        public static MagickImage RenderComposite(ImageProject p)
+        /// <param name="previewMaxDimension">
+        /// Prosleđuje se do ImageEngine.ApplyAdjustments — kad je zadato, slika
+        /// se umanji PRE primene filtera (Sharpen/Blur), ne posle. Videti
+        /// komentar u ImageEngine.ApplyAdjustments za pun razlog (ovo je bio
+        /// uzrok potpunog zamrzavanja aplikacije nakon primene AI predloga sa
+        /// Sharpen/Blur na fotografijama visoke rezolucije).
+        /// </param>
+        public static MagickImage RenderComposite(ImageProject p, uint? previewMaxDimension = null)
         {
             MagickImage canvas;
 
@@ -25,7 +32,7 @@ namespace UltraStudio.Services
                 // Pozadinska fotografija zadržava svoju rezoluciju kao veličinu
                 // platna — isto ponašanje kao pre uvođenja slojeva, ništa se
                 // ne menja za korisnike koji ne koriste dizajn deo uopšte.
-                canvas = ImageEngine.ApplyAdjustments(p.OriginalPath!, p);
+                canvas = ImageEngine.ApplyAdjustments(p.OriginalPath!, p, previewMaxDimension);
             }
             else
             {
@@ -131,7 +138,8 @@ namespace UltraStudio.Services
         /// <summary>Vraća JPEG bajtove kompozitne slike za prikaz u WPF Image kontroli (preview).</summary>
         public static byte[] RenderPreviewJpeg(ImageProject p, uint maxDimension = 1600)
         {
-            using var img = RenderComposite(p);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var img = RenderComposite(p, maxDimension);
             if (img.Width > maxDimension || img.Height > maxDimension)
                 img.Resize(maxDimension, maxDimension);
             img.Format = MagickFormat.Jpeg;
@@ -143,12 +151,14 @@ namespace UltraStudio.Services
                 img.BackgroundColor = MagickColors.White;
                 img.Alpha(AlphaOption.Remove);
             }
-            return img.ToByteArray();
+            var bytes = img.ToByteArray();
+            DebugLog.Write($"CanvasEngine.RenderPreviewJpeg: {sw.ElapsedMilliseconds}ms.");
+            return bytes;
         }
 
         public static void Export(ImageProject p, string outputPath)
         {
-            using var img = RenderComposite(p);
+            using var img = RenderComposite(p); // BEZ previewMaxDimension — pun kvalitet za konačan izvoz
             bool noAlphaFormat = outputPath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
                                   outputPath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
                                   outputPath.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase);

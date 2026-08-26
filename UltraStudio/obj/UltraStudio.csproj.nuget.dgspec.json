@@ -41,7 +41,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net8.0-windows": {
@@ -56,6 +56,10 @@
               "target": "Package",
               "version": "[1.19.0, )"
             },
+            "NPOI": {
+              "target": "Package",
+              "version": "[2.7.2, )"
+            },
             "Newtonsoft.Json": {
               "target": "Package",
               "version": "[13.0.3, )"
@@ -63,6 +67,10 @@
             "Ookii.Dialogs.Wpf": {
               "target": "Package",
               "version": "[5.0.1, )"
+            },
+            "PdfPig": {
+              "target": "Package",
+              "version": "[0.1.17-alpha-202608250026-fd3a9, )"
             },
             "System.Net.Http.Json": {
               "target": "Package",
@@ -83,19 +91,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.29, 8.0.29]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.29, 8.0.29]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.29, 8.0.29]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.29, 8.0.29]"
+              "version": "[8.0.30, 8.0.30]"
             }
           ],
           "frameworkReferences": {
@@ -106,7 +114,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

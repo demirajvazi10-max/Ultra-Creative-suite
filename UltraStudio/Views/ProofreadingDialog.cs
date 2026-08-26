@@ -26,7 +26,7 @@ namespace UltraStudio.Views
         private readonly TextBox _textBox;
         private readonly TextBlock _status;
         private readonly Button _btnRun, _btnApplySelected, _btnApplyAll, _btnUseRewrite, _btnOk;
-        private readonly WF.ListView _issueList;
+        private readonly UltraStudio.Controls.TabAwareListView _issueList;
 
         public string ResultText { get; private set; } = "";
 
@@ -68,7 +68,7 @@ namespace UltraStudio.Views
             Grid.SetRow(issuesLbl, 3);
             root.Children.Add(issuesLbl);
 
-            _issueList = new WF.ListView
+            _issueList = new UltraStudio.Controls.TabAwareListView
             {
                 View = WF.View.Details, FullRowSelect = true, GridLines = false, HideSelection = false, MultiSelect = false,
                 BackColor = System.Drawing.Color.FromArgb(20, 20, 34), ForeColor = System.Drawing.Color.White,
@@ -82,6 +82,7 @@ namespace UltraStudio.Views
             _issueList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(_issueList);
 
             var wfHost = new WFI.WindowsFormsHost { Height = 200, Margin = new Thickness(0, 0, 0, 8), Child = _issueList };
+            _issueList.Host = wfHost;
             Grid.SetRow(wfHost, 4);
             root.Children.Add(wfHost);
 
