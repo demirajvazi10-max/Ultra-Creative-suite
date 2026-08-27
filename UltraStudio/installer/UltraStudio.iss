@@ -8,20 +8,18 @@
 ;    2. Copies the built application.
 ;    3. Downloads/installs Ollama + a vision AI model sized to the detected
 ;       hardware (GPU/RAM) — for AI image description and suggestions.
-;    4. OPTIONAL (checkbox, unchecked by default — see rationale below):
-;       downloads SAM (Segment Anything) ONNX models for precise object
-;       extraction ("extract the child from this photo").
+;    4. Downloads SAM (Segment Anything) ONNX models for precise object
+;       extraction ("extract the child from this photo") — ON by default
+;       (see rationale below); a checkbox lets the user skip it.
 ;
-;  Why SAM is opt-in, not automatic like Ollama:
-;    Everything else in this installer (Ollama, the vision model) is REQUIRED
-;    for the app's core AI features to work at all. SAM is different — it's
-;    needed for exactly one feature (Extract Object), the rest of the app
-;    (adjustments, AI description/suggestions, save/export) works completely
-;    fine without it. Matches the same reasoning already used for the
-;    optional Whisper download in UltraVideoEditor.iss: a meaningful extra
-;    download (real size varies by exact export/quantization used — check
-;    the source below rather than trust a hardcoded number here) shouldn't
-;    be forced on someone who may never use that one feature.
+;  Why SAM is on by default now (previously opt-in):
+;    Extract Object is one of the app's headline features, and Demir wants
+;    a build where nothing needs manual setup for it to "just work" out of
+;    the box. The download is real (~75 MB, quantized ViT-B) but modest
+;    next to the Ollama vision model already downloaded unconditionally
+;    above, so there's no longer a strong reason to hide it behind an
+;    unchecked box. Still skippable via the checkbox for anyone on a very
+;    slow connection who doesn't want the extra download right now.
 ;
 ;  SAM model source (quantized ViT-B, encoder+decoder in one zip):
 ;    https://huggingface.co/vietanhdev/segment-anything-onnx-models
@@ -79,9 +77,9 @@ Name: "german";  MessagesFile: "compiler:Languages\German.isl"
 Name: "serbian"; MessagesFile: "Languages\SerbianLatin.isl"
 
 [Messages]
-english.WelcomeLabel2=This will install %1 on your computer, and set up everything needed for AI image description and suggestions (Ollama).%n%nThe language you choose now will also be the default language of the app.
-german.WelcomeLabel2=Dies installiert %1 auf Ihrem Computer und richtet alles ein, was für KI-Bildbeschreibungen und Vorschläge (Ollama) benötigt wird.%n%nDie hier gewählte Sprache wird auch die Standardsprache der App.
-serbian.WelcomeLabel2=Ovo ce instalirati %1 na vas racunar i podesiti sve sto je potrebno za AI opis slike i predloge (Ollama).%n%nJezik koji sada izaberete bice i podrazumevani jezik aplikacije.
+english.WelcomeLabel2=This will install %1 on your computer, and set up everything needed for AI image description, suggestions, and object extraction (Ollama + Segment Anything).%n%nThe language you choose now will also be the default language of the app.
+german.WelcomeLabel2=Dies installiert %1 auf Ihrem Computer und richtet alles ein, was für KI-Bildbeschreibungen, Vorschläge und Objekterkennung (Ollama + Segment Anything) benötigt wird.%n%nDie hier gewählte Sprache wird auch die Standardsprache der App.
+serbian.WelcomeLabel2=Ovo ce instalirati %1 na vas racunar i podesiti sve sto je potrebno za AI opis slike, predloge i izdvajanje objekata (Ollama + Segment Anything).%n%nJezik koji sada izaberete bice i podrazumevani jezik aplikacije.
 
 [CustomMessages]
 english.DesktopIconGroup=Additional icons:
@@ -90,13 +88,13 @@ serbian.DesktopIconGroup=Dodatne ikone:
 english.DesktopIconTaskName=Create a desktop icon
 german.DesktopIconTaskName=Ein Desktopsymbol erstellen
 serbian.DesktopIconTaskName=Napravi ikonu na radnoj povrsini
-english.SamTaskName=Download AI object-extraction models (Extract Object feature, extra download)
-german.SamTaskName=KI-Objekterkennungsmodelle herunterladen (Funktion "Objekt extrahieren", zusätzlicher Download)
-serbian.SamTaskName=Preuzmi AI modele za izdvajanje objekata (funkcija Extract Object, dodatni download)
+english.SamTaskName=Download AI object-extraction models (Extract Object feature, ~75 MB)
+german.SamTaskName=KI-Objekterkennungsmodelle herunterladen (Funktion "Objekt extrahieren", ~75 MB)
+serbian.SamTaskName=Preuzmi AI modele za izdvajanje objekata (funkcija Extract Object, ~75 MB)
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIconTaskName}"; GroupDescription: "{cm:DesktopIconGroup}"
-Name: "downloadsam"; Description: "{cm:SamTaskName}"; GroupDescription: "{cm:DesktopIconGroup}"; Flags: unchecked
+Name: "downloadsam"; Description: "{cm:SamTaskName}"; GroupDescription: "{cm:DesktopIconGroup}"
 
 [Files]
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.pdb,runtimes\ios*,runtimes\linux*,runtimes\osx*,runtimes\android*"

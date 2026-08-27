@@ -130,7 +130,10 @@ namespace UltraStudio.Services
             string base64Image, int origWidth, int origHeight, string description, CancellationToken ct = default)
         {
             string prompt =
-                $"This image is {origWidth}x{origHeight} pixels. Find \"{description}\" in the image and respond " +
+                $"This image is {origWidth}x{origHeight} pixels. The object description below may be written in " +
+                "English OR Serbian (either Latin or Cyrillic script) — understand it in whichever language it's " +
+                $"written and locate that object regardless. Description: \"{description}\"\n" +
+                "Find that object in the image and respond " +
                 "with ONLY a JSON object (no other text): {\"found\": true or false, \"x\": pixel x coordinate, " +
                 "\"y\": pixel y coordinate} — x,y should be a point roughly in the CENTER of that object, " +
                 "in the original image's pixel coordinates (0,0 is top-left).";

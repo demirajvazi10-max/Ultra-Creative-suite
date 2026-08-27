@@ -1,5 +1,7 @@
 using System;
+using System.Threading;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using UltraStudio.Localization;
 using UltraStudio.Services;
@@ -25,8 +27,10 @@ namespace UltraStudio.Views
 
         private readonly TextBox _textBox;
         private readonly TextBlock _status;
-        private readonly Button _btnRun, _btnApplySelected, _btnApplyAll, _btnUseRewrite, _btnOk;
+        private readonly Button _btnRun, _btnCancel, _btnApplySelected, _btnApplyAll, _btnUseRewrite, _btnOk;
         private readonly UltraStudio.Controls.TabAwareListView _issueList;
+        private bool _proofBusy; // zamena za _btnRun.IsEnabled=false — videti BtnRun_Click
+        private CancellationTokenSource? _proofCts;
 
         public string ResultText { get; private set; } = "";
 
@@ -57,10 +61,13 @@ namespace UltraStudio.Views
             var runRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
             _btnRun = new Button { Content = Lang.T("proof_run"), Width = 150, Height = 30, Style = (Style)Application.Current.Resources["AIButton"] };
             _btnRun.Click += BtnRun_Click;
+            _btnCancel = new Button { Content = Lang.T("proof_cancel"), Width = 90, Height = 30, Margin = new Thickness(6, 0, 0, 0),
+                Style = (Style)Application.Current.Resources["StdButton"], Visibility = Visibility.Collapsed };
+            _btnCancel.Click += (_, __) => _proofCts?.Cancel();
             _status = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0),
                 Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrTextMuted"] };
             System.Windows.Automation.AutomationProperties.SetLiveSetting(_status, System.Windows.Automation.AutomationLiveSetting.Polite);
-            runRow.Children.Add(_btnRun); runRow.Children.Add(_status);
+            runRow.Children.Add(_btnRun); runRow.Children.Add(_btnCancel); runRow.Children.Add(_status);
             Grid.SetRow(runRow, 2);
             root.Children.Add(runRow);
 
@@ -106,6 +113,7 @@ namespace UltraStudio.Views
             root.Children.Add(okRow);
 
             Content = root;
+            Closed += (_, __) => _proofCts?.Cancel();
         }
 
         private TextBlock Label(string text) => new TextBlock
@@ -116,25 +124,59 @@ namespace UltraStudio.Views
 
         private async void BtnRun_Click(object sender, RoutedEventArgs e)
         {
-            _btnRun.IsEnabled = false;
-            _status.Text = Lang.T("proof_running");
+            // NAMERNO se ne koristi _btnRun.IsEnabled=false ovde — isti razlog kao
+            // svuda drugde u Ultra Studiu: onesposobljavanje dugmeta koje TRENUTNO
+            // ima fokus tera WPF da SAM premesti fokus, što je u kombinaciji sa
+            // WindowsFormsHost listom (_issueList) ranije pravilo zaglavljivanje
+            // tastature. Obična bool zastavica daje isti efekat bez diranja fokusa.
+            if (_proofBusy) return;
+            _proofBusy = true;
+            _btnCancel.Visibility = Visibility.Visible;
+
+            _proofCts?.Dispose();
+            _proofCts = new CancellationTokenSource();
+            SetStatusLive(Lang.T("proof_running"));
 
             try
             {
-                _lastResult = await _client.ProofreadAsync(_textBox.Text);
+                _lastResult = await _client.ProofreadAsync(
+                    _textBox.Text,
+                    onProgress: (chunkIndex, total, text) =>
+                        Dispatcher.Invoke(() => SetStatusLive(text)),
+                    ct: _proofCts.Token);
+
                 RefreshIssueList(keepText: true);
-                _status.Text = _lastResult.Issues.Count > 0
+                SetStatusLive(_lastResult.Issues.Count > 0
                     ? string.Format(Lang.T("proof_found_issues"), _lastResult.Issues.Count)
-                    : Lang.T("proof_no_issues");
+                    : Lang.T("proof_no_issues"));
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatusLive(Lang.T("proof_cancelled"));
             }
             catch (Exception ex)
             {
-                _status.Text = string.Format(Lang.T("ai_error"), ex.Message);
+                SetStatusLive(string.Format(Lang.T("ai_error"), ex.Message));
             }
             finally
             {
-                _btnRun.IsEnabled = true;
+                _proofBusy = false;
+                _btnCancel.Visibility = Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// AutomationProperties.LiveSetting u XAML-u/kodu SAM ne najavljuje ništa
+        /// — tek eksplicitno podizanje LiveRegionChanged čini da JAWS/NVDA
+        /// pročitaju promenu (isti obrazac kao svuda drugde u Ultra Studiu).
+        /// Bez ovoga, korak-po-korak progres ("Analiziram deo 2 od 5...") bi se
+        /// menjao tiho — tačno ono što je traženo da se popravi.
+        /// </summary>
+        private void SetStatusLive(string text)
+        {
+            _status.Text = text;
+            var peer = UIElementAutomationPeer.FromElement(_status) ?? UIElementAutomationPeer.CreatePeerForElement(_status);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
         private void RefreshIssueList(bool keepText)
