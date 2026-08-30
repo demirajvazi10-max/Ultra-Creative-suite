@@ -1418,7 +1418,7 @@ namespace UltraVideoEditor
 
         private async Task<bool> RunFFmpegAsync(string arguments, CancellationToken ct)
         {
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -1468,7 +1468,7 @@ namespace UltraVideoEditor
 
         private async Task<string> RunFFmpegGetOutputAsync(string arguments, CancellationToken ct)
         {
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {

@@ -12,7 +12,7 @@ namespace UltraVideoEditor
 
             // ==================== SRPSKI ====================
             var sr = new Dictionary<string, string>();
-            sr["app_title"] = "ULTRA VIDEO EDITOR v1.0";
+            sr["app_title"] = "ULTRA VIDEO EDITOR {0}";
             sr["system_ready"] = "Sistem spreman...";
             sr["status_idle"] = "Status: Idle";
             sr["save_project"] = "Sačuvaj projekat";
@@ -191,7 +191,7 @@ namespace UltraVideoEditor
             sr["up_to_date"] = "Trenutno koristite najnoviju verziju.";
             sr["updates_title"] = "Ažuriranja";
             sr["no_updates"] = "Nema novih ažuriranja";
-            sr["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nPristupačni video editor\nNapravljen za sve korisnike\n\n© 2025";
+            sr["about_text"] = "ULTRA VIDEO EDITOR {0}\n\nPristupačni video editor\nNapravljen za sve korisnike\n\n© 2025";
             sr["about_title"] = "O programu";
             sr["no_drag_data"] = "Nema podataka za prevlačenje";
             sr["unsupported_file"] = "Nijedan fajl nije podržan.";
@@ -437,6 +437,29 @@ namespace UltraVideoEditor
             sr["vc_acc_window"] = "Podešavanje jačine zvuka";
             sr["helpwnd_acc"] = "Prozor sa pomoći";
             sr["aa_too_long"] = "Najavni i odjavni tekst zajedno ({0}s) su duži od audio fajla.";
+            sr["aa_invalid_logo_duration"] = "Unesite validno trajanje loga u sekundama (npr. 5 ili 5.5). Postavljeno je podrazumevanih 5 sekundi.";
+            sr["ctx_auto_describe"] = "AI predlog opisa";
+            sr["vd_analyzing"] = "Analiziram sliku...";
+            sr["vd_file_missing"] = "Fajl slike nije pronađen";
+            sr["vd_analysis_failed"] = "Analiza slike nije uspela: {0}";
+            sr["vd_no_description"] = "Nije moguće generisati opis za ovu sliku";
+            sr["vd_dialog_title"] = "AI predlog opisa za: {0}";
+            sr["vd_detected"] = "Prepoznato: {0}";
+            sr["vd_outdoor"] = "spoljašnja scena";
+            sr["vd_warm"] = "toplo osvetljenje";
+            sr["vd_face"] = "detektovano je lice";
+            sr["vd_face_smile"] = "detektovano je lice sa osmehom";
+            sr["vd_children"] = "detektovana su deca";
+            sr["vd_motion"] = "pokret u kadru";
+            sr["vd_bright"] = "Svetla scena.";
+            sr["vd_dark"] = "Tamna scena.";
+            sr["vd_moderate_light"] = "Umereno osvetljena scena.";
+            sr["export_summary_header"] = "📋 Pregled videa:";
+            sr["export_summary_duration"] = "• Trajanje: {0}";
+            sr["export_summary_clips"] = "• {0} video klip(ova), {1} slika(e), {2} audio traka";
+            sr["export_summary_transitions"] = "• {0} tranzicija primenjeno";
+            sr["export_summary_subtitles"] = "• {0} titl(ova)";
+            sr["export_summary_gap"] = "• Tišina na audio traci od {0} do {1} — proveri da li je namerno";
             sr["mw_saved_as2"] = "Greška pri čuvanju projekta:\n{0}";
             sr["mw_render_complete"] = "Render završen!";
             sr["mw_render_failed"] = "Render nije uspio: {0}";
@@ -595,7 +618,7 @@ namespace UltraVideoEditor
 
             // ==================== ENGLISH ====================
             var en = new Dictionary<string, string>();
-            en["app_title"] = "ULTRA VIDEO EDITOR v1.0";
+            en["app_title"] = "ULTRA VIDEO EDITOR {0}";
             en["system_ready"] = "System ready...";
             en["status_idle"] = "Status: Idle";
             en["save_project"] = "Save project";
@@ -774,7 +797,7 @@ namespace UltraVideoEditor
             en["up_to_date"] = "You are using the latest version.";
             en["updates_title"] = "Updates";
             en["no_updates"] = "No new updates";
-            en["about_text"] = "ULTRA VIDEO EDITOR v1.0\n\nAccessible video editor\nMade for all users\n\n© 2025";
+            en["about_text"] = "ULTRA VIDEO EDITOR {0}\n\nAccessible video editor\nMade for all users\n\n© 2025";
             en["about_title"] = "About";
             en["no_drag_data"] = "No drag data available";
             en["unsupported_file"] = "No files supported.";
@@ -1020,6 +1043,29 @@ namespace UltraVideoEditor
             en["vc_acc_window"] = "Volume settings";
             en["helpwnd_acc"] = "Help window";
             en["aa_too_long"] = "Intro and outro text combined ({0}s) are longer than the audio file.";
+            en["aa_invalid_logo_duration"] = "Enter a valid logo duration in seconds (e.g. 5 or 5.5). Defaulted to 5 seconds.";
+            en["ctx_auto_describe"] = "AI-suggest description";
+            en["vd_analyzing"] = "Analyzing image...";
+            en["vd_file_missing"] = "Image file not found";
+            en["vd_analysis_failed"] = "Image analysis failed: {0}";
+            en["vd_no_description"] = "Could not generate a description for this image";
+            en["vd_dialog_title"] = "AI-suggested description for: {0}";
+            en["vd_detected"] = "Detected: {0}";
+            en["vd_outdoor"] = "outdoor scene";
+            en["vd_warm"] = "warm lighting";
+            en["vd_face"] = "a face is visible";
+            en["vd_face_smile"] = "a smiling face is visible";
+            en["vd_children"] = "children detected";
+            en["vd_motion"] = "motion in the frame";
+            en["vd_bright"] = "Bright scene.";
+            en["vd_dark"] = "Dark scene.";
+            en["vd_moderate_light"] = "Moderately lit scene.";
+            en["export_summary_header"] = "📋 Video overview:";
+            en["export_summary_duration"] = "• Duration: {0}";
+            en["export_summary_clips"] = "• {0} video clip(s), {1} image(s), {2} audio track(s)";
+            en["export_summary_transitions"] = "• {0} transition(s) applied";
+            en["export_summary_subtitles"] = "• {0} subtitle(s)";
+            en["export_summary_gap"] = "• Silence on the audio track from {0} to {1} — check if this is intentional";
             en["mw_saved_as2"] = "Error saving project:\n{0}";
             en["mw_render_complete"] = "Render complete!";
             en["mw_render_failed"] = "Render failed: {0}";
@@ -1178,7 +1224,7 @@ namespace UltraVideoEditor
 
             // ==================== NEMAČKI ====================
             var de = new Dictionary<string, string>();
-            de["app_title"] = "ULTRA VIDEO EDITOR v1.0";
+            de["app_title"] = "ULTRA VIDEO EDITOR {0}";
             de["system_ready"] = "System bereit...";
             de["status_idle"] = "Status: Bereit";
             de["save_project"] = "Projekt speichern";
@@ -1256,7 +1302,7 @@ namespace UltraVideoEditor
             de["animation_tab"] = "ANIMATION";
             de["render_cancelled"] = "Rendern abgebrochen";
             // ── KOMPLETIRANJE NEMAČKOG REČNIKA ───────────────────────
-            de["app_title"] = "ULTRA VIDEO EDITOR v1.0";
+            de["app_title"] = "ULTRA VIDEO EDITOR {0}";
             de["system_ready"] = "System bereit...";
             de["status_idle"] = "Status: Bereit";
             de["save_project"] = "Projekt speichern";
@@ -1523,7 +1569,7 @@ namespace UltraVideoEditor
             de["up_to_date"] = "Aktuell";
             de["updates_title"] = "Updates";
             de["about_title"] = "Über Ultra Video Editor";
-            de["about_text"] = "Ultra Video Editor\nAccessibility-freundlicher Video-Editor\nVersion 1.0";
+            de["about_text"] = "Ultra Video Editor\nAccessibility-freundlicher Video-Editor\nVersion {0}";
             de["settings_title"] = "Einstellungen";
             de["settings_wip"] = "Einstellungen in Entwicklung";
             de["manual_title"] = "Benutzerhandbuch";
@@ -1721,6 +1767,29 @@ namespace UltraVideoEditor
             de["aa_link_error"] = "Link-Fehler";
             de["aa_resolution_tip"] = "Auflösungs-Tipp";
             de["aa_too_long"] = "Zu lang";
+            de["aa_invalid_logo_duration"] = "Geben Sie eine gültige Logo-Dauer in Sekunden ein (z. B. 5 oder 5.5). Standardwert 5 Sekunden wurde verwendet.";
+            de["ctx_auto_describe"] = "KI-Beschreibungsvorschlag";
+            de["vd_analyzing"] = "Bild wird analysiert...";
+            de["vd_file_missing"] = "Bilddatei nicht gefunden";
+            de["vd_analysis_failed"] = "Bildanalyse fehlgeschlagen: {0}";
+            de["vd_no_description"] = "Für dieses Bild konnte keine Beschreibung erstellt werden";
+            de["vd_dialog_title"] = "KI-Vorschlag für: {0}";
+            de["vd_detected"] = "Erkannt: {0}";
+            de["vd_outdoor"] = "Außenszene";
+            de["vd_warm"] = "warmes Licht";
+            de["vd_face"] = "ein Gesicht ist sichtbar";
+            de["vd_face_smile"] = "ein lächelndes Gesicht ist sichtbar";
+            de["vd_children"] = "Kinder erkannt";
+            de["vd_motion"] = "Bewegung im Bild";
+            de["vd_bright"] = "Helle Szene.";
+            de["vd_dark"] = "Dunkle Szene.";
+            de["vd_moderate_light"] = "Mäßig beleuchtete Szene.";
+            de["export_summary_header"] = "📋 Videoübersicht:";
+            de["export_summary_duration"] = "• Dauer: {0}";
+            de["export_summary_clips"] = "• {0} Videoclip(s), {1} Bild(er), {2} Audiospur(en)";
+            de["export_summary_transitions"] = "• {0} Übergang/Übergänge angewendet";
+            de["export_summary_subtitles"] = "• {0} Untertitel";
+            de["export_summary_gap"] = "• Stille auf der Audiospur von {0} bis {1} — bitte prüfen, ob beabsichtigt";
             de["aa_acc_ambient"] = "Umgebungsgeräusche";
             de["aa_acc_crossfade"] = "Crossfade";
             de["aa_acc_kenburns"] = "Ken Burns Effekt";

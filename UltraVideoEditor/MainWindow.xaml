@@ -5,7 +5,7 @@
         xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
         xmlns:wf="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
         xmlns:wfhost="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
-        Title="ULTRA VIDEO EDITOR v1.0" Height="950" Width="1400" 
+        Title="ULTRA VIDEO EDITOR" Height="950" Width="1400" 
         Background="{DynamicResource MainWindowBg}"
         WindowStartupLocation="CenterScreen"
         Focusable="True">

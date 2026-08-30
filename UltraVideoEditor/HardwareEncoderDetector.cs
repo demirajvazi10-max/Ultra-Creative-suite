@@ -135,7 +135,7 @@ namespace UltraVideoEditor
 
             try
             {
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -172,7 +172,7 @@ namespace UltraVideoEditor
             // Generates 1 second of test video (red screen)
             var args = $"-y -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=30 -c:v libx264 -t 1 \"{outputPath}\"";
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {

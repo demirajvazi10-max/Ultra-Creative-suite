@@ -82,7 +82,7 @@ namespace UltraVideoEditor
 
             try
             {
-                var proc = new Process
+                using var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo("where", "whisper")
                     {
@@ -118,7 +118,7 @@ namespace UltraVideoEditor
             string outPath = Path.Combine(tempDir, $"whisper_audio_{Guid.NewGuid():N}.wav");
             string args = $"-nostdin -i \"{mediaPath}\" -ar 16000 -ac 1 -c:a pcm_s16le -y \"{outPath}\"";
 
-            var proc = new Process
+            using var proc = new Process
             {
                 StartInfo = new ProcessStartInfo(ffmpegPath, args)
                 {
@@ -251,7 +251,7 @@ namespace UltraVideoEditor
                       $"--condition_on_previous_text False " +
                       $"--temperature 0 --verbose False";
 
-                var whisperProc = new Process
+                using var whisperProc = new Process
                 {
                     StartInfo = new ProcessStartInfo(whisperExe, whisperArgs)
                     {
@@ -479,7 +479,7 @@ namespace UltraVideoEditor
 
                 progress?.Report($"Whisper alignment ({modelSize} model, listening to voice...)");
 
-                var proc = new Process
+                using var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo(whisperExe, whisperArgs)
                     {

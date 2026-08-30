@@ -8,7 +8,12 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AssemblyName>UltraVideoEditor</AssemblyName>
-		<RootNamespace>UltraVideoEditor</RootNamespace>	
+		<RootNamespace>UltraVideoEditor</RootNamespace>
+		<!-- Jedino mesto koje treba da promeniš pre svakog GitHub release-a/tag-a.
+		     Naslov prozora i "About" dijalog čitaju ovu vrednost u runtime-u
+		     (MainWindow.xaml.cs -> GetAppVersion()), tako da se nigde više ne
+		     ručno kuca broj verzije. -->
+		<Version>1.0.2</Version>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -55,7 +55,7 @@ namespace UltraVideoEditor
                 string args   = $"-nostdin -framerate {FPS} -i \"{tempDir}\\frame_%06d.png\" " +
                                 $"-c:v libx264 -pix_fmt yuv420p -y \"{outputPath}\"";
 
-                var proc = new Process
+                using var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {

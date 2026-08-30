@@ -25,12 +25,14 @@ namespace UltraVideoEditor
         }
         public string Position => (cmbPosition.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content.ToString() ?? "Centar";
 
-        public TextOverlayDialog(string title = "Add text to image")
+        public TextOverlayDialog(string title = "Add text to image", string initialText = null)
         {
             InitializeComponent();
             UiScaling.Register(this);
             this.Title = title;
             AutomationProperties.SetName(this, title);
+            if (!string.IsNullOrEmpty(initialText))
+                txtText.Text = initialText;
             txtText.Focus();
         }
 

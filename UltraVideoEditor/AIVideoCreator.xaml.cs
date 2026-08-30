@@ -2739,7 +2739,7 @@ namespace UltraVideoEditor
                 return audioPath;
 
             string args = $"-nostdin -stream_loop -1 -i \"{audioPath}\" -t {targetDuration.ToString(CultureInfo.InvariantCulture)} -c copy -y \"{outputPath}\"";
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -2769,7 +2769,7 @@ namespace UltraVideoEditor
                 if (!File.Exists(ffmpegPath)) return 180.0;
 
                 string args = $"-nostdin -i \"{audioPath}\" -f null -";
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -3314,7 +3314,7 @@ namespace UltraVideoEditor
 
             string args = $"-nostdin {allInputs} -filter_complex \"{filterGraph};{mixFilter}amix=inputs={mixInputs.Count}:duration=first:normalize=0\" -t {totalDuration.ToString(CultureInfo.InvariantCulture)} -y \"{outputPath}\"";
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -4988,7 +4988,7 @@ namespace UltraVideoEditor
                     return inputPath;
                 }
 
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -5032,7 +5032,7 @@ namespace UltraVideoEditor
                 if (!File.Exists(ffmpegPath)) return 5.0;
 
                 string args = $"-nostdin -i \"{videoPath}\" -f null -";
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -6103,7 +6103,16 @@ namespace UltraVideoEditor
 
             if (chkShowLogo.IsChecked == true && !string.IsNullOrEmpty(txtLogoPath.Text) && File.Exists(txtLogoPath.Text))
             {
-                double logoDuration = double.TryParse(txtLogoDuration.Text, out double ld) ? ld : 5;
+                double logoDuration;
+                if (double.TryParse(txtLogoDuration.Text.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double ld))
+                {
+                    logoDuration = ld;
+                }
+                else
+                {
+                    logoDuration = 5;
+                    LogToMainWindow($"⚠️ Invalid logo duration '{txtLogoDuration.Text}' — using default of 5 seconds.");
+                }
                 var logoItem = new TimelineItem
                 {
                     Path = txtLogoPath.Text,

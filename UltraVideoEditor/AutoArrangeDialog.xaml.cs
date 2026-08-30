@@ -181,7 +181,17 @@ namespace UltraVideoEditor
             // Logo
             LogoPath = txtLogoPath.Text;
             ShowLogo = chkShowLogo.IsChecked == true;
-            LogoDuration = double.TryParse(txtLogoDuration.Text, out double logoDur) ? logoDur : 5;
+            if (double.TryParse(txtLogoDuration.Text.Replace(',', '.'),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out double logoDur))
+            {
+                LogoDuration = logoDur;
+            }
+            else
+            {
+                LogoDuration = 5;
+                WpfMessageBox.Show(L("aa_invalid_logo_duration"), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
 
             // Tekstovi
             IntroText = txtIntroText.Text;

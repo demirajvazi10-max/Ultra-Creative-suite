@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -10,6 +11,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
 using WpfMessageBox = System.Windows.MessageBox;
+using WinForms = System.Windows.Forms;
 
 namespace UltraVideoEditor
 {
@@ -37,10 +39,13 @@ namespace UltraVideoEditor
                 "UltraVideoEditor", "yt-dlp.exe")
         };
 
-        // Folder za preuzete fajlove
+        // Folder za preuzete fajlove (podrazumevani; korisnik ga može promeniti preko "Browse...")
         private static readonly string DownloadFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
             "UltraVideoEditor_Downloads");
+
+        private string _currentSaveFolder = DownloadFolder;
+        private VideoInfo _lastInfo;
 
         // ─── Konstruktor ──────────────────────────────────────────────────────
         public YouTubeDownloadDialog()
@@ -48,6 +53,7 @@ namespace UltraVideoEditor
             InitializeComponent();
             UiScaling.Register(this);
             Directory.CreateDirectory(DownloadFolder);
+            txtSaveFolder.Text = _currentSaveFolder;
             Loaded += (_, _) => txtUrl.Focus();
         }
 
@@ -60,12 +66,28 @@ namespace UltraVideoEditor
             if (e.Key == Key.Enter) BtnFetchInfo_Click(sender, e);
         }
 
+        private void BtnBrowseFolder_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choose where to save downloaded files",
+                UseDescriptionForTitle = true,
+                SelectedPath = Directory.Exists(_currentSaveFolder) ? _currentSaveFolder : DownloadFolder
+            };
+
+            if (dlg.ShowDialog() == WinForms.DialogResult.OK && !string.IsNullOrWhiteSpace(dlg.SelectedPath))
+            {
+                _currentSaveFolder = dlg.SelectedPath;
+                txtSaveFolder.Text = _currentSaveFolder;
+            }
+        }
+
         private void FormatType_Changed(object sender, RoutedEventArgs e)
         {
-            if (pnlQuality == null) return;
-            pnlQuality.Visibility = rbVideo.IsChecked == true
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (pnlQuality == null || pnlAudioQuality == null) return;
+            bool isVideo = rbVideo.IsChecked == true;
+            pnlQuality.Visibility      = isVideo ? Visibility.Visible : Visibility.Collapsed;
+            pnlAudioQuality.Visibility = isVideo ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private async void BtnFetchInfo_Click(object sender, RoutedEventArgs e)
@@ -95,6 +117,7 @@ namespace UltraVideoEditor
 
                 var info = await FetchInfoAsync(ytdlp, url);
                 if (info == null) return;
+                _lastInfo = info;
 
                 // Show info
                 txbInfoTitle.Text = info.IsPlaylist
@@ -104,6 +127,18 @@ namespace UltraVideoEditor
                 txbInfoMeta.Text = info.IsPlaylist
                     ? $"Channel: {info.Channel}"
                     : $"Channel: {info.Channel}   Duration: {FormatDuration(info.DurationSec)}";
+
+                if (info.IsPlaylist && info.EntryTitles.Count > 0)
+                {
+                    lstPlaylistTracks.ItemsSource = info.EntryTitles;
+                    lstPlaylistTracks.SelectAll(); // sve selektovano = cela plejlista, kao pre
+                    pnlPlaylistTracks.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    lstPlaylistTracks.ItemsSource = null;
+                    pnlPlaylistTracks.Visibility = Visibility.Collapsed;
+                }
 
                 pnlInfo.Visibility = Visibility.Visible;
                 btnDownload.IsEnabled = true;
@@ -132,20 +167,52 @@ namespace UltraVideoEditor
             string ytdlp = FindYtdlp();
             if (ytdlp == null) { ShowError("yt-dlp not found."); return; }
 
+            Directory.CreateDirectory(_currentSaveFolder);
+
             bool isAudio = rbAudio.IsChecked == true;
             string quality = ((ComboBoxItem)cmbQuality.SelectedItem)?.Tag?.ToString() ?? "best";
+            string audioQuality = ((ComboBoxItem)cmbAudioQuality.SelectedItem)?.Tag?.ToString() ?? "192K";
+
+            bool isPlaylist = _lastInfo?.IsPlaylist ?? false;
+            List<int> selectedTrackIndices = null;
+            if (isPlaylist && lstPlaylistTracks.Items.Count > 0
+                && lstPlaylistTracks.SelectedItems.Count > 0
+                && lstPlaylistTracks.SelectedItems.Count < lstPlaylistTracks.Items.Count)
+            {
+                // Only a subset of the playlist is selected — yt-dlp --playlist-items is 1-based.
+                selectedTrackIndices = lstPlaylistTracks.SelectedItems
+                    .Cast<string>()
+                    .Select(title => lstPlaylistTracks.Items.IndexOf(title) + 1)
+                    .OrderBy(i => i)
+                    .ToList();
+            }
 
             _cts = new CancellationTokenSource();
             SetDownloadState(true);
 
             try
             {
-                var files = await RunDownloadAsync(ytdlp, url, isAudio, quality, _cts.Token);
-                DownloadedFiles = files;
+                var files = await RunDownloadAsync(ytdlp, url, isAudio, quality, audioQuality,
+                    isPlaylist, selectedTrackIndices, _cts.Token);
 
                 if (files.Count > 0)
                 {
-                    Announce($"Download complete. {files.Count} file(s) added to timeline.");
+                    string savedMsg = files.Count == 1
+                        ? $"Saved to: {files[0]}"
+                        : $"Saved {files.Count} file(s) to: {_currentSaveFolder}";
+
+                    if (chkAddToTimeline.IsChecked == true)
+                    {
+                        DownloadedFiles = files;
+                        Announce($"Download complete. {savedMsg}. Added to timeline.");
+                    }
+                    else
+                    {
+                        DownloadedFiles = new List<string>();
+                        Announce($"Download complete. {savedMsg}. Not added to timeline.");
+                    }
+
+                    WpfMessageBox.Show(savedMsg, "Download complete", MessageBoxButton.OK, MessageBoxImage.Information);
                     DialogResult = true;
                     Close();
                 }
@@ -284,6 +351,7 @@ namespace UltraVideoEditor
             public double DurationSec { get; set; }
             public bool   IsPlaylist  { get; set; }
             public int    Count       { get; set; }
+            public List<string> EntryTitles { get; set; } = new();
         }
 
         private async Task<VideoInfo> FetchInfoAsync(string ytdlp, string url)
@@ -316,6 +384,16 @@ namespace UltraVideoEditor
                     int.TryParse(countStr, out int cnt);
                     info.Count = cnt;
                 }
+
+                // Individual track titles for the track picker.
+                // Flat-playlist JSON is { "title": "<playlist title>", "entries": [ {"title": "..."} , ... ] }
+                // so the first "title" match is the playlist's own title — skip it.
+                var titleMatches = Regex.Matches(output, "\"title\"\\s*:\\s*\"([^\"]*)\"");
+                if (titleMatches.Count > 1)
+                {
+                    for (int i = 1; i < titleMatches.Count; i++)
+                        info.EntryTitles.Add(titleMatches[i].Groups[1].Value);
+                }
             }
             else
             {
@@ -331,10 +409,11 @@ namespace UltraVideoEditor
         // ─── Download ─────────────────────────────────────────────────────────
 
         private async Task<List<string>> RunDownloadAsync(
-            string ytdlp, string url, bool audio, string quality, CancellationToken ct)
+            string ytdlp, string url, bool audio, string quality, string audioQuality,
+            bool isPlaylist, List<int> selectedTrackIndices, CancellationToken ct)
         {
             // Output template
-            string outTemplate = Path.Combine(DownloadFolder, "%(title)s.%(ext)s");
+            string outTemplate = Path.Combine(_currentSaveFolder, "%(title)s.%(ext)s");
 
             string formatArg;
             string postProcess = "";
@@ -342,7 +421,7 @@ namespace UltraVideoEditor
             if (audio)
             {
                 formatArg   = "--format bestaudio/best";
-                postProcess = "--extract-audio --audio-format mp3 --audio-quality 192K";
+                postProcess = $"--extract-audio --audio-format mp3 --audio-quality {audioQuality}";
             }
             else
             {
@@ -354,7 +433,19 @@ namespace UltraVideoEditor
                 postProcess = "--merge-output-format mp4";
             }
 
-            string args = $"{formatArg} {postProcess} --no-warnings --newline " +
+            // Ako korisnik NIJE tražio plejlistu, sprečavamo yt-dlp da je ipak skine u celosti
+            // (linkovi kopirani dok gledaš unutar plejliste sadrže i "&list=..." pa yt-dlp
+            // podrazumevano skida celu plejlistu ako to eksplicitno ne zabranimo).
+            // Ako JESTE plejlista i korisnik je izabrao samo neke numere, skidamo samo njih.
+            string playlistArg;
+            if (!isPlaylist)
+                playlistArg = "--no-playlist";
+            else if (selectedTrackIndices != null && selectedTrackIndices.Count > 0)
+                playlistArg = $"--playlist-items {string.Join(",", selectedTrackIndices)}";
+            else
+                playlistArg = "";
+
+            string args = $"{formatArg} {postProcess} {playlistArg} --no-warnings --newline " +
                           $"--output \"{outTemplate}\" \"{url}\"";
 
             var downloadedPaths = new List<string>();
@@ -370,7 +461,7 @@ namespace UltraVideoEditor
             {
                 // Uzimamo fajlove nastale u poslednjih 5 minuta
                 var cutoff = DateTime.Now.AddMinutes(-5);
-                foreach (var f in Directory.GetFiles(DownloadFolder))
+                foreach (var f in Directory.GetFiles(_currentSaveFolder))
                 {
                     if (File.GetCreationTime(f) >= cutoff)
                         downloadedPaths.Add(f);
@@ -461,9 +552,18 @@ namespace UltraVideoEditor
                 sb.AppendLine(e.Data);
                 lineCallback?.Invoke(e.Data);
             };
+            // yt-dlp progress lines can land on stderr depending on version/flags, and if
+            // RedirectStandardError is true but nobody reads it, the OS pipe buffer can fill
+            // and stall the child process. Read and forward it the same way as stdout.
+            p.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                lineCallback?.Invoke(e.Data);
+            };
 
             p.Start();
             p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
 
             await Task.Run(() => p.WaitForExit(), ct);
             if (ct.IsCancellationRequested) { try { p.Kill(); } catch { } }
@@ -495,7 +595,9 @@ namespace UltraVideoEditor
             btnFetchInfo.IsEnabled = !downloading;
             txtUrl.IsEnabled       = !downloading;
             btnCancel.Content      = downloading ? "Cancel download" : "Cancel";
-            pnlProgress.Visibility = downloading ? Visibility.Visible : Visibility.Visible;
+            // Ostaje vidljivo i posle završetka/otkazivanja da bi poslednja poruka
+            // o statusu ostala čitljiva za JAWS/NVDA, umesto da se panel odmah sakrije.
+            pnlProgress.Visibility = Visibility.Visible;
 
             if (downloading)
             {

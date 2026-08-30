@@ -1,5 +1,6 @@
 #nullable disable
 using SkiaSharp;
+using System.Globalization;
 using Timer = System.Windows.Forms.Timer;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WPF;
@@ -252,7 +253,7 @@ namespace UltraVideoEditor
         {
             string L(string key) => LanguageManager.GetText(key, _currentLanguage);
 
-            this.Title = L("app_title");
+            this.Title = string.Format(L("app_title"), GetAppVersion());
             if (txtJawsLog != null) txtJawsLog.Text = L("system_ready");
             if (txtStatus != null) txtStatus.Text = L("status_idle");
 
@@ -1129,7 +1130,21 @@ namespace UltraVideoEditor
 
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
-            WpfMessageBox.Show(L("about_text"), L("about_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            WpfMessageBox.Show(string.Format(L("about_text"), GetAppVersion()), L("about_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// Verzija aplikacije - čita se iz &lt;Version&gt; u UltraVideoEditor.csproj (podešava
+        /// AssemblyVersion/FileVersion/InformationalVersion automatski pri build-u). To je
+        /// JEDINO mesto koje treba promeniti pre svakog GitHub release-a/tag-a - naslov
+        /// prozora i "About" dijalog je preuzimaju odavde, bez ručnog kucanja broja verzije
+        /// na više mesta u kodu.
+        /// </summary>
+        private static string GetAppVersion()
+        {
+            var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            if (v == null) return "v?";
+            return v.Build > 0 ? $"v{v.Major}.{v.Minor}.{v.Build}" : $"v{v.Major}.{v.Minor}";
         }
 
         private void SetupDragDropFromExplorer()
@@ -2420,7 +2435,9 @@ namespace UltraVideoEditor
         private void AddSubtitle_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage("Enter subtitle text", true); return; }
-            if (!double.TryParse(txtSubStart?.Text, out double start) || !double.TryParse(txtSubEnd?.Text, out double end)) { LogMessage(L("time_format_error"), true); return; }
+            bool startOk = double.TryParse(txtSubStart?.Text?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double start);
+            bool endOk = double.TryParse(txtSubEnd?.Text?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double end);
+            if (!startOk || !endOk) { LogMessage(L("time_format_error"), true); return; }
             subtitles.Add(new SubtitleItem { Text = txtSubtitleText.Text, Start = start, End = end });
             lstSubtitles.Items.Add($"{FormatTime(start)} -> {FormatTime(end)}: {txtSubtitleText.Text}");
             txtSubtitleText.Clear();
@@ -2828,10 +2845,16 @@ namespace UltraVideoEditor
                 if (File.Exists(outputPath))
                 {
                     long fileSize = new FileInfo(outputPath).Length;
+                    string summary = BuildExportSummary();
                     LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
+                    if (!string.IsNullOrWhiteSpace(summary))
+                        LogMessage(summary, true);
                     txtRenderStatus.Text = L("render_done_status");
                     PlayBeep();
-                    WpfMessageBox.Show(string.Format(L("render_done_msg"), outputPath, fileSize / 1024 / 1024), L("render_done_title2"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    string doneMsg = string.Format(L("render_done_msg"), outputPath, fileSize / 1024 / 1024);
+                    if (!string.IsNullOrWhiteSpace(summary))
+                        doneMsg += "\n\n" + summary;
+                    WpfMessageBox.Show(doneMsg, L("render_done_title2"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
                 {
@@ -3332,6 +3355,141 @@ namespace UltraVideoEditor
             }
         }
 
+        private async void AutoDescribeImage_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage))
+            {
+                LogMessage("Select an image first", true);
+                return;
+            }
+            if (!File.Exists(item.Path))
+            {
+                LogMessage(L("vd_file_missing"), true);
+                return;
+            }
+
+            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            LogMessage(L("vd_analyzing"), true);
+
+            VisionResult result;
+            try
+            {
+                // Cheap no-ops if already initialized earlier in the session.
+                await VisionAnalyzer.InitializeAsync(msg => LogMessage(msg, false));
+                await VisionAnalyzer.InitializeQwenAsync(msg => LogMessage(msg, false));
+                result = await VisionAnalyzer.AnalyzeClipAsync(item.Path, ffmpegPath);
+            }
+            catch (Exception ex)
+            {
+                LogMessage(LF("vd_analysis_failed", ex.Message), true);
+                return;
+            }
+
+            string suggestion = BuildFrameDescription(result);
+            if (string.IsNullOrWhiteSpace(suggestion))
+            {
+                LogMessage(L("vd_no_description"), true);
+                return;
+            }
+
+            var dialog = new TextOverlayDialog(LF("vd_dialog_title", item.Name), suggestion);
+            if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
+            {
+                item.AudioDescription = dialog.Text;
+                LogMessage($"Audio description added for image {item.Index}: {dialog.Text}", true);
+                UpdateTimelineDisplay();
+                PlayBeep();
+            }
+        }
+
+        /// <summary>
+        /// Composes a short, human-readable draft description from a VisionAnalyzer result,
+        /// for the user to review/edit before it's saved as the clip's audio description.
+        /// Falls back to brightness/color heuristics when no AI labels are available
+        /// (e.g. Ollama/ONNX not installed) so the feature still gives some result.
+        /// </summary>
+        private string BuildFrameDescription(VisionResult r)
+        {
+            if (r == null) return null;
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(r.TopLabel))
+            {
+                string extra = (r.Labels != null && r.Labels.Length > 0)
+                    ? " (" + string.Join(", ", r.Labels.Take(5)) + ")"
+                    : "";
+                parts.Add(LF("vd_detected", r.TopLabel) + extra);
+            }
+
+            var traits = new List<string>();
+            if (r.IsOutdoor) traits.Add(L("vd_outdoor"));
+            if (r.IsWarm) traits.Add(L("vd_warm"));
+            if (r.HasFaces) traits.Add(r.HasSmile ? L("vd_face_smile") : L("vd_face"));
+            if (r.HasChildren) traits.Add(L("vd_children"));
+            if (r.HasMotion) traits.Add(L("vd_motion"));
+            if (traits.Count > 0)
+                parts.Add(string.Join(", ", traits) + ".");
+
+            if (parts.Count == 0)
+            {
+                // No AI labels available (ONNX/Ollama not installed) — fall back to
+                // the brightness/saturation heuristics FFmpeg-only mode still gives us.
+                if (r.Luminance >= 150) parts.Add(L("vd_bright"));
+                else if (r.Luminance > 0 && r.Luminance <= 60) parts.Add(L("vd_dark"));
+                else if (r.Luminance > 0) parts.Add(L("vd_moderate_light"));
+            }
+
+            return string.Join(" ", parts).Trim();
+        }
+
+        /// <summary>
+        /// Composes a short, plain-language summary of what's in the just-finished export
+        /// (duration, clip/subtitle/transition counts, and any suspicious silent gaps on
+        /// audio tracks), so a blind editor can confirm the result without needing someone
+        /// sighted to "just check it looks right".
+        /// </summary>
+        private string BuildExportSummary()
+        {
+            if (timelineItems.Count == 0) return null;
+
+            var sb = new StringBuilder();
+            sb.AppendLine(L("export_summary_header"));
+
+            double totalDuration = timelineItems.Max(i => i.End);
+            int videoClips = timelineItems.Count(i => !i.IsAudio && !i.IsImage);
+            int imageClips = timelineItems.Count(i => i.IsImage);
+            int audioClips = timelineItems.Count(i => i.IsAudio);
+
+            sb.AppendLine(LF("export_summary_duration", FormatTime(totalDuration)));
+            sb.AppendLine(LF("export_summary_clips", videoClips, imageClips, audioClips));
+
+            if (transitions.Count > 0)
+                sb.AppendLine(LF("export_summary_transitions", transitions.Count));
+
+            if (subtitles.Count > 0)
+                sb.AppendLine(LF("export_summary_subtitles", subtitles.Count));
+
+            // Flag gaps of more than 1s on audio tracks — likely unintended silence
+            // (e.g. background music/narration that doesn't cover the whole video).
+            var audioItems = timelineItems.Where(i => i.IsAudio).OrderBy(i => i.Start).ToList();
+            if (audioItems.Count > 0)
+            {
+                var gaps = new List<(double start, double end)>();
+                double cursor = 0;
+                foreach (var a in audioItems)
+                {
+                    if (a.Start - cursor > 1.0) gaps.Add((cursor, a.Start));
+                    cursor = Math.Max(cursor, a.End);
+                }
+                if (totalDuration - cursor > 1.0) gaps.Add((cursor, totalDuration));
+
+                foreach (var g in gaps.Take(5))
+                    sb.AppendLine(LF("export_summary_gap", FormatTime(g.start), FormatTime(g.end)));
+            }
+
+            return sb.ToString().TrimEnd();
+        }
+
         private void ReadAudioDescription_Click(object sender, RoutedEventArgs e)
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage)
@@ -3630,7 +3788,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem animacija)
             {
-                if (!double.TryParse(txtAnimationStartTime.Text, out double startTime))
+                if (!double.TryParse(txtAnimationStartTime.Text.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double startTime))
                 {
                     LogMessage("Enter a valid number of seconds", true);
                     return;
@@ -4311,6 +4469,7 @@ namespace UltraVideoEditor
                     contextMenu.Items.Add(L("ctx_set_volume"), null, (s, e) => SetClipVolume_Click(null, null));
                     contextMenu.Items.Add(new WinForms.ToolStripSeparator());
                     contextMenu.Items.Add("🎤 " + L("ctx_add_audio_desc"), null, (s, e) => AddAudioDescription_Click(null, null));
+                    contextMenu.Items.Add("🤖 " + L("ctx_auto_describe"), null, (s, e) => AutoDescribeImage_Click(null, null));
                     contextMenu.Items.Add(L("ctx_read_audio"), null, (s, e) => ReadAudioDescription_Click(null, null));
                     contextMenu.Items.Add(new WinForms.ToolStripSeparator());
                     contextMenu.Items.Add(L("ctx_set_position"), null, (s, e) => SetImagePosition_Click(null, null));
