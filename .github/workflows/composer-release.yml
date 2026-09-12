@@ -76,18 +76,23 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
+      # The .iss script lives at the MONOREPO ROOT's installer/ folder (shared
+      # by all Ultra apps, same convention as audio-v*/video-v*), NOT nested
+      # inside UltraComposer/ - this "UltraComposer\installer\..." path was
+      # wrong and is exactly why ISCC failed with a bare "the system cannot
+      # find the path specified" (it couldn't even open the script file).
       - name: Build installer
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            "UltraComposer\installer\UltraComposer.iss" `
+            "installer\UltraComposer.iss" `
             "/DMyAppVersion=${{ steps.version.outputs.version }}"
 
       - name: Upload installer as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: UltraComposer-Setup-${{ steps.version.outputs.version }}
-          path: UltraComposer/installer/Output/*.exe
+          path: installer/Output/*.exe
 
       # Only creates an actual GitHub Release on a real tag push - a
       # workflow_dispatch test build stops at the artifact above instead of
@@ -97,5 +102,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "Ultra Composer ${{ steps.version.outputs.version }}"
-          files: UltraComposer/installer/Output/*.exe
+          files: installer/Output/*.exe
           prerelease: ${{ steps.version.outputs.prerelease }}

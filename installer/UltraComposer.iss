@@ -17,7 +17,7 @@
 #define MyAppExeName "UltraComposer.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0-beta.1"
+  #define MyAppVersion "1.0.0-beta"
 #endif
 
 ; A fixed AppId keeps upgrades (installing a newer version over an older
@@ -71,7 +71,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Double-check this exact path against your own local Release build output
 ; once - if MSBuild puts it somewhere slightly different on your machine,
 ; this is the one line to adjust.
-Source: "..\src\App\bin\x64\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; NOTE: this .iss lives in the monorepo root's installer/ folder (a sibling
+; of UltraComposer/, not inside it - see the header comment above), so the
+; App project's build output needs the "UltraComposer\" prefix here too,
+; same as the GettingStarted.txt line below already has it right.
+Source: "..\UltraComposer\src\App\bin\x64\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; Bilingual (English then Serbian) "what is this, how do I start, where's
 ; the full guide" one-pager - installed alongside the app and offered on the
 ; Finished page below, same "instructions.txt with a checkbox" idea common
