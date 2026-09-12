@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraComposer.Interop</RootNamespace>
+    <AssemblyTitle>Ultra Composer Audio Engine Interop</AssemblyTitle>
+    <Authors>Demir Ajvazi</Authors>
+    <Company>Demir Ajvazi</Company>
+    <Copyright>Copyright (c) Demir Ajvazi</Copyright>
+  </PropertyGroup>
+
+</Project>

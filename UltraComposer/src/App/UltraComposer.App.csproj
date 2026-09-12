@@ -1,0 +1,89 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UltraComposer.App</RootNamespace>
+    <AssemblyName>UltraComposer</AssemblyName>
+    <AssemblyTitle>Ultra Composer</AssemblyTitle>
+    <Product>Ultra Composer</Product>
+    <Authors>Demir Ajvazi</Authors>
+    <Company>Demir Ajvazi</Company>
+    <Copyright>Copyright (c) Demir Ajvazi</Copyright>
+    <!-- Single place to bump before each GitHub tag/release (see installer/UltraComposer.iss's
+         MyAppVersion and the composer-v* tag it's built from) - AssemblyVersion/FileVersion/
+         InformationalVersion are all auto-derived from this at build time, and the About
+         dialog reads it back via GetAppVersion() (MainWindow.xaml.cs), same pattern as
+         Ultra Video Editor/Ultra Audio Editor.
+
+         A "-beta.N" suffix (standard SemVer prerelease syntax) marks this as a beta rather
+         than the first full release - the .NET SDK keeps the full string ("1.0.0-beta.1") in
+         InformationalVersion (what the About dialog shows) while still deriving a valid plain
+         numeric AssemblyVersion/FileVersion ("1.0.0.0") from it, so nothing else needs to
+         change. Drop the "-beta.N" suffix entirely for the first full release, matching Ultra
+         Video Editor's "first full (non-beta) release is v1.0.0" convention - i.e. this stays
+         a 1.0.0-beta.N line until it's ready, then becomes plain 1.0.0. -->
+    <Version>1.0.0-beta.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Interop\UltraComposer.Interop.csproj" />
+  </ItemGroup>
+
+  <!-- Copies the native engine DLL into this project's own output folder right after this
+       project finishes building. Uses a Target (evaluated at build time) instead of a
+       conditioned item (evaluated too early, before other projects have built) - see
+       README.md "Troubleshooting" for why that distinction matters.
+
+       This still requires UltraComposer.AudioEngine to have actually been built already,
+       which Visual Studio only guarantees if the solution's Project Dependencies say
+       UltraComposer.App depends on UltraComposer.AudioEngine (Solution -> right-click ->
+       Project Dependencies...). Without that, build order is not guaranteed and this Target
+       may run too early. -->
+  <Target Name="CopyNativeAudioEngine" AfterTargets="Build">
+    <ItemGroup>
+      <NativeAudioEngineDll Include="$(SolutionDir)bin\$(Configuration)\UltraComposer.AudioEngine.dll" />
+    </ItemGroup>
+    <Error Condition="'@(NativeAudioEngineDll)' != '' AND !Exists('%(NativeAudioEngineDll.Identity)')"
+           Text="UltraComposer.AudioEngine.dll was not found at %(NativeAudioEngineDll.Identity). Build UltraComposer.AudioEngine first (and set it as a Project Dependency of UltraComposer.App so this happens automatically)." />
+    <Copy SourceFiles="@(NativeAudioEngineDll)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- The bundled default SoundFont (see src/AudioEngine/thirdparty/soundfonts)
+       is a ~30MB binary, which is too large to transfer as a single file
+       through the assistant's remote-device bridge - so it's stored on disk
+       as three smaller "GeneralUser-GS.sf2.partN" chunks and reassembled
+       here, once, the first time this project builds. Plain binary
+       concatenation (copy /b) reproduces the original file exactly - this
+       was verified byte-for-byte (md5) before the chunks were ever written
+       to disk. Safe to re-run: it only does anything when the final .sf2
+       doesn't already exist yet. -->
+  <Target Name="AssembleBundledSoundFont" BeforeTargets="CopyBundledSoundFont">
+    <PropertyGroup>
+      <BundledSoundFontDir>$(SolutionDir)src\AudioEngine\thirdparty\soundfonts\</BundledSoundFontDir>
+      <BundledSoundFontPath>$(BundledSoundFontDir)GeneralUser-GS.sf2</BundledSoundFontPath>
+    </PropertyGroup>
+    <Exec Command="copy /b &quot;$(BundledSoundFontDir)GeneralUser-GS.sf2.part0&quot;+&quot;$(BundledSoundFontDir)GeneralUser-GS.sf2.part1&quot;+&quot;$(BundledSoundFontDir)GeneralUser-GS.sf2.part2&quot; &quot;$(BundledSoundFontPath)&quot;"
+          Condition="!Exists('$(BundledSoundFontPath)') AND Exists('$(BundledSoundFontDir)GeneralUser-GS.sf2.part0')" />
+  </Target>
+
+  <!-- Copies the bundled default SoundFont bank (see
+       src/AudioEngine/thirdparty/soundfonts) next to the built exe, so the
+       "Zvučna banka" section has something to load with zero setup.
+       SkipUnchangedFiles avoids re-copying this ~30MB file on every build,
+       only the first time or if it actually changes. -->
+  <Target Name="CopyBundledSoundFont" AfterTargets="Build">
+    <ItemGroup>
+      <BundledSoundFont Include="$(SolutionDir)src\AudioEngine\thirdparty\soundfonts\GeneralUser-GS.sf2" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BundledSoundFont)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

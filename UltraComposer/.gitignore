@@ -1,0 +1,15 @@
+# Visual Studio / MSBuild
+.vs/
+bin/
+obj/
+x64/
+Debug/
+Release/
+*.user
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+
+# vcpkg local install (if you install it inside the repo instead of elsewhere)
+vcpkg_installed/

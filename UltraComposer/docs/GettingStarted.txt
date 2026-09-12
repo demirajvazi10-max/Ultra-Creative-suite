@@ -1,0 +1,85 @@
+ULTRA COMPOSER - GETTING STARTED
+=================================
+
+Thanks for installing Ultra Composer, part of the Ultra Creative Suite - an
+accessible, keyboard-first digital audio workstation, built from day one to
+work equally well for blind and sighted musicians.
+
+FIRST STEPS
+
+1. Launch Ultra Composer. It opens on the "Instrument Bank" view and starts
+   its audio engine automatically.
+2. Press Tab until focus reaches "Performance keyboard".
+3. Play a few notes: Z S X D C V G B H N J M for one octave, Q 2 W 3 E R 5 T
+   6 Y 7 U for the octave above. Page Up/Page Down shift the octave.
+4. A default instrument sound (SoundFont bank) is already bundled in and
+   ready to go - no setup needed to hear something right away.
+5. Have a MIDI keyboard? Pick it from the "MIDI device" list, click
+   "Refresh devices" if needed, then "Connect".
+
+WHERE TO GO NEXT
+
+Ultra Composer has five main views, reachable from the "View" menu:
+Instrument Bank, Sequencer, Arranger, Multi-track & Mixer, and
+Auto-accompaniment. Every one of them is fully operable and announced
+through a screen reader (JAWS was used throughout development).
+
+For detailed, step-by-step instructions on every feature - what each
+button does, how the Sequencer's note list works, how Auto-accompaniment
+follows your chords, how to save a project, and more - open the built-in
+User Guide from inside the app:
+
+    Help menu -> User Guide
+
+That guide is also fully bilingual (English/Serbian, switchable from the
+Language menu) and stays up to date with the app itself, so it's the best
+place to look things up as you go.
+
+ABOUT
+
+Ultra Composer is written and maintained by Demir Ajvazi, licensed under
+GPL-3.0, as part of the Ultra Creative Suite of accessible creative
+software.
+
+
+ULTRA COMPOSER - POČETNO UPUTSTVO
+==================================
+
+Hvala što si instalirao/la Ultra Composer, deo Ultra Creative Suite-a -
+pristupačnu, tastaturi prilagođenu digitalnu audio radnu stanicu, napravljenu
+od samog početka da podjednako dobro radi i za slepe i za videće muzičare.
+
+PRVI KORACI
+
+1. Pokreni Ultra Composer. Program se otvara na prikazu "Banka instrumenata"
+   i sam pokreće audio motor.
+2. Pritiskaj Tab dok fokus ne stigne do "Klavijatura za sviranje".
+3. Odsviraj nekoliko nota: Z S X D C V G B H N J M za jednu oktavu, Q 2 W 3
+   E R 5 T 6 Y 7 U za oktavu iznad. Page Up/Page Down pomeraju oktavu.
+4. Podrazumevani zvuk instrumenta (SoundFont banka) je već ugrađen i
+   spreman - nije potrebno nikakvo podešavanje da bi odmah nešto čuo/la.
+5. Imaš MIDI klavijaturu? Izaberi je iz liste "MIDI uređaj", klikni
+   "Osveži uređaje" ako je potrebno, pa "Poveži".
+
+GDE DALJE
+
+Ultra Composer ima pet glavnih prikaza, dostupnih iz menija "Prikaz":
+Banka instrumenata, Sekvenser, Aranžer, Multi-trake i mikser, i
+Auto-pratnja. Svaki od njih je potpuno funkcionalan i najavljuje se kroz
+čitač ekrana (razvoj je vršen uz JAWS).
+
+Za detaljno, korak-po-korak uputstvo za svaku funkciju - šta koje dugme
+radi, kako radi spisak nota u Sekvenseru, kako Auto-pratnja prati akorde
+koje sviraš, kako se čuva projekat, i još mnogo toga - otvori ugrađeno
+Uputstvo za upotrebu direktno iz programa:
+
+    Meni "Pomoć" -> "Uputstvo za upotrebu"
+
+To uputstvo je takođe potpuno dvojezično (srpski/engleski, menja se iz
+menija "Jezik") i prati sam program, pa je najbolje mesto da tražiš
+odgovore dok radiš.
+
+O PROGRAMU
+
+Ultra Composer piše i održava Demir Ajvazi, pod GPL-3.0 licencom, kao deo
+Ultra Creative Suite-a - paketa pristupačnog kreativnog softvera.

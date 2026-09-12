@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{A1B2C3D4-0001-4000-8000-000000000001}</ProjectGuid>
+    <RootNamespace>UltraComposerAudioEngine</RootNamespace>
+    <!-- Deliberately not pinned to a specific SDK version (e.g. "10.0.19041.0") - leaving this
+         unset lets Visual Studio auto-select whichever Windows SDK is actually installed,
+         instead of showing the project as "(incompatible)" when the exact version isn't present. -->
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <!-- Requires vcpkg installed and integrated once on this machine (vcpkg integrate install).
+         See README.md - this auto-restores and links PortAudio from vcpkg.json. -->
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <!-- Static triplet: PortAudio gets linked straight into UltraComposer.AudioEngine.dll
+         instead of pulling in its own portaudio.dll at runtime. This avoids an entire class
+         of "DllNotFoundException ... one of its dependencies" errors, since there is then no
+         separate native DLL that could go missing from the output folder. -->
+    <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <!-- NOT adding _CRT_SECURE_NO_WARNINGS here: several vendored VST3 SDK
+           files (and our own InterfaceIds.cpp) already #define it themselves
+           in just the one .cpp that needs it, and a project-wide -D here
+           would clash with those, producing a "macro redefinition" warning
+           in every one of them. Any new file that needs it (e.g.
+           SoundFontHost.cpp, for TinySoundFont's fopen call) defines it
+           locally instead, guarded with #ifndef. -->
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;ULTRACOMPOSERAUDIOENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- Must match the x64-windows-static vcpkg triplet's own CRT linkage. -->
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <!-- The vendored VST3 SDK (see thirdparty/vst3sdk) is a plain source
+           drop, not a vcpkg package (Steinberg's vcpkg port can't be used
+           together with the static-CRT triplet above - see the comment at
+           the top of thirdparty/vst3sdk/README-ultracomposer.txt), so it
+           needs its own include path. -->
+      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\vst3sdk;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <!-- RtMidi's Windows backend (WinMM) needs this; harmless if vcpkg's own
+           auto-linking already covers it. -->
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <!-- See the identical comment in the Debug configuration above. -->
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;ULTRACOMPOSERAUDIOENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- Must match the x64-windows-static vcpkg triplet's own CRT linkage. -->
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\vst3sdk;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <!-- RtMidi's Windows backend (WinMM) needs this; harmless if vcpkg's own
+           auto-linking already covers it. -->
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="AccompanimentEngine.h" />
+    <ClInclude Include="AudioEngine.h" />
+    <ClInclude Include="AudioEngineApi.h" />
+    <ClInclude Include="Arranger.h" />
+    <ClInclude Include="Chord.h" />
+    <ClInclude Include="DrumSynth.h" />
+    <ClInclude Include="MidiInput.h" />
+    <ClInclude Include="MultiTrackSequencer.h" />
+    <ClInclude Include="Sequencer.h" />
+    <ClInclude Include="SoundFontHost.h" />
+    <ClInclude Include="Style.h" />
+    <ClInclude Include="Synth.h" />
+    <ClInclude Include="Voice.h" />
+    <ClInclude Include="VstHost.h" />
+    <ClInclude Include="WavWriter.h" />
+    <!-- Vendored TinySoundFont (single-header library, MIT license - see
+         thirdparty/tsf/LICENSE.txt). Only SoundFontHost.cpp compiles it
+         (with TSF_IMPLEMENTATION defined) - listed here just so it shows
+         up in Solution Explorer. -->
+    <ClInclude Include="thirdparty\tsf\tsf.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AccompanimentEngine.cpp" />
+    <ClCompile Include="AudioEngine.cpp" />
+    <ClCompile Include="AudioEngineApi.cpp" />
+    <ClCompile Include="Arranger.cpp" />
+    <ClCompile Include="DrumSynth.cpp" />
+    <ClCompile Include="MidiInput.cpp" />
+    <ClCompile Include="MultiTrackSequencer.cpp" />
+    <ClCompile Include="Sequencer.cpp" />
+    <ClCompile Include="SoundFontHost.cpp" />
+    <ClCompile Include="Style.cpp" />
+    <ClCompile Include="Synth.cpp" />
+    <ClCompile Include="Voice.cpp" />
+    <ClCompile Include="VstHost.cpp" />
+    <ClCompile Include="WavWriter.cpp" />
+    <!-- Defines the storage for every VST3 interface ID (see the comment
+         inside this file) - must be compiled exactly once. -->
+    <ClCompile Include="InterfaceIds.cpp" />
+    <!-- Vendored VST3 SDK hosting helpers (Steinberg's own code, used as-is -
+         see thirdparty/vst3sdk/LICENSE.txt). Only the pieces an instrument
+         host actually needs are included here. -->
+    <ClCompile Include="thirdparty\vst3sdk\pluginterfaces\base\funknown.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\module.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\module_win32.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\plugprovider.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\connectionproxy.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\eventlist.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\parameterchanges.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\processdata.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\hostclasses.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\hosting\pluginterfacesupport.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\vst\utility\stringconvert.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\common\commonstringconvert.cpp" />
+    <ClCompile Include="thirdparty\vst3sdk\public.sdk\source\common\threadchecker_win32.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

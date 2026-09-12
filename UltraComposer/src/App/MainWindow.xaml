@@ -1,0 +1,628 @@
+<Window x:Class="UltraComposer.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ultra Composer" Height="800" Width="860"
+        Loaded="Window_Loaded" Closing="Window_Closing">
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Menu Grid.Row="0" x:Name="MainMenu">
+            <MenuItem x:Name="FileMenuItem" Header="_Fajl">
+                <MenuItem x:Name="OpenProjectMenuItem" Header="_Otvori projekat..." Click="OpenProjectMenuItem_Click" />
+                <MenuItem x:Name="SaveProjectMenuItem" Header="_Sačuvaj projekat" Click="SaveProjectMenuItem_Click" />
+                <MenuItem x:Name="SaveProjectAsMenuItem" Header="Sačuvaj _kao..." Click="SaveProjectAsMenuItem_Click" />
+                <Separator />
+                <MenuItem x:Name="ExitMenuItem" Header="_Izlaz" Click="ExitMenuItem_Click" />
+            </MenuItem>
+            <MenuItem x:Name="ViewMenuItem" Header="_Prikaz">
+                <MenuItem x:Name="ShowInstrumentsMenuItem" Header="_Banka instrumenata" IsCheckable="True" IsChecked="True"
+                          Click="ShowInstrumentsMenuItem_Click" />
+                <MenuItem x:Name="ShowSequencerMenuItem" Header="_Sekvenser" IsCheckable="True"
+                          Click="ShowSequencerMenuItem_Click" />
+                <MenuItem x:Name="ShowArrangerMenuItem" Header="_Aranžer" IsCheckable="True"
+                          Click="ShowArrangerMenuItem_Click" />
+                <MenuItem x:Name="ShowMultiTrackMenuItem" Header="_Multi-trake i mikser" IsCheckable="True"
+                          Click="ShowMultiTrackMenuItem_Click" />
+                <MenuItem x:Name="ShowAccompanimentMenuItem" Header="_Auto-pratnja" IsCheckable="True"
+                          Click="ShowAccompanimentMenuItem_Click" />
+            </MenuItem>
+            <MenuItem x:Name="LanguageMenuItem" Header="_Jezik">
+                <MenuItem x:Name="LanguageSerbianMenuItem" Header="Srpski" IsCheckable="True"
+                          Click="LanguageSerbianMenuItem_Click" />
+                <MenuItem x:Name="LanguageEnglishMenuItem" Header="Engleski" IsCheckable="True" IsChecked="True"
+                          Click="LanguageEnglishMenuItem_Click" />
+            </MenuItem>
+            <MenuItem x:Name="HelpMenuItem" Header="_Pomoć">
+                <MenuItem x:Name="UserGuideMenuItem" Header="_Uputstvo za upotrebu" Click="UserGuideMenuItem_Click" />
+                <MenuItem x:Name="AboutMenuItem" Header="_O programu" Click="AboutMenuItem_Click" />
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Row="1" Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Ultra Composer" FontSize="20" FontWeight="Bold" Margin="0,0,0,8" />
+
+            <TextBlock x:Name="StatusText" Grid.Row="1"
+                       AutomationProperties.LiveSetting="Polite"
+                       Text="Motor za zvuk nije pokrenut."
+                       Margin="0,0,0,12" />
+
+            <!-- ==================== Banka instrumenata (MIDI + VST3 + SoundFont + auto-terca + klavijatura) ==================== -->
+            <StackPanel Grid.Row="2" x:Name="InstrumentsView">
+                <StackPanel Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="MidiLabelText" Text="MIDI uređaj:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="MidiPortComboBox" Width="220" VerticalAlignment="Center" />
+                        <Button x:Name="RefreshMidiButton" Content="Osveži uređaje" Margin="8,0,0,0"
+                                Click="RefreshMidiButton_Click" />
+                        <Button x:Name="ConnectMidiButton" Content="Poveži" Margin="8,0,0,0"
+                                Click="ConnectMidiButton_Click" IsEnabled="False" />
+                    </StackPanel>
+                    <TextBlock x:Name="MidiStatusText"
+                               AutomationProperties.LiveSetting="Polite"
+                               Margin="0,4,0,0"
+                               Text="Nijedan MIDI uredjaj nije pronadjen." />
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock x:Name="VstIntroText" TextWrapping="Wrap"
+                               Text="VST3 instrument (putanja do .vst3 fajla ili fascikle) - ukucaj/nalepi putanju, ili je pronađi dugmetom 'Pretraži':" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBox x:Name="VstPathTextBox" Width="320" />
+                        <Button x:Name="BrowseVstButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="BrowseVstButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button x:Name="LoadVstButton" Content="Učitaj instrument" Click="LoadVstButton_Click" />
+                        <Button x:Name="UnloadVstButton" Content="Isključi instrument" Margin="8,0,0,0"
+                                Click="UnloadVstButton_Click" IsEnabled="False" />
+                    </StackPanel>
+                    <TextBlock x:Name="VstStatusText"
+                               AutomationProperties.LiveSetting="Polite"
+                               Margin="0,4,0,0"
+                               Text="Nijedan VST3 instrument nije učitan - svira samo ugrađeni sintisajzer." />
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock x:Name="SfIntroText" TextWrapping="Wrap"
+                               Text="Zvučna banka (SoundFont, .sf2) - gotovi instrumenti kao u Cakewalk-u (klavir, žice, bubnjevi, gitara...). Podrazumevano je već upisana ugrađena banka koja radi odmah; ukucaj/nalepi drugu putanju, ili je pronađi dugmetom 'Pretraži', da učitaš neku svoju:" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBox x:Name="SoundFontPathTextBox" Width="320" />
+                        <Button x:Name="BrowseSoundFontButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="BrowseSoundFontButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button x:Name="LoadSoundFontButton" Content="Učitaj banku" Click="LoadSoundFontButton_Click" />
+                        <Button x:Name="UnloadSoundFontButton" Content="Isključi banku" Margin="8,0,0,0"
+                                Click="UnloadSoundFontButton_Click" IsEnabled="False" />
+                        <TextBlock x:Name="SfInstrumentLabelText" Text="Instrument:" VerticalAlignment="Center" Margin="16,0,4,0" />
+                        <ComboBox x:Name="SoundFontPresetComboBox" Width="220" VerticalAlignment="Center"
+                                  IsEnabled="False"
+                                  SelectionChanged="SoundFontPresetComboBox_SelectionChanged" />
+                    </StackPanel>
+                    <TextBlock x:Name="SoundFontStatusText"
+                               AutomationProperties.LiveSetting="Polite"
+                               Margin="0,4,0,0"
+                               Text="Nijedna SoundFont banka nije učitana - svira samo ugrađeni sintisajzer." />
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock x:Name="AutoThirdSectionTitleText"
+                               Text="Automatska terca (svaka odsvirana nota dobija automatski i drugi glas, tercu iznad ili ispod - radi svugde, i sa MIDI-jem i bez njega):"
+                               FontWeight="Bold" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <CheckBox x:Name="AutoThirdCheckBox" Content="Uključi automatsku tercu" VerticalAlignment="Center"
+                                  Click="AutoThirdCheckBox_Click" />
+                        <RadioButton x:Name="AutoThirdUpperRadio" Content="Gornja terca" GroupName="AutoThirdDirection"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" IsChecked="True"
+                                     Click="AutoThirdDirection_Click" />
+                        <RadioButton x:Name="AutoThirdLowerRadio" Content="Donja terca" GroupName="AutoThirdDirection"
+                                     VerticalAlignment="Center" Margin="8,0,0,0"
+                                     Click="AutoThirdDirection_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="AutoThirdScaleLabelText" Text="Skala (radi tačnu tercu iz cele skale, ne samo veliku):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <ComboBox x:Name="AutoThirdScaleRootComboBox" Width="70" VerticalAlignment="Center"
+                                  SelectionChanged="AutoThirdScale_Changed" />
+                        <RadioButton x:Name="AutoThirdScaleMajorRadio" Content="Dur" GroupName="AutoThirdScaleType"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" IsChecked="True"
+                                     Click="AutoThirdScale_Changed" />
+                        <RadioButton x:Name="AutoThirdScaleMinorRadio" Content="Mol" GroupName="AutoThirdScaleType"
+                                     VerticalAlignment="Center" Margin="8,0,0,0"
+                                     Click="AutoThirdScale_Changed" />
+                        <RadioButton x:Name="AutoThirdScaleHijazRadio" Content="Hidžaz" GroupName="AutoThirdScaleType"
+                                     VerticalAlignment="Center" Margin="8,0,0,0"
+                                     Click="AutoThirdScale_Changed" />
+                        <RadioButton x:Name="AutoThirdScaleHijazKarRadio" Content="Hidžaz kar" GroupName="AutoThirdScaleType"
+                                     VerticalAlignment="Center" Margin="8,0,0,0"
+                                     Click="AutoThirdScale_Changed" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border x:Name="PerformanceKeyboardBorder"
+                        Focusable="True"
+                        BorderBrush="Gray" BorderThickness="1" Padding="12"
+                        PreviewKeyDown="PerformanceKeyboard_PreviewKeyDown"
+                        PreviewKeyUp="PerformanceKeyboard_PreviewKeyUp"
+                        GotKeyboardFocus="PerformanceKeyboard_GotFocus"
+                        LostKeyboardFocus="PerformanceKeyboard_LostFocus">
+                    <StackPanel>
+                        <TextBlock x:Name="KeyboardIntroText" TextWrapping="Wrap"
+                                   Text="Fokusiraj ovo polje (Tab) da bi tasteri Z-M i Q-U svirali note. Page Up / Page Down menjaju oktavu. Strelica gore/dole menja instrument iz učitane SoundFont banke." />
+                        <TextBlock x:Name="OctaveText"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Margin="0,8,0,0" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Sekvenser ==================== -->
+            <StackPanel Grid.Row="2" x:Name="SequencerView" Visibility="Collapsed">
+                <TextBlock x:Name="SeqTitleText" Text="Sekvenser (spisak nota koje se automatski sviraju u petlji):" FontWeight="Bold" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="SeqNoteLabelText" Text="Nota ili akord (npr. c4, ili c4, e4, g4):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="NotePitchTextBox" Width="110" Text="c4" />
+                    <TextBlock x:Name="SeqStartLabelText" Text="Početak (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="NoteStartTextBox" Width="45" Text="0" />
+                    <TextBlock x:Name="SeqLengthLabelText" Text="Trajanje (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="NoteLengthTextBox" Width="45" Text="1" />
+                    <TextBlock x:Name="SeqVelocityLabelText" Text="Jačina (1-127):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="NoteVelocityTextBox" Width="45" Text="100" />
+                    <Button x:Name="AddNoteButton" Content="Dodaj notu/akord" Margin="8,0,0,0" Click="AddNoteButton_Click" />
+                    <Button x:Name="ListenForChordButton" Content="Slušaj akord" Margin="8,0,0,0" Click="ListenForChordButton_Click" />
+                    <Button x:Name="StopListenForChordButton" Content="Prestani da slušaš" Margin="8,0,0,0"
+                            Click="StopListenForChordButton_Click" IsEnabled="False" />
+                </StackPanel>
+
+                <ListView x:Name="NotesListView" Height="110" Margin="0,4,0,0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn x:Name="SeqColNote" Header="Nota" DisplayMemberBinding="{Binding PitchDisplay}" Width="110" />
+                            <GridViewColumn x:Name="SeqColStart" Header="Početak (otkucaji)" DisplayMemberBinding="{Binding StartBeat}" Width="120" />
+                            <GridViewColumn x:Name="SeqColLength" Header="Trajanje (otkucaji)" DisplayMemberBinding="{Binding LengthBeats}" Width="120" />
+                            <GridViewColumn x:Name="SeqColVelocity" Header="Jačina" DisplayMemberBinding="{Binding Velocity}" Width="60" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="RemoveNoteButton" Content="Ukloni izabranu notu" Click="RemoveNoteButton_Click" />
+                    <Button x:Name="ClearNotesButton" Content="Obriši sve note" Margin="8,0,0,0" Click="ClearNotesButton_Click" />
+                    <TextBlock x:Name="SeqTempoLabelText" Text="Tempo (BPM):" VerticalAlignment="Center" Margin="16,0,4,0" />
+                    <TextBox x:Name="TempoTextBox" Width="45" Text="120" />
+                    <TextBlock x:Name="SeqLoopLabelText" Text="Dužina petlje (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="LoopLengthTextBox" Width="45" Text="16" />
+                    <Button x:Name="PlaySequencerButton" Content="Sviraj" Margin="16,0,0,0" Click="PlaySequencerButton_Click" />
+                    <Button x:Name="StopSequencerButton" Content="Zaustavi" Margin="8,0,0,0"
+                            Click="StopSequencerButton_Click" IsEnabled="False" />
+                </StackPanel>
+
+                <TextBlock x:Name="SequencerStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,4,0,0"
+                           Text="Sekvenser je prazan - dodaj bar jednu notu." />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <CheckBox x:Name="PianoRollToggleCheckBox" Content="Prikaži piano roll (vizuelni prikaz, dodatak spisku)"
+                              Click="PianoRollToggleCheckBox_Click" />
+                </StackPanel>
+                <StackPanel x:Name="PianoRollPanel" Visibility="Collapsed" Margin="0,4,0,0">
+                    <TextBlock x:Name="PianoRollInstructionsText" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <ScrollViewer Height="260" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                  BorderBrush="Gray" BorderThickness="1">
+                        <Canvas x:Name="PianoRollCanvas" Background="White" Width="1920" Height="840"
+                                MouseLeftButtonDown="PianoRollCanvas_MouseLeftButtonDown"
+                                MouseRightButtonDown="PianoRollCanvas_MouseRightButtonDown" />
+                    </ScrollViewer>
+                </StackPanel>
+
+                <TextBlock x:Name="SeqTipText" Margin="0,12,0,0" TextWrapping="Wrap"
+                           Text="Savet: kad sekvenser ima notu ili akord kakav želiš, pređi na Aranžer (meni Prikaz) i sačuvaj ovaj spisak kao obrazac." />
+            </StackPanel>
+
+            <!-- ==================== Aranžer ==================== -->
+            <StackPanel Grid.Row="2" x:Name="ArrangerView" Visibility="Collapsed">
+                <TextBlock x:Name="ArrTitleText"
+                           Text="Aranžer (poređaj sačuvane obrasce jedan za drugim, npr. kitica, kitica, refren, kitica):"
+                           FontWeight="Bold" TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock x:Name="ArrNameLabelText" Text="Ime obrasca:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="ArrangerPatternNameTextBox" Width="160" />
+                    <Button x:Name="SavePatternButton" Content="Sačuvaj trenutni sekvenser kao obrazac" Margin="8,0,0,0"
+                            Click="SavePatternButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="ArrSaveExplainText" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Ovo uzima spisak nota i dužinu petlje koji trenutno stoje u Sekvenseru (meni Prikaz) i čuva ih ovde pod izabranim imenom, kao poseban obrazac. Sekvenser posle toga ostaje nezavisan - promene u njemu ne menjaju već sačuvani obrazac." />
+
+                <TextBlock x:Name="ArrPatternsLabelText" Text="Sačuvani obrasci:" FontWeight="Bold" Margin="0,12,0,0" />
+                <ListBox x:Name="ArrangerPatternsListBox" Height="90" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="AppendPatternToOrderButton" Content="Dodaj u redosled" Click="AppendPatternToOrderButton_Click" />
+                    <Button x:Name="RemovePatternButton" Content="Ukloni izabrani obrazac" Margin="8,0,0,0"
+                            Click="RemovePatternButton_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="ArrOrderLabelText" Text="Redosled sviranja:" FontWeight="Bold" Margin="0,12,0,0" />
+                <ListBox x:Name="ArrangerOrderListBox" Height="90" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="RemoveLastFromOrderButton" Content="Ukloni poslednji iz redosleda" Click="RemoveLastFromOrderButton_Click" />
+                    <Button x:Name="ClearOrderButton" Content="Obriši ceo redosled" Margin="8,0,0,0" Click="ClearOrderButton_Click" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock x:Name="ArrTempoLabelText" Text="Tempo (BPM):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="ArrangerTempoTextBox" Width="45" Text="120" />
+                    <Button x:Name="PlayArrangerButton" Content="Sviraj aranžman" Margin="16,0,0,0" Click="PlayArrangerButton_Click" />
+                    <Button x:Name="StopArrangerButton" Content="Zaustavi" Margin="8,0,0,0"
+                            Click="StopArrangerButton_Click" IsEnabled="False" />
+                </StackPanel>
+
+                <TextBlock x:Name="ArrangerStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,8,0,0"
+                           Text="Aranžer je prazan - sačuvaj bar jedan obrazac i dodaj ga u redosled." />
+            </StackPanel>
+
+            <!-- ==================== Multi-trake i mikser ==================== -->
+            <StackPanel Grid.Row="2" x:Name="MultiTrackView" Visibility="Collapsed">
+                <TextBlock x:Name="MixTitleText" FontWeight="Bold" TextWrapping="Wrap"
+                           Text="Multi-trake i mikser (više traka odjednom, svaka sa svojim instrumentom, jačinom i pan-om):" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock x:Name="MixNewTrackNameLabelText" Text="Ime nove trake:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="NewTrackNameTextBox" Width="160" />
+                    <Button x:Name="AddTrackButton" Content="Dodaj traku" Margin="8,0,0,0" Click="AddTrackButton_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="MixTracksLabelText" Text="Trake:" FontWeight="Bold" Margin="0,12,0,0" />
+                <ListBox x:Name="MixTracksListBox" Height="90" Margin="0,4,0,0"
+                         SelectionChanged="MixTracksListBox_SelectionChanged" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="RemoveTrackButton" Content="Ukloni izabranu traku" Click="RemoveTrackButton_Click" />
+                </StackPanel>
+
+                <StackPanel x:Name="MixTrackDetailPanel" IsEnabled="False" Margin="0,12,0,0">
+                    <TextBlock x:Name="MixSelectedTrackTitleText" Text="Izabrana traka:" FontWeight="Bold" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="MixRenameLabelText" Text="Ime:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TrackNameTextBox" Width="160" />
+                        <Button x:Name="RenameTrackButton" Content="Preimenuj" Margin="8,0,0,0" Click="RenameTrackButton_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock x:Name="MixInstrumentModeLabelText" Text="Instrument:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <RadioButton x:Name="TrackSynthRadio" Content="Ugrađeni sintisajzer" GroupName="TrackInstrumentMode"
+                                     VerticalAlignment="Center" IsChecked="True" Click="TrackInstrumentMode_Click" />
+                        <RadioButton x:Name="TrackSoundFontRadio" Content="SoundFont banka (posebna za ovu traku)" GroupName="TrackInstrumentMode"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" Click="TrackInstrumentMode_Click" />
+                        <RadioButton x:Name="TrackVstRadio" Content="VST3 (poseban za ovu traku)" GroupName="TrackInstrumentMode"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" Click="TrackInstrumentMode_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="MixSfPathLabelText" Text="Putanja do .sf2:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TrackSoundFontPathTextBox" Width="260" />
+                        <Button x:Name="BrowseTrackSoundFontButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="BrowseTrackSoundFontButton_Click" />
+                        <Button x:Name="LoadTrackSoundFontButton" Content="Učitaj banku za ovu traku" Margin="8,0,0,0"
+                                Click="LoadTrackSoundFontButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="MixPresetLabelText" Text="Instrument u banci:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <ComboBox x:Name="TrackSoundFontPresetComboBox" Width="220" VerticalAlignment="Center"
+                                  IsEnabled="False" SelectionChanged="TrackSoundFontPresetComboBox_SelectionChanged" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="MixVstPathLabelText" Text="Putanja do .vst3:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TrackVstPathTextBox" Width="260" />
+                        <Button x:Name="BrowseTrackVstButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="BrowseTrackVstButton_Click" />
+                        <Button x:Name="LoadTrackVstButton" Content="Učitaj VST za ovu traku" Margin="8,0,0,0"
+                                Click="LoadTrackVstButton_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock x:Name="MixVolumeLabelText" Text="Jačina (0 - 1.5):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TrackVolumeTextBox" Width="50" Text="1.0" />
+                        <TextBlock x:Name="MixPanLabelText" Text="Pan (-1 levo .. 1 desno):" VerticalAlignment="Center" Margin="16,0,4,0" />
+                        <TextBox x:Name="TrackPanTextBox" Width="50" Text="0" />
+                        <Button x:Name="ApplyVolumePanButton" Content="Primeni jačinu i pan" Margin="8,0,0,0"
+                                Click="ApplyVolumePanButton_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <CheckBox x:Name="TrackMuteCheckBox" Content="Isključi zvuk (mute)" Click="TrackMuteCheckBox_Click" />
+                        <CheckBox x:Name="TrackSoloCheckBox" Content="Solo (samo ova traka)" Margin="16,0,0,0"
+                                  Click="TrackSoloCheckBox_Click" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="MixNotesTitleText" Text="Note ove trake:" FontWeight="Bold" Margin="0,12,0,0" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="MixTrackNoteLabelText" Text="Nota ili akord (npr. c4, ili c4, e4, g4):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TrackNotePitchTextBox" Width="110" Text="c4" />
+                        <TextBlock x:Name="MixTrackStartLabelText" Text="Početak (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <TextBox x:Name="TrackNoteStartTextBox" Width="45" Text="0" />
+                        <TextBlock x:Name="MixTrackLengthLabelText" Text="Trajanje (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <TextBox x:Name="TrackNoteLengthTextBox" Width="45" Text="1" />
+                        <TextBlock x:Name="MixTrackVelocityLabelText" Text="Jačina (1-127):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <TextBox x:Name="TrackNoteVelocityTextBox" Width="45" Text="100" />
+                        <Button x:Name="AddTrackNoteButton" Content="Dodaj notu/akord" Margin="8,0,0,0" Click="AddTrackNoteButton_Click" />
+                        <Button x:Name="TrackListenForChordButton" Content="Slušaj akord" Margin="8,0,0,0" Click="TrackListenForChordButton_Click" />
+                        <Button x:Name="TrackStopListenForChordButton" Content="Prestani da slušaš" Margin="8,0,0,0"
+                                Click="TrackStopListenForChordButton_Click" IsEnabled="False" />
+                    </StackPanel>
+
+                    <ListView x:Name="TrackNotesListView" Height="110" Margin="0,4,0,0">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn x:Name="TrackSeqColNote" Header="Nota" DisplayMemberBinding="{Binding PitchDisplay}" Width="110" />
+                                <GridViewColumn x:Name="TrackSeqColStart" Header="Početak (otkucaji)" DisplayMemberBinding="{Binding StartBeat}" Width="120" />
+                                <GridViewColumn x:Name="TrackSeqColLength" Header="Trajanje (otkucaji)" DisplayMemberBinding="{Binding LengthBeats}" Width="120" />
+                                <GridViewColumn x:Name="TrackSeqColVelocity" Header="Jačina" DisplayMemberBinding="{Binding Velocity}" Width="60" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button x:Name="RemoveTrackNoteButton" Content="Ukloni izabranu notu" Click="RemoveTrackNoteButton_Click" />
+                        <Button x:Name="ClearTrackNotesButton" Content="Obriši sve note" Margin="8,0,0,0" Click="ClearTrackNotesButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock x:Name="MixStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,12,0,0" TextWrapping="Wrap"
+                           Text="Nema nijedne trake - dodaj bar jednu." />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock x:Name="MixTempoLabelText" Text="Tempo (BPM):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="MixTempoTextBox" Width="45" Text="120" />
+                    <TextBlock x:Name="MixLoopLabelText" Text="Dužina petlje (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="MixLoopLengthTextBox" Width="45" Text="16" />
+                    <Button x:Name="PlayMultiTrackButton" Content="Sviraj sve trake" Margin="16,0,0,0" Click="PlayMultiTrackButton_Click" />
+                    <Button x:Name="StopMultiTrackButton" Content="Zaustavi" Margin="8,0,0,0"
+                            Click="StopMultiTrackButton_Click" IsEnabled="False" />
+                </StackPanel>
+
+                <TextBlock x:Name="MixExportTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
+                           Text="Izvoz u WAV fajl (za dalje miksovanje, npr. u Ultra Audio Editoru):" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="MixExportDurationLabelText" Text="Trajanje izvoza (sekunde):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="ExportDurationTextBox" Width="60" Text="8" />
+                    <Button x:Name="ExportWavButton" Content="Izvezi kao WAV..." Margin="8,0,0,0" Click="ExportWavButton_Click" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ==================== Auto-pratnja (ritam, bas, kontra, harmonija) ==================== -->
+            <StackPanel Grid.Row="2" x:Name="AccompanimentView" Visibility="Collapsed">
+                <TextBlock x:Name="AccTitleText" FontWeight="Bold" TextWrapping="Wrap"
+                           Text="Auto-pratnja (izaberi ritam i on sam svira bubnjeve, bas, kontru i harmoniju, prateći akord koji sviraš):" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock x:Name="AccStyleLabelText" Text="Ritam:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccStyleComboBox" Width="160" VerticalAlignment="Center"
+                              SelectionChanged="AccStyleComboBox_SelectionChanged" />
+                </StackPanel>
+
+                <TextBlock x:Name="AccLayersLabelText" Text="Slojevi:" FontWeight="Bold" Margin="0,12,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <CheckBox x:Name="AccDrumsCheckBox" Content="Bubnjevi" IsChecked="True" Click="AccLayerCheckBox_Click" />
+                    <CheckBox x:Name="AccBassCheckBox" Content="Bas" IsChecked="True" Margin="16,0,0,0" Click="AccLayerCheckBox_Click" />
+                    <CheckBox x:Name="AccKontraCheckBox" Content="Kontra" IsChecked="True" Margin="16,0,0,0" Click="AccLayerCheckBox_Click" />
+                    <CheckBox x:Name="AccHarmonijaCheckBox" Content="Harmonija" IsChecked="True" Margin="16,0,0,0" Click="AccLayerCheckBox_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="AccChordInputLabelText" Text="Unos akorda:" FontWeight="Bold" Margin="0,12,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <RadioButton x:Name="AccChordAutoRadio" Content="Automatski (sviraj akord levom rukom)" GroupName="AccChordInputMode"
+                                 VerticalAlignment="Center" IsChecked="True" Click="AccChordInputMode_Click" />
+                    <RadioButton x:Name="AccChordManualRadio" Content="Ručno (biram akord)" GroupName="AccChordInputMode"
+                                 VerticalAlignment="Center" Margin="16,0,0,0" Click="AccChordInputMode_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccSplitLabelText" Text="Granica podele (nota, npr. c4):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="AccSplitPointTextBox" Width="70" Text="c4" />
+                    <Button x:Name="ApplySplitPointButton" Content="Primeni" Margin="8,0,0,0" Click="ApplySplitPointButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="AccSplitExplainText" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="U automatskom režimu, note ispod granice podele sviraju akord za pratnju umesto da se čuju kao obična nota - sviraj ih levom rukom, kao na klavijaturama." />
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock x:Name="AccManualRootLabelText" Text="Osnovni ton:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccManualRootComboBox" Width="70" VerticalAlignment="Center" />
+                    <TextBlock x:Name="AccManualQualityLabelText" Text="Vrsta akorda:" VerticalAlignment="Center" Margin="16,0,4,0" />
+                    <ComboBox x:Name="AccManualQualityComboBox" Width="110" VerticalAlignment="Center" />
+                    <Button x:Name="ApplyManualChordButton" Content="Primeni akord" Margin="8,0,0,0" Click="ApplyManualChordButton_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="AccCurrentChordText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,8,0,0" FontWeight="Bold"
+                           Text="Trenutni akord: C dur" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock x:Name="AccTempoLabelText" Text="Tempo (BPM):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="AccTempoTextBox" Width="45" Text="100" />
+                    <Button x:Name="ApplyAccTempoButton" Content="Primeni tempo" Margin="8,0,0,0" Click="ApplyAccTempoButton_Click" />
+                    <Button x:Name="PlayAccompanimentButton" Content="Sviraj pratnju" Margin="16,0,0,0" Click="PlayAccompanimentButton_Click" />
+                    <Button x:Name="StopAccompanimentButton" Content="Zaustavi" Margin="8,0,0,0"
+                            Click="StopAccompanimentButton_Click" IsEnabled="False" />
+                </StackPanel>
+
+                <TextBlock x:Name="AccStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,8,0,0" TextWrapping="Wrap"
+                           Text="Pratnja nije pokrenuta." />
+
+                <TextBlock x:Name="AccTipText" Margin="0,12,0,0" TextWrapping="Wrap"
+                           Text="Savet: pusti pratnju, pa sviraj melodiju desnom rukom (ili iznad granice podele) - radi i sa MIDI tastaturom i sa računarskom tastaturom." />
+
+                <TextBlock x:Name="AccInstrumentsTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
+                           Text="Instrumenti pratnje (iz zvučne banke, umesto ugrađenog sintisajzera):" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccInstrumentLayerLabelText" Text="Sloj:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccInstrumentLayerComboBox" Width="140" VerticalAlignment="Center"
+                              SelectionChanged="AccInstrumentLayerComboBox_SelectionChanged" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <RadioButton x:Name="AccLayerSynthRadio" Content="Ugrađeni sintisajzer" GroupName="AccLayerInstrumentMode"
+                                 VerticalAlignment="Center" IsChecked="True" Click="AccLayerInstrumentMode_Click" />
+                    <RadioButton x:Name="AccLayerSoundFontRadio" Content="Zvučna banka (posebna za ovaj sloj)" GroupName="AccLayerInstrumentMode"
+                                 VerticalAlignment="Center" Margin="16,0,0,0" Click="AccLayerInstrumentMode_Click" />
+                    <RadioButton x:Name="AccLayerVstRadio" Content="VST3 (poseban za ovaj sloj)" GroupName="AccLayerInstrumentMode"
+                                 VerticalAlignment="Center" Margin="16,0,0,0" Click="AccLayerInstrumentMode_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccLayerSfPathLabelText" Text="Putanja do .sf2:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="AccLayerSoundFontPathTextBox" Width="260" />
+                    <Button x:Name="AccBrowseLayerSoundFontButton" Content="Pretraži..." Margin="8,0,0,0"
+                            Click="AccBrowseLayerSoundFontButton_Click" />
+                    <Button x:Name="AccLoadLayerSoundFontButton" Content="Učitaj banku za ovaj sloj" Margin="8,0,0,0"
+                            Click="AccLoadLayerSoundFontButton_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccLayerPresetLabelText" Text="Instrument u banci:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccLayerSoundFontPresetComboBox" Width="220" VerticalAlignment="Center"
+                              IsEnabled="False" SelectionChanged="AccLayerSoundFontPresetComboBox_SelectionChanged" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccLayerVstPathLabelText" Text="Putanja do .vst3:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="AccLayerVstPathTextBox" Width="260" />
+                    <Button x:Name="AccBrowseLayerVstButton" Content="Pretraži..." Margin="8,0,0,0"
+                            Click="AccBrowseLayerVstButton_Click" />
+                    <Button x:Name="AccLoadLayerVstButton" Content="Učitaj VST za ovaj sloj" Margin="8,0,0,0"
+                            Click="AccLoadLayerVstButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="AccLayerInstrumentStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Bas: svira ugrađeni sintisajzer." />
+
+                <TextBlock x:Name="AccChordVoicingTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
+                           Text="Gustina akorda (kontra i harmonija):" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccChordVoicingLabelText" Text="Broj tonova u akordu:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccChordVoicingComboBox" Width="220" VerticalAlignment="Center"
+                              SelectionChanged="AccChordVoicingComboBox_SelectionChanged" />
+                </StackPanel>
+                <TextBlock x:Name="AccChordVoicingExplainText" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Kako je ritam napisao (podrazumevano) svira onoliko tonova koliko je ritam predvideo za svaki akord; trozvuk uvek svira samo osnovni ton, tercu i kvintu; četvorozvuk uvek dodaje i sedmi ton. Ne utiče na bas." />
+
+                <TextBlock x:Name="CustomRhythmTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
+                           Text="Sopstveni ritam (napravi svoj takt od bubnjeva, basa, kontre i harmonije, pa dodaj još taktova kao varijacije):" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="CustomRhythmLengthLabelText" Text="Dužina ovog takta (otkucaji):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="CustomRhythmLengthTextBox" Width="45" Text="4" />
+                </StackPanel>
+
+                <TextBlock x:Name="CustomRhythmDrumTitleText" FontWeight="Bold" Margin="0,8,0,0" Text="Bubnjevi u ovom taktu:" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="CustomRhythmDrumVoiceLabelText" Text="Zvuk:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="CustomRhythmDrumVoiceComboBox" Width="110" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CustomRhythmDrumBeatLabelText" Text="Otkucaj:" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="CustomRhythmDrumBeatTextBox" Width="45" Text="0" />
+                    <TextBlock x:Name="CustomRhythmDrumVelocityLabelText" Text="Jačina (1-127):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="CustomRhythmDrumVelocityTextBox" Width="45" Text="100" />
+                    <Button x:Name="AddCustomRhythmDrumHitButton" Content="Dodaj udarac" Margin="8,0,0,0" Click="AddCustomRhythmDrumHitButton_Click" />
+                </StackPanel>
+                <ListView x:Name="CustomRhythmDrumListView" Height="90" Margin="0,4,0,0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn x:Name="CrColDrumVoice" Header="Zvuk" DisplayMemberBinding="{Binding VoiceDisplay}" Width="110" />
+                            <GridViewColumn x:Name="CrColDrumBeat" Header="Otkucaj" DisplayMemberBinding="{Binding StartBeat}" Width="90" />
+                            <GridViewColumn x:Name="CrColDrumVelocity" Header="Jačina" DisplayMemberBinding="{Binding Velocity}" Width="60" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="RemoveCustomRhythmDrumHitButton" Content="Ukloni izabrani udarac" Click="RemoveCustomRhythmDrumHitButton_Click" />
+                    <Button x:Name="ClearCustomRhythmDrumHitsButton" Content="Obriši sve udarce" Margin="8,0,0,0" Click="ClearCustomRhythmDrumHitsButton_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="CustomRhythmMelodicTitleText" FontWeight="Bold" Margin="0,12,0,0" Text="Bas, kontra i harmonija u ovom taktu:" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="CustomRhythmLayerLabelText" Text="Sloj:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="CustomRhythmLayerComboBox" Width="100" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CustomRhythmMelodicBeatLabelText" Text="Početak (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="CustomRhythmMelodicBeatTextBox" Width="45" Text="0" />
+                    <TextBlock x:Name="CustomRhythmMelodicLengthLabelText" Text="Trajanje (otkucaji):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="CustomRhythmMelodicLengthTextBox" Width="45" Text="1" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="CustomRhythmTonesLabelText" Text="Tonovi akorda:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <CheckBox x:Name="CustomRhythmRootCheckBox" Content="Osnovni ton" IsChecked="True" />
+                    <CheckBox x:Name="CustomRhythmThirdCheckBox" Content="Terca" IsChecked="True" Margin="8,0,0,0" />
+                    <CheckBox x:Name="CustomRhythmFifthCheckBox" Content="Kvinta" IsChecked="True" Margin="8,0,0,0" />
+                    <CheckBox x:Name="CustomRhythmSeventhCheckBox" Content="Septima" Margin="8,0,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="CustomRhythmOctaveLabelText" Text="Oktava (relativno):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="CustomRhythmOctaveTextBox" Width="35" Text="0" />
+                    <TextBlock x:Name="CustomRhythmMelodicVelocityLabelText" Text="Jačina (1-127):" VerticalAlignment="Center" Margin="8,0,4,0" />
+                    <TextBox x:Name="CustomRhythmMelodicVelocityTextBox" Width="45" Text="90" />
+                    <Button x:Name="AddCustomRhythmMelodicHitButton" Content="Dodaj" Margin="8,0,0,0" Click="AddCustomRhythmMelodicHitButton_Click" />
+                </StackPanel>
+                <ListView x:Name="CustomRhythmMelodicListView" Height="90" Margin="0,4,0,0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn x:Name="CrColLayer" Header="Sloj" DisplayMemberBinding="{Binding LayerDisplay}" Width="90" />
+                            <GridViewColumn x:Name="CrColMelodicBeat" Header="Početak" DisplayMemberBinding="{Binding StartBeat}" Width="70" />
+                            <GridViewColumn x:Name="CrColMelodicLength" Header="Trajanje" DisplayMemberBinding="{Binding LengthBeats}" Width="70" />
+                            <GridViewColumn x:Name="CrColTones" Header="Tonovi" DisplayMemberBinding="{Binding TonesDisplay}" Width="140" />
+                            <GridViewColumn x:Name="CrColMelodicVelocity" Header="Jačina" DisplayMemberBinding="{Binding Velocity}" Width="60" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="RemoveCustomRhythmMelodicHitButton" Content="Ukloni izabrano" Click="RemoveCustomRhythmMelodicHitButton_Click" />
+                    <Button x:Name="ClearCustomRhythmMelodicHitsButton" Content="Obriši sve" Margin="8,0,0,0" Click="ClearCustomRhythmMelodicHitsButton_Click" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <Button x:Name="AddCustomRhythmBarButton" Content="Dodaj kao novi takt" Click="AddCustomRhythmBarButton_Click" />
+                    <Button x:Name="RemoveLastCustomRhythmBarButton" Content="Ukloni poslednji takt" Margin="8,0,0,0" Click="RemoveLastCustomRhythmBarButton_Click" />
+                    <Button x:Name="ClearCustomRhythmBarsButton" Content="Obriši sve taktove" Margin="8,0,0,0" Click="ClearCustomRhythmBarsButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="CustomRhythmBarsStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Ovaj ritam još nema nijedan takt." />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock x:Name="CustomRhythmNameLabelText" Text="Naziv ritma:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="CustomRhythmNameTextBox" Width="140" Text="Moj ritam" />
+                    <Button x:Name="UseCustomRhythmButton" Content="Sačuvaj ritam" Margin="8,0,0,0" Click="UseCustomRhythmButton_Click" />
+                    <Button x:Name="NewCustomRhythmButton" Content="Novi ritam" Margin="8,0,0,0" Click="NewCustomRhythmButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="CustomRhythmStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,8,0,0" TextWrapping="Wrap" />
+
+                <TextBlock x:Name="CustomRhythmSavedTitleText" FontWeight="Bold" Margin="0,16,0,0"
+                           Text="Sačuvani sopstveni ritmovi:" />
+                <ListBox x:Name="SavedCustomRhythmsListBox" Height="80" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button x:Name="EditSavedCustomRhythmButton" Content="Uredi izabrani" Click="EditSavedCustomRhythmButton_Click" />
+                    <Button x:Name="RemoveSavedCustomRhythmButton" Content="Ukloni izabrani ritam" Margin="8,0,0,0" Click="RemoveSavedCustomRhythmButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="CustomRhythmSavedStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,4,0,0" TextWrapping="Wrap" />
+
+                <TextBlock x:Name="CustomRhythmTipText" Margin="0,8,0,0" TextWrapping="Wrap"
+                           Text="Savet: napravi prvi takt, dodaj mu bubnjeve i note, pa „Dodaj kao novi takt”. Ako hoćeš varijaciju, napravi još jedan takt na isti način - svi taktovi će se odsvirati redom, u petlji." />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,57 @@
+<Window x:Class="UltraComposer.App.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="User Guide" Height="620" Width="880"
+        Loaded="Window_Loaded">
+    <!-- Plain master/detail layout, same spirit as the rest of the app: a
+         Tab-reachable list of topics on the left, and a read-only text box
+         on the right showing whichever topic is selected. Deliberately a
+         TextBox (not a TextBlock live region) for the body - this is meant
+         to be read at leisure with normal JAWS reading commands once you
+         Tab into it, not announced all at once as a status update. The
+         short topic title above it IS a live region, so arrowing through
+         the topic list alone still gives a lightweight spoken confirmation
+         of which topic is now selected. -->
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock x:Name="WindowTitleText" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                   Text="User Guide" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
+            <TextBlock x:Name="TopicsLabelText" Text="Topics:" Margin="0,0,0,4" />
+            <ListBox x:Name="TopicsListBox"
+                     AutomationProperties.Name="Topics"
+                     SelectionChanged="TopicsListBox_SelectionChanged"
+                     DisplayMemberPath="Title" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="TopicTitleText" Grid.Row="0" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"
+                       AutomationProperties.LiveSetting="Polite" />
+
+            <TextBox x:Name="TopicBodyTextBox" Grid.Row="1"
+                     IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                     TextWrapping="Wrap" AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                     FontSize="13" />
+        </Grid>
+
+        <Button x:Name="CloseButton" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                Content="_Close" HorizontalAlignment="Right" Margin="0,12,0,0" Padding="16,4"
+                Click="CloseButton_Click" />
+    </Grid>
+</Window>

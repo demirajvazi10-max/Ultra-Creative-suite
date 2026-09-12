@@ -1,0 +1,89 @@
+name: Ultra Composer Release
+
+# Mirrors the audio-v*/video-v* release workflows already used elsewhere in
+# this monorepo: push a tag matching "composer-v*" (e.g. composer-v1.0.0)
+# and this builds the solution, packages it with Inno Setup, and attaches
+# the installer to a GitHub Release. "workflow_dispatch" is included too,
+# so a build can also be triggered by hand from the Actions tab without
+# pushing a tag - handy the first few times, while this is still new.
+
+on:
+  push:
+    tags:
+      - "composer-v*"
+  workflow_dispatch: {}
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Derive version number from the tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '^composer-v(.+)$') {
+            $version = $Matches[1]
+          } else {
+            # workflow_dispatch with no tag - use a clearly-marked dev version
+            # rather than failing, so a manual test build still works.
+            $version = "0.0.0-dev"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          # A SemVer prerelease suffix (e.g. "1.0.0-beta.1") marks this as a
+          # beta - the GitHub Release gets flagged "Pre-release" accordingly,
+          # so it doesn't show up as the latest/stable release until the
+          # suffix is dropped for the actual 1.0.0.
+          $isPrerelease = $version -match '-'
+          "prerelease=$($isPrerelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore UltraComposer/UltraComposer.sln
+
+      # windows-latest's runner image ships vcpkg preinstalled with MSBuild
+      # integration already active (this is what VcpkgEnableManifest/
+      # VcpkgTriplet in UltraComposer.AudioEngine.vcxproj rely on) - so no
+      # separate "vcpkg integrate install" step should be needed here, the
+      # same way it's only a one-time step on a dev machine. If this build
+      # ever fails on the native AudioEngine project with PortAudio/RtMidi
+      # headers not found, that assumption is the first thing to check.
+      - name: Build solution (Release|x64)
+        run: msbuild UltraComposer/UltraComposer.sln /p:Configuration=Release /p:Platform=x64 /p:Version=${{ steps.version.outputs.version }} /m
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "UltraComposer\installer\UltraComposer.iss" `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}"
+
+      - name: Upload installer as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltraComposer-Setup-${{ steps.version.outputs.version }}
+          path: UltraComposer/installer/Output/*.exe
+
+      # Only creates an actual GitHub Release on a real tag push - a
+      # workflow_dispatch test build stops at the artifact above instead of
+      # publishing anything public.
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/composer-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Ultra Composer ${{ steps.version.outputs.version }}"
+          files: UltraComposer/installer/Output/*.exe
+          prerelease: ${{ steps.version.outputs.prerelease }}
