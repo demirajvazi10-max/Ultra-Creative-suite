@@ -8,6 +8,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UltraComposer.Interop", "src\Interop\UltraComposer.Interop.csproj", "{A1B2C3D4-0002-4000-8000-000000000002}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UltraComposer.App", "src\App\UltraComposer.App.csproj", "{A1B2C3D4-0003-4000-8000-000000000003}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A1B2C3D4-0001-4000-8000-000000000001} = {A1B2C3D4-0001-4000-8000-000000000001}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,8 +33,5 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ProjectDependencies) = postSolution
-		{A1B2C3D4-0003-4000-8000-000000000003}.0 = {A1B2C3D4-0001-4000-8000-000000000001}
 	EndGlobalSection
 EndGlobal
