@@ -75,7 +75,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; of UltraComposer/, not inside it - see the header comment above), so the
 ; App project's build output needs the "UltraComposer\" prefix here too,
 ; same as the GettingStarted.txt line below already has it right.
-Source: "..\UltraComposer\src\App\bin\x64\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; No "x64\" segment here: the .sln maps the solution's Release|x64 to this
+; (managed, SDK-style) project's own Release|Any CPU configuration, and an
+; SDK-style csproj built as AnyCPU does not get a platform folder in its
+; output path - it's just bin\Release\<TargetFramework>\, confirmed by the
+; real CI log ("No files found matching ...\bin\x64\Release\...").
+Source: "..\UltraComposer\src\App\bin\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; Bilingual (English then Serbian) "what is this, how do I start, where's
 ; the full guide" one-pager - installed alongside the app and offered on the
 ; Finished page below, same "instructions.txt with a checkbox" idea common
