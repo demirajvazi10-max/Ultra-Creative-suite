@@ -51,13 +51,25 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore UltraComposer/UltraComposer.sln
 
-      # windows-latest's runner image ships vcpkg preinstalled with MSBuild
-      # integration already active (this is what VcpkgEnableManifest/
-      # VcpkgTriplet in UltraComposer.AudioEngine.vcxproj rely on) - so no
-      # separate "vcpkg integrate install" step should be needed here, the
-      # same way it's only a one-time step on a dev machine. If this build
-      # ever fails on the native AudioEngine project with PortAudio/RtMidi
-      # headers not found, that assumption is the first thing to check.
+      # windows-latest DOES ship vcpkg preinstalled (at $env:VCPKG_INSTALLATION_ROOT),
+      # but - this was the wrong assumption that broke the first real CI run -
+      # the runner image does NOT run "vcpkg integrate install" for you. Without
+      # that one-time step, VcpkgEnableManifest/VcpkgTriplet in
+      # UltraComposer.AudioEngine.vcxproj have nothing to hook into, MSBuild never
+      # invokes vcpkg's manifest install at all, and the build fails with
+      # "Cannot open include file: 'portaudio.h'" / "'rtmidi/RtMidi.h'" - exactly
+      # what happened. "git pull" + re-bootstrap first keeps the preinstalled
+      # vcpkg's port catalogue new enough to actually contain the commit pinned
+      # as builtin-baseline in vcpkg.json (an older preinstalled copy can predate
+      # that commit and fail with a "baseline" error instead).
+      - name: Update and integrate vcpkg with MSBuild
+        shell: pwsh
+        run: |
+          cd "$env:VCPKG_INSTALLATION_ROOT"
+          git pull
+          .\bootstrap-vcpkg.bat
+          .\vcpkg integrate install
+
       - name: Build solution (Release|x64)
         run: msbuild UltraComposer/UltraComposer.sln /p:Configuration=Release /p:Platform=x64 /p:Version=${{ steps.version.outputs.version }} /m
 
