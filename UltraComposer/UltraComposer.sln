@@ -32,6 +32,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectDependencies) = postSolution
-		{A1B2C3D4-0003-4000-8000-000000000003} = {A1B2C3D4-0001-4000-8000-000000000001}
+		{A1B2C3D4-0003-4000-8000-000000000003}.0 = {A1B2C3D4-0001-4000-8000-000000000001}
 	EndGlobalSection
 EndGlobal
