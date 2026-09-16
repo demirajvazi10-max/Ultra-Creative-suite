@@ -91,4 +91,8 @@ Built around a single, linearly navigable list of adjustments (native Windows Li
 
 Created by **Demir Ajvazi**.
 
+## License
+
+GPL-3.0 — see the repository's [LICENSE](../LICENSE) file. This tool shares its license with the rest of the Ultra Creative Suite repository.
+
 © 2026 Demir Ajvazi. Part of the Ultra Creative Suite.

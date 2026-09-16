@@ -20,7 +20,7 @@ Accessible multi-track audio recording — part of the [Ultra suite](https://git
 
 ## Status
 
-Early skeleton — has not yet been built/tested locally. Build in Visual Studio and verify before relying on it for anything important.
+Built and tested — multi-track recording, arm/disarm, and audio-based clipping alerts all confirmed working. Known gap: the input device list only loads at startup, so a device plugged in afterwards doesn't appear without restarting; a "Refresh Devices" button is planned for a future update.
 
 ## Author
 

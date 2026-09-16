@@ -827,6 +827,5 @@ other apps. Third-party pieces used here:
   details; loading your own `.sf2` file instead is always an option and
   isn't bound by this license.
 
-A `LICENSE` file with the full GPL-3.0 text isn't included in this drop —
-grab the canonical text from https://www.gnu.org/licenses/gpl-3.0.txt and
-drop it in the repo root, same as the other Ultra apps.
+GPL-3.0 — see the repository's [LICENSE](../LICENSE) file. This tool shares
+its license with the rest of the Ultra Creative Suite repository.

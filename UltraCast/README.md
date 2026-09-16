@@ -34,7 +34,7 @@ Keeping video and audio as two separate pipelines (instead of one shared FFmpeg 
 
 ## Status
 
-Early skeleton — has not yet been built/tested locally. Build in Visual Studio and verify before relying on it for anything important. Known v1 limitations: primary monitor only (no monitor picker or window-specific capture yet), no live preview while recording.
+Built and tested end to end (recording, system/mic audio mixing, and the final mux all confirmed working on a clean test run) — pushed to GitHub as the v0.1 skeleton. Known v1 limitations: primary monitor only (no monitor picker or window-specific capture yet), no live preview while recording.
 
 ## Author
 
