@@ -30,6 +30,12 @@ jobs:
         run: |
           $clean = "${{ github.ref_name }}" -replace '^video-', ''
           echo "CLEAN_VERSION=$clean" >> $env:GITHUB_ENV
+          # Broj verzije za sam .exe (bez "v"), npr. "1.0.3" ili "1.0.3-beta".
+          # Prosleđuje se u dotnet publish, pa verzija u aplikaciji UVEK odgovara tagu —
+          # inače bi updater (UpdateChecker) stalno nudio "novu" verziju ako se zaboravi
+          # promeniti <Version> u csproj-u.
+          $num = $clean -replace '^v', ''
+          echo "APP_VERSION=$num" >> $env:GITHUB_ENV
 
       - name: Restore NuGet paketa
         run: dotnet restore UltraVideoEditor\UltraVideoEditor.csproj
@@ -41,6 +47,7 @@ jobs:
             --runtime win-x64 `
             --self-contained true `
             --output ./publish `
+            -p:Version=${{ env.APP_VERSION }} `
             -p:PublishSingleFile=false `
             -p:IncludeNativeLibrariesForSelfExtract=true
 

@@ -1,17 +1,149 @@
-# UltraVideoEditor — AI-Powered Music Video Creator
+# Ultra Video Editor
 
-> Automatic music video generator for children's songs, with deep integration of AI lyric analysis, beat detection, and semantic shot matching.
+> An accessible video editor for Windows, with a built-in AI music video creator. Fully usable with JAWS and NVDA, and equally usable for sighted and low-vision users.
+
+Part of [Ultra Creative Suite](../README.md). Built by a blind developer and tested daily with JAWS for Windows.
 
 ---
 
 ## What is this?
 
-UltraVideoEditor is a WPF desktop application (.NET 8) that takes an audio file and song lyrics and returns a finished music video. The system uses a local LLM (Ollama/Qwen), computer vision (Qwen2-VL + ONNX MobileNet), Whisper transcription, and an FFmpeg render pipeline to automatically:
+Ultra Video Editor is a WPF desktop application (.NET 8) with two sides:
 
-- Analyze lyrics and assign semantic, emotional, and seasonal context to each shot
-- Fetch relevant stock video clips from the Pixabay API
-- Sync cuts to musical phrases (beat detection + piano mode)
-- Render the final video with color grading, cross-dissolve transitions, and ambient sounds
+- **A timeline video editor.** You can add video, images and audio, cut, arrange, add effects, transitions, keyframe animations and subtitles, and export, all from the keyboard with full screen reader feedback.
+- **An AI music video creator.** It takes an audio file and song lyrics and produces a finished music video. A local LLM (Ollama/Qwen) analyzes the lyrics, matching stock footage is downloaded from Pixabay, cuts are synced to the music, and FFmpeg renders the result with color grading, transitions and ambient sound.
+
+---
+
+## Download and Install
+
+Download the latest installer (`UltraVideoEditorSetup-vX.Y.Z.exe`) from the [Releases page](https://github.com/demirajvazi10-max/Ultra-Creative-suite/releases) and run it. Windows will ask for administrator permission; this is expected.
+
+The installer:
+
+- Lets you choose the language at the start (English, German or Serbian). This also becomes the app's default language.
+- Automatically downloads and sets up **FFmpeg** (video processing), **VLC** (preview) and **Ollama** with AI models chosen for your hardware (GPU and RAM are detected automatically).
+- Optionally installs AI transcription and subtitles (**Faster-Whisper-XXL**, about 1.3 GB). This is left as a checkbox because of its size.
+- Starts the app when it finishes.
+
+The ambient sound/SFX library is **not** included in the installer. If you want it, unpack it into the `Assets\` folder next to the `.exe`.
+
+The app checks for new versions itself (**Help → Updates**) and can download and start the new installer for you.
+
+---
+
+## Features
+
+### Editing
+- Multiple video and audio tracks, with filtering by track type
+- Cut, copy, paste, move clips left/right/up/down, set clip duration and volume
+- Markers, including "cut at all markers"
+- Video and audio effects, transitions between clips, keyframe animations (zoom, rotation, position)
+- Text overlays and synchronized subtitles
+- Project templates, batch export, and export for Shorts/TikTok/Instagram (9:16 and square)
+- GPU-accelerated encoding (NVIDIA NVENC) with automatic fallback to `libx264`
+
+### Accessibility
+- Three display modes: **Sighted**, **Accessibility (screen reader)** and **Low Vision**
+- Dark, light and high-contrast themes, plus adjustable text and control size
+- Every action is available from the keyboard; menus show their shortcuts
+- Status changes, progress and errors are announced to JAWS/NVDA through live regions, so you never need to open the log window to know what happened
+- AI-generated audio descriptions of clips and an exportable accessibility report
+
+### Import from YouTube (Timeline → Import from YouTube)
+- Video (MP4, choice of quality) or audio (MP3, choice of bitrate)
+- **Playlist links are never downloaded in full by accident.** When a link is part of a playlist you choose:
+  - **Just this video**: the default when the link points to a specific video. Only that video is downloaded.
+  - **Entire playlist**: private or deleted videos are skipped, and the rest is still downloaded.
+  - **Choose specific tracks**: use the arrow keys to move and Space to select. Each selection is announced ("3 of 15 tracks selected"), and **Select all** / **Clear selection** buttons are available.
+- Downloaded files can be added straight to the timeline
+- Progress is announced at 25/50/75% and per track ("Track 2 of 5"); **Cancel** really stops the download
+- Uses [yt-dlp](https://github.com/yt-dlp/yt-dlp). If it is missing, the app offers to download it, and keeps its own copy up to date weekly. If YouTube requires the Deno JavaScript helper, the app offers to download it and retries.
+
+### AI tools
+- AI music video creator (Video Engine, AUTO)
+- AI video review, clip descriptions (vision AI), smart scene detection, AI highlight engine
+- Voice generation, audio transcription, lyric sync
+- Timeline AI assistant and color grading engine
+
+### Languages
+- English, German and Serbian. Change the language anytime from **View → Language**.
+
+---
+
+## What's New in 1.0.3
+
+- YouTube import: "Just this video" and "Choose specific tracks" now download exactly what you chose (previously a whole playlist could be downloaded). Cancel now works, only files from the current download are added to the timeline, and screen reader announcements are audible.
+- Fixed possible freezes during transcription, beat detection, 9:16/square export and other FFmpeg operations on longer videos. Cancelling these now stops FFmpeg/Whisper too.
+- Update download no longer times out on slower connections.
+- Correct version number in the title bar and About dialog.
+- Complete German translation of the YouTube dialog and update messages.
+
+---
+
+## Requirements
+
+| Component | Note |
+|---|---|
+| Windows | 10 / 11, 64-bit |
+| RAM | 8 GB minimum, 16 GB+ recommended |
+| GPU | NVIDIA GPU optional (NVENC encoding, faster AI) |
+| FFmpeg, VLC, Ollama + models | Installed automatically by the installer |
+| Whisper (faster-whisper-xxl) | Optional, installed by the installer on request |
+| Pixabay API key | Free, needed for the AI music video creator ([pixabay.com/api/docs](https://pixabay.com/api/docs/)). Enter it under **Tools → Media Providers (API keys)**. |
+| yt-dlp | Only for YouTube import; downloaded by the app on first use |
+
+---
+
+## Building from Source
+
+This project lives in the Ultra Creative Suite monorepo:
+
+```bash
+git clone https://github.com/demirajvazi10-max/Ultra-Creative-suite.git
+cd Ultra-Creative-suite/UltraVideoEditor
+dotnet restore
+dotnet build -c Release
+```
+
+You can also open `UltraVideoEditor.csproj` in Visual Studio 2022 and build there.
+
+For a local build, place the external tools next to the built `.exe` (the installer does this for end users):
+
+```
+UltraVideoEditor/
+├── Ffmpeg/
+│   ├── ffmpeg.exe
+│   └── ffprobe.exe
+├── Whisper/
+│   └── faster-whisper-xxl.exe   # or whisper.exe
+└── ...
+```
+
+Then start Ollama and pull the models, for example:
+```bash
+ollama pull qwen2.5:7b
+ollama pull qwen2.5vl:7b
+```
+
+NuGet packages:
+```xml
+<PackageReference Include="LibVLCSharp" Version="3.9.6" />
+<PackageReference Include="LibVLCSharp.WPF" Version="3.9.6" />
+<PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.16.0" />
+<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
+<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.6" />
+<PackageReference Include="NAudio" Version="2.3.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+<PackageReference Include="PixabaySharp" Version="1.1.0" />
+<PackageReference Include="SkiaSharp" Version="2.88.6" />
+<PackageReference Include="SkiaSharp.Views.WPF" Version="2.88.6" />
+<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
+```
+
+### Releases
+
+Releases are built by GitHub Actions (`.github/workflows/build-release-video.yml`) when a tag in the form `video-vX.Y.Z` is pushed. The version from the tag is written into the app automatically, so the version shown in the app always matches the release.
 
 ---
 
@@ -66,67 +198,7 @@ Audio file + Lyrics
 
 ---
 
-## Requirements
-
-### Runtime
-| Component | Version | Note |
-|---|---|---|
-| Windows | 10 / 11 | WPF application |
-| .NET | 8.0 | `net8.0-windows` |
-| FFmpeg | 6.0+ | Must be in the `Ffmpeg/` folder next to the exe |
-| Ollama | Any | Local LLM server |
-| Qwen2.5 14B | Via Ollama | `ollama pull qwen2.5:14b` |
-| Qwen2-VL | Via Ollama | `ollama pull qwen2.5vl:latest` |
-| Whisper | whisper.exe / faster-whisper-xxl.exe | In the `Whisper/` folder |
-
-### API Keys
-- **Pixabay** — free API key from [pixabay.com/api/docs](https://pixabay.com/api/docs/)
-
-### NuGet Packages
-```xml
-<PackageReference Include="LibVLCSharp" Version="3.9.6" />
-<PackageReference Include="LibVLCSharp.WPF" Version="3.9.6" />
-<PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.13.0" />
-<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
-<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.6" />
-<PackageReference Include="NAudio" Version="2.3.0" />
-<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-<PackageReference Include="PixabaySharp" Version="1.1.0" />
-<PackageReference Include="SkiaSharp" Version="2.88.6" />
-<PackageReference Include="SkiaSharp.Views.WPF" Version="2.88.6" />
-<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
-```
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/YOUR_REPO/UltraVideoEditor.git
-cd UltraVideoEditor
-dotnet restore
-dotnet build -c Release
-```
-
-Place the external tools:
-```
-UltraVideoEditor/
-├── Ffmpeg/
-│   └── ffmpeg.exe
-├── Whisper/
-│   └── faster-whisper-xxl.exe   # or whisper.exe
-└── ...
-```
-
-Start Ollama and pull the models:
-```bash
-ollama pull qwen2.5:14b
-ollama pull qwen2.5vl:latest
-```
-
----
-
-## How It Works
+## How the AI Music Video Creator Works
 
 ### 1. Query Pipeline (3 layers)
 
@@ -195,15 +267,21 @@ The same visual theme (first 2 keywords of a query) may not repeat within 4 cons
 
 | Class | Responsibility |
 |---|---|
-| `AIVideoCreator` | Main orchestrator — scene loop, query pipeline, media selection |
+| `MainWindow` | Timeline editor, menus, keyboard shortcuts, screen reader announcements |
+| `AIVideoCreator` | Main orchestrator of the AI music video creator: scene loop, query pipeline, media selection |
 | `StrictQueryEngine` | SR/BA/HR → EN keyword map, Ollama prompt builder, ClassifyLyric/Sentiment |
 | `BeatDetection` | Audio analysis, beat timestamps, piano mode phrase detection |
 | `VisionAnalyzer` | Qwen2-VL / ONNX shot analysis, score, labels, smile |
 | `MotionAnalyzer` | FFmpeg optical flow, direction matching |
 | `RenderEngine` | FFmpeg filter_complex build, xfade, color grading, denoise |
 | `SkiaAnimationEngine` | Skia-based text overlay and title animations |
-| `CinematicProcessor` | Ken Burns, zoom/pan effects |
+| `CinematicProcessor` | Ken Burns, zoom/pan effects, Shorts/square export |
 | `LocalSoundLibrary` | 1279+ ambient sounds, categorization and matching |
+| `AITranscription` | Whisper transcription and lyric alignment |
+| `YouTubeDownloadDialog` | Accessible YouTube import (yt-dlp), playlist scope and track selection |
+| `UpdateChecker` | Checks GitHub Releases for new `video-v*` versions |
+| `LanguageManager` | All UI text in English, German and Serbian |
+| `ProcessExtensions` | Safe handling of external processes (FFmpeg, Whisper): no stalls on full output buffers, killed on cancel |
 
 ---
 
@@ -212,8 +290,10 @@ The same visual theme (first 2 keywords of a query) may not repeat within 4 cons
 Everything is configured directly in code. Key parameters:
 
 ```csharp
-// BeatDetection.cs
+// AIVideoCreator.xaml.cs
 const int QUERY_COOLDOWN_SCENES = 4;     // Anti-repetition of themes
+
+// BeatDetection.cs
 double baseDuration = 4.5 - NoteDensity * 2.7; // Piano pacing: 1.8-4.5s
 
 // RenderEngine.cs
@@ -232,17 +312,17 @@ double baseDuration = 4.5 - NoteDensity * 2.7; // Piano pacing: 1.8-4.5s
 
 The app has a global handler for unexpected errors (`App.xaml.cs`), at three levels:
 
-- `DispatcherUnhandledException` — errors on the main (UI) thread. The user sees a message, and the app **keeps running** instead of silently closing. This matters especially for screen reader users, for whom a silent close gives no signal at all that something happened.
-- `AppDomain.CurrentDomain.UnhandledException` — more serious errors outside the main thread.
-- `TaskScheduler.UnobservedTaskException` — errors from "fire and forget" async tasks nobody awaited, which would otherwise vanish without a trace.
+- `DispatcherUnhandledException`: errors on the main (UI) thread. The user sees a message and the app **keeps running** instead of silently closing. This matters especially for screen reader users, for whom a silent close gives no signal at all that something happened.
+- `AppDomain.CurrentDomain.UnhandledException`: more serious errors outside the main thread.
+- `TaskScheduler.UnobservedTaskException`: errors from "fire and forget" async tasks that nobody awaited, which would otherwise vanish without a trace.
 
-`RenderEngine.cs` additionally logs (silently, without interrupting the render) rare, non-critical errors during processing — filter string building, post-processing file swap, temp folder cleanup, FFmpeg duration parsing — to:
+External tools (FFmpeg, Whisper, yt-dlp) are always run with their output read, so long operations cannot stall on a full output buffer. Cancelling an operation also stops the external process and its child processes.
+
+`RenderEngine.cs` additionally logs rare, non-critical errors during processing, silently and without interrupting the render. These include filter string building, the post-processing file swap, temp folder cleanup and FFmpeg duration parsing. The log is written to:
 
 ```
 %APPDATA%\UltraVideoEditor\render_errors.log
 ```
-
-This doesn't change the behavior of these steps (non-critical errors are still skipped on purpose, so they don't interrupt the render) — it just leaves a trail for diagnostics if something starts happening repeatedly.
 
 ---
 
@@ -266,10 +346,10 @@ This doesn't change the behavior of these steps (non-critical errors are still s
 
 ## Known Limitations
 
-- **Pixabay pool**: For long songs (3+ minutes), the deduplication pool can run dry for recurring query themes. The system has a cooldown variant as mitigation.
-- **Beat detection on piano**: Piano mode relies on energy flux detection — for solo piano without accompaniment it may generate fewer phrase boundaries than optimal.
-- **Magick.NET**: Version 14.13.0 has security advisories for the underlying ImageMagick C library. Doesn't affect app operation (it doesn't process external/untrusted images), but an update to the latest version is recommended once available without breaking changes.
+- **Pixabay pool**: For long songs (3+ minutes), the deduplication pool can run dry for recurring query themes. The system uses a cooldown variant as mitigation.
+- **Beat detection on piano**: Piano mode relies on energy flux detection. For solo piano without accompaniment, it may generate fewer phrase boundaries than optimal.
 - **GPU encoder**: Uses `h264_nvenc` (NVIDIA). On systems without an NVIDIA GPU, it automatically falls back to `libx264`.
+- **YouTube import**: YouTube changes often. The app updates its own copy of yt-dlp weekly, but a download can occasionally fail until yt-dlp publishes a fix.
 
 ---
 
@@ -289,4 +369,4 @@ Created by **Demir Ajvazi**.
 
 ## License
 
-Private project. All rights reserved.
+Licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE).
