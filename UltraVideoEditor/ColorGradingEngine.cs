@@ -311,10 +311,11 @@ namespace UltraVideoEditor
             try
             {
                 using var proc = Process.Start(psi);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
                 if (proc == null) return null;
                 using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts2.CancelAfter(10000);
-                await proc.WaitForExitAsync(cts2.Token);
+                await proc.WaitForExitOrKillAsync(cts2.Token);
                 return File.Exists(outPath) ? outPath : null;
             }
             catch { return null; }

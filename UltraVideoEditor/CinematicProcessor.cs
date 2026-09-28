@@ -144,7 +144,8 @@ namespace UltraVideoEditor
                     RedirectStandardError = true
                 };
                 using var proc = Process.Start(psi);
-                await proc.WaitForExitAsync(ct);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
+                await proc.WaitForExitOrKillAsync(ct);
                 return proc.ExitCode == 0;
             }
             catch { return false; }
@@ -428,7 +429,8 @@ namespace UltraVideoEditor
                     RedirectStandardError = true
                 };
                 using var proc = Process.Start(psi);
-                await proc.WaitForExitAsync(ct);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
+                await proc.WaitForExitOrKillAsync(ct);
                 return proc.ExitCode == 0 ? outputPath : null;
             }
             catch { return null; }
@@ -526,7 +528,8 @@ namespace UltraVideoEditor
                     RedirectStandardError = true
                 };
                 using var proc = Process.Start(psi);
-                await proc.WaitForExitAsync(ct);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
+                await proc.WaitForExitOrKillAsync(ct);
                 return proc.ExitCode == 0 ? outputPath : null;
             }
             catch { return null; }
@@ -708,7 +711,8 @@ namespace UltraVideoEditor
                     RedirectStandardError = true
                 };
                 using var proc = Process.Start(psi);
-                await proc.WaitForExitAsync(ct);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
+                await proc.WaitForExitOrKillAsync(ct);
                 return File.Exists(outPath) ? outPath : null;
             }
             catch { return null; }

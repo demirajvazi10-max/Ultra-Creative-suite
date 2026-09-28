@@ -129,6 +129,7 @@ namespace UltraVideoEditor
                 }
             };
             proc.Start();
+            proc.DrainAll(); // ffmpeg piše napredak u stderr — bez čitanja zastane na dužim snimcima
             await Task.Run(() => proc.WaitForExit());
             return File.Exists(outPath) ? outPath : null;
         }
@@ -277,6 +278,7 @@ namespace UltraVideoEditor
 
                 whisperProc.Start();
                 whisperProc.BeginErrorReadLine();
+                whisperProc.DrainStdout();
 
                 // WaitForExitAsync(ct) direktno reaguje na otkazivanje — nema polling latency
                 try
@@ -285,7 +287,7 @@ namespace UltraVideoEditor
                 }
                 catch (OperationCanceledException)
                 {
-                    try { whisperProc.Kill(); } catch { }
+                    try { whisperProc.Kill(entireProcessTree: true); } catch { }
                     throw;
                 }
 
@@ -502,8 +504,8 @@ namespace UltraVideoEditor
 
                 proc.Start();
                 proc.BeginErrorReadLine();
-                try { await proc.WaitForExitAsync(ct); }
-                catch (OperationCanceledException) { try { proc.Kill(); } catch { } throw; }
+                proc.DrainStdout();
+                await proc.WaitForExitOrKillAsync(ct);
 
                 ct.ThrowIfCancellationRequested();
                 progress?.Report("Mapping text to timestamps...");
@@ -527,7 +529,8 @@ namespace UltraVideoEditor
                         }
                     };
                     proc2.Start();
-                    await proc2.WaitForExitAsync(ct);
+                    proc2.DrainAll();
+                    await proc2.WaitForExitOrKillAsync(ct);
                     srtPath = Directory.GetFiles(tempDir, "*.srt").FirstOrDefault();
                 }
 

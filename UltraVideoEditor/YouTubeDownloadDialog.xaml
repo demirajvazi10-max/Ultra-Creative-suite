@@ -1,10 +1,11 @@
-<Window x:Class="UltraVideoEditor.YouTubeDownloadDialog"
+﻿<Window x:Class="UltraVideoEditor.YouTubeDownloadDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Import from YouTube"
-        Width="560" Height="680"
+        Width="600" Height="780"
+        MinWidth="480" MinHeight="420"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         Background="{DynamicResource PanelBg}"
         Foreground="{DynamicResource TextPrimary}"
         AutomationProperties.Name="Dialog for importing video or audio from YouTube">
@@ -68,72 +69,72 @@
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>  <!-- 10 Add to timeline checkbox -->
             <RowDefinition Height="16"/>
-            <RowDefinition Height="Auto"/>  <!-- 12 Info panel (+ playlist track picker) -->
+            <RowDefinition Height="Auto"/>  <!-- 12 Info panel (+ playlist scope picker) -->
             <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>  <!-- 14 Progress -->
             <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>  <!-- 16 Dugmici -->
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>  <!-- 18 Status (uvek vidljiv, live region) -->
         </Grid.RowDefinitions>
 
         <!-- Naslov -->
         <TextBlock Grid.Row="0"
+                   x:Name="txbDialogTitle"
                    Text="Import from YouTube"
                    FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"
                    AutomationProperties.HeadingLevel="Level1"/>
 
         <!-- URL -->
         <StackPanel Grid.Row="2">
-            <Label Content="YouTube URL (video or playlist):" Target="{Binding ElementName=txtUrl}"/>
+            <Label x:Name="lblUrl" Content="YouTube URL (video or playlist):" Target="{Binding ElementName=txtUrl}"/>
             <TextBox x:Name="txtUrl"
-                     AutomationProperties.Name="YouTube URL — enter link to video or playlist"
-                     AutomationProperties.HelpText="Accepts a link to a single video or an entire playlist"
-                     KeyDown="TxtUrl_KeyDown"/>
+                     KeyDown="TxtUrl_KeyDown"
+                     TextChanged="TxtUrl_TextChanged"/>
         </StackPanel>
 
         <!-- Tip fajla -->
         <GroupBox Grid.Row="4"
+                  x:Name="grpFileType"
                   Header="File type"
-                  Foreground="{DynamicResource TextPrimary}" BorderBrush="#555"
-                  AutomationProperties.Name="File type selection">
+                  Foreground="{DynamicResource TextPrimary}" BorderBrush="#555">
             <StackPanel Orientation="Horizontal" Margin="8,6">
                 <RadioButton x:Name="rbVideo" Content="Video (MP4)" IsChecked="True"
-                             AutomationProperties.Name="Video, MP4 format"
+                             GroupName="FileType"
                              Checked="FormatType_Changed"/>
                 <RadioButton x:Name="rbAudio" Content="Audio (MP3)"
-                             AutomationProperties.Name="Audio, MP3 format"
+                             GroupName="FileType"
                              Checked="FormatType_Changed"/>
             </StackPanel>
         </GroupBox>
 
         <!-- Kvalitet -->
         <StackPanel Grid.Row="6" x:Name="pnlQuality">
-            <Label Content="Video quality:" Target="{Binding ElementName=cmbQuality}"/>
+            <Label x:Name="lblQuality" Content="Video quality:" Target="{Binding ElementName=cmbQuality}"/>
             <ComboBox x:Name="cmbQuality"
-                      AutomationProperties.Name="Video quality selection"
                       SelectedIndex="0">
-                <ComboBoxItem Content="Best available" Tag="best"/>
-                <ComboBoxItem Content="1080p" Tag="1080"/>
-                <ComboBoxItem Content="720p" Tag="720"/>
-                <ComboBoxItem Content="480p" Tag="480"/>
-                <ComboBoxItem Content="360p" Tag="360"/>
+                <ComboBoxItem x:Name="cmbQBest" Content="Best available" Tag="best"/>
+                <ComboBoxItem x:Name="cmbQ1080" Content="1080p" Tag="1080"/>
+                <ComboBoxItem x:Name="cmbQ720" Content="720p" Tag="720"/>
+                <ComboBoxItem x:Name="cmbQ480" Content="480p" Tag="480"/>
+                <ComboBoxItem x:Name="cmbQ360" Content="360p" Tag="360"/>
             </ComboBox>
         </StackPanel>
 
         <StackPanel Grid.Row="6" x:Name="pnlAudioQuality" Visibility="Collapsed">
-            <Label Content="MP3 quality:" Target="{Binding ElementName=cmbAudioQuality}"/>
+            <Label x:Name="lblAudioQuality" Content="MP3 quality:" Target="{Binding ElementName=cmbAudioQuality}"/>
             <ComboBox x:Name="cmbAudioQuality"
-                      AutomationProperties.Name="MP3 audio quality selection"
                       SelectedIndex="2">
-                <ComboBoxItem Content="Best (VBR, largest file)" Tag="0"/>
-                <ComboBoxItem Content="320 kbps" Tag="320K"/>
-                <ComboBoxItem Content="192 kbps (recommended)" Tag="192K"/>
-                <ComboBoxItem Content="128 kbps (smaller file)" Tag="128K"/>
+                <ComboBoxItem x:Name="cmbAQBest" Content="Best (VBR, largest file)" Tag="0"/>
+                <ComboBoxItem x:Name="cmbAQ320" Content="320 kbps" Tag="320K"/>
+                <ComboBoxItem x:Name="cmbAQ192" Content="192 kbps (recommended)" Tag="192K"/>
+                <ComboBoxItem x:Name="cmbAQ128" Content="128 kbps (smaller file)" Tag="128K"/>
             </ComboBox>
         </StackPanel>
 
         <!-- Save to folder -->
         <StackPanel Grid.Row="8">
-            <Label Content="Save to folder:" Target="{Binding ElementName=txtSaveFolder}"/>
+            <Label x:Name="lblSaveFolder" Content="Save to folder:" Target="{Binding ElementName=txtSaveFolder}"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -141,11 +142,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="txtSaveFolder" Grid.Column="0"
-                         IsReadOnly="True"
-                         AutomationProperties.Name="Destination folder for downloaded file"/>
+                         IsReadOnly="True"/>
                 <Button x:Name="btnBrowseFolder" Grid.Column="2"
                         Content="Browse..."
-                        AutomationProperties.Name="Choose a different destination folder"
                         Click="BtnBrowseFolder_Click"/>
             </Grid>
         </StackPanel>
@@ -153,10 +152,9 @@
         <!-- Add to timeline -->
         <CheckBox Grid.Row="10" x:Name="chkAddToTimeline"
                    Content="Add to timeline after download"
-                   IsChecked="True"
-                   AutomationProperties.Name="Add downloaded file to timeline after download completes"/>
+                   IsChecked="True"/>
 
-        <!-- Info panel (pojavljuje se nakon fetch-a), sadrži i listu numera za plejliste -->
+        <!-- Info panel (pojavljuje se nakon fetch-a), sadrži i izbor obima plejliste -->
         <Border Grid.Row="12"
                 x:Name="pnlInfo"
                 Background="{DynamicResource ControlBg}" BorderBrush="#444" BorderThickness="1"
@@ -171,14 +169,78 @@
                            Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
                            TextWrapping="Wrap"/>
 
-                <StackPanel x:Name="pnlPlaylistTracks" Visibility="Collapsed" Margin="0,8,0,0">
-                    <TextBlock Text="Choose which track(s) to download (all selected = whole playlist):"
-                               Foreground="{DynamicResource TextPrimary}" FontSize="12"
-                               TextWrapping="Wrap" Margin="0,0,0,4"/>
-                    <ListBox x:Name="lstPlaylistTracks"
-                             Height="110"
-                             SelectionMode="Multiple"
-                             AutomationProperties.Name="Playlist tracks — select one or more to download only those, or leave all selected for the whole playlist"/>
+                <!-- Prikazuje se samo kada link vodi na plejlistu -->
+                <StackPanel x:Name="pnlPlaylistTracks" Visibility="Collapsed" Margin="0,10,0,0">
+                    <TextBlock x:Name="txbPlaylistPrompt"
+                               Text="This link is part of a playlist. What do you want to download?"
+                               Foreground="{DynamicResource TextPrimary}" FontSize="12" FontWeight="Bold"
+                               TextWrapping="Wrap" Margin="0,0,0,6"/>
+
+                    <GroupBox x:Name="grpScope"
+                              Header="Download scope"
+                              Foreground="{DynamicResource TextPrimary}" BorderBrush="#555">
+                        <StackPanel Margin="8,6">
+                            <RadioButton x:Name="rbScopeSingle"
+                                         Content="Just this video (ignore the rest of the playlist)"
+                                         GroupName="PlaylistScope"
+                                         Margin="0,0,0,4"
+                                         Checked="PlaylistScope_Changed"/>
+                            <RadioButton x:Name="rbScopeAll"
+                                         Content="Entire playlist"
+                                         GroupName="PlaylistScope"
+                                         Margin="0,0,0,4"
+                                         Checked="PlaylistScope_Changed"/>
+                            <RadioButton x:Name="rbScopeChoose"
+                                         Content="Choose specific tracks..."
+                                         GroupName="PlaylistScope"
+                                         Checked="PlaylistScope_Changed"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Izbor pojedinačnih numera. Svaka stavka nosi svoj IsSelected (vezan na
+                         PlaylistEntry.IsSelected), pa je izbor uvek tačan i ne zavisi od toga da li
+                         je korisnik strelicama samo pomerio fokus ili zaista označio stavku. -->
+                    <StackPanel x:Name="pnlTrackPicker" Visibility="Collapsed" Margin="0,8,0,0">
+                        <TextBlock x:Name="txbTracksHint"
+                                   Text="Arrow keys move through the tracks, Space selects or deselects a track."
+                                   Foreground="{DynamicResource TextPrimary}" FontSize="12"
+                                   TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <ListBox x:Name="lstPlaylistTracks"
+                                 Height="160"
+                                 SelectionMode="Multiple"
+                                 VirtualizingPanel.IsVirtualizing="False"
+                                 SelectionChanged="LstPlaylistTracks_SelectionChanged">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- Vizuelni kvadratić za videće korisnike; nije fokusabilan,
+                                             screen reader čita stanje same stavke liste. -->
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                  Focusable="False" IsHitTestVisible="False"
+                                                  IsTabStop="False" VerticalAlignment="Center"
+                                                  Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextPrimary}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Name="btnSelectAllTracks" Content="Select all"
+                                    Margin="0,0,8,0" Click="BtnSelectAllTracks_Click"/>
+                            <Button x:Name="btnClearTracks" Content="Clear selection"
+                                    Click="BtnClearTracks_Click"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txbTracksCount"
+                                   Foreground="{DynamicResource TextPrimary}" FontSize="12"
+                                   Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -187,13 +249,13 @@
         <StackPanel Grid.Row="14" x:Name="pnlProgress" Visibility="Collapsed">
             <ProgressBar x:Name="prgDownload"
                          Height="10" Minimum="0" Maximum="100" Value="0"
-                         Background="{DynamicResource ControlBg}" Foreground="#0078D4"
-                         AutomationProperties.Name="Download progress"/>
-            <!-- Bez static AutomationProperties.Name namerno - vidi napomenu kod
-                 txtJawsLog u MainWindow.xaml. -->
+                         Background="{DynamicResource ControlBg}" Foreground="#0078D4"/>
+            <!-- Tekst napretka (procenat, brzina, ETA) se menja više puta u sekundi — namerno
+                 NIJE live region, da JAWS/NVDA ne bi bili zatrpani. Važne poruke idu kroz
+                 txbStatus ispod. -->
             <TextBlock x:Name="txbProgress"
-                       Foreground="#AAA" FontSize="12" Margin="0,4,0,0"
-                       AutomationProperties.LiveSetting="Polite"/>
+                       Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,4,0,0"
+                       TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Dugmici -->
@@ -210,7 +272,6 @@
                     Grid.Column="0"
                     Content="Load info"
                     Style="{StaticResource PrimaryBtn}"
-                    AutomationProperties.Name="Load video or playlist information"
                     Click="BtnFetchInfo_Click"/>
 
             <Button x:Name="btnDownload"
@@ -218,15 +279,21 @@
                     Content="Download"
                     IsEnabled="False"
                     Style="{StaticResource PrimaryBtn}"
-                    AutomationProperties.Name="Download video or audio"
                     Click="BtnDownload_Click"/>
 
             <Button x:Name="btnCancel"
                     Grid.Column="4" IsCancel="True"
                     Content="Cancel"
                     Background="#3D3D3D" Foreground="{DynamicResource ButtonTextBrush}" BorderThickness="0"
-                    AutomationProperties.Name="Cancel and close dialog"
                     Click="BtnCancel_Click"/>
         </Grid>
+
+        <!-- Status: uvek vidljiv (i videćima), live region kroz koji se najavljuje sve bitno.
+             Ranije su najave išle u progress panel koji je bio sakriven pre preuzimanja, pa
+             JAWS/NVDA nisu čuli npr. "pronađena plejlista". -->
+        <TextBlock Grid.Row="18" x:Name="txbStatus"
+                   Foreground="{DynamicResource TextPrimary}" FontSize="12"
+                   TextWrapping="Wrap"
+                   AutomationProperties.LiveSetting="Assertive"/>
     </Grid>
 </Window>

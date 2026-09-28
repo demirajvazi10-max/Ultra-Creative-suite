@@ -291,7 +291,8 @@ namespace UltraVideoEditor
                     RedirectStandardOutput = true
                 };
                 using var proc = Process.Start(psi);
-                if (proc != null) await proc.WaitForExitAsync(ct);
+                proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
+                if (proc != null) await proc.WaitForExitOrKillAsync(ct);
             }
             catch { }
         }

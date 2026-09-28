@@ -1123,9 +1123,92 @@ namespace UltraVideoEditor
         private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
         {
             LogMessage(L("check_updates"), true);
-            await Task.Delay(1000);
-            WpfMessageBox.Show(L("up_to_date"), L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
-            LogMessage(L("no_updates"), true);
+
+            UpdateChecker.UpdateInfo update;
+            try
+            {
+                var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                update = await UpdateChecker.CheckForUpdateAsync(currentVersion);
+            }
+            catch (Exception ex)
+            {
+                LogMessage(L("update_check_failed"), true);
+                WpfMessageBox.Show(string.Format(L("update_check_failed_msg"), ex.Message),
+                    L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (update == null)
+            {
+                WpfMessageBox.Show(L("up_to_date"), L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+                LogMessage(L("no_updates"), true);
+                return;
+            }
+
+            string newVerText = $"v{update.Version.Major}.{update.Version.Minor}.{Math.Max(update.Version.Build, 0)}";
+            var choice = WpfMessageBox.Show(
+                string.Format(L("update_available_msg"), newVerText, GetAppVersion()),
+                L("updates_title"), MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+            if (choice != MessageBoxResult.Yes) return;
+
+            if (string.IsNullOrEmpty(update.DownloadUrl))
+            {
+                // Release postoji, ali (jos) nema prikacen .exe installer - otvaramo stranicu
+                // release-a u browseru kao rezervnu opciju umesto da korisnik ostane bez ičega.
+                LogMessage(L("update_opening_page"), true);
+                try { Process.Start(new ProcessStartInfo(update.HtmlUrl) { UseShellExecute = true }); } catch { }
+                return;
+            }
+
+            try
+            {
+                LogMessage(L("update_downloading"), true);
+
+                string tempPath = Path.Combine(Path.GetTempPath(), $"UltraVideoEditor-Update-{update.TagName}.exe");
+
+                // Installer ima više stotina MB: podrazumevani HttpClient timeout (100 s) je
+                // na sporijoj vezi prekidao preuzimanje, a GetByteArrayAsync je držao ceo fajl
+                // u memoriji. Sada se fajl upisuje direktno na disk, sa najavom na svakih 25%.
+                using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(60) })
+                {
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("UltraVideoEditor");
+                    using var response = await http.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
+                    long total = response.Content.Headers.ContentLength ?? -1;
+
+                    await using var net = await response.Content.ReadAsStreamAsync();
+                    await using var file = File.Create(tempPath);
+                    var buffer = new byte[81920];
+                    long done = 0;
+                    int read, lastQuarter = 0;
+                    while ((read = await net.ReadAsync(buffer)) > 0)
+                    {
+                        await file.WriteAsync(buffer.AsMemory(0, read));
+                        done += read;
+                        if (total > 0)
+                        {
+                            int quarter = (int)(done * 4 / total);
+                            if (quarter > lastQuarter && quarter < 4)
+                            {
+                                lastQuarter = quarter;
+                                LogMessage($"{L("update_downloading")} {quarter * 25}%", true);
+                            }
+                        }
+                    }
+                }
+
+                LogMessage(L("update_installing"), true);
+                WpfMessageBox.Show(L("update_installing"), L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+
+                Process.Start(new ProcessStartInfo(tempPath) { UseShellExecute = true });
+                WpfApplication.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                WpfMessageBox.Show(string.Format(L("update_download_failed"), ex.Message),
+                    L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
@@ -2535,7 +2618,7 @@ namespace UltraVideoEditor
         // ── YouTube Import ──────────────────────────────────────────────────────
         private async void ImportFromYouTube_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new YouTubeDownloadDialog { Owner = this };
+            var dlg = new YouTubeDownloadDialog(_currentLanguage) { Owner = this };
 
             if (dlg.ShowDialog() != true || dlg.DownloadedFiles.Count == 0)
                 return;
