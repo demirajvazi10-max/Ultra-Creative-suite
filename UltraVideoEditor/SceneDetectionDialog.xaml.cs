@@ -125,7 +125,7 @@ namespace UltraVideoEditor
             {
                 _running = false;
                 _cts?.Dispose(); _cts = null;
-                BtnDetect.Content   = "🔍 Detektuj scene";
+                BtnDetect.Content   = LanguageManager.T("loc_detect_scenes");
                 BtnDetect.IsEnabled = File.Exists(TxtVideoPath.Text);
                 ProgressPanel.Visibility = Visibility.Collapsed;
             }
@@ -277,22 +277,27 @@ namespace UltraVideoEditor
 
             if (Owner is MainWindow mw)
             {
-                double cursor = 0.0;
+                // v1.4: scenes are appended AFTER what is already on Video 1 (they were placed
+                // from 0 s, on top of the existing clips), and the scene's place in the source
+                // video goes to SourceOffset (Start is the timeline position — every scene was
+                // rendered from the beginning of the source).
+                TimelineLayout.Recalculate(mw.timelineItems);
+                double cursor = mw.timelineItems.Where(t => t.TrackIndex == 0).Select(t => t.End).DefaultIfEmpty(0).Max();
                 foreach (var scene in _selected.OrderBy(s => s.Start))
                 {
                     var item = new TimelineItem
                     {
                         Path             = scene.SourcePath,
-                        Start            = scene.Start,
-                        End              = scene.End,
+                        SourceOffset     = scene.Start,
                         Duration         = scene.Duration,
-                        Name             = $"Scena {scene.Index:D3}",
-                        Type             = "Scene",
+                        Name             = LanguageManager.F("loc_scene_name", scene.Index),
+                        Type             = "Video",
+                        VideoEffect      = new VideoEffectData(),
                         TrackIndex       = 0,
                         FixedPosition    = cursor,
                         UseFixedPosition = true,
                         AccessibilityDescription =
-                            $"Scena {scene.Index}, {scene.Label}, {scene.Duration:F1} sekundi",
+                            LanguageManager.F("loc_scene_desc", scene.Index, scene.Label, scene.Duration),
                     };
                     mw.timelineItems.Add(item);
                     cursor += scene.Duration;

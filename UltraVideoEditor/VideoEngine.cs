@@ -229,7 +229,7 @@ namespace UltraVideoEditor
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 }
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Reading the AI shot list (JSON)", swallowed); }   // v1.4: was silent
 
             // Ako AI output nije validan, koristimo lokalni engine
             if (aiShots == null || aiShots.Count == 0)

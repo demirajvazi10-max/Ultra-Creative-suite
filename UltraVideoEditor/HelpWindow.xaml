@@ -72,7 +72,16 @@
                         <TextBlock Text="PLAYBACK" FontSize="14" FontWeight="Bold"
                                    Foreground="{DynamicResource WarningBrush}" Margin="0,0,0,8"/>
                         <TextBlock Text="Ctrl+Space     Play / Pause" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
-                        <TextBlock Text="Left/Right     Seek +/- 5 seconds" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Shift+Space Play the whole montage (all sounds mixed, no render) / pause it" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Alt+Left/Right       Seek -/+ 5 seconds" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Alt+Shift+Left/Right Seek -/+ 0.1 second (fine)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="J / K / L      Shuttle back / stop / forward (press again: faster)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Comma / Period One frame back / forward" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Q / W          Trim clip start / end to the playhead (ripple)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Alt+S     Clip speed" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Shift+V   Volume point at the playhead (volume over time)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Shift+F   Describe the frame under the playhead (AI)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Alt+D     Describe the selected clip by parts (AI, background)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Home           Go to start" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="End            Go to end" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                     </StackPanel>
@@ -99,7 +108,7 @@
                                    Foreground="{DynamicResource WarningBrush}" Margin="0,0,0,8"/>
                         <TextBlock Text="Ctrl+M         Add marker" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Ctrl+Shift+N   Next marker" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
-                        <TextBlock Text="Ctrl+Shift+P   Previous marker" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Shift+,   Previous marker" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Ctrl+Shift+X   Cut at all markers" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                     </StackPanel>
                 </Border>

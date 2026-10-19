@@ -236,6 +236,92 @@ namespace UltraVideoEditor
         /// Checks whether a Pixabay hit (tags string) contains forbidden content.
         /// Returns true if the hit is SAFE for children (i.e. can be downloaded).
         /// </summary>
+        // ── v1.4: things a children's video must never show (Gemini review of "Pesma o šetnji":
+        //    physiotherapy of an elderly person in a wheelchair, road works with a danger sign,
+        //    aerial shots of crowds of adults, a French press instead of hot chocolate) ──────
+        private static readonly string[] _notForKids =
+        {
+            // care, illness, therapy
+            "wheelchair", "physiotherapy", "physical therapy", "therapy", "therapist", "rehabilitation",
+            "rehab", "nurse", "nursing", "caregiver", "care home", "nursing home", "retirement home",
+            "elderly care", "senior care", "patient", "doctor", "illness", "disease", "crutches",
+            "walking frame", "walker aid", "healthcare", "health care", "massage", "dementia", "alzheimer",
+            // building sites and roads
+            "construction", "road work", "roadwork", "road works", "building site", "barrier", "roadblock",
+            "warning sign", "danger sign", "caution", "traffic cone", "excavator", "bulldozer",
+            "scaffolding", "construction crane", "jackhammer", "asphalt", "pothole",
+            // crowds and strangers
+            "crowd", "crowded", "pedestrians", "commuters", "passers-by", "passersby", "protest",
+            "demonstration", "rally", "aerial view people", "people from above", "tourists",
+            // adult drinks and gadgets
+            "french press", "coffee", "espresso", "barista", "cafe", "café",
+            // ski resorts (a snowy line is about children in snow, not about lifts)
+            "cable car", "ski lift", "chairlift", "gondola", "ski resort", "skier", "skiing",
+            // v1.4 (second Gemini review): gloomy interiors, buildings, vehicles, body-part close-ups
+            "waiting room", "airport", "terminal", "lounge", "window silhouette", "silhouettes",
+            "colonnade", "columns", "pillars", "architecture", "monument", "parking", "motorbike",
+            "motorcycle", "scooters parked", "hairstyle", "hair care", "hairdresser", "cooking pot",
+            "saucepan", "boiling", "stove",
+            "industrial", "industry", "chain-link", "barbed wire", "power plant", "pylon",
+        };
+
+        // v1.4 — wild or odd animals: only when the lyric itself names them (Serbian word starts)
+        private static readonly (string Tag, string[] LyricStems)[] _onlyIfSung =
+        {
+            ("meerkat", new[] { "merkat", "surikat" }),
+            ("monkey", new[] { "majmun" }), ("monkeys", new[] { "majmun" }), ("primate", new[] { "majmun" }),
+            ("ape", new[] { "majmun" }), ("gorilla", new[] { "gorila" }), ("lemur", new[] { "lemur" }),
+            ("ant", new[] { "mrav" }), ("ants", new[] { "mrav" }), ("insect", new[] { "buba", "insekt", "bubamar", "pcel", "leptir" }),
+            ("beetle", new[] { "buba", "bubamar" }), ("lemon", new[] { "limun" }), ("lizard", new[] { "gusteric", "gušteric" }),
+            // v1.4 (fourth Gemini review): wild animals and screens
+            ("tiger", new[] { "tigar", "tigr" }), ("tigers", new[] { "tigar", "tigr" }), ("lion", new[] { "lav" }),
+            ("lions", new[] { "lav" }), ("wolf", new[] { "vuk" }), ("wolves", new[] { "vuk" }), ("bear", new[] { "medved", "medvjed", "meda" }),
+            ("crocodile", new[] { "krokodil" }), ("shark", new[] { "ajkul" }), ("snake", new[] { "zmij" }), ("predator", new[] { "zver", "zvijer" }),
+            ("tablet", new[] { "tablet" }), ("ipad", new[] { "tablet" }), ("smartphone", new[] { "telefon", "mobil" }),
+            ("phone", new[] { "telefon", "mobil" }), ("mobile phone", new[] { "telefon", "mobil" }), ("screen", new[] { "ekran" }),
+            ("laptop", new[] { "kompjuter", "racunar", "računar", "laptop" }), ("computer", new[] { "kompjuter", "racunar", "računar" }),
+            ("video game", new[] { "igric" }), ("gaming", new[] { "igric" }), ("television", new[] { "televiz", "crtac", "crtać" }),
+            ("tv", new[] { "televiz", "crtac", "crtać" }),
+            // v1.4 (third Gemini review): trains, railways and icy cliffs in a song about walking
+            ("train", new[] { "voz" }), ("trains", new[] { "voz" }), ("railway", new[] { "voz", "prug" }),
+            ("railroad", new[] { "voz", "prug" }), ("rail", new[] { "voz", "prug" }), ("rails", new[] { "voz", "prug" }),
+            ("tracks", new[] { "voz", "prug" }), ("tram", new[] { "tramvaj" }), ("locomotive", new[] { "voz", "lokomotiv" }),
+            ("station", new[] { "stanic", "voz" }), ("cliff", new[] { "litic", "sten" }), ("glacier", new[] { "glec", "gleč" }),
+            ("iceberg", new[] { "ledeni breg", "santa" }), ("pot", new[] { "lonac", "kuva", "kuha", "ruca", "ruča" }),
+            ("steam", new[] { "caj", "čaj", "cokolad", "čokolad", "kuva", "kuha" }), ("cooking", new[] { "kuva", "kuha", "ruca", "ruča" }),
+        };
+
+        private static readonly string[] _elderlyWords =
+            { "elderly", "senior", "old man", "old woman", "old people", "old couple", "pensioner", "retired", "aged", "grandmother", "grandfather", "grandma", "grandpa", "granny" };
+
+        private static readonly string[] _childWords =
+            { "child", "children", "kid", "kids", "baby", "toddler", "grandchild", "grandchildren", "granddaughter", "grandson", "boy", "girl", "little" };
+
+        /// <summary>
+        /// v1.4 — true when the tags show something a children's video must not show, or old
+        /// people without any child in the picture (grandparents only together with grandchildren).
+        /// </summary>
+        public static bool IsUnsuitableForKids(string tagsLower, out string reason) =>
+            IsUnsuitableForKids(tagsLower, null, out reason);
+
+        /// <summary>v1.4 — the same, plus animals and things that may appear only when the lyric names them.</summary>
+        public static bool IsUnsuitableForKids(string tagsLower, string lyric, out string reason)
+        {
+            reason = null;
+            if (string.IsNullOrWhiteSpace(tagsLower)) return false;
+            string t = tagsLower.ToLowerInvariant();
+            foreach (var w in _notForKids)
+                if (t.Contains(w)) { reason = w; return true; }
+            string sung = StrictQueryEngine.Fold(lyric ?? "");
+            var tagList = t.Split(',').Select(x => x.Trim()).ToList();
+            foreach (var (tag, stems) in _onlyIfSung)
+                if (tagList.Contains(tag) && !stems.Any(s => sung.Contains(StrictQueryEngine.Fold(s))))
+                { reason = tag + " (not in the lyric)"; return true; }
+            bool hasChild = _childWords.Any(w => System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{System.Text.RegularExpressions.Regex.Escape(w)}\b"));
+            if (!hasChild && _elderlyWords.Any(w => t.Contains(w))) { reason = "old people without a child"; return true; }
+            return false;
+        }
+
         public static bool IsHitSafe(string pixabayTagsLower)
         {
             if (string.IsNullOrWhiteSpace(pixabayTagsLower)) return true;
@@ -243,7 +329,7 @@ namespace UltraVideoEditor
             foreach (var tag in _hitBlockTags)
                 if (pixabayTagsLower.Contains(tag))
                     return false;
-            return true;
+            return !IsUnsuitableForKids(pixabayTagsLower, out _);
         }
 
         /// <summary>

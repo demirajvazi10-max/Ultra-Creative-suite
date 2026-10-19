@@ -195,7 +195,26 @@ namespace UltraVideoEditor
 
         // ── Command execution ───────────────────────────────────────
 
+        /// <summary>
+        /// v1.4: the commands work only on the picture/video clips of Video 1. Before, they ran
+        /// over EVERYTHING — "keep only clips with faces" could remove the song itself, the
+        /// ambient sounds and the overlays on Video 2. Everything else is kept as it is.
+        /// </summary>
         private static AssistantResult ExecuteCommand(AssistantCommand cmd, List<TimelineItem> items)
+        {
+            static bool IsMainClip(TimelineItem i) => i.TrackIndex == 0 && (i.IsImage || i.IsVideo);
+            var clips = items.Where(IsMainClip).ToList();
+            var rest  = items.Where(i => !IsMainClip(i)).ToList();
+            if (clips.Count == 0)
+                return Fail("There are no picture or video clips on Video 1.");
+
+            var result = ExecuteOnClips(cmd, clips);
+            if (result.Success)
+                result.UpdatedItems = result.UpdatedItems.Concat(rest).ToList();
+            return result;
+        }
+
+        private static AssistantResult ExecuteOnClips(AssistantCommand cmd, List<TimelineItem> items)
         {
             var result = new AssistantResult
             {

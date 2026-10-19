@@ -9,7 +9,23 @@ namespace UltraVideoEditor
     {
         protected override void OnStartup(StartupEventArgs e)
         {
+            // ── v1.4: brojevi uvek sa TAČKOM (InvariantCulture) ─────────────────
+            // Na Windowsu sa srpskim (ili nemačkim) regionalnim podešavanjima decimalni
+            // separator je ZAREZ. Desetine mesta u kodu prave FFmpeg komande sa
+            // $"...st={x:F2}..." ili $"-t {dur}" — sa zarezom to postaje "st=12,50", a zarez
+            // u FFmpeg filteru znači "sledeći filter", pa fade/Ken Burns/Shorts izvoz/animacije
+            // pucaju ili rade pogrešno. Isto važi za JSON od AI-ja ("2.5" se čitalo kao 25).
+            // Formatiranje (CurrentCulture) se zato postavlja na Invariant za ceo program;
+            // jezik interfejsa (CurrentUICulture) ostaje netaknut. Unos korisnika se i dalje
+            // prihvata i sa zarezom (sva polja rade Replace(',', '.') pre parsiranja).
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            System.Globalization.CultureInfo.DefaultThreadCurrentCulture = invariant;
+            System.Threading.Thread.CurrentThread.CurrentCulture = invariant;
+
             base.OnStartup(e);
+
+            // v1.4: text in FFmpeg (titles, outro, subtitles) needs a font configuration
+            AppPaths.EnsureFontconfig();
 
             // Accessibility for screen readers
             // NE koristite AutomationProperties.SetName na App klasi
@@ -22,12 +38,14 @@ namespace UltraVideoEditor
             // najavi/prikaže grešku pre gašenja, umesto potpune tišine.
             DispatcherUnhandledException += (s, args) =>
             {
+                AppLog.Error("Unexpected error", args.Exception);   // v1.4: full details in the log file
                 try
                 {
-                    string msg = $"Došlo je do neočekivane greške: {args.Exception.Message}\n\n" +
-                                 "Aplikacija će pokušati da nastavi sa radom. Ako se ovo ponavlja, " +
-                                 "sačuvajte projekat pod novim imenom kao bezbednosnu meru.";
-                    System.Windows.MessageBox.Show(msg, "Neočekivana greška",
+                    // v1.4: in the interface language (it was always Serbian)
+                    string lang = LanguageManager.CurrentLanguage;
+                    string msg = string.Format(LanguageManager.GetText("app_unexpected_error_msg", lang),
+                                               args.Exception.Message, AppLog.TodayFile);
+                    System.Windows.MessageBox.Show(msg, LanguageManager.GetText("app_unexpected_error_title", lang),
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 catch { /* i sam MessageBox može teoretski da pukne — ne dozvoli da to sakrije originalnu grešku */ }
@@ -42,9 +60,11 @@ namespace UltraVideoEditor
                 try
                 {
                     var ex = args.ExceptionObject as Exception;
+                    AppLog.Error("Serious error", ex);
+                    string lang = LanguageManager.CurrentLanguage;
                     System.Windows.MessageBox.Show(
-                        $"Došlo je do ozbiljne greške: {ex?.Message}\n\nAplikacija se možda mora zatvoriti.",
-                        "Ozbiljna greška", MessageBoxButton.OK, MessageBoxImage.Error);
+                        string.Format(LanguageManager.GetText("app_serious_error_msg", lang), ex?.Message, AppLog.TodayFile),
+                        LanguageManager.GetText("app_serious_error_title", lang), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 catch { }
             };
@@ -53,6 +73,7 @@ namespace UltraVideoEditor
             {
                 // Greške iz "fire and forget" async zadataka koje niko nije čekao (await) —
                 // bez ovoga nestaju potpuno bez traga.
+                AppLog.Error("Background task error", args.Exception);   // v1.4: no longer lost
                 args.SetObserved();
             };
         }

@@ -79,8 +79,7 @@ namespace UltraVideoEditor
         {
             settings ??= new AudioMixSettings();
 
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             if (!File.Exists(ffmpegPath))
                 return Fail("FFmpeg not found.");
@@ -256,7 +255,7 @@ namespace UltraVideoEditor
                         out double lufs))
                     return lufs;
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Measuring loudness (LUFS)", swallowed); }   // v1.4: was silent
             return -99.0;
         }
 

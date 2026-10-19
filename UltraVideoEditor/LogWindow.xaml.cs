@@ -43,9 +43,11 @@ namespace UltraVideoEditor
                     IsAnnouncement = isAnnouncement
                 };
                 _logEntries.Add(entry);
+                // v1.4: keep the window responsive during long sessions
+                while (_logEntries.Count > 5000) _logEntries.RemoveAt(0);
 
                 lstLog.ScrollIntoView(entry);
-                txtStatus.Text = $"Ukupno poruka: {_logEntries.Count}";
+                txtStatus.Text = string.Format(LanguageManager.GetText("log_total", LanguageManager.CurrentLanguage), _logEntries.Count);
             });
         }
 
@@ -70,14 +72,15 @@ namespace UltraVideoEditor
                 sb.AppendLine($"[{entry.Time}] {entry.Message}");
             }
             WpfClipboard.SetText(sb.ToString());
-            AnnounceToJaws($"Kopirano {_logEntries.Count} poruka");
+            AnnounceToJaws(string.Format(LanguageManager.GetText("log_copied", LanguageManager.CurrentLanguage), _logEntries.Count));
         }
 
         private void Clear_Click(object sender, RoutedEventArgs e)
         {
             _logEntries.Clear();
-            AnnounceToJaws("Log obrisan");
-            txtStatus.Text = "Log obrisan";
+            string cleared = LanguageManager.GetText("log_cleared", LanguageManager.CurrentLanguage);
+            AnnounceToJaws(cleared);
+            txtStatus.Text = cleared;
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -108,5 +111,8 @@ namespace UltraVideoEditor
         public string Time { get; set; }
         public string Message { get; set; }
         public bool IsAnnouncement { get; set; }
+
+        // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+        public override string ToString() => $"{Time} {Message}";
     }
 }

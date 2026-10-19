@@ -97,7 +97,7 @@ namespace UltraVideoEditor
                 _recording = true;
                 BtnMic.Content = "⏹ Stop";
                 SetMicButtonColor(true);
-                ShowStatus("🎙 Snimam… Izgovorite komandu, pa pritisnite Stop.", null, true, false);
+                ShowStatus(LanguageManager.T("loc_recording_cmd"), null, true, false);
 
                 // Auto-stop posle 10 sekundi
                 _ = Task.Delay(10000).ContinueWith(_ =>
@@ -131,8 +131,7 @@ namespace UltraVideoEditor
                 BtnExecute.IsEnabled = false;
                 ShowStatus("⏳ Transkribujem snimak (Whisper large-v3)…", null, true, false);
 
-                string ffmpegPath = System.IO.Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegPath = AppPaths.FFmpeg;
 
                 var result = await AITranscription.TranscribeAsync(
                     mediaPath:  _recordingPath,

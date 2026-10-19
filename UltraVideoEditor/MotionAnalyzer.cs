@@ -227,16 +227,21 @@ namespace UltraVideoEditor
             {
                 // Koristimo blend diff + signalstats za mjerenje ukupne promjene pixela
                 // Specifically: comparing left/right and top/bottom halves to determine direction
+                // v1.4: this graph never ran — "signalstats=stat=mean" is not a valid option (FFmpeg
+                // stopped with "Invalid argument"), each input was used four times without split,
+                // and signalstats prints nothing without metadata=print. Every clip came out as
+                // "Motion: Unknown", so motion matching between shots never worked.
                 string args = $"-nostdin -i \"{frameA}\" -i \"{frameB}\"" +
                     " -filter_complex" +
-                    " \"[0:v]crop=80:90:0:0[left0];[1:v]crop=80:90:0:0[left1];" +
-                    "[0:v]crop=80:90:80:0[right0];[1:v]crop=80:90:80:0[right1];" +
-                    "[0:v]crop=160:45:0:0[top0];[1:v]crop=160:45:0:0[top1];" +
-                    "[0:v]crop=160:45:0:45[bot0];[1:v]crop=160:45:0:45[bot1];" +
-                    "[left0][left1]blend=all_mode=difference,signalstats=stat=mean[dl];" +
-                    "[right0][right1]blend=all_mode=difference,signalstats=stat=mean[dr];" +
-                    "[top0][top1]blend=all_mode=difference,signalstats=stat=mean[dt];" +
-                    "[bot0][bot1]blend=all_mode=difference,signalstats=stat=mean[db]\"" +
+                    " \"[0:v]split=4[a0][a1][a2][a3];[1:v]split=4[b0][b1][b2][b3];" +
+                    "[a0]crop=80:90:0:0[left0];[b0]crop=80:90:0:0[left1];" +
+                    "[a1]crop=80:90:80:0[right0];[b1]crop=80:90:80:0[right1];" +
+                    "[a2]crop=160:45:0:0[top0];[b2]crop=160:45:0:0[top1];" +
+                    "[a3]crop=160:45:0:45[bot0];[b3]crop=160:45:0:45[bot1];" +
+                    "[left0][left1]blend=all_mode=difference,signalstats,metadata=mode=print[dl];" +
+                    "[right0][right1]blend=all_mode=difference,signalstats,metadata=mode=print[dr];" +
+                    "[top0][top1]blend=all_mode=difference,signalstats,metadata=mode=print[dt];" +
+                    "[bot0][bot1]blend=all_mode=difference,signalstats,metadata=mode=print[db]\"" +
                     " -map [dl] -map [dr] -map [dt] -map [db]" +
                     " -frames:v 1 -f null -";
 
@@ -256,13 +261,21 @@ namespace UltraVideoEditor
                 await proc.WaitForExitAsync(ct);
 
                 // Izvuci YAVG vrijednosti za svaki od 4 cropova
-                var means = Regex.Matches(stderr, @"YAVG:([\d.]+)");
+                // one line per crop, "[Parsed_metadata_N @ ...] lavfi.signalstats.YAVG=x"; ordered by N
+                // (left, right, top, bottom — the order they appear in the graph)
+                var means = Regex.Matches(stderr, @"Parsed_metadata_(\d+)[^\]]*\]\s*lavfi\.signalstats\.YAVG=([\d.]+)")
+                    .Cast<Match>()
+                    .Select(m => (n: int.Parse(m.Groups[1].Value), v: double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)))
+                    .GroupBy(x => x.n).Select(g => g.First())
+                    .OrderBy(x => x.n)
+                    .Select(x => x.v)
+                    .ToList();
                 if (means.Count < 4) return (double.NaN, double.NaN);
 
-                double meanLeft  = double.Parse(means[0].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                double meanRight = double.Parse(means[1].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                double meanTop   = double.Parse(means[2].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                double meanBot   = double.Parse(means[3].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                double meanLeft  = means[0];
+                double meanRight = means[1];
+                double meanTop   = means[2];
+                double meanBot   = means[3];
 
                 // dx positive = motion to the right (more changes on the left side)
                 // dy positive = motion downward (more changes on the top side)
@@ -294,7 +307,7 @@ namespace UltraVideoEditor
                 proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
                 if (proc != null) await proc.WaitForExitOrKillAsync(ct);
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Motion analysis: running FFmpeg", swallowed); }   // v1.4: was silent
         }
 
         private static MotionResult MakeUnknown()

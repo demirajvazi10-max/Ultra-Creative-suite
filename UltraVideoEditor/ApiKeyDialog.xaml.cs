@@ -9,7 +9,7 @@ namespace UltraVideoEditor
 {
     public partial class ApiKeyDialog : Window
     {
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -59,7 +59,7 @@ namespace UltraVideoEditor
             if (!hasPixabay && !hasAzure)
             {
                 WpfMessageBox.Show(
-                    "Unesi barem Pixabay API key ili Azure AI Foundry endpoint i key.",
+                    LanguageManager.T("loc_apikey_need_one"),
                     L("warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;

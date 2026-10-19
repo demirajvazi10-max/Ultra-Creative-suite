@@ -512,7 +512,8 @@ namespace UltraVideoEditor
             string ffmpegPath, CancellationToken ct)
         {
             // 1:1 crop centra
-            string filter = "crop=ih:ih:(iw-ih)/2:0,scale=1080:1080";
+            // v1.4: works for vertical sources too (ih:ih failed when the video is taller than wide)
+            string filter = "crop=min(iw\\,ih):min(iw\\,ih),scale=1080:1080";
             string args =
                 $"-nostdin -i \"{inputPath}\" " +
                 $"-vf \"{filter}\" " +
@@ -554,7 +555,7 @@ namespace UltraVideoEditor
     public static class VisionAI
     {
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private static string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 

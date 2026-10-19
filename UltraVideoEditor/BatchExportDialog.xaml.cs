@@ -157,7 +157,7 @@ namespace UltraVideoEditor
                 int okCount = _jobs.Count(j => j.Status == BatchJobStatus.Done);
                 int errCount = _jobs.Count(j => j.Status == BatchJobStatus.Error);
                 Log($"Batch complete — ✅ {okCount} done, ❌ {errCount} errors.");
-                TxtProgressMsg.Text = $"Gotovo: {okCount}/{total}";
+                TxtProgressMsg.Text = LanguageManager.F("loc_done_of", okCount, total);
                 TotalProgressBar.Value = 100;
             }
         }

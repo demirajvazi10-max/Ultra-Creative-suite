@@ -53,8 +53,7 @@ namespace UltraVideoEditor
             IProgress<(int Percent, string Message)> progress = null,
             CancellationToken ct = default)
         {
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             if (!File.Exists(videoPath))  return Fail($"Video file not found: {videoPath}");
             if (!File.Exists(ffmpegPath)) return Fail("FFmpeg not found.");
@@ -75,7 +74,7 @@ namespace UltraVideoEditor
                 var cutTimes = FilterCuts(rawCuts, duration);
 
                 // 2 — Kreiraj segmente
-                Report(progress, 45, "Kreiram segmente…");
+                Report(progress, 45, LanguageManager.T("loc_creating_segments"));
                 var segments = BuildSegments(videoPath, cutTimes, duration);
 
                 // 3 — Vision analiza (paralelno, max 3)
@@ -277,7 +276,7 @@ namespace UltraVideoEditor
             sb.AppendLine($"   Duration:{AIHighlightEngine.FormatTime(result.TotalDuration)}");
             sb.AppendLine($"   Scenes:  {result.SceneCount}");
             sb.AppendLine();
-            sb.AppendLine("🎬 DETEKTOVANE SCENE");
+            sb.AppendLine("🎬 DETECTED SCENES");
             foreach (var s in result.Scenes)
             {
                 string motion = s.Motion == null ? "" : s.Motion.IsStatic ? " [static]" : $" [{s.Motion.Direction}]";
@@ -286,7 +285,7 @@ namespace UltraVideoEditor
                 sb.AppendLine($"         {s.Label}{motion}");
             }
             sb.AppendLine();
-            sb.AppendLine($"Generisan: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
+            sb.AppendLine($"Generated: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
             sb.AppendLine("Ultra Creative Suite — Smart Scene Detector (Phase 4A)");
             return sb.ToString();
         }

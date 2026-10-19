@@ -13,7 +13,7 @@
 		     Naslov prozora i "About" dijalog čitaju ovu vrednost u runtime-u
 		     (MainWindow.xaml.cs -> GetAppVersion()), tako da se nigde više ne
 		     ručno kuca broj verzije. -->
-		<Version>1.0.3</Version>
+		<Version>1.4.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -23,7 +23,6 @@
 		<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.6" />
 		<PackageReference Include="NAudio" Version="2.3.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="PixabaySharp" Version="1.1.0" />
 		<!-- ONNX Runtime — AI computer vision za analizu klipova -->
 		<!-- Ako nije instalirano, VisionAnalyzer automatski koristi FFmpeg fallback -->
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.0" />
@@ -31,6 +30,14 @@
 		<PackageReference Include="SkiaSharp.Views.WPF" Version="2.88.6" />
 		<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
 		</ItemGroup>
+
+	<!-- v1.4: the test project lives in the Tests folder and is built on its own -->
+	<ItemGroup>
+		<Compile Remove="Tests\**" />
+		<EmbeddedResource Remove="Tests\**" />
+		<None Remove="Tests\**" />
+		<Page Remove="Tests\**" />
+	</ItemGroup>
 
 	<ItemGroup>
 	  <Compile Update="Properties\Resources.Designer.cs">

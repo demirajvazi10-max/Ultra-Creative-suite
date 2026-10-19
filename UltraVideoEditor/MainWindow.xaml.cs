@@ -54,7 +54,7 @@ namespace UltraVideoEditor
         private string          _lastHighlightMusicPath   = null;
 
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -143,10 +143,23 @@ namespace UltraVideoEditor
         private LogWindow _logWindow;
         private TimelineItem _copiedClip = null;
         private RenderEngine _renderEngine;
-        internal string _currentLanguage = "en";
+        // v1.4: stored in LanguageManager so every thread can read it safely
+        internal string _currentLanguage
+        {
+            get => LanguageManager.CurrentLanguage;
+            set => LanguageManager.CurrentLanguage = string.IsNullOrEmpty(value) ? "en" : value;
+        }
         private string _currentTheme = "dark"; // dark | contrast | light
 
         private List<AnimationScene> _animationScenes = new List<AnimationScene>();
+
+        // v1.4: the clip currently loaded in the preview player. The player plays ONE clip
+        // file at a time, so its position is relative to that clip — everything that needs a
+        // timeline time (markers, cut, keyframes) converts through this item.
+        private TimelineItem _playingItem = null;
+        // v1.4: the project file last saved/opened — Ctrl+S saves there without asking again.
+        private string _currentProjectPath = null;
+
         [DllImport("user32.dll")]
         private static extern bool MessageBeep(uint uType);
         private const uint MB_ICONASTERISK = 0x00000040;
@@ -189,19 +202,27 @@ namespace UltraVideoEditor
                 _mediaPlayer.Playing += (s, e) =>
                 {
                     isPlaying = true;
-                    Dispatcher.Invoke(() => { if (btnPlay != null) btnPlay.Content = "⏸ PAUSE"; });
+                    // v1.4: player events arrive on the player's own thread — queue UI work
+                    Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "⏸ " + L("pause"); }));
                     LogMessage("Playback started", false);
+                };
+                // v1.4: a file opened paused (":start-paused", used after the end) reports Playing
+                // first; the Paused event puts the state right again
+                _mediaPlayer.Paused += (s, e) =>
+                {
+                    isPlaying = false;
+                    Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "▶ " + L("play"); }));
                 };
                 _mediaPlayer.Stopped += (s, e) =>
                 {
                     isPlaying = false;
-                    Dispatcher.Invoke(() => { if (btnPlay != null) btnPlay.Content = "▶ PLAY"; });
+                    Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "▶ " + L("play"); }));
                     LogMessage("Playback stopped", false);
                 };
                 _mediaPlayer.EndReached += (s, e) =>
                 {
                     isPlaying = false;
-                    Dispatcher.Invoke(() => { if (btnPlay != null) btnPlay.Content = "▶ PLAY"; });
+                    Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "▶ " + L("play"); }));
                     LogMessage(L("playback_done"), false);
                 };
                 _mediaPlayer.TimeChanged += OnTimeChanged;
@@ -227,7 +248,11 @@ namespace UltraVideoEditor
                     {
                         if (_pendingPlaybackItem != null)
                         {
-                            PlaySelectedItem(_pendingPlaybackItem);
+                            // v1.4: a list refresh selects the same clip again — that must not
+                            // restart the clip that is already loaded (it jumped back to 0:00
+                            // after describing, trimming, changing volume…). Space/Enter still play.
+                            if (!(ReferenceEquals(_pendingPlaybackItem, _playingItem) && _currentMedia != null && !_mixPreviewActive))
+                                PlaySelectedItem(_pendingPlaybackItem);
                             _pendingPlaybackItem = null;
                         }
                     }));
@@ -237,9 +262,14 @@ namespace UltraVideoEditor
                 Loaded += (s, ev) =>
                 {
                     ApplyLanguage();
+                    // v1.4: with a Serbian interface, transcription/lyric sync default to Serbian
+                    if (_currentLanguage == "sr" && rbSrb != null) rbSrb.IsChecked = true;
                     LoadSavedTheme();
                     DetectAndApplyInitialMode();
                     LogMessage("System ready...", true);
+                    // v1.4: offer to restore work lost in a crash, then keep autosaving
+                    OfferAutosaveRecovery();
+                    StartAutosave();
                 };
             }
             catch (Exception ex)
@@ -447,7 +477,7 @@ namespace UltraVideoEditor
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "theme.cfg"),
                     _currentTheme);
                 }
-                catch { }
+                catch (Exception swallowed) { AppLog.Error("Saving the theme", swallowed); }   // v1.4: was silent
             }
             catch (Exception ex) { LogMessage("Error applying theme: " + ex.Message, false); }
         }
@@ -464,32 +494,37 @@ namespace UltraVideoEditor
                     { _currentTheme = t; ApplyTheme(); }
                 }
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Loading the saved theme", swallowed); }   // v1.4: was silent
         }
 
 
-        private string GetApiKey(string keyName)
-        {
-            string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-            string keyFile = Path.Combine(settingsPath, $"{keyName}_key.bin");
-            if (!File.Exists(keyFile)) return null;
-            try
-            {
-                byte[] encrypted = File.ReadAllBytes(keyFile);
-                byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(decrypted);
-            }
-            catch { return null; }
-        }
+        // v1.4: keys and tokens go through the shared KeyStore (same files as before)
+        private string GetApiKey(string keyName) => KeyStore.Load(keyName);
 
         private void SaveApiKey(string keyName, string apiKey)
         {
-            string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-            Directory.CreateDirectory(settingsPath);
-            string keyFile = Path.Combine(settingsPath, $"{keyName}_key.bin");
-            byte[] data = Encoding.UTF8.GetBytes(apiKey);
-            byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(keyFile, encrypted);
+            if (!KeyStore.Save(keyName, apiKey))
+                LogMessage($"The key '{keyName}' could not be saved. Details are in the log file.", true);
+        }
+
+        /// <summary>
+        /// v1.4 — the Cloudflare ACCOUNT ID (needed in every Workers AI URL). It was hard-coded to
+        /// one developer account, so a token from any other account was refused (403) and image
+        /// generation, scenario and description never worked for other users. Asked once, saved
+        /// encrypted like the token.
+        /// </summary>
+        private string GetCloudflareAccountId(bool askIfMissing = true)
+        {
+            string id = GetApiKey("cloudflare_account");
+            if (!string.IsNullOrWhiteSpace(id) || !askIfMissing) return id?.Trim();
+            var dlg = new TextOverlayDialog("Cloudflare Account ID (Cloudflare dashboard → Workers AI → Account ID)") { Owner = this };
+            if (dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.Text))
+            {
+                id = dlg.Text.Trim();
+                SaveApiKey("cloudflare_account", id);
+                return id;
+            }
+            return null;
         }
 
         private string GetHuggingFaceApiKey() => GetApiKey("huggingface");
@@ -520,7 +555,7 @@ namespace UltraVideoEditor
 
         public void LogMessage(string message, bool announce = false)
         {
-            Dispatcher.Invoke(() =>
+            void Write()
             {
                 if (txtJawsLog != null)
                     txtJawsLog.Text = message;
@@ -529,12 +564,16 @@ namespace UltraVideoEditor
                 // Screen reader announcement: samo jednom, ne duplo
                 if (announce && accessibilityMode)
                     AnnounceToJaws(message);
-            });
+            }
+            // v1.4: from another thread (player events, background work) the message is queued
+            // instead of waiting for the UI thread — waiting could deadlock with the player.
+            if (Dispatcher.CheckAccess()) Write();
+            else Dispatcher.BeginInvoke(new Action(Write));
         }
         /// <summary>
         /// Dodaje titl na timeline za JAWS i prikaz na ekranu
         /// </summary>
-        public void AddSubtitle(string text, double startTime, double endTime)
+        public void AddSubtitle(string text, double startTime, double endTime, List<KaraokeWord> karaokeWords = null)
         {
             try
             {
@@ -542,7 +581,8 @@ namespace UltraVideoEditor
                 {
                     Text = text,
                     Start = startTime,
-                    End = endTime
+                    End = endTime,
+                    Words = karaokeWords   // v1.4: karaoke timing from the AI video creator (null = plain subtitle)
                 };
 
                 subtitles.Add(subtitle);
@@ -555,7 +595,8 @@ namespace UltraVideoEditor
                     }
                 });
 
-                LogMessage($"📝 Titl: {text} ({FormatTime(startTime)} - {FormatTime(endTime)})", true);
+                // v1.4: logged, not spoken — the AI creator adds dozens of lines at once
+                LogMessage($"📝 Titl: {text} ({FormatTime(startTime)} - {FormatTime(endTime)})", false);
             }
             catch (Exception ex)
             {
@@ -568,6 +609,24 @@ namespace UltraVideoEditor
             // Korisnik NIKAD ne mora otvarati Log prozor da bi dobio info.
             Dispatcher.Invoke(() =>
             {
+                // v1.4 (R6): NVDA and Narrator read UI Automation notifications reliably, while
+                // WPF live regions are read inconsistently by them (sometimes twice because of the
+                // ghost region, sometimes not at all). With NVDA or Narrator — and no JAWS — the
+                // message goes out as one notification; JAWS keeps the live regions it was tested with.
+                var reader = ScreenReaderDetector.CurrentReader();
+                if ((reader == ScreenReaderDetector.Reader.Nvda || reader == ScreenReaderDetector.Reader.Narrator) && txtJawsLog != null)
+                {
+                    txtJawsLog.Text = message;
+                    try
+                    {
+                        var np = UIElementAutomationPeer.CreatePeerForElement(txtJawsLog) ?? UIElementAutomationPeer.FromElement(txtJawsLog);
+                        np?.RaiseNotificationEvent(AutomationNotificationKind.Other,
+                            AutomationNotificationProcessing.ImportantMostRecent, message, "UltraVideoEditor.Announcement");
+                        return;
+                    }
+                    catch (Exception ex) { AppLog.Error("UIA notification", ex); }   // fall back to live regions
+                }
+
                 // ── Primarni live region (uvijek vidljiv status bar) ──────────────
                 if (txtJawsLog != null)
                 {
@@ -607,7 +666,7 @@ namespace UltraVideoEditor
             AutomationProperties.SetName(btnZoomOut, "Zoom out, Ctrl minus");
             AutomationProperties.SetName(btnAddMarker, "Add marker, Ctrl M");
             AutomationProperties.SetName(btnNextMarker, L("acc_next_marker"));
-            AutomationProperties.SetName(btnPrevMarker, "Previous marker, Ctrl Shift P");
+            AutomationProperties.SetName(btnPrevMarker, "Previous marker, Ctrl Shift comma");
             AutomationProperties.SetName(btnSeekBack, "Seek back 5 seconds");
             AutomationProperties.SetName(btnSeekForward, "Seek forward 5 seconds");
             AutomationProperties.SetName(tabTimeline, "Timeline tab, clip list");
@@ -670,7 +729,66 @@ namespace UltraVideoEditor
 
         private string FormatTime(double seconds) => TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss");
         private string FormatTimeDetailed(double seconds) => TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss\.f");
-        private double GetTotalDuration() => timelineItems.Sum(t => t.Duration);
+        // v1.4: the project's length is where the last clip ends (tracks run in parallel);
+        // the old sum of ALL clip durations counted the song and the pictures one after another.
+        private double GetTotalDuration() => timelineItems.Count == 0 ? 0 : timelineItems.Max(t => t.End);
+
+        /// <summary>Timeline time of the preview player's current position.</summary>
+        private double TimelinePosition => (_playingItem?.Start ?? 0) + currentPlaybackPosition;
+
+        /// <summary>
+        /// Position inside <paramref name="item"/> that corresponds to the player position:
+        /// the player position itself if this clip is the one playing, otherwise the timeline
+        /// position translated into the clip. Before v1.4 every command subtracted item.Start
+        /// from the CLIP-relative player time, so Cut, markers and keyframes only worked on
+        /// the very first clip of the timeline ("Cut does nothing").
+        /// </summary>
+        private double PositionInClip(TimelineItem item)
+        {
+            if (item == null) return 0;
+            if (ReferenceEquals(item, _playingItem)) return currentPlaybackPosition;
+            return TimelinePosition - item.Start;
+        }
+
+        /// <summary>
+        /// v1.4 — gives every clip its Start/End. Tracks run in parallel (Video 1, Video 2,
+        /// Audio 1, Audio 2 each start at 0). Within a track clips follow each other in list
+        /// order; a clip with a fixed position ("Set position on the timeline", AI music video,
+        /// auto-arrange) stays exactly there and the others flow around it.
+        /// Before v1.4 every list refresh laid out ALL clips of ALL tracks one after another:
+        /// the song ended up after the last picture, fixed positions were overwritten, and
+        /// the AI video's lyric timing was destroyed as soon as the list was redrawn.
+        /// </summary>
+        private void RecalculatePositions()
+        {
+            RootRelativePaths();
+            TimelineLayout.Recalculate(timelineItems);
+        }
+
+        /// <summary>
+        /// v1.4 — a clip path without a folder ("AI_1234.mp4") only works while the current
+        /// directory happens to be right; FFmpeg runs elsewhere and cannot find it. Such paths
+        /// are made absolute as long as the file can still be found.
+        /// </summary>
+        private void RootRelativePaths()
+        {
+            foreach (var item in timelineItems)
+            {
+                if (string.IsNullOrEmpty(item.Path) || Path.IsPathRooted(item.Path)) continue;
+                try
+                {
+                    string[] candidates =
+                    {
+                        Path.GetFullPath(item.Path),
+                        string.IsNullOrEmpty(currentProjectFolder) ? null : Path.Combine(currentProjectFolder, item.Path),
+                        Path.Combine(AppPaths.BaseDir, item.Path)
+                    };
+                    string found = candidates.FirstOrDefault(c => c != null && File.Exists(c));
+                    if (found != null) item.Path = found;
+                }
+                catch (Exception ex) { AppLog.Error($"Resolving the clip path '{item.Path}'", ex); }
+            }
+        }
         private void UpdatePositionDisplay()
         {
             if (txtCurrentPosition != null)
@@ -678,13 +796,17 @@ namespace UltraVideoEditor
         }
         private void OnMediaLengthChanged(object sender, LibVLCSharp.Shared.MediaPlayerLengthChangedEventArgs e)
         {
-            currentVideoDuration = e.Length / 1000.0;
-            Dispatcher.Invoke(UpdatePositionDisplay);
+            // v1.4: a cut part plays from the middle of its file — its own length is what counts
+            var playing = _playingItem;
+            currentVideoDuration = playing != null && !_mixPreviewActive ? playing.Duration : e.Length / 1000.0;
+            Dispatcher.BeginInvoke(new Action(UpdatePositionDisplay));   // v1.4: player thread → queue
         }
         private void OnTimeChanged(object sender, LibVLCSharp.Shared.MediaPlayerTimeChangedEventArgs e)
         {
-            currentPlaybackPosition = e.Time / 1000.0;
-            Dispatcher.Invoke(UpdatePositionDisplay);
+            // v1.4: position relative to the CLIP (the file may start at the clip's in-point)
+            double inPoint = _playingItem?.SourceOffset ?? 0;
+            currentPlaybackPosition = Math.Max(0, e.Time / 1000.0 - inPoint);
+            Dispatcher.BeginInvoke(new Action(UpdatePositionDisplay));   // v1.4: player thread → queue
         }
 
         private void InitPositionAnnouncer()
@@ -697,7 +819,7 @@ namespace UltraVideoEditor
                 {
                     try
                     {
-                        LogMessage($"Pozicija: {FormatTime(currentPlaybackPosition)} od {FormatTime(currentVideoDuration)}", true);
+                        LogMessage(string.Format(L("position_of"), FormatTime(currentPlaybackPosition), FormatTime(currentVideoDuration)), true);
                     }
                     catch { }
                 }
@@ -723,96 +845,351 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
         }
 
+        // ── v1.4: unsaved changes ────────────────────────────────────────────
+        // The saved state is remembered as text; "unsaved" simply means the project now
+        // serializes differently. No need to mark every single edit as a change.
+        private string _savedSnapshot;
+
+        private string ProjectSnapshot() => JsonConvert.SerializeObject(new ProjectData
+        {
+            TimelineItems = timelineItems,
+            Subtitles = subtitles,
+            Markers = markers,
+            Transitions = transitions
+        });
+
+        private void MarkProjectSaved()
+        {
+            _savedSnapshot = ProjectSnapshot();
+            DeleteAutosave();
+        }
+
+        private bool HasUnsavedChanges()
+        {
+            if (_savedSnapshot == null) return timelineItems.Count > 0 || subtitles.Count > 0;
+            return ProjectSnapshot() != _savedSnapshot;
+        }
+
+        /// <summary>
+        /// Asks "save changes?" when there is something unsaved. Returns false when the user
+        /// cancelled (or cancelled the Save as dialog) — the caller must then stop.
+        /// </summary>
+        private bool ConfirmSaveChanges(string questionKey)
+        {
+            if (!HasUnsavedChanges()) return true;
+            var result = WpfMessageBox.Show(L(questionKey), "Ultra Video Editor",
+                                            MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (result == MessageBoxResult.Cancel) return false;
+            if (result == MessageBoxResult.No) return true;
+            return !string.IsNullOrEmpty(_currentProjectPath)
+                ? WriteProjectFile(_currentProjectPath)
+                : SaveAsInteractive();
+        }
+
+        // ── v1.4: autosave and crash recovery ────────────────────────────────
+        // Every 2 minutes, if something changed, the project is written to
+        // %LOCALAPPDATA%\UltraVideoEditor\Autosave. A normal save or a normal close removes it,
+        // so a file that is still there at start-up means the program did not close normally.
+        private System.Windows.Threading.DispatcherTimer _autosaveTimer;
+        private string _lastAutosavedSnapshot;
+        private static string AutosaveFile => Path.Combine(AppPaths.AutosaveDir, "autosave.iskra");
+        private static string AutosaveOriginFile => Path.Combine(AppPaths.AutosaveDir, "autosave_origin.txt");
+
+        private void StartAutosave()
+        {
+            _autosaveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(2) };
+            _autosaveTimer.Tick += (s, e) => AutosaveNow();
+            _autosaveTimer.Start();
+        }
+
+        private void AutosaveNow()
+        {
+            try
+            {
+                if (!HasUnsavedChanges()) return;
+                string snapshot = ProjectSnapshot();
+                if (snapshot == _lastAutosavedSnapshot) return;
+                string tmp = AutosaveFile + ".tmp";
+                File.WriteAllText(tmp, JsonConvert.SerializeObject(new ProjectData
+                {
+                    TimelineItems = timelineItems,
+                    Subtitles = subtitles,
+                    Markers = markers,
+                    Transitions = transitions,
+                    CurrentTrackFilter = currentTrackFilter,
+                    ZoomLevel = zoomLevel,
+                    ProjectVersion = "5.1"
+                }, Formatting.Indented));
+                File.Copy(tmp, AutosaveFile, true);
+                File.Delete(tmp);
+                File.WriteAllText(AutosaveOriginFile, _currentProjectPath ?? "");
+                _lastAutosavedSnapshot = snapshot;
+                LogMessage(L("autosave_done"), false);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Autosave", ex);
+            }
+        }
+
+        private static void DeleteAutosave()
+        {
+            try
+            {
+                if (File.Exists(AutosaveFile)) File.Delete(AutosaveFile);
+                if (File.Exists(AutosaveOriginFile)) File.Delete(AutosaveOriginFile);
+            }
+            catch (Exception ex) { AppLog.Error("Removing the autosave", ex); }
+        }
+
+        private async void OfferAutosaveRecovery()
+        {
+            try
+            {
+                if (!File.Exists(AutosaveFile)) return;
+                string origin = File.Exists(AutosaveOriginFile) ? File.ReadAllText(AutosaveOriginFile).Trim() : "";
+                string when = File.GetLastWriteTime(AutosaveFile).ToString("dd.MM.yyyy HH:mm");
+                string name = string.IsNullOrEmpty(origin) ? L("autosave_unnamed") : Path.GetFileName(origin);
+                var answer = WpfMessageBox.Show(string.Format(L("autosave_restore_question"), name, when),
+                    "Ultra Video Editor", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (answer == MessageBoxResult.Yes)
+                {
+                    await LoadProjectFromFileAsync(AutosaveFile, string.IsNullOrEmpty(origin) ? null : origin, recovered: true);
+                    LogMessage(L("autosave_restored"), true);
+                }
+                else
+                {
+                    DeleteAutosave();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Restoring the autosave", ex);
+            }
+        }
+
+        // ── v1.4: projects that can be moved ─────────────────────────────────
+        private void StoreRelativePaths(string projectDir)
+        {
+            if (string.IsNullOrEmpty(projectDir)) return;
+            foreach (var item in timelineItems)
+            {
+                if (string.IsNullOrEmpty(item.Path)) continue;
+                try
+                {
+                    // Different drives give an absolute path back — then there is nothing relative to store.
+                    string rel = Path.GetRelativePath(projectDir, item.Path);
+                    item.RelativePath = Path.IsPathRooted(rel) ? "" : rel;
+                }
+                catch { item.RelativePath = ""; }   // malformed path — keep the absolute one only
+            }
+        }
+
+        /// <summary>
+        /// Media that is not where the project says: first tried next to the project (relative
+        /// path), then — after asking — in a folder the user picks, by file name.
+        /// </summary>
+        private void FindMovedMedia(string projectDir)
+        {
+            int fixedByRelative = 0;
+            foreach (var item in timelineItems)
+            {
+                if (string.IsNullOrEmpty(item.Path) || File.Exists(item.Path)) continue;
+                if (string.IsNullOrEmpty(item.RelativePath) || string.IsNullOrEmpty(projectDir)) continue;
+                string candidate = Path.GetFullPath(Path.Combine(projectDir, item.RelativePath));
+                if (File.Exists(candidate)) { item.Path = candidate; fixedByRelative++; }
+            }
+
+            var missing = timelineItems.Where(i => !string.IsNullOrEmpty(i.Path) && !File.Exists(i.Path)).ToList();
+            if (fixedByRelative > 0)
+                LogMessage(string.Format(L("media_relinked"), fixedByRelative), true);
+            if (missing.Count == 0) { if (fixedByRelative > 0) UpdateTimelineDisplay(); return; }
+
+            var answer = WpfMessageBox.Show(string.Format(L("media_missing_question"), missing.Count),
+                "Ultra Video Editor", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer == MessageBoxResult.Yes)
+            {
+                var dlg = new Microsoft.Win32.OpenFolderDialog { Title = L("media_pick_folder") };
+                if (dlg.ShowDialog() == true)
+                {
+                    var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+                        foreach (string f in Directory.EnumerateFiles(dlg.FolderName, "*", options))
+                            byName.TryAdd(Path.GetFileName(f), f);
+                    }
+                    catch (Exception ex) { AppLog.Error("Searching for missing media", ex); }
+
+                    int found = 0;
+                    foreach (var item in missing)
+                        if (byName.TryGetValue(Path.GetFileName(item.Path), out string f)) { item.Path = f; found++; }
+                    LogMessage(string.Format(L("media_found"), found, missing.Count), true);
+                }
+            }
+            UpdateTimelineDisplay();
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (!e.Cancel && !ConfirmSaveChanges("save_before_close"))
+                e.Cancel = true;
+            if (!e.Cancel)
+            {
+                // The user decided (saved or chose not to) — this is not a crash.
+                _autosaveTimer?.Stop();
+                DeleteAutosave();
+            }
+            base.OnClosing(e);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            // v1.4: the log window only hides itself when closed, so it could keep the
+            // program running in the background after the main window was closed.
+            WpfApplication.Current?.Shutdown();
+        }
+
         private void NewProject_Click(object sender, RoutedEventArgs e)
         {
-            if (timelineItems.Count > 0 || subtitles.Count > 0)
-            {
-                var result = WpfMessageBox.Show(L("save_before_new"),
-                                              "New project", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-                if (result == MessageBoxResult.Yes)
-                    SaveProject_Click(null, null);
-                else if (result == MessageBoxResult.Cancel)
-                    return;
-            }
+            if (!ConfirmSaveChanges("save_before_new")) return;
             timelineItems.Clear();
             subtitles.Clear();
             markers.Clear();
             transitions.Clear();
             undoStack.Clear();
             redoStack.Clear();
+            _currentProjectPath = null;
+            _playingItem = null;
+            _savedSnapshot = null;
             UpdateTimelineDisplay();
             lstSubtitles.Items.Clear();
             LogMessage("New project created", true);
         }
 
-        private void SaveProject_Click(object sender, RoutedEventArgs e)
+        /// <summary>v1.4 — writes the project to <paramref name="path"/> and remembers it for Ctrl+S.</summary>
+        private bool WriteProjectFile(string path)
         {
-            var d = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
-            if (d.ShowDialog() == true)
+            try
             {
-                try
+                currentProjectFolder = Path.GetDirectoryName(path) ?? string.Empty;
+                CollectTempMedia(path);
+                StoreRelativePaths(Path.GetDirectoryName(path) ?? "");
+                var projectData = new ProjectData
                 {
-                    currentProjectFolder = Path.GetDirectoryName(d.FileName) ?? string.Empty;
-                    var projectData = new ProjectData
-                    {
-                        TimelineItems = timelineItems,
-                        Subtitles = subtitles,
-                        Markers = markers,
-                        Transitions = transitions,
-                        CurrentTrackFilter = currentTrackFilter,
-                        ZoomLevel = zoomLevel,
-                        ProjectVersion = "5.0"
-                    };
-                    string json = JsonConvert.SerializeObject(projectData, Formatting.Indented);
-                    File.WriteAllText(d.FileName, json);
-                    LogMessage(string.Format(L("project_saved_as"), Path.GetFileName(d.FileName)), true);
-                    PlayBeep();
-                }
-                catch (Exception ex)
-                {
-                    WpfMessageBox.Show(string.Format(L("project_save_error"), ex.Message), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                    TimelineItems = timelineItems,
+                    Subtitles = subtitles,
+                    Markers = markers,
+                    Transitions = transitions,
+                    CurrentTrackFilter = currentTrackFilter,
+                    ZoomLevel = zoomLevel,
+                    ProjectVersion = "5.1"
+                };
+                string json = JsonConvert.SerializeObject(projectData, Formatting.Indented);
+                // v1.4: write to a temporary file first and then swap it in, keeping the
+                // previous version as .bak — a crash or power cut while saving used to leave
+                // a half-written, unreadable project.
+                string tmp = path + ".tmp";
+                File.WriteAllText(tmp, json);
+                if (File.Exists(path)) File.Replace(tmp, path, path + ".bak", true);
+                else File.Move(tmp, path);
+                _currentProjectPath = path;
+                MarkProjectSaved();
+                LogMessage(string.Format(L("project_saved_as"), Path.GetFileName(path)), true);
+                PlayBeep();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                WpfMessageBox.Show(string.Format(L("project_save_error"), ex.Message), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 
-        private void SaveAsProject_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// v1.4 — clips the AI creator, Video Engine, TTS etc. downloaded into the Windows TEMP
+        /// folder are copied next to the project ("&lt;name&gt;_media") when it is saved.
+        /// Windows cleans TEMP on its own, so a project opened weeks later had lost its clips.
+        /// </summary>
+        private void CollectTempMedia(string projectPath)
         {
-            var d = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
-            if (d.ShowDialog() == true)
+            RootRelativePaths();
+            string temp = Path.GetFullPath(Path.GetTempPath());
+            // the program's own folder counts too: clips the AI saved there disappear with a clean build
+            string programDir = Path.GetFullPath(AppPaths.BaseDir);
+            var inTemp = timelineItems
+                .Where(i => !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path) &&
+                            (Path.GetFullPath(i.Path).StartsWith(temp, StringComparison.OrdinalIgnoreCase) ||
+                             Path.GetFullPath(i.Path).StartsWith(programDir, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (inTemp.Count == 0) return;
+
+            string mediaDir = Path.Combine(Path.GetDirectoryName(projectPath) ?? "",
+                                           Path.GetFileNameWithoutExtension(projectPath) + "_media");
+            Directory.CreateDirectory(mediaDir);
+            var copied = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in inTemp)
             {
-                try
+                string src = Path.GetFullPath(item.Path);
+                if (!copied.TryGetValue(src, out string dest))
                 {
-                    currentProjectFolder = Path.GetDirectoryName(d.FileName) ?? string.Empty;
-                    var projectData = new ProjectData
-                    {
-                        TimelineItems = timelineItems,
-                        Subtitles = subtitles,
-                        Markers = markers,
-                        Transitions = transitions,
-                        CurrentTrackFilter = currentTrackFilter,
-                        ZoomLevel = zoomLevel,
-                        ProjectVersion = "5.0"
-                    };
-                    string json = JsonConvert.SerializeObject(projectData, Formatting.Indented);
-                    File.WriteAllText(d.FileName, json);
-                    LogMessage(string.Format(L("project_saved_as"), Path.GetFileName(d.FileName)), true);
-                    PlayBeep();
+                    dest = Path.Combine(mediaDir, Path.GetFileName(src));
+                    for (int n = 2; File.Exists(dest); n++)
+                        dest = Path.Combine(mediaDir, $"{Path.GetFileNameWithoutExtension(src)}_{n}{Path.GetExtension(src)}");
+                    File.Copy(src, dest);
+                    copied[src] = dest;
                 }
-                catch (Exception ex)
-                {
-                    WpfMessageBox.Show(string.Format(L("save_error2"), ex.Message), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                item.Path = dest;
             }
+            LogMessage($"{copied.Count} temporary media files were copied into the project folder ({Path.GetFileName(mediaDir)}).", true);
+        }
+
+        private void SaveProject_Click(object sender, RoutedEventArgs e)
+        {
+            // v1.4: Save writes to the current project file; only the first save asks where.
+            if (!string.IsNullOrEmpty(_currentProjectPath))
+            {
+                WriteProjectFile(_currentProjectPath);
+                return;
+            }
+            SaveAsProject_Click(sender, e);
+        }
+
+        private void SaveAsProject_Click(object sender, RoutedEventArgs e) => SaveAsInteractive();
+
+        /// <summary>Shows Save as; true when the project was written.</summary>
+        private bool SaveAsInteractive()
+        {
+            var d = new WpfSaveFileDialog
+            {
+                Filter = "Iskra Project|*.iskra",
+                DefaultExt = "iskra",
+                FileName = string.IsNullOrEmpty(_currentProjectPath) ? "project.iskra" : Path.GetFileName(_currentProjectPath)
+            };
+            return d.ShowDialog() == true && WriteProjectFile(d.FileName);
         }
 
         private async void LoadProject_Click(object sender, RoutedEventArgs e)
         {
+            if (!ConfirmSaveChanges("save_before_open")) return;
             var d = new WpfOpenFileDialog { Filter = "Iskra Project|*.iskra" };
             if (d.ShowDialog() == true)
+                await LoadProjectFromFileAsync(d.FileName, d.FileName);
+        }
+
+        /// <summary>
+        /// v1.4 — loads a project. <paramref name="projectPath"/> is where it belongs (null for a
+        /// recovered autosave of a never-saved project); <paramref name="sourceFile"/> is what is
+        /// actually read (the project itself, or the autosave copy).
+        /// </summary>
+        private async Task LoadProjectFromFileAsync(string sourceFile, string projectPath, bool recovered = false)
+        {
+            var d = new { FileName = projectPath ?? sourceFile };
             {
                 try
                 {
-                    string json = await File.ReadAllTextAsync(d.FileName);
+                    string json = await File.ReadAllTextAsync(sourceFile);
                     var projectData = JsonConvert.DeserializeObject<ProjectData>(json);
                     if (projectData == null) { LogMessage(L("project_corrupt"), true); return; }
                     timelineItems = projectData.TimelineItems ?? new List<TimelineItem>();
@@ -821,16 +1198,26 @@ namespace UltraVideoEditor
                     transitions = projectData.Transitions ?? new List<TransitionEffect>();
                     currentTrackFilter = projectData.CurrentTrackFilter;
                     zoomLevel = projectData.ZoomLevel;
-                    currentProjectFolder = Path.GetDirectoryName(d.FileName) ?? string.Empty;
-                    double currentTime = 0;
-                    foreach (var item in timelineItems) { item.Start = currentTime; item.End = currentTime + item.Duration; currentTime += item.Duration; }
+                    currentProjectFolder = projectPath != null ? Path.GetDirectoryName(projectPath) ?? string.Empty : string.Empty;
+                    _currentProjectPath = projectPath;
+                    // v1.4: positions come from RecalculatePositions (per track, fixed positions
+                    // kept) — the old loop laid every clip of every track end to end.
                     UpdateZoomDisplay();
                     UpdateTimelineDisplay();
                     UpdateMarkerDisplay();
                     lstSubtitles.Items.Clear();
                     foreach (var sub in subtitles) lstSubtitles.Items.Add($"{FormatTime(sub.Start)} -> {FormatTime(sub.End)}: {sub.Text}");
+                    undoStack.Clear();
+                    redoStack.Clear();
+                    if (recovered)
+                        _savedSnapshot = null;   // a recovered project counts as unsaved
+                    else
+                        MarkProjectSaved();
                     LogMessage(string.Format(L("project_loaded_clips"), Path.GetFileName(d.FileName), timelineItems.Count), true);
                     PlayBeep();
+
+                    // v1.4: media of a moved project is found again (relative paths, then a folder search)
+                    if (projectPath != null) FindMovedMedia(Path.GetDirectoryName(projectPath) ?? "");
 
                     await Task.Delay(100);
                 }
@@ -846,6 +1233,8 @@ namespace UltraVideoEditor
 
         private TimelineItem DeepCloneTimelineItem(TimelineItem source)
         {
+            // v1.4: copies EVERY field — undo/copy/cut used to lose the fixed position,
+            // the text on the image, the colour grade and the ambient sound of a clip.
             var clone = new TimelineItem
             {
                 Path = source.Path,
@@ -855,6 +1244,25 @@ namespace UltraVideoEditor
                 Volume = source.Volume,
                 TrackIndex = source.TrackIndex,
                 AudioDescription = source.AudioDescription,
+                Start = source.Start,
+                End = source.End,
+                FixedPosition = source.FixedPosition,
+                UseFixedPosition = source.UseFixedPosition,
+                SourceOffset = source.SourceOffset,
+                TransitionOut = source.TransitionOut,
+                TransitionOutDuration = source.TransitionOutDuration,
+                ContentTag = source.ContentTag,
+                AmbientSoundPath = source.AmbientSoundPath,
+                RelativePath = source.RelativePath,
+                TextOverlay = source.TextOverlay == null ? new TextOverlayData() : new TextOverlayData
+                {
+                    Text = source.TextOverlay.Text,
+                    Font = source.TextOverlay.Font,
+                    SelectedFontSize = source.TextOverlay.SelectedFontSize,
+                    Color = source.TextOverlay.Color,
+                    Position = source.TextOverlay.Position,
+                    Enabled = source.TextOverlay.Enabled
+                },
                 VideoEffect = source.VideoEffect != null ? new VideoEffectData
                 {
                     Brightness = source.VideoEffect.Brightness,
@@ -887,6 +1295,20 @@ namespace UltraVideoEditor
             }
             undoStack.Push(copy);
             redoStack.Clear();
+        }
+
+        /// <summary>v1.4 — drops the snapshot taken before a dialog that was cancelled.</summary>
+        private void DiscardLastUndo()
+        {
+            if (undoStack.Count > 0) undoStack.Pop();
+        }
+
+        /// <summary>v1.4: silently go back to the last snapshot (a dialog was cancelled after it had already changed clips).</summary>
+        private void RestoreLastUndo()
+        {
+            if (undoStack.Count == 0) return;
+            timelineItems = undoStack.Pop();
+            UpdateTimelineDisplay();
         }
 
         private void Undo()
@@ -1115,9 +1537,23 @@ namespace UltraVideoEditor
             WpfMessageBox.Show(L("settings_wip"), L("settings_title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
+        /// <summary>v1.4: opens %LOCALAPPDATA%\UltraVideoEditor\Logs (error details, render logs).</summary>
+        private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(AppPaths.LogsDir) { UseShellExecute = true })?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                LogMessage(string.Format(L("generic_error"), ex.Message), true);
+            }
+        }
+
         private void ShowUserManual_Click(object sender, RoutedEventArgs e)
         {
-            WpfMessageBox.Show(L("manual_wip"), L("manual_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            // v1.4: the manual used to be a "coming soon" message — open the built-in help instead.
+            ShowHelp_Click(sender, e);
         }
 
         private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
@@ -1157,7 +1593,7 @@ namespace UltraVideoEditor
                 // Release postoji, ali (jos) nema prikacen .exe installer - otvaramo stranicu
                 // release-a u browseru kao rezervnu opciju umesto da korisnik ostane bez ičega.
                 LogMessage(L("update_opening_page"), true);
-                try { Process.Start(new ProcessStartInfo(update.HtmlUrl) { UseShellExecute = true }); } catch { }
+                try { Process.Start(new ProcessStartInfo(update.HtmlUrl) { UseShellExecute = true }); } catch (Exception swallowed) { AppLog.Error("Opening the release page", swallowed); }   // v1.4: was silent
                 return;
             }
 
@@ -1211,9 +1647,95 @@ namespace UltraVideoEditor
             }
         }
 
+        /// <summary>
+        /// v1.4 — About window with the author and the ways to support development (GitHub Sponsors,
+        /// Ko-fi, PayPal). A message box cannot hold links, so this is a small window: the text is a
+        /// read-only text field (JAWS/NVDA read it line by line with the arrow keys), the links are
+        /// buttons that open the default browser. Escape closes it.
+        /// </summary>
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
-            WpfMessageBox.Show(string.Format(L("about_text"), GetAppVersion()), L("about_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            var links = new (string Key, string Url)[]
+            {
+                ("about_btn_sponsors", "https://github.com/sponsors/demirajvazi10-max"),
+                ("about_btn_kofi",     "https://ko-fi.com/ultracreativesuite"),
+                ("about_btn_paypal",   "https://paypal.me/demirajvazi10"),
+                ("about_btn_repo",     "https://github.com/demirajvazi10-max/Ultra-Creative-suite"),
+            };
+
+            var win = new System.Windows.Window
+            {
+                Title = L("about_title"),
+                Owner = this,
+                Width = 520,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false
+            };
+            win.SetResourceReference(System.Windows.Window.BackgroundProperty, "ControlBg");
+            var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(18) };
+
+            string text = string.Format(L("about_text"), GetAppVersion()) + Environment.NewLine + Environment.NewLine + L("about_support_intro");
+            var info = new System.Windows.Controls.TextBox
+            {
+                Text = text.Replace("\n", Environment.NewLine),
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                BorderThickness = new Thickness(0),
+                Background = System.Windows.Media.Brushes.Transparent,
+                FontSize = 14,
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            info.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimary");
+            AutomationProperties.SetName(info, L("about_title"));
+            panel.Children.Add(info);
+
+            foreach (var (key, url) in links)
+            {
+                var b = new System.Windows.Controls.Button
+                {
+                    Content = L(key),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                    Padding = new Thickness(10, 6, 10, 6),
+                    Margin = new Thickness(0, 0, 0, 6),
+                    ToolTip = url
+                };
+                b.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "PanelBg");
+                b.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimary");
+                AutomationProperties.SetHelpText(b, url);
+                b.Click += (s, a) =>
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                        LogMessage(L("about_opening_browser"), true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Error("Opening " + url, ex);
+                        LogMessage(LF("about_open_failed", url), true);
+                    }
+                };
+                panel.Children.Add(b);
+            }
+
+            var close = new System.Windows.Controls.Button
+            {
+                Content = L("about_btn_close"),
+                IsCancel = true,
+                IsDefault = true,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                MinWidth = 100,
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            close.Click += (s, a) => win.Close();
+            panel.Children.Add(close);
+
+            win.Content = panel;
+            win.Loaded += (s, a) => { info.Focus(); info.CaretIndex = 0; };
+            win.ShowDialog();
         }
 
         /// <summary>
@@ -1384,60 +1906,84 @@ namespace UltraVideoEditor
             }
         }
 
+        // v1.4: markers are stored in TIMELINE time (clip start + position in the clip).
+        // They used to store the player's clip-relative time, so a marker set in clip 5
+        // pointed somewhere into clip 1 and "Cut at all markers" cut the wrong clip or nothing.
         private void AddMarker_Click(object sender, RoutedEventArgs e)
         {
-            if (currentPlaybackPosition >= 0)
+            double t = TimelinePosition;
+            if (t >= 0)
             {
-                markers.Add(currentPlaybackPosition);
+                markers.Add(t);
                 markers.Sort();
                 UpdateMarkerDisplay();
-                LogMessage($"Marker added {FormatTime(currentPlaybackPosition)}", true);
+                string inClip = _playingItem != null ? $" ({_playingItem.Name}, {FormatTimeDetailed(currentPlaybackPosition)})" : "";
+                LogMessage($"Marker added {FormatTimeDetailed(t)}{inClip}", true);
                 PlayBeep();
+            }
+        }
+
+        /// <summary>v1.4 — moves the preview to a timeline time, switching clips if needed.</summary>
+        private void SeekToTimeline(double t)
+        {
+            int track = _playingItem?.TrackIndex ?? 0;
+            var target = timelineItems
+                .Where(i => i.TrackIndex == track && t >= i.Start - 0.001 && t < i.End)
+                .FirstOrDefault()
+                ?? timelineItems.Where(i => !i.IsAudio && t >= i.Start - 0.001 && t < i.End).FirstOrDefault();
+            if (target == null) return;
+
+            double inClip = t - target.Start;
+            if (ReferenceEquals(target, _playingItem) && _currentMedia != null)
+            {
+                _mediaPlayer.Time = (long)((target.SourceOffset + inClip) * 1000);
+                currentPlaybackPosition = inClip;
+            }
+            else
+            {
+                PlaySelectedItem(target, inClip);
+                SelectItemInList(target);
+            }
+            UpdatePositionDisplay();
+        }
+
+        private void SelectItemInList(TimelineItem target)
+        {
+            if (nativeListView == null) return;
+            foreach (WinForms.ListViewItem lvi in nativeListView.Items)
+            {
+                if (ReferenceEquals(lvi.Tag, target))
+                {
+                    _selectionProcessing = true;   // don't trigger another auto-play
+                    nativeListView.SelectedItems.Clear();
+                    lvi.Selected = true;
+                    lvi.EnsureVisible();
+                    _selectionProcessing = false;
+                    break;
+                }
             }
         }
 
         private void NextMarker_Click(object sender, RoutedEventArgs e)
         {
             if (markers.Count == 0) { LogMessage("No markers", true); return; }
-            var next = markers.FirstOrDefault(m => m > currentPlaybackPosition + 0.1);
-            if (next > 0)
-            {
-                _mediaPlayer.Time = (long)(next * 1000);
-                currentPlaybackPosition = next;
-                UpdatePositionDisplay();
-                LogMessage(string.Format(L("jumped_to_marker"), FormatTime(next)), true);
-                PlayBeep();
-            }
-            else
-            {
-                _mediaPlayer.Time = (long)(markers[0] * 1000);
-                currentPlaybackPosition = markers[0];
-                UpdatePositionDisplay();
-                LogMessage(string.Format(L("jumped_to_first"), FormatTime(markers[0])), true);
-                PlayBeep();
-            }
+            double now = TimelinePosition;
+            bool found = markers.Any(m => m > now + 0.1);
+            double next = found ? markers.First(m => m > now + 0.1) : markers[0];
+            SeekToTimeline(next);
+            LogMessage(string.Format(found ? L("jumped_to_marker") : L("jumped_to_first"), FormatTime(next)), true);
+            PlayBeep();
         }
 
         private void PrevMarker_Click(object sender, RoutedEventArgs e)
         {
             if (markers.Count == 0) { LogMessage("No markers", true); return; }
-            var prev = markers.LastOrDefault(m => m < currentPlaybackPosition - 0.1);
-            if (prev > 0)
-            {
-                _mediaPlayer.Time = (long)(prev * 1000);
-                currentPlaybackPosition = prev;
-                UpdatePositionDisplay();
-                LogMessage(string.Format(L("jumped_to_marker"), FormatTime(prev)), true);
-                PlayBeep();
-            }
-            else
-            {
-                _mediaPlayer.Time = (long)(markers[markers.Count - 1] * 1000);
-                currentPlaybackPosition = markers[markers.Count - 1];
-                UpdatePositionDisplay();
-                LogMessage(string.Format(L("jumped_to_last"), FormatTime(markers[markers.Count - 1])), true);
-                PlayBeep();
-            }
+            double now = TimelinePosition;
+            bool found = markers.Any(m => m < now - 0.1);
+            double prev = found ? markers.Last(m => m < now - 0.1) : markers[markers.Count - 1];
+            SeekToTimeline(prev);
+            LogMessage(string.Format(found ? L("jumped_to_marker") : L("jumped_to_last"), FormatTime(prev)), true);
+            PlayBeep();
         }
 
         private void CutClip_Click(object sender, RoutedEventArgs e)
@@ -1448,13 +1994,20 @@ namespace UltraVideoEditor
                 return;
             }
 
-            double cutPosition = currentPlaybackPosition - item.Start;
+            // v1.4: position INSIDE the selected clip (see PositionInClip) — the old
+            // "player time minus clip start" was negative for every clip except the first.
+            double cutPosition = PositionInClip(item);
             if (cutPosition > 0.5 && cutPosition < item.Duration - 0.5)
             {
                 SaveState();
                 var secondPart = DeepCloneTimelineItem(item);
                 secondPart.Duration = item.Duration - cutPosition;
-                secondPart.Name = $"{item.Name} (deo 2)";
+                secondPart.Name = item.Name + " " + L("cut_part_2");
+                // v1.4: the second part CONTINUES the source (it used to start the file from
+                // the beginning again in the render), and keeps its place if the clip was fixed.
+                if (!item.IsImage) secondPart.SourceOffset = item.SourceOffset + cutPosition;
+                if (item.UseFixedPosition) secondPart.FixedPosition = item.FixedPosition + cutPosition;
+                item.TransitionOut = null; item.TransitionOutDuration = 0;
                 secondPart.Keyframes.Clear();
                 foreach (var kf in item.Keyframes.Where(k => k.Time > cutPosition))
                 {
@@ -1470,7 +2023,7 @@ namespace UltraVideoEditor
                 }
                 item.Keyframes.RemoveAll(k => k.Time > cutPosition);
                 item.Duration = cutPosition;
-                item.Name = $"{item.Name} (deo 1)";
+                item.Name = item.Name + " " + L("cut_part_1");
                 int originalIndex = timelineItems.IndexOf(item);
                 timelineItems.Insert(originalIndex + 1, secondPart);
                 UpdateTimelineDisplay();
@@ -1487,10 +2040,19 @@ namespace UltraVideoEditor
         {
             if (markers.Count == 0) { LogMessage(L("no_markers_to_cut"), true); return; }
             SaveState();
+            RecalculatePositions();
+            // v1.4: cut only the tracks being edited — video tracks normally, or the audio
+            // track that is shown. Before, the song on the audio track was chopped too.
+            bool cutAudio = currentTrackFilter == 2 || currentTrackFilter == 3;
             var newItems = new List<TimelineItem>();
             foreach (var item in timelineItems)
             {
-                var markersInItem = markers.Where(m => m > item.Start && m < item.End).OrderBy(m => m).ToList();
+                bool onEditedTrack = currentTrackFilter >= 0
+                    ? item.TrackIndex == currentTrackFilter
+                    : (cutAudio ? item.IsAudio : !item.IsAudio);
+                var markersInItem = onEditedTrack
+                    ? markers.Where(m => m > item.Start && m < item.End).OrderBy(m => m).ToList()
+                    : new List<double>();
                 if (markersInItem.Count == 0)
                 {
                     newItems.Add(item);
@@ -1506,6 +2068,9 @@ namespace UltraVideoEditor
                         var part = DeepCloneTimelineItem(item);
                         part.Duration = cutPos - currentOffset;
                         part.Name = $"{item.Name} (deo {partIndex})";
+                        if (!item.IsImage) part.SourceOffset = item.SourceOffset + currentOffset;
+                        if (item.UseFixedPosition) part.FixedPosition = item.FixedPosition + currentOffset;
+                        part.TransitionOut = null; part.TransitionOutDuration = 0;
                         part.Keyframes.Clear();
                         foreach (var kf in item.Keyframes.Where(k => k.Time > currentOffset && k.Time <= cutPos))
                         {
@@ -1527,6 +2092,8 @@ namespace UltraVideoEditor
                 var lastPart = DeepCloneTimelineItem(item);
                 lastPart.Duration = item.Duration - currentOffset;
                 lastPart.Name = $"{item.Name} (deo {partIndex})";
+                if (!item.IsImage) lastPart.SourceOffset = item.SourceOffset + currentOffset;
+                if (item.UseFixedPosition) lastPart.FixedPosition = item.FixedPosition + currentOffset;
                 lastPart.Keyframes.Clear();
                 foreach (var kf in item.Keyframes.Where(k => k.Time > currentOffset))
                 {
@@ -1548,50 +2115,60 @@ namespace UltraVideoEditor
             PlayBeep();
         }
 
-        private void MoveLeft_Click(object sender, RoutedEventArgs e)
-        {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
-            {
-                SaveState();
-                int oldIndex = timelineItems.IndexOf(item);
-                if (oldIndex > 0)
-                {
-                    timelineItems.RemoveAt(oldIndex);
-                    timelineItems.Insert(oldIndex - 1, item);
-                    UpdateTimelineDisplay();
-                    LogMessage("Clip moved left", true);
-                    PlayBeep();
-                }
-                else LogMessage("No clip to the left", true);
-            }
-        }
+        // v1.4: Move left/right swaps the clip with its neighbour ON THE SAME TRACK (it used
+        // to swap with whatever was next in the list — often the song on the audio track — so
+        // nothing visible happened). For clips with fixed positions the two slots are swapped.
+        private void MoveLeft_Click(object sender, RoutedEventArgs e) => MoveOnTrack(-1);
+        private void MoveRight_Click(object sender, RoutedEventArgs e) => MoveOnTrack(+1);
 
-        private void MoveRight_Click(object sender, RoutedEventArgs e)
+        private void MoveOnTrack(int direction)
         {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
+            if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                SaveState();
-                int oldIndex = timelineItems.IndexOf(item);
-                if (oldIndex < timelineItems.Count - 1)
-                {
-                    timelineItems.RemoveAt(oldIndex);
-                    timelineItems.Insert(oldIndex + 1, item);
-                    UpdateTimelineDisplay();
-                    LogMessage("Clip moved right", true);
-                    PlayBeep();
-                }
-                else LogMessage("No clip to the right", true);
+                LogMessage("Select a clip first", true);
+                return;
             }
+            RecalculatePositions();
+            var sameTrack = timelineItems.Where(i => i.TrackIndex == item.TrackIndex).OrderBy(i => i.Start).ToList();
+            int pos = sameTrack.IndexOf(item);
+            int otherPos = pos + direction;
+            if (otherPos < 0 || otherPos >= sameTrack.Count)
+            {
+                LogMessage(direction < 0 ? "No clip to the left" : "No clip to the right", true);
+                return;
+            }
+            var other = sameTrack[otherPos];
+            SaveState();
+
+            var first = direction < 0 ? other : item;    // the one that is earlier now
+            var second = direction < 0 ? item : other;
+            if (first.UseFixedPosition || second.UseFixedPosition)
+            {
+                double gap = Math.Max(0, second.Start - first.End);
+                double firstStart = first.Start;
+                second.UseFixedPosition = true;
+                second.FixedPosition = firstStart;
+                first.UseFixedPosition = true;
+                first.FixedPosition = firstStart + second.Duration + gap;
+            }
+            int iItem = timelineItems.IndexOf(item);
+            int iOther = timelineItems.IndexOf(other);
+            timelineItems[iItem] = other;
+            timelineItems[iOther] = item;
+            UpdateTimelineDisplay();
+            SelectItemInList(item);
+            LogMessage(direction < 0 ? "Clip moved left" : "Clip moved right", true);
+            PlayBeep();
         }
 
         private async void SetClipDuration_Click(object sender, RoutedEventArgs e)
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                SaveState();
                 var dialog = new DurationDialog(item.Duration);
                 if (dialog.ShowDialog() == true)
                 {
+                    SaveState();   // v1.4: only when something changes (Cancel left an empty undo step)
                     item.Duration = dialog.Duration;
                     UpdateTimelineDisplay();
                     LogMessage($"Duration changed to {FormatTime(item.Duration)}", true);
@@ -1610,7 +2187,8 @@ namespace UltraVideoEditor
                 {
                     SaveState();
                     item.Volume = dialog.Volume;
-                    LogMessage(string.Format(L("volume_set2"), dialog.Volume), true);
+                    LogMessage(string.Format(L("volume_set2"), dialog.Volume) +
+                               (AudioAutomation.HasCurve(item) ? " " + L("vol_curve_note") : ""), true);
                     PlayBeep();
                     if (_mediaPlayer != null && _mediaPlayer.IsPlaying) _mediaPlayer.Volume = (int)item.Volume;
                 }
@@ -1634,16 +2212,10 @@ namespace UltraVideoEditor
         {
             if (_currentMedia == null && timelineItems.Count > 0)
             {
-                var firstItem = timelineItems.FirstOrDefault();
+                var firstItem = (nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null)
+                                ?? timelineItems.FirstOrDefault();
                 if (firstItem != null)
-                {
-                    _currentMedia = new Media(_libVLC, firstItem.Path);
-                    _mediaPlayer.Media = _currentMedia;
-                    _mediaPlayer.Volume = (int)firstItem.Volume;
-                    _mediaPlayer.Play();
-                    isPlaying = true;
-                    if (btnPlay != null) btnPlay.Content = "⏸ PAUSE";
-                }
+                    PlaySelectedItem(firstItem);
                 return;
             }
             if (_currentMedia == null)
@@ -1655,59 +2227,787 @@ namespace UltraVideoEditor
             {
                 _mediaPlayer.Pause();
                 isPlaying = false;
-                if (btnPlay != null) btnPlay.Content = "▶ PLAY";
-                LogMessage($"Pauzirano na {FormatTimeDetailed(currentPlaybackPosition)}", true);
+                if (btnPlay != null) btnPlay.Content = "▶ " + L("play");
+                LogMessage(LF("paused_at", FormatTimeDetailed(currentPlaybackPosition)), true);
+            }
+            else if (PlayerEnded)
+            {
+                // v1.4: after the end, Play did nothing (the player stays "ended") — start again
+                RestartAt(0, play: true);
+                LogMessage(_mixPreviewActive ? LF("mix_resumed", FormatTime(0)) : L("playback_from_start"), true);
             }
             else
             {
                 _mediaPlayer.Play();
                 isPlaying = true;
-                if (btnPlay != null) btnPlay.Content = "⏸ PAUSE";
+                if (btnPlay != null) btnPlay.Content = "⏸ " + L("pause");
                 // Announce which clip is playing and its duration
                 var selItem = nativeListView?.SelectedItems.Count > 0
                     ? nativeListView.SelectedItems[0].Tag as TimelineItem : null;
-                if (selItem != null)
+                if (_mixPreviewActive)
+                    LogMessage(LF("mix_resumed", FormatTime(currentPlaybackPosition)), true);
+                else if (selItem != null)
                     LogMessage($"Playing: {selItem.Name}, duration {FormatTime(selItem.Duration)}", true);
                 else
-                    LogMessage("Reprodukcija pokrenuta", true);
+                    LogMessage(L("playback_started_msg"), true);
             }
         }
 
-        private void SeekForward_Click(object sender, RoutedEventArgs e)
+        private void SeekForward_Click(object sender, RoutedEventArgs e) => SeekBy(5000);
+
+        private void SeekBack_Click(object sender, RoutedEventArgs e) => SeekBy(-5000);
+
+        /// <summary>
+        /// v1.4 — moves the player by a number of milliseconds inside the current clip and always
+        /// announces the new position (before, the announcement depended on accessibility mode and
+        /// a clip that was not loaded yet did nothing without a word).
+        /// </summary>
+        private void SeekBy(long ms)
         {
-            if (_mediaPlayer == null) return;
-            long newTime = _mediaPlayer.Time + 5000;
-            if (newTime > _mediaPlayer.Length) newTime = _mediaPlayer.Length;
+            if (_mediaPlayer == null || _currentMedia == null)
+            {
+                LogMessage(L("select_clip_first_play"), true);
+                return;
+            }
+            // v1.4 (R5): stay inside the clip — a cut part or highlight starts in the middle of its
+            // file, and seeking used to run past its in-point into footage that is not on the timeline.
+            if (PlayerEnded)
+            {
+                // the player cannot move once it reached the end: reload at the new place, paused
+                double len = _mixPreviewActive ? currentVideoDuration : (_playingItem?.Duration ?? currentVideoDuration);
+                double target = Math.Clamp(currentPlaybackPosition + ms / 1000.0, 0, Math.Max(0, len - 0.05));
+                RestartAt(target, play: false);
+                LogMessage(Math.Abs(ms) < 1000 ? FormatTimeDetailed(target) : FormatTime(target), true);
+                return;
+            }
+            var (minT, maxT) = PlayerTimeBounds();
+            long newTime = Math.Clamp(_mediaPlayer.Time + ms, minT, maxT);
             _mediaPlayer.Time = newTime;
-            currentPlaybackPosition = newTime / 1000.0;
+            currentPlaybackPosition = Math.Max(0, newTime / 1000.0 - (_playingItem?.SourceOffset ?? 0));
             UpdatePositionDisplay();
-            if (accessibilityMode) LogMessage($"Fast-forwarded to {FormatTime(currentPlaybackPosition)}", true);
+            LogMessage(Math.Abs(ms) < 1000 ? FormatTimeDetailed(currentPlaybackPosition) : FormatTime(currentPlaybackPosition), true);
         }
 
-        private void SeekBack_Click(object sender, RoutedEventArgs e)
+        // ══════════════════════════════════════════════════════════════
+        // v1.4 (R5) — PRECISE EDITING FROM THE KEYBOARD
+        //   J / K / L   shuttle back / stop / forward (press again for 2× and 4×)
+        //   , and .     one frame back / forward (the player pauses)
+        //   Q / W       trim the start / the end of the clip to the playhead
+        //   Ctrl+Alt+S  clip speed
+        // ══════════════════════════════════════════════════════════════
+
+        private string _lastKeyCmd;
+        private long _lastKeyTick;
+        private int _shuttle = 0;   // > 0 forward ×N, < 0 backward ×N, 0 = normal
+        private System.Windows.Threading.DispatcherTimer _rewindTimer;
+
+        /// <summary>True when the player reached the end (or stopped) and cannot simply continue.</summary>
+        private bool PlayerEnded =>
+            _mediaPlayer != null && _currentMedia != null &&
+            (_mediaPlayer.State == LibVLCSharp.Shared.VLCState.Ended ||
+             _mediaPlayer.State == LibVLCSharp.Shared.VLCState.Stopped ||
+             _mediaPlayer.State == LibVLCSharp.Shared.VLCState.Error);
+
+        /// <summary>
+        /// v1.4 — reloads what was playing (the clip, or the montage mix) at a position, playing or
+        /// paused. Needed after the end: LibVLC ignores Play and seeking once a file has ended,
+        /// which made play, J/K/L and Alt+arrows silently do nothing ("position 00:00" forever).
+        /// </summary>
+        private void RestartAt(double pos, bool play)
         {
-            if (_mediaPlayer == null) return;
-            long newTime = _mediaPlayer.Time - 5000;
-            if (newTime < 0) newTime = 0;
-            _mediaPlayer.Time = newTime;
-            currentPlaybackPosition = newTime / 1000.0;
+            if (_mixPreviewActive && _mixPath != null && File.Exists(_mixPath))
+            {
+                LoadMix(_mixPath, pos, play);
+                return;
+            }
+            var item = _playingItem ?? SelectedClip();
+            if (item != null) PlaySelectedItem(item, Math.Clamp(pos, 0, Math.Max(0, item.Duration - 0.05)), startPaused: !play);
+        }
+
+        /// <summary>
+        /// True when the same command already ran for this very key press — a key pressed in the
+        /// clip list can arrive both through Windows Forms and through the WPF window.
+        /// </summary>
+        private bool DuplicateKey(string id)
+        {
+            long now = Environment.TickCount64;
+            bool dup = id == _lastKeyCmd && now - _lastKeyTick < 25;
+            _lastKeyCmd = id;
+            _lastKeyTick = now;
+            return dup;
+        }
+
+        private static bool IsTextInput(object source) =>
+            source is System.Windows.Controls.Primitives.TextBoxBase || source is System.Windows.Controls.PasswordBox ||
+            source is System.Windows.Controls.ComboBox || (source is FrameworkElement fe && fe.TemplatedParent is System.Windows.Controls.ComboBox);
+
+        private static double ClipSpeed(TimelineItem item)
+        {
+            double s = item?.VideoEffect?.Speed ?? 1.0;
+            return s > 0.05 && s < 20 ? s : 1.0;
+        }
+
+        /// <summary>Player time range (ms) that belongs to the playing clip; the whole file otherwise.</summary>
+        private (long Min, long Max) PlayerTimeBounds()
+        {
+            long length = _mediaPlayer?.Length ?? 0;
+            long max = length > 0 ? length : long.MaxValue / 4;
+            if (_playingItem == null || _playingItem.IsImage) return (0, max);
+            long min = (long)Math.Round(_playingItem.SourceOffset * 1000);
+            long end = (long)Math.Round((_playingItem.SourceOffset + _playingItem.Duration * ClipSpeed(_playingItem)) * 1000);
+            return (Math.Min(min, max), Math.Max(min, Math.Min(end, max)));
+        }
+
+        private string FormatTimeFrames(double seconds) => TimeSpan.FromSeconds(Math.Max(0, seconds)).ToString(@"mm\:ss\.ff");
+
+        /// <summary>Handles J, K, L, Q, W, comma and period. Returns false for any other key.</summary>
+        private bool HandleEditingKey(Key key)
+        {
+            if (key != Key.J && key != Key.K && key != Key.L && key != Key.Q && key != Key.W &&
+                key != Key.OemComma && key != Key.OemPeriod) return false;
+            if (DuplicateKey("ed" + key)) return true;
+            switch (key)
+            {
+                case Key.J: Shuttle(-1); break;
+                case Key.K: ShuttleStop(); break;
+                case Key.L: Shuttle(+1); break;
+                case Key.OemComma: StepFrame(-1); break;
+                case Key.OemPeriod: StepFrame(+1); break;
+                case Key.Q: TrimToPlayhead(trimStart: true); break;
+                case Key.W: TrimToPlayhead(trimStart: false); break;
+            }
+            return true;
+        }
+
+        private bool PlayerReady()
+        {
+            if (_mediaPlayer != null && _currentMedia != null) return true;
+            LogMessage(L("select_clip_first_play"), true);
+            return false;
+        }
+
+        private void SetPlayingUi(bool playing)
+        {
+            isPlaying = playing;
+            if (btnPlay != null) btnPlay.Content = playing ? "⏸ " + L("pause") : "▶ " + L("play");
+        }
+
+        /// <summary>L plays forward (again: 2×, 4×); J runs backward (again: 2×, 4×, 8×).</summary>
+        private void Shuttle(int direction)
+        {
+            if (!PlayerReady()) return;
+            if (PlayerEnded)
+            {
+                if (direction > 0) { RestartAt(0, play: true); LogMessage(L("playback_from_start"), true); }
+                else { RestartAt(Math.Max(0, currentPlaybackPosition - 1), play: false); LogMessage(LF("paused_at", FormatTimeDetailed(currentPlaybackPosition)), true); }
+                return;
+            }
+            double baseRate = ClipSpeed(_playingItem);
+            if (direction > 0)
+            {
+                _rewindTimer?.Stop();
+                _shuttle = _shuttle <= 0 ? 1 : Math.Min(_shuttle * 2, 4);
+                _mediaPlayer.SetRate((float)(baseRate * _shuttle));
+                if (!isPlaying) { _mediaPlayer.SetPause(false); _mediaPlayer.Play(); }
+                SetPlayingUi(true);
+                LogMessage(_shuttle == 1 ? L("shuttle_play") : LF("shuttle_forward", _shuttle), true);
+                return;
+            }
+
+            // VLC cannot play backward: the player pauses and the position steps back four times
+            // a second, so the editor hears where the playhead is going through the announcements.
+            _shuttle = _shuttle >= 0 ? -1 : Math.Max(_shuttle * 2, -8);
+            if (isPlaying) _mediaPlayer.SetPause(true);
+            SetPlayingUi(false);
+            _mediaPlayer.SetRate((float)baseRate);
+            if (_rewindTimer == null)
+            {
+                _rewindTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _rewindTimer.Tick += (s, e) =>
+                {
+                    if (_shuttle >= 0 || _mediaPlayer == null || _currentMedia == null) { _rewindTimer.Stop(); return; }
+                    var (minT, _) = PlayerTimeBounds();
+                    long t = Math.Max(minT, _mediaPlayer.Time - 250L * -_shuttle);
+                    _mediaPlayer.Time = t;
+                    currentPlaybackPosition = Math.Max(0, t / 1000.0 - (_playingItem?.SourceOffset ?? 0));
+                    UpdatePositionDisplay();
+                    if (t <= minT)
+                    {
+                        _rewindTimer.Stop();
+                        _shuttle = 0;
+                        LogMessage(LF("shuttle_at_start", FormatTimeDetailed(currentPlaybackPosition)), true);
+                    }
+                };
+            }
+            _rewindTimer.Start();
+            LogMessage(LF("shuttle_back", -_shuttle), true);
+        }
+
+        /// <summary>K: stop the shuttle, pause, and say where the playhead is.</summary>
+        private void ShuttleStop()
+        {
+            if (!PlayerReady()) return;
+            _rewindTimer?.Stop();
+            _shuttle = 0;
+            _mediaPlayer.SetRate((float)ClipSpeed(_playingItem));
+            if (isPlaying) _mediaPlayer.SetPause(true);
+            SetPlayingUi(false);
+            LogMessage(LF("paused_at", FormatTimeDetailed(_mixPreviewActive ? currentPlaybackPosition : PositionInClip(_playingItem))), true);
+        }
+
+        private double FrameRateOfCurrentMedia()
+        {
+            try
+            {
+                foreach (var t in _currentMedia.Tracks)
+                    if (t.TrackType == TrackType.Video && t.Data.Video.FrameRateNum > 0 && t.Data.Video.FrameRateDen > 0)
+                    {
+                        double fps = (double)t.Data.Video.FrameRateNum / t.Data.Video.FrameRateDen;
+                        if (fps >= 5 && fps <= 240) return fps;
+                    }
+            }
+            catch { }
+            return 25.0;
+        }
+
+        /// <summary>Comma / period: one frame back / forward, paused, with the exact time announced.</summary>
+        private void StepFrame(int direction)
+        {
+            if (!PlayerReady()) return;
+            if (PlayerEnded)
+            {
+                RestartAt(Math.Max(0, currentPlaybackPosition - 0.04), play: false);
+                LogMessage(FormatTimeFrames(currentPlaybackPosition), true);
+                return;
+            }
+            _rewindTimer?.Stop();
+            _shuttle = 0;
+            if (isPlaying) _mediaPlayer.SetPause(true);
+            SetPlayingUi(false);
+            long frameMs = (long)Math.Max(1, Math.Round(1000.0 / FrameRateOfCurrentMedia()));
+            var (minT, maxT) = PlayerTimeBounds();
+            long t = Math.Clamp(_mediaPlayer.Time + direction * frameMs, minT, maxT);
+            _mediaPlayer.Time = t;
+            currentPlaybackPosition = Math.Max(0, t / 1000.0 - (_playingItem?.SourceOffset ?? 0));
             UpdatePositionDisplay();
-            if (accessibilityMode) LogMessage($"Rewound to {FormatTime(currentPlaybackPosition)}", true);
+            LogMessage(FormatTimeFrames(currentPlaybackPosition), true);
+        }
+
+        /// <summary>
+        /// Q / W — trims the start or the end of the clip to the playhead (Premiere's ripple trim).
+        /// The clips after it on the same track move up, so no gap is left. The clip then plays
+        /// from its new start (Q) or its last two seconds (W) so the edit can be heard at once.
+        /// </summary>
+        private void TrimToPlayhead(bool trimStart)
+        {
+            var item = _playingItem ??
+                       (nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null);
+            if (item == null) { LogMessage(L("select_clip_first_play"), true); return; }
+            double pos = PositionInClip(item);
+            if (pos < 0.04 || pos > item.Duration - 0.04)
+            {
+                LogMessage(LF("trim_outside", FormatTimeDetailed(pos), FormatTimeDetailed(item.Duration)), true);
+                PlayBeep();
+                return;
+            }
+            SaveState();
+            double before = item.Duration;
+            if (trimStart)
+            {
+                if (!item.IsImage) item.SourceOffset += pos * ClipSpeed(item);
+                item.Duration = before - pos;
+            }
+            else
+            {
+                item.Duration = pos;
+            }
+            UpdateTimelineDisplay();
+            _pendingPlaybackItem = null;   // the list refresh must not restart the clip from 0
+            LogMessage(LF(trimStart ? "trim_start_done" : "trim_end_done",
+                          FormatTimeDetailed(before - item.Duration), FormatTimeDetailed(item.Duration)), true);
+            PlaySelectedItem(item, trimStart ? 0 : Math.Max(0, item.Duration - 2));
+        }
+
+        /// <summary>Ctrl+Alt+S — choose the playback speed of the selected clip.</summary>
+        private void SetClipSpeed_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item))
+            {
+                LogMessage("Select a clip first", true);
+                return;
+            }
+            if (item.IsAudio || item.IsImage) { LogMessage(L("speed_video_only"), true); return; }
+
+            double[] speeds = { 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 };
+            double current = ClipSpeed(item);
+            var dlg = new System.Windows.Window
+            {
+                Title = L("speed_title"),
+                Owner = this,
+                Width = 360,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false
+            };
+            dlg.SetResourceReference(System.Windows.Window.BackgroundProperty, "ControlBg");
+            var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
+            var label = new System.Windows.Controls.Label { Content = L("speed_label"), Padding = new Thickness(0, 0, 0, 6) };
+            label.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimary");
+            var list = new System.Windows.Controls.ListBox { Height = 200 };
+            foreach (double s in speeds)
+            {
+                string text = s == 1.0 ? L("speed_normal")
+                                       : (s.ToString("0.##", CultureInfo.CurrentCulture) + "×" + (s < 1 ? " — " + L("speed_slower") : " — " + L("speed_faster")));
+                list.Items.Add(new System.Windows.Controls.ListBoxItem { Content = text, Tag = s });
+            }
+            int sel = Array.FindIndex(speeds, s => Math.Abs(s - current) < 0.001);
+            list.SelectedIndex = sel >= 0 ? sel : 3;
+            label.Target = list;
+            AutomationProperties.SetName(list, L("speed_label"));
+            var buttons = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+            var ok = new System.Windows.Controls.Button { Content = L("dlg_ok"), IsDefault = true, MinWidth = 80, Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(10, 4, 10, 4) };
+            var cancel = new System.Windows.Controls.Button { Content = L("review_cancel"), IsCancel = true, MinWidth = 80, Padding = new Thickness(10, 4, 10, 4) };
+            ok.Click += (s, a) => dlg.DialogResult = true;
+            list.MouseDoubleClick += (s, a) => dlg.DialogResult = true;
+            buttons.Children.Add(ok);
+            buttons.Children.Add(cancel);
+            panel.Children.Add(label);
+            panel.Children.Add(list);
+            panel.Children.Add(buttons);
+            dlg.Content = panel;
+            dlg.Loaded += (s, a) =>
+            {
+                list.Focus();
+                (list.ItemContainerGenerator.ContainerFromIndex(list.SelectedIndex) as System.Windows.Controls.ListBoxItem)?.Focus();
+            };
+            if (dlg.ShowDialog() != true || !(list.SelectedItem is System.Windows.Controls.ListBoxItem chosen) || !(chosen.Tag is double speed)) return;
+
+            SaveState();
+            item.VideoEffect ??= new VideoEffectData();
+            item.VideoEffect.Speed = speed;
+            UpdateTimelineDisplay();
+            _pendingPlaybackItem = null;
+            LogMessage(LF("speed_set", speed.ToString("0.##", CultureInfo.CurrentCulture)) +
+                       (Math.Abs(speed - 1.0) > 0.001 ? " " + L("speed_sound_note") : ""), true);
+            PlayBeep();
+            PlaySelectedItem(item);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // v1.4 (R3) — HEAR THE WHOLE MONTAGE WITHOUT A RENDER
+        // Ctrl+Shift+Space mixes every sound of the timeline (music, ambience, effects, the sound
+        // of your own videos) into one file in a few seconds and plays it from the selected clip.
+        // While it plays, the shot that is on screen at that moment is announced, so a blind
+        // editor hears both the sound and the picture order, like pressing Space in Premiere.
+        // ══════════════════════════════════════════════════════════════
+
+        private bool _mixPreviewActive = false;
+        private bool _mixAnnounceShots = true;
+        private bool _mixBuilding = false;
+        private TimelineItem _mixLastShot = null;
+        private System.Windows.Threading.DispatcherTimer _mixShotTimer;
+
+        private async void PlayMix_Click(object sender, RoutedEventArgs e)
+        {
+            // The mix is already loaded: the same key pauses and continues it.
+            if (_mixPreviewActive && _currentMedia != null &&
+                _mediaPlayer.State != LibVLCSharp.Shared.VLCState.Ended &&
+                _mediaPlayer.State != LibVLCSharp.Shared.VLCState.Stopped)
+            {
+                if (isPlaying)
+                {
+                    _mediaPlayer.Pause();
+                    isPlaying = false;
+                    if (btnPlay != null) btnPlay.Content = "▶ " + L("play");
+                    LogMessage(LF("mix_paused_at", FormatTime(currentPlaybackPosition)), true);
+                }
+                else
+                {
+                    _mediaPlayer.Play();
+                    isPlaying = true;
+                    if (btnPlay != null) btnPlay.Content = "⏸ " + L("pause");
+                    LogMessage(LF("mix_resumed", FormatTime(currentPlaybackPosition)), true);
+                }
+                return;
+            }
+            if (_mixBuilding) { LogMessage(L("mix_building"), true); return; }
+            if (timelineItems.Count == 0) { LogMessage(L("mix_nothing"), true); return; }
+
+            // Where to start: where the player stands, else at the selected clip, else at 0.
+            double total = TimelineMixPreview.TotalLength(timelineItems);
+            double from = 0;
+            if (!_mixPreviewActive && _playingItem != null) from = TimelinePosition;
+            else if (!_mixPreviewActive && nativeListView?.SelectedItems.Count > 0 &&
+                     nativeListView.SelectedItems[0].Tag is TimelineItem sel) from = sel.Start;
+            if (from >= total - 0.5) from = 0;
+
+            _mixBuilding = true;
+            LogMessage(L("mix_building"), true);
+            try
+            {
+                RecalculatePositions();
+                var snapshot = timelineItems.ToList();
+                var (path, count) = await TimelineMixPreview.BuildAsync(snapshot, CancellationToken.None);
+                if (path == null)
+                {
+                    LogMessage(L("mix_nothing"), true);
+                    PlayBeep();
+                    return;
+                }
+
+                _mixPreviewActive = true;
+                LoadMix(path, from, play: true);
+                currentVideoDuration = total;
+                UpdatePositionDisplay();
+                LogMessage(LF("mix_playing", FormatTime(from), FormatTime(total), count), true);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Mixing the timeline for preview", ex);
+                LogMessage(LF("mix_failed", ex.Message), true);
+            }
+            finally
+            {
+                _mixBuilding = false;
+            }
+        }
+
+        private string _mixPath;
+
+        /// <summary>Loads the montage mix into the player at a timeline position.</summary>
+        private void LoadMix(string path, double from, bool play)
+        {
+            if (_mediaPlayer.IsPlaying) _mediaPlayer.Stop();
+            _rewindTimer?.Stop();   // a J (backward) still running must not move the mix
+            _shuttle = 0;
+            var oldMedia = _currentMedia;
+            _currentMedia = new Media(_libVLC, path);
+            if (from > 0.01)
+                _currentMedia.AddOption($":start-time={from.ToString("F3", CultureInfo.InvariantCulture)}");
+            if (!play) _currentMedia.AddOption(":start-paused");
+            _mediaPlayer.Media = _currentMedia;
+            oldMedia?.Dispose();
+            _mediaPlayer.Volume = 100;
+            _mediaPlayer.SetRate(1f);
+            _playingItem = null;               // positions are now timeline time
+            _mixPath = path;
+            _mixPreviewActive = true;
+            currentPlaybackPosition = from;
+            _mixLastShot = null;
+            _mediaPlayer.Play();
+            isPlaying = play;
+            if (btnPlay != null) btnPlay.Content = play ? "⏸ " + L("pause") : "▶ " + L("play");
+            StartFollowTimer();
+        }
+
+        /// <summary>Turns the shot announcements during the montage mix on or off.</summary>
+        private void ToggleMixShotAnnouncements_Click(object sender, RoutedEventArgs e)
+        {
+            _mixAnnounceShots = !_mixAnnounceShots;
+            if (sender is MenuItem mi) mi.IsChecked = _mixAnnounceShots;
+            LogMessage(L(_mixAnnounceShots ? "mix_shots_on" : "mix_shots_off"), true);
+        }
+
+        /// <summary>
+        /// v1.4 (R3/R4) — follows the playhead four times a second. During the montage mix it
+        /// announces each new shot (name, on-screen text and its saved picture description);
+        /// for a single clip it announces the saved description of the part the playhead
+        /// enters — while playing, seeking, stepping frames or shuttling.
+        /// </summary>
+        private void StartFollowTimer()
+        {
+            if (_mixShotTimer == null)
+            {
+                _mixShotTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _mixShotTimer.Tick += (s, e) => FollowTick();
+            }
+            _followPart = null;
+            _mixShotTimer.Start();
+        }
+
+        private FrameDescription _followPart;
+
+        private void FollowTick()
+        {
+            if (_currentMedia == null) return;
+            TimelineItem item;
+            double pos;
+            if (_mixPreviewActive)
+            {
+                item = TimelineMixPreview.VideoAt(timelineItems, TimelinePosition);
+                pos = item == null ? 0 : TimelinePosition - item.Start;
+            }
+            else
+            {
+                item = _playingItem;
+                pos = currentPlaybackPosition;
+            }
+            if (item == null) return;
+
+            // v1.4 (R5): the clip preview follows the clip's volume curve
+            if (!_mixPreviewActive && AudioAutomation.HasCurve(item) && _mediaPlayer != null)
+            {
+                int v = (int)Math.Round(Math.Clamp(AudioAutomation.VolumeAt(item, pos), 0, 200));
+                if (_mediaPlayer.Volume != v) _mediaPlayer.Volume = v;
+            }
+
+            var part = _announceDescriptions ? item.DescriptionAt(pos) : null;
+            bool shotChanged = !ReferenceEquals(item, _mixLastShot);
+            bool partChanged = !ReferenceEquals(part, _followPart);
+            _mixLastShot = item;
+            _followPart = part;
+
+            if (_mixPreviewActive && shotChanged)
+            {
+                if (!isPlaying || !_mixAnnounceShots) return;
+                string text = item.TextOverlay?.Enabled == true && !string.IsNullOrWhiteSpace(item.TextOverlay.Text)
+                    ? $"{item.Name} — {item.TextOverlay.Text}" : item.Name;
+                if (part != null) text += ". " + part.Text;
+                LogMessage(text, true);
+                return;
+            }
+            if (partChanged && part != null)
+                LogMessage(part.Text, true);
+        }
+
+        /// <summary>Leaves montage-mix mode (a single clip is about to be played).</summary>
+        private void StopMixPreviewMode()
+        {
+            _mixPreviewActive = false;
+            _mixLastShot = null;
+            _followPart = null;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // v1.4 (R5) — VOLUME OVER TIME AND MUSIC UNDER SPEECH
+        //   Ctrl+Shift+V  volume point at the playhead (the clip's volume curve)
+        //   Menu commands: read the curve, remove it, lower the music under speech
+        // ══════════════════════════════════════════════════════════════
+
+        private TimelineItem SelectedClip() =>
+            nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null;
+
+        private void AddVolumePoint_Click(object sender, RoutedEventArgs e)
+        {
+            var item = _playingItem ?? SelectedClip();
+            if (item == null || item.IsImage) { LogMessage(L("vol_select_sound_clip"), true); return; }
+            double pos = Math.Clamp(PositionInClip(item), 0, item.Duration);
+            var dlg = new VolumeControl(Math.Round(AudioAutomation.VolumeAt(item, pos))) { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+            SaveState();
+            AudioAutomation.SetPoint(item, pos, dlg.Volume);
+            LogMessage(LF("vol_point_set", FormatTimeDetailed(pos), Math.Round(dlg.Volume), item.VolumePoints.Count), true);
+            PlayBeep();
+        }
+
+        private void ReadVolumeCurve_Click(object sender, RoutedEventArgs e)
+        {
+            var item = SelectedClip() ?? _playingItem;
+            if (item == null) { LogMessage(L("vol_select_sound_clip"), true); return; }
+            string d = AudioAutomation.Describe(item);
+            LogMessage(d == null ? LF("vol_no_curve", Math.Round(item.Volume)) : LF("vol_curve", item.VolumePoints.Count, d), true);
+        }
+
+        private void ClearVolumeCurve_Click(object sender, RoutedEventArgs e)
+        {
+            var item = SelectedClip() ?? _playingItem;
+            if (item == null || !AudioAutomation.HasCurve(item)) { LogMessage(L("vol_nothing_to_clear"), true); return; }
+            SaveState();
+            item.VolumePoints = null;
+            if (ReferenceEquals(item, _playingItem) && _mediaPlayer != null) _mediaPlayer.Volume = (int)Math.Clamp(item.Volume, 0, 200);
+            LogMessage(LF("vol_cleared", Math.Round(item.Volume)), true);
+            PlayBeep();
+        }
+
+        /// <summary>
+        /// Lowers the music to 30 % wherever speech or another sound of yours plays: other audio clips
+        /// (AI sound effects and ambience excluded) and the sound of your own video clips. The music
+        /// is the selected audio clip, or the longest one. Ctrl+Z undoes it.
+        /// </summary>
+        private async void DuckMusic_Click(object sender, RoutedEventArgs e)
+        {
+            var sel = SelectedClip();
+            var music = sel != null && sel.IsAudio ? sel
+                      : timelineItems.Where(i => i.IsAudio && !string.IsNullOrEmpty(i.Path)).OrderByDescending(i => i.Duration).FirstOrDefault();
+            if (music == null) { LogMessage(L("duck_no_music"), true); return; }
+            RecalculatePositions();
+
+            bool IsEffectOrAmbience(TimelineItem i) =>
+                (i.Name ?? "").StartsWith("🔊") || (i.Name ?? "").StartsWith("🌳") || RenderEngine.IsAiCreatorClip(i);
+            var voices = timelineItems.Where(i => !ReferenceEquals(i, music) && i.IsAudio && i.Volume > 0 && !IsEffectOrAmbience(i)).ToList();
+            foreach (var v in timelineItems.Where(i => i.IsVideo && i.Volume > 0 && !IsEffectOrAmbience(i) &&
+                                                       Math.Abs(ClipSpeed(i) - 1.0) < 0.001 && File.Exists(i.Path)))
+                if (await ExportHelpers.HasAudioAsync(v.Path, CancellationToken.None)) voices.Add(v);
+
+            if (voices.Count == 0) { LogMessage(L("duck_no_voice"), true); return; }
+            SaveState();
+            int places = AudioAutomation.DuckUnder(music, voices);
+            if (places == 0) { LogMessage(L("duck_no_overlap"), true); return; }
+            LogMessage(LF("duck_done", Path.GetFileNameWithoutExtension(music.Name ?? ""), places), true);
+            PlayBeep();
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // v1.4 (R4) — WHAT IS IN THE PICTURE HERE, FOR EVERY CLIP
+        //   Ctrl+Shift+F  describe the frame under the playhead (also your own footage)
+        //   Ctrl+Alt+D    describe the selected clip part by part (shot changes); the parts are
+        //                 then announced while you move through the clip, and saved in the project
+        // ══════════════════════════════════════════════════════════════
+
+        private bool _announceDescriptions = true;
+        private bool _frameDescribing = false;
+        private CancellationTokenSource _describeCts;
+
+        /// <summary>The clip under the playhead and the position inside it.</summary>
+        private (TimelineItem Item, double Pos) ClipAtPlayhead()
+        {
+            if (_mixPreviewActive)
+            {
+                var shot = TimelineMixPreview.VideoAt(timelineItems, TimelinePosition);
+                return (shot, shot == null ? 0 : TimelinePosition - shot.Start);
+            }
+            var item = _playingItem ??
+                       (nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null);
+            return (item, item == null ? 0 : PositionInClip(item));
+        }
+
+        private async void DescribeFrameHere_Click(object sender, RoutedEventArgs e)
+        {
+            if (_frameDescribing) { LogMessage(L("desc_busy"), true); return; }
+            var (item, pos) = ClipAtPlayhead();
+            if (item == null || string.IsNullOrEmpty(item.Path) || !File.Exists(item.Path))
+            {
+                LogMessage(L("desc_no_picture"), true);
+                return;
+            }
+            if (item.IsAudio) { LogMessage(L("desc_audio_clip"), true); return; }
+
+            pos = Math.Clamp(pos, 0, Math.Max(0, item.Duration - 0.04));
+            double fileTime = item.IsImage ? 0 : item.SourceOffset + pos * ClipSpeed(item);
+            _frameDescribing = true;
+            LogMessage(LF("desc_working", FormatTimeDetailed(pos)), true);
+            try
+            {
+                var r = await FrameDescriber.DescribeFrameAsync(item.Path, fileTime, CancellationToken.None);
+                if (r.Text != null)
+                    LogMessage(r.CoverOnly ? LF("desc_cover", r.Text) : r.Text, true);
+                else if (r.Error == "no_model") LogMessage(L("desc_no_model"), true);
+                else if (r.Error == "no_picture") LogMessage(L("desc_sound_only"), true);
+                else LogMessage(LF("desc_frame_failed", r.Detail), true);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Describing the frame", ex);
+                LogMessage(LF("desc_failed", ex.Message), true);
+            }
+            finally
+            {
+                _frameDescribing = false;
+            }
+        }
+
+        private async void DescribeClipParts_Click(object sender, RoutedEventArgs e)
+        {
+            var item = nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null;
+            if (item == null) { LogMessage(L("select_clip_first_play"), true); return; }
+            if (item.IsAudio || string.IsNullOrEmpty(item.Path) || !File.Exists(item.Path))
+            {
+                LogMessage(L("desc_audio_clip"), true);
+                return;
+            }
+            await DescribePartsAsync(new List<TimelineItem> { item });
+        }
+
+        private async void DescribeAllMyClips_Click(object sender, RoutedEventArgs e)
+        {
+            var items = timelineItems.Where(i => (i.IsVideo || i.IsImage) && !RenderEngine.IsAiCreatorClip(i) &&
+                                                 !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path) &&
+                                                 (i.FrameDescriptions == null || i.FrameDescriptions.Count == 0))
+                                     .ToList();
+            if (items.Count == 0) { LogMessage(L("desc_parts_nothing"), true); return; }
+            await DescribePartsAsync(items);
+        }
+
+        private void StopDescribing_Click(object sender, RoutedEventArgs e)
+        {
+            if (_describeCts == null) LogMessage(L("desc_parts_none"), true);
+            else _describeCts.Cancel();
+        }
+
+        private void ToggleAnnounceDescriptions_Click(object sender, RoutedEventArgs e)
+        {
+            _announceDescriptions = !_announceDescriptions;
+            if (sender is MenuItem mi) mi.IsChecked = _announceDescriptions;
+            LogMessage(L(_announceDescriptions ? "desc_follow_on" : "desc_follow_off"), true);
+        }
+
+        /// <summary>Describes the clips one after another in the background; editing goes on meanwhile.</summary>
+        private async Task DescribePartsAsync(List<TimelineItem> items)
+        {
+            if (_describeCts != null) { LogMessage(L("desc_parts_running"), true); return; }
+            _describeCts = new CancellationTokenSource();
+            var ct = _describeCts.Token;
+            int done = 0;
+            LogMessage(LF("desc_parts_start", items.Count), true);
+            try
+            {
+                foreach (var item in items)
+                {
+                    string problem = null;
+                    bool cover = false;
+                    var parts = await FrameDescriber.DescribeByPartsAsync(item,
+                        (d, t) => LogMessage(LF("desc_parts_progress", item.Name, d, t), false),
+                        p => { if (p == "cover") cover = true; else problem = p; }, ct);
+                    if (parts == null) { LogMessage(L("desc_no_model"), true); return; }
+                    string name = Path.GetFileNameWithoutExtension(item.Name ?? "");
+                    if (parts.Count == 0)
+                    {
+                        LogMessage(problem == "no_picture" ? LF("desc_clip_sound_only", name)
+                                                           : LF("desc_clip_failed", name, problem ?? "?"), true);
+                        continue;
+                    }
+                    item.FrameDescriptions = parts;
+                    done++;
+                    if (ReferenceEquals(item, _playingItem)) _followPart = null;
+                    LogMessage(cover ? LF("desc_clip_cover_done", name, parts[0].Text)
+                                     : LF("desc_parts_clip_done", name, parts.Count), true);
+                }
+                LogMessage(LF("desc_parts_done", done), true);
+                PlayBeep();
+            }
+            catch (OperationCanceledException)
+            {
+                LogMessage(LF("desc_parts_stopped", done), true);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Describing clips by parts", ex);
+                LogMessage(LF("desc_failed", ex.Message), true);
+            }
+            finally
+            {
+                _describeCts.Dispose();
+                _describeCts = null;
+            }
         }
 
         private void AddVideoTrack_Click(object sender, RoutedEventArgs e)
         {
-            int maxTrackIndex = timelineItems.Any() ? timelineItems.Max(x => x.TrackIndex) : 0;
-            int newTrackIndex = maxTrackIndex + 1;
-            LogMessage($"Added new video track {newTrackIndex + 1}", true);
+            // v1.4: honest message — the four tracks always exist; nothing was ever "added".
+            currentTrackFilter = 1;
+            if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 1;
+            UpdateTimelineDisplay();
+            LogMessage("Video 2 track selected. New videos and images are added to it; Ctrl+Up / Ctrl+Down moves a clip between tracks.", true);
             PlayBeep();
         }
 
         private void AddAudioTrack_Click(object sender, RoutedEventArgs e)
         {
-            int maxTrackIndex = timelineItems.Any() ? timelineItems.Max(x => x.TrackIndex) : 2;
-            int newTrackIndex = maxTrackIndex + 1;
-            LogMessage($"Added new audio track {newTrackIndex + 1}", true);
+            currentTrackFilter = 3;
+            if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 3;
+            UpdateTimelineDisplay();
+            LogMessage("Audio 2 track selected. New audio is added to it; Ctrl+Up / Ctrl+Down moves a clip between tracks.", true);
             PlayBeep();
         }
 
@@ -1730,7 +3030,21 @@ namespace UltraVideoEditor
                 item.VideoEffect.Brightness = sldBrightness?.Value ?? 0;
                 item.VideoEffect.Contrast = sldContrast?.Value ?? 0;
                 item.VideoEffect.Blur = sldBlur?.Value ?? 0;
-                LogMessage($"Effects applied to {item.Name}", true);
+                // v1.4 (R5): the audio effects of the Effects tab are stored on the clip too and
+                // reach the render and the montage mix (before, they only coloured the preview)
+                if (item.IsAudio || item.IsVideo)
+                {
+                    item.AudioFx = new AudioSettingsData
+                    {
+                        BassBoost = sldBass?.Value ?? 0,
+                        TrebleBoost = sldTreble?.Value ?? 0,
+                        ReverbAmount = sldReverb?.Value ?? 0,
+                        CompressorEnabled = chkCompressor?.IsChecked == true
+                    };
+                }
+                LogMessage(LF("fx_applied_summary", item.Name,
+                              Math.Round(item.VideoEffect.Brightness), Math.Round(item.VideoEffect.Contrast), Math.Round(item.VideoEffect.Blur),
+                              Math.Round(item.AudioFx?.BassBoost ?? 0), Math.Round(item.AudioFx?.TrebleBoost ?? 0), Math.Round(item.AudioFx?.ReverbAmount ?? 0)), true);
                 PlayBeep();
             }
             else LogMessage("Select a clip first", true);
@@ -1749,7 +3063,7 @@ namespace UltraVideoEditor
                 _equalizer.SetAmp(trebleGain * 0.9f, 8);
                 _equalizer.SetAmp(trebleGain * 0.8f, 9);
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Applying the equalizer", swallowed); }   // v1.4: was silent
         }
 
         private void AudioEffect_ValueChanged(object sender, RoutedEventArgs e) => UpdateAudioEffects();
@@ -1860,11 +3174,10 @@ namespace UltraVideoEditor
                 int dropIndex = GetDropIndex(dropPoint);
                 if (dropIndex >= 0 && dropIndex < timelineItems.Count - 1)
                 {
-                    transition.Duration = transitionDuration;
-                    transition.ClipIndex1 = dropIndex;
-                    transition.ClipIndex2 = dropIndex + 1;
-                    transitions.RemoveAll(t => t.ClipIndex1 == dropIndex || t.ClipIndex2 == dropIndex + 1);
-                    transitions.Add(transition);
+                    var t = new TransitionEffect { Name = transition.Name, Type = transition.Type, Duration = transitionDuration, ClipIndex1 = dropIndex, ClipIndex2 = dropIndex + 1 };
+                    transitions.RemoveAll(x => x.ClipIndex1 == dropIndex || x.ClipIndex2 == dropIndex + 1);
+                    transitions.Add(t);
+                    SetClipTransition(timelineItems[dropIndex], t);
                     LogMessage(string.Format(L("transition_added"), transition.Name, dropIndex + 1, dropIndex + 2), true);
                     PlayBeep();
                 }
@@ -1901,6 +3214,9 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
                 int idx = timelineItems.IndexOf(item);
+                foreach (var t in transitions.Where(x => x.ClipIndex1 == idx || x.ClipIndex2 == idx).ToList())
+                    ClearClipTransition(t.ClipIndex1);
+                item.TransitionOut = null; item.TransitionOutDuration = 0;
                 transitions.RemoveAll(t => t.ClipIndex1 == idx || t.ClipIndex2 == idx);
                 LogMessage("Tranzicija uklonjena", true);
                 PlayBeep();
@@ -1923,7 +3239,7 @@ namespace UltraVideoEditor
                 sldY.Value = kf.Y;
                 sldOpacity.Value = kf.Opacity;
                 UpdateAnimValueDisplays();
-                LogMessage($"Keyframe na {FormatTime(kf.Time)} sekundi", true);
+                LogMessage(LanguageManager.F("loc_keyframe_at", FormatTime(kf.Time)), true);
             }
         }
 
@@ -1945,7 +3261,7 @@ namespace UltraVideoEditor
                 LogMessage("Select a clip first", true);
                 return;
             }
-            double time = currentPlaybackPosition - item.Start;
+            double time = PositionInClip(item);   // v1.4: was "player time − clip start"
             if (time < 0) time = 0;
             if (time > item.Duration) time = item.Duration;
             var kf = new AnimationKeyframe
@@ -2037,6 +3353,29 @@ namespace UltraVideoEditor
             catch { return 5.0; }
         }
 
+        /// <summary>v1.4 — splits text into pieces of at most <paramref name="max"/> characters at sentence or word boundaries.</summary>
+        private static IEnumerable<string> SplitForTts(string text, int max)
+        {
+            var words = (text ?? "").Replace("\r", " ").Replace("\n", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var sb = new StringBuilder();
+            foreach (var w in words)
+            {
+                if (sb.Length > 0 && sb.Length + 1 + w.Length > max)
+                {
+                    yield return sb.ToString();
+                    sb.Clear();
+                }
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(w.Length > max ? w.Substring(0, max) : w);
+                if ((w.EndsWith(".") || w.EndsWith("!") || w.EndsWith("?")) && sb.Length > max * 0.6)
+                {
+                    yield return sb.ToString();
+                    sb.Clear();
+                }
+            }
+            if (sb.Length > 0) yield return sb.ToString();
+        }
+
         private async void GenerateVoice_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) { WpfMessageBox.Show(L("save_project_first2")); return; }
@@ -2049,16 +3388,27 @@ namespace UltraVideoEditor
             string voiceoverPath = Path.Combine(currentProjectFolder, "AI_Voiceover.mp3");
             try
             {
+                // v1.4: the free TTS endpoint accepts only ~200 characters per request — longer
+                // texts failed completely. The text is now split at sentence/word boundaries and
+                // the MP3 pieces are joined (MP3 frames can simply be concatenated).
+                // A unique file name per generation (it used to overwrite the previous voice).
+                voiceoverPath = Path.Combine(currentProjectFolder, $"AI_Voiceover_{DateTime.Now:yyyyMMdd_HHmmss}.mp3");
                 using (var client = new HttpClient())
+                using (var output = new MemoryStream())
                 {
                     client.Timeout = TimeSpan.FromSeconds(30);
                     client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
-                    string url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(txtVoiceText.Text)}&tl={lang}&client=tw-ob";
-                    var audioData = await client.GetByteArrayAsync(url);
-                    File.WriteAllBytes(voiceoverPath, audioData);
+                    foreach (string chunk in SplitForTts(txtVoiceText.Text, 190))
+                    {
+                        string url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(chunk)}&tl={lang}&client=tw-ob";
+                        var audioData = await client.GetByteArrayAsync(url);
+                        output.Write(audioData, 0, audioData.Length);
+                    }
+                    File.WriteAllBytes(voiceoverPath, output.ToArray());
                 }
+                double voiceDuration = await GetMediaDurationWithTimeoutAsync(voiceoverPath, TimeSpan.FromSeconds(15));
                 SaveState();
-                timelineItems.Add(new TimelineItem { Path = voiceoverPath, Duration = GetAudioDuration(voiceoverPath), Name = "AI Voice", Type = "Audio", Volume = 100, TrackIndex = 2, VideoEffect = new VideoEffectData() });
+                timelineItems.Add(new TimelineItem { Path = voiceoverPath, Duration = voiceDuration, Name = "AI Voice", Type = "Audio", Volume = 100, TrackIndex = 3, VideoEffect = new VideoEffectData() });
                 UpdateTimelineDisplay();
                 LogMessage("AI voice generated", true);
                 txtVoiceStatus.Text = L("voice_done");
@@ -2074,7 +3424,7 @@ namespace UltraVideoEditor
             string apiToken = GetCloudflareApiKey();
             if (string.IsNullOrEmpty(apiToken))
             {
-                var dialog = new ApiKeyDialog("cloudflare", "Cloudflare API token za generisanje slika");
+                var dialog = new ApiKeyDialog("cloudflare", LanguageManager.T("loc_cf_token_images"));
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.ApiKey))
                 {
                     apiToken = dialog.ApiKey;
@@ -2087,11 +3437,12 @@ namespace UltraVideoEditor
                     return;
                 }
             }
-            string accountId = "9b8004123c153014d851b6056d2da4fe";
+            string accountId = GetCloudflareAccountId();
+            if (string.IsNullOrEmpty(accountId)) { LogMessage("Cloudflare Account ID is required for image generation.", true); return; }
             btnGenerate.IsEnabled = false;
             prgAI.Visibility = Visibility.Visible;
             txtAIStatus.Text = "Generating via Cloudflare...";
-            LogMessage("Generisanje AI kadrova preko Cloudflare Workers AI...", true);
+            LogMessage(LanguageManager.T("loc_cf_generating"), true);
             string[] prompts = txtAIPrompt.Text.Split(',');
             int generated = 0;
             using (var client = new HttpClient())
@@ -2122,7 +3473,7 @@ namespace UltraVideoEditor
                                 double duration = dialog.ShowDialog() == true ? dialog.Duration : 5.0;
                                 LogMessage("Generating description for: " + cleanP + "...", false);
                                 string imgDesc = await GenerateImageDescriptionAsync(img, cleanP);
-                                if (string.IsNullOrEmpty(imgDesc)) imgDesc = "AI generisana slika: " + cleanP;
+                                if (string.IsNullOrEmpty(imgDesc)) imgDesc = LanguageManager.F("loc_ai_image_desc", cleanP);
 
                                 timelineItems.Add(new TimelineItem
                                 {
@@ -2205,33 +3556,59 @@ namespace UltraVideoEditor
             try
             {
                 string language = rbSrb.IsChecked == true ? "sr" : (rbEng.IsChecked == true ? "en" : "de");
-                string ffmpegPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegPath = AppPaths.FFmpeg;
                 var transcriptionResult = await AITranscription.TranscribeAsync(
                     selectedTranscribeAudioPath,
                     language: language,
                     ffmpegPath: ffmpegPath,
                     modelSize: "large-v3");
-                string result = transcriptionResult.Success
-                    ? transcriptionResult.FullText
-                    : transcriptionResult.ErrorMessage;
+                if (!transcriptionResult.Success)
+                {
+                    // v1.4: an error message used to be offered as subtitles
+                    txtTranscriptionResult.Text = transcriptionResult.ErrorMessage;
+                    LogMessage(transcriptionResult.ErrorMessage, true);
+                    return;
+                }
+                // v1.4: when the song's lyrics are typed in the lyrics box, they replace what
+                // Whisper wrote (sung songs are often misheard: "moja đele" for "moj Anđele").
+                // Whisper is then only used for the timing; repeated choruses get their own lines.
+                var typedLyrics = (txtLyrics?.Text ?? "")
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+                if (typedLyrics.Count > 0 && transcriptionResult.WordTimings.Count > 0)
+                {
+                    if (AITranscription.TryApplySungAlignment(typedLyrics, transcriptionResult.WordTimings, transcriptionResult))
+                    {
+                        transcriptionResult.FullText = string.Join("\n", transcriptionResult.Lines.Select(l => l.Text));
+                        LogMessage(string.Format(L("transcription_used_lyrics"), transcriptionResult.Lines.Count), true);
+                    }
+                    else
+                    {
+                        LogMessage(L("transcription_lyrics_not_matched"), true);
+                    }
+                }
+                string result = transcriptionResult.FullText;
                 txtTranscriptionResult.Text = result;
                 LogMessage(L("transcription_done2"), true);
                 if (WpfMessageBox.Show(L("add_as_subtitles"), L("add_subtitles_title"),
                     MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
-                    var sentences = result.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
-                    double duration = GetAudioDuration(selectedTranscribeAudioPath);
-                    double timePerSentence = duration / Math.Max(sentences.Length, 1);
-                    for (int i = 0; i < sentences.Length; i++)
+                    // v1.4: use Whisper's real timestamps for each line (the text used to be
+                    // split into sentences and spread evenly over the file, ignoring the timing).
+                    // Times are shifted by where that audio clip sits on the timeline.
+                    var audioOnTimeline = timelineItems.FirstOrDefault(i => i.Path == selectedTranscribeAudioPath);
+                    double offset = audioOnTimeline?.Start ?? 0;
+                    SaveState();
+                    int added = 0;
+                    foreach (var line in transcriptionResult.Lines)
                     {
-                        string sentence = sentences[i].Trim();
-                        if (!string.IsNullOrEmpty(sentence))
-                        {
-                            subtitles.Add(new SubtitleItem { Text = sentence + ".", Start = i * timePerSentence, End = (i + 1) * timePerSentence });
-                            lstSubtitles.Items.Add($"{FormatTime(i * timePerSentence)} -> {FormatTime((i + 1) * timePerSentence)}: {sentence}.");
-                        }
+                        if (string.IsNullOrWhiteSpace(line.Text)) continue;
+                        double s = offset + line.StartSeconds, en = offset + Math.Max(line.EndSeconds, line.StartSeconds + 0.5);
+                        subtitles.Add(new SubtitleItem { Text = line.Text.Trim(), Start = s, End = en });
+                        lstSubtitles.Items.Add($"{FormatTime(s)} -> {FormatTime(en)}: {line.Text.Trim()}");
+                        added++;
                     }
-                    LogMessage($"Added {sentences.Length} subtitles from the transcript", true);
+                    LogMessage($"Added {added} subtitles from the transcript", true);
                 }
             }
             catch (Exception ex)
@@ -2255,7 +3632,7 @@ namespace UltraVideoEditor
                 string[] lines = txtLyrics.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 var lyrics = lines.Where(l => !string.IsNullOrWhiteSpace(l.Trim())).ToList();
                 if (lyrics.Count == 0) { LogMessage("No valid lyric lines", true); return; }
-                double duration = GetAudioDuration(selectedAudioPath);
+                double duration = await GetMediaDurationWithTimeoutAsync(selectedAudioPath, TimeSpan.FromSeconds(15));
                 syncedSubtitles.Clear();
 
                 // SYNC FIX: Attempting Whisper transcription for accurate audio timestamps.
@@ -2272,15 +3649,19 @@ namespace UltraVideoEditor
                         // Result: millisecond-accurate timestamps that follow the real voice.
                         txtSyncStatus.Text = "Whisper is listening and aligning text...";
                         LogMessage("🎵 Forced alignment: Whisper detecting where each line begins...", true);
-                        string ffmpegPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                        string ffmpegPath = AppPaths.FFmpeg;
 
                         var alignResult = await AITranscription.ForcedAlignAsync(
                             audioPath:   selectedAudioPath,
                             userLines:   lyrics,
-                            language:    _currentLanguage ?? "en",
+                            // v1.4: the SONG's language (the radio buttons), not the app's UI language
+                            language:    rbSrb.IsChecked == true ? "sr" : (rbEng.IsChecked == true ? "en" : "de"),
                             ffmpegPath:  ffmpegPath,
-                            modelSize:   "small",
-                            progress:    new Progress<string>(msg => Dispatcher.Invoke(() => txtSyncStatus.Text = msg)));
+                            modelSize:   "large-v3",
+                            progress:    new Progress<string>(msg => Dispatcher.Invoke(() => txtSyncStatus.Text = msg)),
+                            // v1.4: every repeat of the chorus gets its own subtitle, even when
+                            // the chorus is typed only once
+                            allowRepeats: true);
 
                         if (alignResult.Success && alignResult.Lines.Count > 0)
                         {
@@ -2387,6 +3768,7 @@ namespace UltraVideoEditor
 
         private void ApplyTemplate(ProjectTemplate t)
         {
+            SaveState();   // v1.4: snapshot before the change (it was taken after, so Undo did nothing)
             // Apply template settings to MainWindow state
             if (!string.IsNullOrEmpty(t.Language))
             {
@@ -2410,7 +3792,6 @@ namespace UltraVideoEditor
                     }
                 }
             }
-            SaveState();
             UpdateTimelineDisplay();
             LogMessage($"Template \"{t.Name}\" primenjen.", true);
         }
@@ -2427,10 +3808,10 @@ namespace UltraVideoEditor
                     System.Windows.MessageBoxImage.Information);
                 return;
             }
+            SaveState();   // v1.4: before the dialog — it writes the grade into the clips directly
             var dlg = new ColorGradingDialog(videoItems) { Owner = this };
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog() != true) { DiscardLastUndo(); return; }
             {
-                SaveState();
                 UpdateTimelineDisplay();
                 LogMessage("Color Grading: grade applied to the timeline clips.", true);
             }
@@ -2439,13 +3820,14 @@ namespace UltraVideoEditor
         // ── Faza 4A: Smart Scene Detection ──────────────────────────
         private void OpenSceneDetection_Click(object sender, RoutedEventArgs e)
         {
+            // v1.4: snapshot BEFORE the dialog changes the timeline, so Undo removes the scenes
+            SaveState();
             var dlg = new SceneDetectionDialog { Owner = this };
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog() != true) { DiscardLastUndo(); return; }
             {
                 var added = dlg.SelectedScenes;
                 if (added?.Count > 0)
                 {
-                    SaveState();
                     UpdateTimelineDisplay();
                     LogMessage($"Smart Scene Detection: added {added.Count} scenes to the timeline.", true);
                 }
@@ -2464,10 +3846,12 @@ namespace UltraVideoEditor
                     System.Windows.MessageBoxImage.Information);
                 return;
             }
-            var dlg = new TimelineAIAssistantDialog(new List<TimelineItem>(timelineItems)) { Owner = this };
-            if (dlg.ShowDialog() == true)
+            SaveState();   // v1.4: before the dialog — it replaces the timeline itself
+            // v1.4: the assistant works on copies, so trying commands and then pressing Cancel
+            // leaves the timeline untouched (sorting used to change the real clips right away).
+            var dlg = new TimelineAIAssistantDialog(timelineItems.Select(DeepCloneTimelineItem).ToList()) { Owner = this };
+            if (dlg.ShowDialog() != true) { DiscardLastUndo(); return; }
             {
-                SaveState();
                 timelineItems.Clear();
                 foreach (var item in dlg.ResultItems)
                     timelineItems.Add(item);
@@ -2486,20 +3870,24 @@ namespace UltraVideoEditor
                 if (segments?.Count > 0)
                 {
                     SaveState();
-                    double cursor = timelineItems.Sum(t => t.Duration);
+                    RecalculatePositions();
+                    double cursor = timelineItems.Where(t => t.TrackIndex == 0).Select(t => t.End).DefaultIfEmpty(0).Max();
                     foreach (var seg in segments.OrderBy(s => s.Order))
                     {
+                        // v1.4: the segment's position IN THE SOURCE goes to SourceOffset (it was
+                        // put into Start, which is the timeline position — so every highlight was
+                        // rendered from the beginning of the source video).
                         var item = new TimelineItem
                         {
                             Path             = seg.SourcePath,
-                            Start            = seg.SourceStart,
-                            End              = seg.SourceEnd,
+                            SourceOffset     = seg.SourceStart,
                             Duration         = seg.Duration,
                             Name             = $"Highlight {seg.Order:D2}",
-                            Type             = "Highlight",
+                            Type             = "Video",
                             TrackIndex       = 0,
                             FixedPosition    = cursor,
                             UseFixedPosition = true,
+                            VideoEffect      = new VideoEffectData()
                         };
                         timelineItems.Add(item);
                         cursor += seg.Duration;
@@ -2696,6 +4084,7 @@ namespace UltraVideoEditor
                 Directory.CreateDirectory(folder);
 
             _renderCancellation = new CancellationTokenSource();
+            RecalculatePositions();
             prgRender.Visibility = Visibility.Visible;
             prgRender.Value = 0;
             btnRenderTool.IsEnabled = false;
@@ -2717,7 +4106,7 @@ namespace UltraVideoEditor
                     var aiCreator = FindAIVideoCreator();
                     if (aiCreator != null) renderBeatInfo = aiCreator.GetBeatInfo();
                 }
-                catch { }
+                catch (Exception swallowed) { AppLog.Error("Reading beat info from the AI creator", swallowed); }   // v1.4: was silent
 
                 await _renderEngine.RenderSimpleAsync(
                     timelineItems,
@@ -2810,28 +4199,25 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                var dlg = new WpfSaveFileDialog { Filter = "Iskra Project|*.iskra", DefaultExt = "iskra", FileName = "project.iskra" };
-                if (dlg.ShowDialog() == true)
-                {
-                    currentProjectFolder = Path.GetDirectoryName(dlg.FileName) ?? string.Empty;
-                    var projectData = new ProjectData
-                    {
-                        TimelineItems = timelineItems,
-                        Subtitles = subtitles,
-                        Markers = markers,
-                        Transitions = transitions,
-                        CurrentTrackFilter = currentTrackFilter,
-                        ZoomLevel = zoomLevel,
-                        ProjectVersion = "5.0"
-                    };
-                    string json = JsonConvert.SerializeObject(projectData, Formatting.Indented);
-                    await File.WriteAllTextAsync(dlg.FileName, json);
-                }
-                else
+                SaveAsProject_Click(null, null);
+                if (string.IsNullOrEmpty(currentProjectFolder))
                 {
                     LogMessage(L("save_project_first2"), true);
                     return;
                 }
+            }
+            RecalculatePositions();
+
+            // v1.4: "Export audio only" (Export options) now really exports just the audio
+            if (currentExportSettings?.ExportAudioOnly == true)
+            {
+                var audioDialog = new WpfSaveFileDialog { Filter = "MP3 audio|*.mp3|WAV audio|*.wav", DefaultExt = "mp3", FileName = "audio.mp3" };
+                if (audioDialog.ShowDialog() != true) return;
+                LogMessage("Exporting audio only...", true);
+                bool audioOk = await ExportHelpers.ExportAudioOnlyAsync(timelineItems, audioDialog.FileName, CancellationToken.None);
+                LogMessage(audioOk ? $"Audio exported: {audioDialog.FileName}" : "Audio export failed — no audio clip on the timeline?", true);
+                if (audioOk) PlayBeep();
+                return;
             }
 
             var saveDialog = new WpfSaveFileDialog
@@ -2843,24 +4229,33 @@ namespace UltraVideoEditor
 
             if (saveDialog.ShowDialog() != true) return;
 
-            string outputPath = saveDialog.FileName;
+            // v1.4: the renderer always produces H.264/AAC in MP4. For WebM/AVI it renders to
+            // a temporary MP4 next to the target and converts at the end (WebM used to fail).
+            string requestedPath = saveDialog.FileName;
+            string requestedExt = Path.GetExtension(requestedPath).ToLowerInvariant();
+            bool needsConversion = requestedExt == ".webm" || requestedExt == ".avi";
+            string outputPath = needsConversion
+                ? Path.Combine(Path.GetDirectoryName(requestedPath) ?? "", Path.GetFileNameWithoutExtension(requestedPath) + "_tmp_render.mp4")
+                : requestedPath;
             string format = Path.GetExtension(outputPath).ToLower().TrimStart('.');
             if (format == "mp4") format = "mp4";
             else if (format == "webm") format = "webm";
             else if (format == "avi") format = "avi";
             else format = "mp4";
 
-            // Provjeri da li postoji audio za odabir rezolucije
-            string selectedResolution = "1920x1080";
-            var audioItem = timelineItems.FirstOrDefault(i => i.IsAudio);
-            if (audioItem != null)
+            // v1.4: always ask for the resolution (it was only asked when the project had
+            // audio — otherwise 1920x1080 was used silently, even after choosing 9:16 before)
+            string selectedResolution = _selectedResolution ?? "1920x1080";
+            var resolutionDialog = new ResolutionDialog { Owner = this };
+            if (resolutionDialog.ShowDialog() != true)
             {
-                var resolutionDialog = new ResolutionDialog();
-                if (resolutionDialog.ShowDialog() == true)
-                {
-                    selectedResolution = resolutionDialog.SelectedResolution;
-                    _selectedResolution = selectedResolution; // save for AIVideoCreator
-                }
+                LogMessage("Rendering cancelled", true);
+                return;
+            }
+            if (!string.IsNullOrEmpty(resolutionDialog.SelectedResolution))
+            {
+                selectedResolution = resolutionDialog.SelectedResolution;
+                _selectedResolution = selectedResolution; // save for AIVideoCreator
             }
 
             _renderCancellation = new CancellationTokenSource();
@@ -2874,7 +4269,7 @@ namespace UltraVideoEditor
 
             try
             {
-                string ffmpegExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegExePath = AppPaths.FFmpeg;
                 LogMessage($"Checking FFmpeg at: {ffmpegExePath}", true);
 
                 if (!File.Exists(ffmpegExePath))
@@ -2909,7 +4304,7 @@ namespace UltraVideoEditor
                     if (aiCreator != null)
                         renderBeatInfo = aiCreator.GetBeatInfo();
                 }
-                catch { }
+                catch (Exception swallowed) { AppLog.Error("Reading beat info from the AI creator", swallowed); }   // v1.4: was silent
 
                 await _renderEngine.RenderSimpleAsync(
                     timelineItems,
@@ -2924,6 +4319,21 @@ namespace UltraVideoEditor
                     AIVideoCreator.FastRenderMode,  // BRZI RENDER (bez Ken Burns)
                     enableSubtitles,    // HARD-ANCHOR subtitle toggle
                     renderBeatInfo);    // BEAT-SYNC: DownBeat snap za rezove
+
+                if (needsConversion && File.Exists(outputPath))
+                {
+                    LogMessage($"Converting to {requestedExt.TrimStart('.').ToUpperInvariant()}...", true);
+                    bool converted = await ExportHelpers.ConvertContainerAsync(outputPath, requestedPath, _renderCancellation?.Token ?? CancellationToken.None);
+                    if (converted)
+                    {
+                        try { File.Delete(outputPath); } catch { }
+                        outputPath = requestedPath;
+                    }
+                    else
+                    {
+                        LogMessage($"Conversion failed — the MP4 is kept: {outputPath}", true);
+                    }
+                }
 
                 if (File.Exists(outputPath))
                 {
@@ -2954,10 +4364,13 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
+                // v1.4: details go to the log files; the message tells where they are instead of
+                // reading a stack trace aloud.
+                AppLog.Error("Render", ex);
                 LogMessage($"RENDER ERROR: {ex.Message}", true);
-                LogMessage($"Stack trace: {ex.StackTrace}", true);
                 txtRenderStatus.Text = L("render_failed_status");
-                WpfMessageBox.Show(string.Format(L("render_failed_msg"), ex.Message, ex.StackTrace), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
+                string where = File.Exists(RenderEngine.LastErrorLogPath) ? RenderEngine.LastErrorLogPath : AppLog.TodayFile;
+                WpfMessageBox.Show(string.Format(L("render_failed_msg"), ex.Message, where), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -3059,6 +4472,29 @@ namespace UltraVideoEditor
         {
             this.PreviewKeyDown += (sender, e) =>
             {
+                // v1.4: seeking from the keyboard. Before, moving inside a clip was possible only with
+                // the two on-screen buttons. Alt+Left/Right = 5 seconds, Alt+Shift+Left/Right = one
+                // tenth of a second (fine positioning before a cut). WPF reports Alt combinations as
+                // Key.System, the real key is in SystemKey.
+                Key realKey = e.Key == Key.System ? e.SystemKey : e.Key;
+                if ((realKey == Key.Left || realKey == Key.Right) &&
+                    (Keyboard.Modifiers == ModifierKeys.Alt || Keyboard.Modifiers == (ModifierKeys.Alt | ModifierKeys.Shift)))
+                {
+                    bool fine = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                    if (!DuplicateKey("seek" + realKey + fine))
+                        SeekBy((realKey == Key.Right ? 1 : -1) * (fine ? 100 : 5000));
+                    e.Handled = true;
+                    return;
+                }
+
+                // v1.4 (R5): Premiere-style editing keys without modifiers — J/K/L shuttle,
+                // comma/period one frame, Q/W trim the clip to the playhead. Never inside a text field.
+                if (Keyboard.Modifiers == ModifierKeys.None && !IsTextInput(e.OriginalSource) && HandleEditingKey(e.Key))
+                {
+                    e.Handled = true;
+                    return;
+                }
+
                 // Ctrl+G – Idi na broj klipa
                 if (e.Key == Key.G && Keyboard.Modifiers == ModifierKeys.Control)
                 {
@@ -3092,11 +4528,43 @@ namespace UltraVideoEditor
                 else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
                 else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
                 else if (e.Key == Key.X && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
-                else if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
-                else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
-                else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = false; }
+                // v1.4: these shortcuts were shown in the menus but nothing handled them — WPF menus
+                // only DISPLAY the gesture text. Undo, Redo, Select all, Add video/image, Add audio,
+                // Apply effects and Help now work from the keyboard. In a text field, Ctrl+Z / Ctrl+Y /
+                // Ctrl+A keep their normal text meaning.
+                else if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    if (!(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)) { SelectAll_Click(null, null); e.Handled = true; }
+                }
+                else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    if (!(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)) { Undo_Click(null, null); e.Handled = true; }
+                }
+                else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    if (!(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)) { Redo_Click(null, null); e.Handled = true; }
+                }
+                else if (e.Key == Key.I && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    AddVideoImage_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.I && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    AddAudioOnly_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.E && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    ApplyEffects_Click(null, null);
+                    e.Handled = true;
+                }
                 else if (e.Key == Key.Delete) { e.Handled = false; }
-                else if (e.Key == Key.F1) { e.Handled = false; }
+                else if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
+                {
+                    // the transition list uses F1 to read the selected effect's description
+                    if (!lstTransitions.IsKeyboardFocusWithin) { ShowHelp_Click(null, null); e.Handled = true; }
+                }
                 else if (e.Key == Key.F2) { e.Handled = false; }
                 else if (e.Key == Key.F3) { e.Handled = false; }
                 else if (e.Key == Key.L && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -3209,7 +4677,32 @@ namespace UltraVideoEditor
                 }
                 else if (e.Key == Key.Space && Keyboard.Modifiers == ModifierKeys.Control)
                 {
-                    TogglePlay_Click(null, null);
+                    if (!DuplicateKey("play")) TogglePlay_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Space && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    if (!DuplicateKey("mix")) PlayMix_Click(null, null);   // v1.4 (R3): hear the whole montage without a render
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt))
+                {
+                    SetClipSpeed_Click(null, null);   // v1.4 (R5): clip speed had no control at all
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.V && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    if (!DuplicateKey("volpoint")) AddVolumePoint_Click(null, null);   // v1.4 (R5)
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    if (!DuplicateKey("descframe")) DescribeFrameHere_Click(null, null);   // v1.4 (R4)
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.D && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt))
+                {
+                    if (!DuplicateKey("descparts")) DescribeClipParts_Click(null, null);   // v1.4 (R4)
                     e.Handled = true;
                 }
                 else if (e.Key == Key.Left && Keyboard.Modifiers == ModifierKeys.Control)
@@ -3266,27 +4759,30 @@ namespace UltraVideoEditor
                     }
                     if (newIndex >= 0 && newIndex < nativeListView.Items.Count)
                     {
+                        nativeListView.SelectedItems.Clear();
                         nativeListView.Items[newIndex].Selected = true;
                         nativeListView.Items[newIndex].EnsureVisible();
-                        if (nativeListView.SelectedItems[0].Tag is TimelineItem newItem)
-                            LogMessage($"Selected clip {newItem.Index}: {newItem.Name}", true);
+                        // v1.4: no extra announcement here — ProcessSelectedItem already reads
+                        // "N of TOTAL, type: name, duration..." (it was spoken twice)
                         e.Handled = true;
                     }
                 }
-                else if (e.Key == Key.PageUp && nativeListView?.Focused == true)
+                else if (e.Key == Key.PageUp && nativeListView?.Focused == true && nativeListView.Items.Count > 0)
                 {
+                    // v1.4: guard for an empty list and use the VISIBLE list (track filter),
+                    // not the whole timeline — it crashed / jumped past the end before.
                     int newIndex = Math.Max(0, (nativeListView.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Index : 0) - 5);
+                    nativeListView.SelectedItems.Clear();
                     nativeListView.Items[newIndex].Selected = true;
                     nativeListView.Items[newIndex].EnsureVisible();
-                    LogMessage($"Clip {newIndex + 1} of {timelineItems.Count}", true);
                     e.Handled = true;
                 }
-                else if (e.Key == Key.PageDown && nativeListView?.Focused == true)
+                else if (e.Key == Key.PageDown && nativeListView?.Focused == true && nativeListView.Items.Count > 0)
                 {
-                    int newIndex = Math.Min(timelineItems.Count - 1, (nativeListView.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Index : 0) + 5);
+                    int newIndex = Math.Min(nativeListView.Items.Count - 1, (nativeListView.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Index : 0) + 5);
+                    nativeListView.SelectedItems.Clear();
                     nativeListView.Items[newIndex].Selected = true;
                     nativeListView.Items[newIndex].EnsureVisible();
-                    LogMessage($"Clip {newIndex + 1} of {timelineItems.Count}", true);
                     e.Handled = true;
                 }
             };
@@ -3349,10 +4845,12 @@ namespace UltraVideoEditor
                 {
                     if (lstTransitions.SelectedItem is TransitionEffect transition)
                     {
-                        transition.Duration = transitionDuration;
-                        transition.ClipIndex1 = idx;
-                        transition.ClipIndex2 = idx + 1;
-                        transitions.Add(transition);
+                        // v1.4: a NEW transition object each time (the list item itself was
+                        // reused, so adding it twice changed both) and stored on the clip
+                        var t = new TransitionEffect { Name = transition.Name, Type = transition.Type, Duration = transitionDuration, ClipIndex1 = idx, ClipIndex2 = idx + 1 };
+                        transitions.RemoveAll(x => x.ClipIndex1 == idx);
+                        transitions.Add(t);
+                        SetClipTransition(item, t);
                         LogMessage(string.Format(L("transition_added"), transition.Name, idx + 1, idx + 2), true);
                         PlayBeep();
                     }
@@ -3372,10 +4870,10 @@ namespace UltraVideoEditor
                 int clipIndex = dialog.ClipIndex - 1;
                 if (clipIndex >= 0 && clipIndex < timelineItems.Count - 1)
                 {
-                    transition.Duration = transitionDuration;
-                    transition.ClipIndex1 = clipIndex;
-                    transition.ClipIndex2 = clipIndex + 1;
-                    transitions.Add(transition);
+                    var t = new TransitionEffect { Name = transition.Name, Type = transition.Type, Duration = transitionDuration, ClipIndex1 = clipIndex, ClipIndex2 = clipIndex + 1 };
+                    transitions.RemoveAll(x => x.ClipIndex1 == clipIndex);
+                    transitions.Add(t);
+                    SetClipTransition(timelineItems[clipIndex], t);
                     LogMessage(string.Format(L("transition_added"), transition.Name, clipIndex + 1, clipIndex + 2), true);
                     PlayBeep();
                 }
@@ -3405,7 +4903,7 @@ namespace UltraVideoEditor
                     }
                     else
                     {
-                        LogMessage("Clipboard je prazan", true);
+                        LogMessage(LanguageManager.T("loc_clipboard_empty"), true);
                     }
                 }
                 else
@@ -3421,9 +4919,10 @@ namespace UltraVideoEditor
 
         private void AddAudioDescription_Click(object sender, RoutedEventArgs e)
         {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage)
+            // v1.4: any clip with a picture can get a description, not only pictures
+            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && !item.IsAudio)
             {
-                var dialog = new TextOverlayDialog($"Audio description for image: {item.Name}");
+                var dialog = new TextOverlayDialog($"Audio description: {item.Name}");
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     item.AudioDescription = dialog.Text;
@@ -3442,7 +4941,8 @@ namespace UltraVideoEditor
         {
             if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage))
             {
-                LogMessage("Select an image first", true);
+                // v1.4: for a video the frame under the playhead is described (same as Ctrl+Shift+F)
+                DescribeFrameHere_Click(null, null);
                 return;
             }
             if (!File.Exists(item.Path))
@@ -3451,7 +4951,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             LogMessage(L("vd_analyzing"), true);
 
             VisionResult result;
@@ -3573,23 +5073,24 @@ namespace UltraVideoEditor
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>
+        /// v1.4 — reads the description of ANY clip (it only worked for pictures): the clip's own
+        /// description, and for a clip described by parts the part under the playhead.
+        /// </summary>
         private void ReadAudioDescription_Click(object sender, RoutedEventArgs e)
         {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.IsImage)
+            var item = SelectedClip();
+            if (item == null) { LogMessage(L("select_clip_first_play"), true); return; }
+            var parts = new List<string>();
+            string own = UsableDescription(item.AudioDescription);
+            if (own != null) parts.Add(own);
+            if (item.FrameDescriptions != null && item.FrameDescriptions.Count > 0)
             {
-                if (!string.IsNullOrEmpty(item.AudioDescription))
-                {
-                    LogMessage($"Image {item.Index} description: {item.AudioDescription}", true);
-                }
-                else
-                {
-                    LogMessage($"Image {item.Index} has no audio description", true);
-                }
+                double pos = ReferenceEquals(item, _playingItem) ? currentPlaybackPosition : 0;
+                var here = item.DescriptionAt(pos) ?? item.FrameDescriptions[0];
+                parts.Add(LF("desc_read_part", FormatTimeDetailed(here.Start), here.Text, item.FrameDescriptions.Count));
             }
-            else
-            {
-                LogMessage("Select an image first", true);
-            }
+            LogMessage(parts.Count > 0 ? string.Join(" ", parts) : L("desc_read_none"), true);
         }
 
         private async void GenerateScenario_Click(object sender, RoutedEventArgs e)
@@ -3605,7 +5106,7 @@ namespace UltraVideoEditor
             string apiToken = GetCloudflareApiKey();
             if (string.IsNullOrEmpty(apiToken))
             {
-                var dialog = new ApiKeyDialog("cloudflare", "Cloudflare API token za generisanje scenarija");
+                var dialog = new ApiKeyDialog("cloudflare", LanguageManager.T("loc_cf_token_story"));
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.ApiKey))
                 {
                     apiToken = dialog.ApiKey;
@@ -3668,7 +5169,7 @@ namespace UltraVideoEditor
                 string jsonArray = cleanedResult.Substring(jsonStart, jsonEnd - jsonStart + 1);
                 string wrappedJson = $"{{\"scenes\": {jsonArray}}}";
 
-                LogMessage($"JSON za parsiranje: {wrappedJson.Substring(0, Math.Min(200, wrappedJson.Length))}", true);
+                LogMessage($"JSON to parse: {wrappedJson.Substring(0, Math.Min(200, wrappedJson.Length))}", true);
 
                 var scenes = JsonConvert.DeserializeObject<dynamic>(wrappedJson);
 
@@ -3680,7 +5181,10 @@ namespace UltraVideoEditor
                         var newScene = new AnimationScene
                         {
                             ImageName = scene.imageName.ToString(),
-                            Duration = double.Parse(scene.duration.ToString()),
+                            Duration = double.TryParse(((string)scene.duration.ToString()).Replace(',', '.'),
+                                           System.Globalization.NumberStyles.Float,
+                                           System.Globalization.CultureInfo.InvariantCulture, out double sceneDur) && sceneDur > 0
+                                           ? sceneDur : 3.0,
                             Effect = scene.effect.ToString(),
                             Description = scene.description.ToString(),
                             AvailableImages = availableImages,
@@ -3763,6 +5267,7 @@ namespace UltraVideoEditor
                 message.AppendLine(L("ai_arrangement_result"));
                 foreach (var item in layout.raspored)
                 {
+                    if (item.animacija_index < 1 || item.animacija_index > animacije.Count) continue;  // v1.4: AI may return a bad index
                     var anim = animacije[item.animacija_index - 1];
                     message.AppendLine($"Animation {item.animacija_index}: '{anim.Name}' from {FormatTime(item.pocetak)} to {FormatTime(item.kraj)}. Reason: {item.razlog}");
                 }
@@ -3780,10 +5285,12 @@ namespace UltraVideoEditor
 
                     foreach (var item in layout.raspored.OrderBy(p => p.pocetak))
                     {
+                        if (item.animacija_index < 1 || item.animacija_index > animacije.Count) continue;
                         var anim = animacije[item.animacija_index - 1];
-                        anim.Start = item.pocetak;
-                        anim.Duration = item.kraj - item.pocetak;
-                        timelineItems.Add(anim);
+                        anim.UseFixedPosition = true;
+                        anim.FixedPosition = Math.Max(0, item.pocetak);
+                        anim.Duration = Math.Max(0.5, item.kraj - item.pocetak);
+                        if (!timelineItems.Contains(anim)) timelineItems.Add(anim);
                     }
 
                     UpdateTimelineDisplay();
@@ -3812,7 +5319,7 @@ namespace UltraVideoEditor
             _animationScenes.Add(newScene);
             lstAnimationScenes.ItemsSource = null;
             lstAnimationScenes.ItemsSource = _animationScenes;
-            LogMessage("New scene added", true);
+            LogMessage(LanguageManager.T("loc_scene_added"), true);
         }
 
         private void RemoveScene_Click(object sender, RoutedEventArgs e)
@@ -3822,12 +5329,12 @@ namespace UltraVideoEditor
                 _animationScenes.Remove(scene);
                 lstAnimationScenes.ItemsSource = null;
                 lstAnimationScenes.ItemsSource = _animationScenes;
-                LogMessage("Scena obrisana", true);
+                LogMessage(LanguageManager.T("loc_scene_deleted"), true);
                 PlayBeep();
             }
             else
             {
-                LogMessage("Select a scene to delete", true);
+                LogMessage(LanguageManager.T("loc_scene_select_delete"), true);
             }
         }
 
@@ -3843,7 +5350,7 @@ namespace UltraVideoEditor
                     lstAnimationScenes.ItemsSource = null;
                     lstAnimationScenes.ItemsSource = _animationScenes;
                     lstAnimationScenes.SelectedItem = scene;
-                    LogMessage("Scene moved up", true);
+                    LogMessage(LanguageManager.T("loc_scene_moved_up"), true);
                     PlayBeep();
                 }
             }
@@ -3861,7 +5368,7 @@ namespace UltraVideoEditor
                     lstAnimationScenes.ItemsSource = null;
                     lstAnimationScenes.ItemsSource = _animationScenes;
                     lstAnimationScenes.SelectedItem = scene;
-                    LogMessage("Scena pomjerena dolje", true);
+                    LogMessage(LanguageManager.T("loc_scene_moved_down"), true);
                     PlayBeep();
                 }
             }
@@ -3877,7 +5384,8 @@ namespace UltraVideoEditor
                     return;
                 }
                 SaveState();
-                animacija.Start = startTime;
+                animacija.UseFixedPosition = true;      // v1.4: Start alone was overwritten on the next refresh
+                animacija.FixedPosition = Math.Max(0, startTime);
                 UpdateTimelineDisplay();
                 LogMessage($"Animacija '{animacija.Name}' postavljena na {FormatTime(startTime)}", true);
                 PlayBeep();
@@ -3905,7 +5413,7 @@ namespace UltraVideoEditor
                 if (image != null)
                 {
                     var animacija = DeepCloneTimelineItem(image);
-                    animacija.Name = $"Animacija: {scene.Description}";
+                    animacija.Name = $"Animation: {scene.Description}";
                     animacija.Type = "Animation";
                     animacija.Duration = scene.Duration;
                     animacija.Start = 0;
@@ -3938,7 +5446,10 @@ namespace UltraVideoEditor
 
                 var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
-                string url = "https://api.cloudflare.com/client/v4/accounts/9b8004123c153014d851b6056d2da4fe/ai/run/@cf/meta/llama-2-7b-chat-int8";
+                // v1.4: own account ID + a current model (llama-2-7b-chat-int8 was retired by Cloudflare)
+                string accountId = GetCloudflareAccountId();
+                if (string.IsNullOrEmpty(accountId)) return "";
+                string url = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct";
                 LogMessage($"CallCloudflareAI: Pozivam URL: {url}", true);
 
                 try
@@ -3992,7 +5503,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                double time = currentPlaybackPosition - item.Start;
+                double time = PositionInClip(item);   // v1.4: was "player time − clip start"
                 if (time < 0) time = 0;
                 if (time > item.Duration) time = item.Duration;
 
@@ -4019,7 +5530,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                double time = currentPlaybackPosition - item.Start;
+                double time = PositionInClip(item);   // v1.4: was "player time − clip start"
                 if (time < 0) time = 0;
                 if (time > item.Duration) time = item.Duration;
 
@@ -4046,7 +5557,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                double time = currentPlaybackPosition - item.Start;
+                double time = PositionInClip(item);   // v1.4: was "player time − clip start"
                 if (time < 0) time = 0;
                 if (time > item.Duration) time = item.Duration;
 
@@ -4130,7 +5641,8 @@ namespace UltraVideoEditor
             {
                 byte[] bytes = await File.ReadAllBytesAsync(imagePath);
                 string b64 = Convert.ToBase64String(bytes);
-                string accountId = "9b8004123c153014d851b6056d2da4fe";
+                string accountId = GetCloudflareAccountId(askIfMissing: false);
+                if (string.IsNullOrEmpty(accountId)) return "";
                 string url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/@cf/llava-hf/llava-1.5-7b-hf";
                 string prompt = string.IsNullOrWhiteSpace(contextPrompt)
                     ? "Describe the image briefly and clearly in English, in at most two sentences. The description is intended for blind users."
@@ -4174,26 +5686,22 @@ namespace UltraVideoEditor
             var audioItem = timelineItems.FirstOrDefault(i => i.IsAudio);
             double audioDur = audioItem != null ? audioItem.Duration : GetTotalDuration();
 
+            // v1.4: the snapshot is taken BEFORE the dialog, because "Evenly distribute"
+            // changes the clips while the dialog is open (the old snapshot taken afterwards
+            // made Undo restore the already-changed timeline, and Cancel kept the changes).
+            SaveState();
             var dlg = new PositionDialog(item, timelineItems, audioDur);
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog() != true)
             {
-                SaveState();
-
+                if (dlg.AutoPlaceAll) RestoreLastUndo();
+                else DiscardLastUndo();
+                return;
+            }
+            {
                 if (dlg.AutoPlaceAll)
                 {
-                    // Automatski rasporedi sve slike
-                    var images = timelineItems.Where(i => i.IsImage).ToList();
-                    if (images.Count > 0 && audioItem != null)
-                    {
-                        double timePerImage = audioItem.Duration / images.Count;
-                        for (int i = 0; i < images.Count; i++)
-                        {
-                            images[i].FixedPosition = i * timePerImage;
-                            images[i].Duration = timePerImage;
-                            images[i].UseFixedPosition = true;
-                        }
-                    }
-                    LogMessage("Even distribution applied to all images.", true);
+                    // The dialog already distributed the clips of this track evenly.
+                    LogMessage("Even distribution applied.", true);
                 }
                 else if (dlg.SelectedPosition >= 0)
                 {
@@ -4207,108 +5715,18 @@ namespace UltraVideoEditor
                 // Ponovo rasporedi sve klipove
                 ReorderAllClips();
 
-                LogMessage($"Slika '{item.Name}' postavljena na {FormatTime(dlg.SelectedPosition)}", true);
+                LogMessage(LanguageManager.F("loc_image_placed", item.Name, FormatTime(dlg.SelectedPosition)), true);
                 UpdateTimelineDisplay();
                 PlayBeep();
             }
         }
         private void ReorderAllClips()
         {
-            var allItems = timelineItems.ToList();
-            var videoItems = allItems.Where(i => i.IsImage || i.IsVideo).ToList();
-            var audioItems = allItems.Where(i => i.IsAudio).ToList();
-
-            // Podijeli na fiksirane i nefiksirane
-            var fixedVideos = videoItems.Where(i => i.UseFixedPosition && i.FixedPosition > 0).OrderBy(i => i.FixedPosition).ToList();
-            var nonFixedVideos = videoItems.Where(i => !i.UseFixedPosition || i.FixedPosition <= 0).ToList();
-
-            // Napravi novu listu
-            var newTimeline = new List<TimelineItem>();
-
-            // Add pinned video clips to their exact positions
-            foreach (var video in fixedVideos)
-            {
-                video.Start = video.FixedPosition;
-                video.End = video.FixedPosition + video.Duration;
-                newTimeline.Add(video);
-            }
-
-            // Add unpinned video clips – position them after the largest pinned or at the start
-            double lastEnd = fixedVideos.Any() ? fixedVideos.Max(i => i.End) : 0;
-
-            // Sort unpinned by current Start (to preserve order)
-            nonFixedVideos = nonFixedVideos.OrderBy(i => i.Start).ToList();
-
-            foreach (var video in nonFixedVideos)
-            {
-                // Find the first free position not occupied by pinned clips
-                while (newTimeline.Any(i => i.Start < lastEnd + video.Duration && i.End > lastEnd))
-                {
-                    lastEnd = newTimeline.Where(i => i.Start < lastEnd + video.Duration && i.End > lastEnd)
-                                         .Max(i => i.End);
-                }
-
-                video.Start = lastEnd;
-                video.End = lastEnd + video.Duration;
-                lastEnd = video.End;
-                newTimeline.Add(video);
-            }
-
-            // Dodaj audio klipove (njihove pozicije ostaju iste)
-            foreach (var audio in audioItems)
-            {
-                newTimeline.Add(audio);
-            }
-
-            // Sort all by start
-            timelineItems = newTimeline.OrderBy(i => i.Start).ToList();
-
-            // Log za debug
-            LogMessage("=== REORDER FINAL ===", true);
-            foreach (var i in timelineItems.Where(i => i.IsImage || i.IsVideo))
-            {
-                LogMessage($"{i.Name}: Start={i.Start:F2}, End={i.End:F2}, Fixed={i.FixedPosition:F2}, UseFixed={i.UseFixedPosition}", true);
-            }
-
-            UpdateTimelineDisplay();
-        }
-        private void ApplyFixedPositions()
-        {
-            var videoItems = timelineItems.Where(i => i.IsImage || i.IsVideo).ToList();
-            var audioItems = timelineItems.Where(i => i.IsAudio).ToList();
-
-            // Only those with UseFixedPosition = true retain fixed position
-            var fixedItems = videoItems.Where(i => i.UseFixedPosition && i.FixedPosition > 0).ToList();
-            var nonFixedItems = videoItems.Where(i => !i.UseFixedPosition || i.FixedPosition <= 0).ToList();
-
-            // Prvo rasporedi fiksirane stavke
-            foreach (var it in fixedItems)
-            {
-                it.Start = it.FixedPosition;
-                it.End = it.FixedPosition + it.Duration;
-            }
-
-            // Zatim rasporedi nefiksirane stavke iza fiksiranih
-            double cursor = 0;
-            if (fixedItems.Any())
-                cursor = fixedItems.Max(i => i.End);
-
-            foreach (var it in nonFixedItems)
-            {
-                it.Start = cursor;
-                it.End = cursor + it.Duration;
-                cursor = it.End;
-            }
-
-            // Kombinuj sve
-            timelineItems.Clear();
-            timelineItems.AddRange(fixedItems);
-            timelineItems.AddRange(nonFixedItems);
-            timelineItems.AddRange(audioItems);
-
-            // Sort by start
-            timelineItems = timelineItems.OrderBy(i => i.Start).ToList();
-
+            // v1.4: this used to squeeze BOTH video tracks into one lane, push every
+            // unpinned clip behind the last pinned one, re-sort the list and drop any item
+            // that was neither audio nor picture. The shared layout keeps tracks parallel
+            // and lets unpinned clips fill the gaps between pinned ones.
+            RecalculatePositions();
             UpdateTimelineDisplay();
         }
         private void SetupTransitionContextMenus()
@@ -4335,6 +5753,37 @@ namespace UltraVideoEditor
             };
         }
 
+        /// <summary>
+        /// v1.4 — stores the transition ON the outgoing clip, which is what the render reads.
+        /// Before, transitions only went into a list of clip numbers that the render never
+        /// looked at, so every transition chosen in the Transitions tab was ignored.
+        /// </summary>
+        private void SetClipTransition(TimelineItem outgoing, TransitionEffect t)
+        {
+            if (outgoing == null || t == null) return;
+            outgoing.TransitionOut = TransitionEffect.ToXfadeName(t.Type);
+            outgoing.TransitionOutDuration = Math.Max(0.1, t.Duration);
+        }
+
+        private void ClearClipTransition(int clipIndex)
+        {
+            if (clipIndex >= 0 && clipIndex < timelineItems.Count)
+            {
+                timelineItems[clipIndex].TransitionOut = null;
+                timelineItems[clipIndex].TransitionOutDuration = 0;
+            }
+        }
+
+        /// <summary>Previous clip on the same track (the transition goes from it into <paramref name="item"/>).</summary>
+        private TimelineItem PreviousOnTrack(TimelineItem item)
+        {
+            RecalculatePositions();
+            return timelineItems
+                .Where(i => i.TrackIndex == item.TrackIndex && !ReferenceEquals(i, item) && i.Start < item.Start)
+                .OrderByDescending(i => i.Start)
+                .FirstOrDefault();
+        }
+
         private void ApplyTransitionToSelectedClip()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect tpl))
@@ -4342,20 +5791,23 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             { LogMessage("Select a clip that is not the first — the transition goes between the previous clip and the selected one.", true); return; }
             int idx = timelineItems.IndexOf(item);
-            if (idx <= 0) { LogMessage("Select a clip that is not the first", true); return; }
+            var prevItem = PreviousOnTrack(item);
+            if (prevItem == null) { LogMessage("Select a clip that is not the first", true); return; }
+            int prevIdx = timelineItems.IndexOf(prevItem);
+            SaveState();
             var t = new TransitionEffect
             {
                 Name = tpl.Name,
                 Type = tpl.Type,
                 Duration = transitionDuration,
-                ClipIndex1 = idx - 1,
+                ClipIndex1 = prevIdx,
                 ClipIndex2 = idx
             };
-            transitions.RemoveAll(x => x.ClipIndex1 == idx - 1 || x.ClipIndex2 == idx);
+            transitions.RemoveAll(x => x.ClipIndex1 == prevIdx || x.ClipIndex2 == idx);
             transitions.Add(t);
-            SaveState();
-            string c1 = idx - 1 < timelineItems.Count ? timelineItems[idx - 1].Name : "?";
-            string c2 = idx < timelineItems.Count ? timelineItems[idx].Name : "?";
+            SetClipTransition(prevItem, t);
+            string c1 = prevItem.Name;
+            string c2 = item.Name;
             LogMessage("Tranzicija '" + t.Name + "' (" + transitionDuration.ToString("F1") + "s) izmedju '" + c1 + "' i '" + c2 + "'.", true);
             PlayBeep();
             UpdateTransitionIndicators();
@@ -4369,11 +5821,15 @@ namespace UltraVideoEditor
             if (vids.Count < 2) { LogMessage("At least 2 video/image clips are required.", true); return; }
             SaveState();
             transitions.Clear();
+            RecalculatePositions();
+            vids = vids.OrderBy(v => v.Start).ToList();
             for (int i = 1; i < vids.Count; i++)
             {
                 int g1 = timelineItems.IndexOf(vids[i - 1]);
                 int g2 = timelineItems.IndexOf(vids[i]);
-                transitions.Add(new TransitionEffect { Name = tpl.Name, Type = tpl.Type, Duration = transitionDuration, ClipIndex1 = g1, ClipIndex2 = g2 });
+                var t = new TransitionEffect { Name = tpl.Name, Type = tpl.Type, Duration = transitionDuration, ClipIndex1 = g1, ClipIndex2 = g2 };
+                transitions.Add(t);
+                SetClipTransition(vids[i - 1], t);
             }
             LogMessage("Tranzicija '" + tpl.Name + "' primenjena na " + transitions.Count + " prelaza.", true);
             PlayBeep();
@@ -4385,7 +5841,7 @@ namespace UltraVideoEditor
             if (!(lstTransitions.SelectedItem is TransitionEffect t))
             { LogMessage("No transition selected.", true); return; }
             string desc;
-            if (t.Type == TransitionType.Fade) desc = "Fade: slika postepeno nestaje u crno, pa se pojavljuje sledeca.";
+            if (t.Type == TransitionType.Fade) desc = LanguageManager.T("loc_fade_desc");
             else if (t.Type == TransitionType.Crossfade) desc = "Crossfade: the two clips gradually blend into each other.";
             else if (t.Type == TransitionType.SlideLeft) desc = "Slide Left: the new clip enters from the right and pushes the old one left.";
             else if (t.Type == TransitionType.SlideRight) desc = "Slide Right: the new clip enters from the left and pushes the old one right.";
@@ -4418,6 +5874,8 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             { LogMessage("No clip selected.", true); return; }
             int idx = timelineItems.IndexOf(item);
+            foreach (var t in transitions.Where(x => x.ClipIndex1 == idx || x.ClipIndex2 == idx).ToList())
+                ClearClipTransition(t.ClipIndex1);
             int removed = transitions.RemoveAll(t => t.ClipIndex1 == idx || t.ClipIndex2 == idx);
             if (removed > 0) { SaveState(); LogMessage("Removed " + removed + " transition(s) from clip " + (idx + 1) + ".", true); PlayBeep(); UpdateTransitionIndicators(); }
             else LogMessage("No transitions on this clip.", true);
@@ -4624,9 +6082,12 @@ namespace UltraVideoEditor
 
                 // Ime klipa: koristi AudioDescription ako postoji (bolji kontekst),
                 // otherwise just the filename without path and extension
-                string clipName = !string.IsNullOrWhiteSpace(item.AudioDescription)
-                    ? item.AudioDescription
-                    : Path.GetFileNameWithoutExtension(item.Name ?? string.Empty);
+                // v1.4: the name always comes first; a real picture description follows it. AI tags
+                // ("context:…") and old error texts ("Could not extract a frame…") are not read —
+                // they used to replace the clip's name.
+                string clipName = Path.GetFileNameWithoutExtension(item.Name ?? string.Empty);
+                string spokenDesc = UsableDescription(item.AudioDescription);
+                if (spokenDesc != null) clipName += " — " + spokenDesc;
 
                 // Format that JAWS reads naturally and in the right order:
                 // "1 of 21, Video: Clip name, duration 00:09, start 00:04, end 00:13"
@@ -4644,6 +6105,75 @@ namespace UltraVideoEditor
 
         private void NativeListView_KeyDown(object sender, WinFormsKeyEventArgs e)
         {
+            // v1.4 (R3/R5): the clip list is a Windows Forms control, and key presses inside it
+            // do not always reach the WPF window's shortcuts. The playback and editing keys are
+            // therefore handled here as well; DuplicateKey makes sure a key that arrives through
+            // both paths acts only once.
+            bool noMods = !e.Control && !e.Alt && !e.Shift;
+            if (e.KeyCode == WinForms.Keys.Space && e.Control && e.Shift && !e.Alt)
+            {
+                if (!DuplicateKey("mix")) PlayMix_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (e.KeyCode == WinForms.Keys.Space && e.Control && !e.Shift && !e.Alt)
+            {
+                if (!DuplicateKey("play")) TogglePlay_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if ((e.KeyCode == WinForms.Keys.Left || e.KeyCode == WinForms.Keys.Right) && e.Alt && !e.Control)
+            {
+                Key k = e.KeyCode == WinForms.Keys.Right ? Key.Right : Key.Left;
+                if (!DuplicateKey("seek" + k + e.Shift))
+                    SeekBy((k == Key.Right ? 1 : -1) * (e.Shift ? 100 : 5000));
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (e.KeyCode == WinForms.Keys.S && e.Control && e.Alt && !e.Shift)
+            {
+                SetClipSpeed_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (e.KeyCode == WinForms.Keys.V && e.Control && e.Shift && !e.Alt)
+            {
+                if (!DuplicateKey("volpoint")) AddVolumePoint_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (e.KeyCode == WinForms.Keys.F && e.Control && e.Shift && !e.Alt)
+            {
+                if (!DuplicateKey("descframe")) DescribeFrameHere_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (e.KeyCode == WinForms.Keys.D && e.Control && e.Alt && !e.Shift)
+            {
+                if (!DuplicateKey("descparts")) DescribeClipParts_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
+            if (noMods)
+            {
+                Key wk = e.KeyCode switch
+                {
+                    WinForms.Keys.J => Key.J,
+                    WinForms.Keys.K => Key.K,
+                    WinForms.Keys.L => Key.L,
+                    WinForms.Keys.Q => Key.Q,
+                    WinForms.Keys.W => Key.W,
+                    WinForms.Keys.Oemcomma => Key.OemComma,
+                    WinForms.Keys.OemPeriod => Key.OemPeriod,
+                    _ => Key.None
+                };
+                if (wk != Key.None && HandleEditingKey(wk))
+                {
+                    e.Handled = true; e.SuppressKeyPress = true;   // no type-ahead jump in the list
+                    return;
+                }
+            }
+
             if (e.Control && e.KeyCode == WinForms.Keys.C)
             {
                 CopyClip_Click(null, null);
@@ -4669,10 +6199,10 @@ namespace UltraVideoEditor
                 FinalRender_Click(null, null);
                 e.Handled = true;
             }
-            else if (e.KeyCode == WinForms.Keys.Space || e.KeyCode == WinForms.Keys.Enter)
+            else if ((e.KeyCode == WinForms.Keys.Space || e.KeyCode == WinForms.Keys.Enter) && !e.Control && !e.Alt)
             {
                 // Both Space and Enter trigger play — screen readers often use Enter
-                TogglePlay_Click(null, null);
+                if (!DuplicateKey("play")) TogglePlay_Click(null, null);
                 e.Handled = true;
             }
             else if (e.KeyCode == WinForms.Keys.F6)
@@ -4687,7 +6217,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView == null)
             {
-                LogMessage("UpdateNativeListView: nativeListView je null", true);
+                LogMessage("UpdateNativeListView: nativeListView is null", true);
                 return;
             }
 
@@ -4701,17 +6231,17 @@ namespace UltraVideoEditor
                 nativeListView.BeginUpdate();
                 nativeListView.Items.Clear();
 
+                // v1.4: positions are computed for ALL tracks first (independently of the
+                // track filter), so Start/End no longer change just because a filter is on.
+                RecalculatePositions();
+
                 var filteredItems = currentTrackFilter == -1
                     ? timelineItems
                     : timelineItems.Where(x => x.TrackIndex == currentTrackFilter).ToList();
 
-                double currentTime = 0;
-
                 for (int i = 0; i < filteredItems.Count; i++)
                 {
                     var item = filteredItems[i];
-                    item.Start = currentTime;
-                    item.End = currentTime + item.Duration;
                     item.Index = i + 1;
 
                     var listItem = new WinForms.ListViewItem(item.Index.ToString());
@@ -4724,7 +6254,6 @@ namespace UltraVideoEditor
                     listItem.Tag = item;
 
                     nativeListView.Items.Add(listItem);
-                    currentTime += item.Duration;
                 }
 
                 // Vrati selekciju na isti indeks
@@ -4767,19 +6296,39 @@ namespace UltraVideoEditor
             }
         }
 
-        private void PlaySelectedItem(TimelineItem item)
+        private void PlaySelectedItem(TimelineItem item, double startInClip = 0, bool startPaused = false)
         {
-            if (!File.Exists(item.Path)) return;
+            if (item == null || !File.Exists(item.Path)) return;
 
             try
             {
                 if (_mediaPlayer.IsPlaying) _mediaPlayer.Stop();
+                StopMixPreviewMode();   // v1.4 (R3): a single clip replaces the montage mix
+                var oldMedia = _currentMedia;
                 _currentMedia = new Media(_libVLC, item.Path);
+                // v1.4: start where this clip really begins in its file (cut parts, highlights)
+                // and stop where it ends, so the preview matches the render.
+                double from = Math.Max(0, item.SourceOffset + Math.Max(0, startInClip));
+                if (from > 0.01)
+                    _currentMedia.AddOption($":start-time={from.ToString("F3", CultureInfo.InvariantCulture)}");
+                // v1.4 (R5): a clip with a changed speed uses Duration × speed seconds of its file
+                double clipSpeed = ClipSpeed(item);
+                if (!item.IsImage && item.Duration > 0.1)
+                    _currentMedia.AddOption($":stop-time={(item.SourceOffset + item.Duration * clipSpeed).ToString("F3", CultureInfo.InvariantCulture)}");
+                if (startPaused) _currentMedia.AddOption(":start-paused");
+                _shuttle = 0;
+                _rewindTimer?.Stop();
                 _mediaPlayer.Media = _currentMedia;
+                oldMedia?.Dispose();
                 _mediaPlayer.Volume = (int)item.Volume;
+                _playingItem = item;
+                currentPlaybackPosition = Math.Max(0, startInClip);
+                currentVideoDuration = item.Duration;   // v1.4: "position X of Y" uses the clip's length, not the file's
                 _mediaPlayer.Play();
-                isPlaying = true;
-                if (btnPlay != null) btnPlay.Content = "⏸ PAUSE";
+                _mediaPlayer.SetRate((float)clipSpeed);
+                isPlaying = !startPaused;
+                StartFollowTimer();   // v1.4 (R4): saved picture descriptions follow the playhead
+                if (btnPlay != null) btnPlay.Content = isPlaying ? "⏸ " + L("pause") : "▶ " + L("play");
             }
             catch (Exception ex)
             {
@@ -4831,7 +6380,7 @@ namespace UltraVideoEditor
                         await File.WriteAllBytesAsync(imgPath, bytes);
 
                         string desc = await GenerateImageDescriptionAsync(imgPath, cleanP);
-                        if (string.IsNullOrEmpty(desc)) desc = "Pollinations slika: " + cleanP;
+                        if (string.IsNullOrEmpty(desc)) desc = LanguageManager.F("loc_pollinations_desc", cleanP);
 
                         SaveState();
                         timelineItems.Add(new TimelineItem
@@ -4977,7 +6526,7 @@ namespace UltraVideoEditor
                     return;
                 }
 
-                LogMessage($"Auto-raspored: {images.Count} slika, svaka po {timePerImage:F2} sekundi", true);
+                LogMessage(LanguageManager.F("loc_auto_layout", images.Count, timePerImage), true);
 
                 // Initialize local sound library if sounds are enabled
                 bool soundsEnabled = dialog.EnableTransitionSounds || dialog.EnableAmbientSounds;
@@ -5044,19 +6593,22 @@ namespace UltraVideoEditor
                             {
                                 Path = soundPath,
                                 Duration = 0.5,
+                                // v1.4: fixed, otherwise the sound was moved to the end of the audio track
+                                UseFixedPosition = true,
+                                FixedPosition = Math.Max(0, currentTime + timePerImage - 0.2),
+                                TrackIndex = 3,
                                 Start = currentTime + timePerImage - 0.2,
                                 End = currentTime + timePerImage + 0.3,
                                 Name = $"🔊 Tranzicija: {transitionType}",
                                 Type = "Audio",
                                 Volume = 30,
-                                TrackIndex = 2,
                                 VideoEffect = new VideoEffectData()
                             };
                             transitionSounds.Add(soundItem);
                         }
                     }
 
-                    LogMessage($"Slika {i + 1}: '{img.Name}' na {FormatTime(img.Start)} - {(dialog.EnableKenBurns ? "Ken Burns zoom" : GetEffectName(dialog.EffectMode, dialog.EffectSequence, i))}", false);
+                    LogMessage(LanguageManager.F("loc_image_n_at", i + 1, img.Name, FormatTime(img.Start), dialog.EnableKenBurns ? "Ken Burns zoom" : GetEffectName(dialog.EffectMode, dialog.EffectSequence, i)), false);
 
                     currentTime += timePerImage;
                 }
@@ -5092,12 +6644,14 @@ namespace UltraVideoEditor
                                 {
                                     Path = soundPath,
                                     Duration = ambientEnd - ambientStart,
+                                    UseFixedPosition = true,          // v1.4
+                                    FixedPosition = ambientStart,
                                     Start = ambientStart,
                                     End = ambientEnd,
                                     Name = $"🌳 Ambient sound: {ambientType}",
                                     Type = "Audio",
                                     Volume = 15,
-                                    TrackIndex = 2,
+                                    TrackIndex = 3,
                                     VideoEffect = new VideoEffectData()
                                 };
                                 ambientSounds.Add(ambientItem);
@@ -5114,18 +6668,32 @@ namespace UltraVideoEditor
                         LogMessage($"Added {ambientSounds.Count} ambient sounds", true);
                     }
                 }
-                // ADD INTRO TEXT (at the start)
-                if (!string.IsNullOrEmpty(dialog.IntroText))
+                // v1.4: logo and intro text both used to sit at 0 s on top of each other.
+                // The logo now takes the first part of the intro time, the title the rest.
+                bool hasLogo = dialog.ShowLogo && !string.IsNullOrEmpty(dialog.LogoPath) && File.Exists(dialog.LogoPath);
+                double logoDur = hasLogo ? Math.Min(dialog.LogoDuration, dialog.IntroDuration) : 0;
+                if (hasLogo && !string.IsNullOrEmpty(dialog.IntroText) && dialog.IntroDuration - logoDur < 1.0)
+                    logoDur = Math.Max(0, dialog.IntroDuration - 1.0);
+                if (hasLogo && logoDur < 0.5)
                 {
-                    string introImagePath = await CreateTextImage(dialog.IntroText, dialog.IntroDuration, true);
+                    LogMessage("Not enough intro time for the logo — set a longer intro duration to show it.", true);
+                    hasLogo = false;
+                    logoDur = 0;
+                }
+
+                // ADD INTRO TEXT (at the start)
+                if (!string.IsNullOrEmpty(dialog.IntroText) && dialog.IntroDuration - logoDur >= 0.5)
+                {
+                    double introDur = dialog.IntroDuration - logoDur;
+                    string introImagePath = await CreateTextImage(dialog.IntroText, introDur, true);
                     var introTextItem = new TimelineItem
                     {
                         Path = introImagePath,
-                        Duration = dialog.IntroDuration,
-                        FixedPosition = 0,
+                        Duration = introDur,
+                        FixedPosition = logoDur,
                         UseFixedPosition = true,
-                        Start = 0,
-                        End = dialog.IntroDuration,
+                        Start = logoDur,
+                        End = logoDur + introDur,
                         Name = $"Intro text: {dialog.IntroText}",
                         Type = "Image",
                         Volume = 100,
@@ -5162,16 +6730,16 @@ namespace UltraVideoEditor
                 }
 
                 // Logo
-                if (dialog.ShowLogo && !string.IsNullOrEmpty(dialog.LogoPath) && File.Exists(dialog.LogoPath))
+                if (hasLogo)
                 {
                     var logoItem = new TimelineItem
                     {
                         Path = dialog.LogoPath,
-                        Duration = dialog.LogoDuration,
+                        Duration = logoDur,
                         FixedPosition = 0,
                         UseFixedPosition = true,
                         Start = 0,
-                        End = dialog.LogoDuration,
+                        End = logoDur,
                         Name = "Logo kanala",
                         Type = "Image",
                         Volume = 100,
@@ -5390,7 +6958,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            var dialog = new TextOverlayDialog($"Add text to: {item.Name}");
+            var dialog = new TextOverlayDialog($"Add text to: {item.Name}", null, styleOptions: true);
             if (dialog.ShowDialog() == true)
             {
                 item.TextOverlay = new TextOverlayData
@@ -5507,7 +7075,7 @@ namespace UltraVideoEditor
         }
         private async void btnPixabay_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new PixabaySearchDialog();
+            var dialog = new PixabaySearchDialog { Owner = this };
             if (dialog.ShowDialog() == true && dialog.DownloadedMediaPaths.Count > 0)
             {
                 SaveState();
@@ -5515,16 +7083,24 @@ namespace UltraVideoEditor
                 foreach (var mediaPath in dialog.DownloadedMediaPaths)
                 {
                     string ext = Path.GetExtension(mediaPath).ToLower();
-                    string type = (ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv") ? "Video" : "Image";
+                    string type = (ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv" || ext == ".webm") ? "Video" : "Image";
+
+                    // v1.4: videos get their real length (they were all cut to 5 seconds)
+                    double dur = 5.0;
+                    if (type == "Video")
+                    {
+                        double real = await GetMediaDurationWithTimeoutAsync(mediaPath, TimeSpan.FromSeconds(10));
+                        if (real > 0.5) dur = real;
+                    }
 
                     var newItem = new TimelineItem
                     {
                         Path = mediaPath,
-                        Duration = 5.0,
+                        Duration = dur,
                         Name = Path.GetFileName(mediaPath),
                         Type = type,
                         Volume = 100,
-                        TrackIndex = type == "Video" ? 0 : 0,
+                        TrackIndex = 0,
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(newItem);
@@ -5537,7 +7113,7 @@ namespace UltraVideoEditor
         }
         private void btnAIVideoCreator_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new AIVideoCreator();
+            var dialog = new AIVideoCreator { Owner = this };
             dialog.ShowDialog();
         }
 
@@ -5551,17 +7127,14 @@ namespace UltraVideoEditor
 
         private void OpenVideoReview_Click(object sender, RoutedEventArgs e)
         {
-            var thread = new System.Threading.Thread(() =>
-            {
-                var dlg = new VideoReviewDialog();
-                dlg.Show();
-                // Dispatcher.Run() — STA thread treba vlastiti message loop
-                // bez ovoga, async/await i UI eventi ne rade
-                System.Windows.Threading.Dispatcher.Run();
-            });
-            thread.SetApartmentState(System.Threading.ApartmentState.STA);
-            thread.IsBackground = true;
-            thread.Start();
+            // v1.4: the review window used to run on its own UI thread. From there every
+            // label lookup (Application.MainWindow) and "Go to" seek touched the main window
+            // across threads, which WPF forbids — the window crashed or did nothing. All of
+            // its work is async, so it now simply opens as a normal (modeless) window.
+            var existing = System.Windows.Application.Current.Windows.OfType<VideoReviewDialog>().FirstOrDefault();
+            if (existing != null) { existing.Activate(); return; }
+            var dlg = new VideoReviewDialog { Owner = this };
+            dlg.Show();
         }
 
         /// <summary>
@@ -5601,12 +7174,11 @@ namespace UltraVideoEditor
                 return;
             }
 
-            string ffmpeg = System.IO.Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpeg = AppPaths.FFmpeg;
             string dir = System.IO.Path.GetDirectoryName(finalVideo);
             string name = System.IO.Path.GetFileNameWithoutExtension(finalVideo);
 
-            LogMessage("Multi-format export: kreiram Shorts (9:16) i Instagram (1:1)...", true);
+            LogMessage(LanguageManager.T("loc_multiformat"), true);
 
             try
             {
@@ -5630,10 +7202,15 @@ namespace UltraVideoEditor
             }
         }
 
+        internal string LastRenderedVideoPath => GetLastRenderedVideo();
+
         private string GetLastRenderedVideo()
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) return null;
-            var files = System.IO.Directory.GetFiles(currentProjectFolder, "*.mp4");
+            // v1.4: skip earlier exports, otherwise the next export made Shorts of the Shorts
+            var files = System.IO.Directory.GetFiles(currentProjectFolder, "*.mp4")
+                .Where(f => !f.Contains("_shorts_9x16") && !f.Contains("_instagram_1x1") && !f.Contains("_tmp_render"))
+                .ToArray();
             if (files.Length == 0) return null;
             // Vrati najnoviji MP4 fajl
             return files.OrderByDescending(f => System.IO.File.GetLastWriteTime(f))
@@ -5641,40 +7218,72 @@ namespace UltraVideoEditor
         }
 
         // ── Vision AI - opisi klipova ────────────────────────────────
+        /// <summary>
+        /// v1.4 — a clip description worth reading aloud, or null for AI creator tags and for the
+        /// error texts the old "Describe all clips" stored as if they were descriptions.
+        /// </summary>
+        private static string UsableDescription(string d)
+        {
+            if (string.IsNullOrWhiteSpace(d)) return null;
+            if (d.Contains("context:") || d.Contains("mood:") || d.Contains("energy=") || d.Contains("static=")) return null;
+            foreach (string bad in new[] { "Could not extract", "Error while describing", "Description not available", "File does not exist" })
+                if (d.StartsWith(bad, StringComparison.OrdinalIgnoreCase)) return null;
+            return d.Trim();
+        }
+
+        /// <summary>
+        /// v1.4 — "Describe all clips": one description per clip (the middle of the clip) with the
+        /// same describer as Ctrl+Shift+F. It handles songs saved as video (no picture, or only a
+        /// cover picture), and a failure is reported instead of being stored as the description.
+        /// </summary>
         private async void DescribeAllClips_Click(object sender, RoutedEventArgs e)
         {
-            if (!await VisionAI.IsVisionModelAvailable("moondream"))
+            if (_describeCts != null) { LogMessage(L("desc_parts_running"), true); return; }
+            var items = timelineItems.Where(i => !i.IsAudio && (i.IsVideo || i.IsImage) && !RenderEngine.IsAiCreatorClip(i) &&
+                                                 !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path) &&
+                                                 UsableDescription(i.AudioDescription) == null).ToList();
+            if (items.Count == 0) { LogMessage(L("desc_all_nothing"), true); return; }
+            _describeCts = new CancellationTokenSource();
+            var ct = _describeCts.Token;
+            int done = 0;
+            LogMessage(LF("desc_parts_start", items.Count), true);
+            try
             {
-                string models = string.Join(Environment.NewLine, VisionAI.RecommendedModels
-                    .Select(m => "  " + m.pullCmd));
-                string visionMsg = "Vision AI model is not available." + Environment.NewLine + Environment.NewLine +
-                    "Instaliraj jedan od modela:" + Environment.NewLine + models;
-                System.Windows.MessageBox.Show(visionMsg,
-                    "Vision AI", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            string ffmpeg = System.IO.Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
-
-            LogMessage("Vision AI: Generating clip descriptions...", true);
-            var items = timelineItems.Where(i => !i.IsAudio).ToList();
-
-            await VisionAI.DescribeAllClips(
-                items, ffmpeg, "moondream",
-                (idx2, desc) =>
+                foreach (var item in items)
                 {
-                    if (idx2 == -1 || idx2 == -2)
-                        LogMessage(desc, true);
-                    else
-                        Dispatcher.Invoke(() =>
-                        {
-                            LogMessage(desc, true);
-                            UpdateTimelineDisplay();
-                        });
-                });
-
+                    double mid = item.IsImage ? 0 : item.SourceOffset + item.Duration / 2.0 * ClipSpeed(item);
+                    var r = await FrameDescriber.DescribeFrameAsync(item.Path, mid, ct);
+                    if (r.Error == "no_model") { LogMessage(L("desc_no_model"), true); return; }
+                    string name = Path.GetFileNameWithoutExtension(item.Name ?? "");
+                    if (r.Text == null)
+                    {
+                        // never store an error as the description (it replaced the clip name before)
+                        if (UsableDescription(item.AudioDescription) == null) item.AudioDescription = null;
+                        LogMessage(r.Error == "no_picture" ? LF("desc_clip_sound_only", name) : LF("desc_clip_failed", name, r.Detail), true);
+                        continue;
+                    }
+                    item.AudioDescription = r.Text;
+                    done++;
+                    LogMessage($"{name} — {r.Text}", true);
+                }
+                LogMessage(LF("desc_parts_done", done), true);
+            }
+            catch (OperationCanceledException) { LogMessage(LF("desc_parts_stopped", done), true); }
+            catch (Exception ex)
+            {
+                AppLog.Error("Describing all clips", ex);
+                LogMessage(LF("desc_failed", ex.Message), true);
+            }
+            finally
+            {
+                _describeCts.Dispose();
+                _describeCts = null;
+                _pendingPlaybackItem = null;
+                UpdateTimelineDisplay();
+                _pendingPlaybackItem = null;   // refreshing the list must not restart the clip
+            }
         }
+
         // OVE KLASE DODATI NA KRAJ FAJLA (poslije zatvaranja MainWindow klase)
 
         public class CloudflareImageResponse
@@ -5704,7 +7313,10 @@ namespace UltraVideoEditor
         /// </summary>
         private AIVideoCreator FindAIVideoCreator()
         {
-            return FindVisualChild<AIVideoCreator>(this);
+            // v1.4: AIVideoCreator is its own window, never a visual child of MainWindow,
+            // so the old visual-tree search always returned null.
+            return System.Windows.Application.Current?.Windows.OfType<AIVideoCreator>().FirstOrDefault()
+                   ?? FindVisualChild<AIVideoCreator>(this);
         }
 
         private static T FindVisualChild<T>(System.Windows.DependencyObject parent) where T : System.Windows.DependencyObject

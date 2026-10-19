@@ -405,7 +405,7 @@ namespace UltraVideoEditor
                 proc.DrainAll(); // bez ovoga ffmpeg zastane kad se napuni stderr bafer
                 if (proc != null) await proc.WaitForExitOrKillAsync(ct);
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Beat detection: running FFmpeg", swallowed); }   // v1.4: was silent
 
             var profile = new List<(double time, double energy)>();
             if (!File.Exists(tempLog)) return profile;

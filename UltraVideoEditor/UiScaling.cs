@@ -104,6 +104,59 @@ namespace UltraVideoEditor
                 _states.Remove(window);
                 _openWindows.RemoveAll(wr => !wr.TryGetTarget(out var w) || w == window);
             };
+
+            // v1.4: every window registers here, so this is the one place that cleans up
+            // screen reader names for the whole suite (see FixEmojiNames).
+            window.Loaded += (s, e) => FixEmojiNames(window);
+        }
+
+        /// <summary>
+        /// v1.4 — buttons, check boxes, menu items and tabs whose text starts with an emoji
+        /// ("🗑 CLEAR ALL SUBTITLES") were read by JAWS/NVDA with the emoji's name first
+        /// ("wastebasket clear all subtitles"). For every such control that has no explicit
+        /// accessible name, the name is set to the same text without the emoji. Controls that
+        /// already have a name are left alone.
+        /// </summary>
+        public static void FixEmojiNames(DependencyObject root)
+        {
+            if (root == null) return;
+            foreach (object child in LogicalTreeHelper.GetChildren(root))
+            {
+                if (child is not DependencyObject d) continue;
+                string text = d switch
+                {
+                    System.Windows.Controls.Primitives.ButtonBase b => b.Content as string,
+                    HeaderedItemsControl hi => hi.Header as string,      // MenuItem, TreeViewItem
+                    HeaderedContentControl hc => hc.Header as string,    // TabItem, Expander, GroupBox
+                    _ => null
+                };
+                if (!string.IsNullOrWhiteSpace(text) &&
+                    string.IsNullOrEmpty(System.Windows.Automation.AutomationProperties.GetName(d)))
+                {
+                    string clean = StripSymbols(text);
+                    if (clean.Length > 0 && clean != text.Trim())
+                        System.Windows.Automation.AutomationProperties.SetName(d, clean);
+                }
+                FixEmojiNames(d);
+            }
+        }
+
+        private static string StripSymbols(string text)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var rune in text.EnumerateRunes())
+            {
+                var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(rune.Value);
+                bool keep = System.Text.Rune.IsLetterOrDigit(rune) || System.Text.Rune.IsWhiteSpace(rune) ||
+                            cat == System.Globalization.UnicodeCategory.OtherPunctuation ||
+                            cat == System.Globalization.UnicodeCategory.DashPunctuation ||
+                            cat == System.Globalization.UnicodeCategory.OpenPunctuation ||
+                            cat == System.Globalization.UnicodeCategory.ClosePunctuation ||
+                            cat == System.Globalization.UnicodeCategory.ConnectorPunctuation;
+                if (keep) sb.Append(rune.ToString());
+            }
+            string s = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+            return s.Replace("_", "");   // access-key marker
         }
 
         /// <summary>

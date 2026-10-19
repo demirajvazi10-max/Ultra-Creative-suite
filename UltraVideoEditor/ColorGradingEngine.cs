@@ -121,8 +121,7 @@ namespace UltraVideoEditor
             IProgress<(int Percent, string Message)> progress = null,
             CancellationToken ct = default)
         {
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             var results = new List<ClipGradeResult>();
             int total   = items.Count;
@@ -140,7 +139,7 @@ namespace UltraVideoEditor
                     if (preset == GradePreset.Auto && File.Exists(item.Path))
                     {
                         try { vision = await VisionAnalyzer.AnalyzeClipAsync(item.Path, ffmpegPath, ct); }
-                        catch { }
+                        catch (Exception swallowed) { AppLog.Error("Color grading: vision analysis of a clip", swallowed); }   // v1.4: was silent
                         chosen = AutoChoosePreset(vision, item);
                     }
 

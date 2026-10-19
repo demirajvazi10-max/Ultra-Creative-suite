@@ -17,6 +17,12 @@ namespace UltraVideoEditor
     /// </summary>
     public static class AITranscription
     {
+        /// <summary>v1.4: faster-whisper-xxl's built-in vocal separation (MDX Kim_Vocal_2).</summary>
+        private const string VocalExtractArg = "--ff_vocal_extract mdx_kim2";
+
+        private static string LastLine(string text) =>
+            (text ?? "").Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Length > 0) ?? "";
+
         // ── Rezultat transkripcije ────────────────────────────────────────────
         public class TranscriptionResult
         {
@@ -30,6 +36,18 @@ namespace UltraVideoEditor
             /// Za stih "Leti kupite sladoled" → {"leti":1.2, "kupite":1.6, "sladoled":2.1}
             /// </summary>
             public List<WordTiming> WordTimings { get; set; } = new();
+
+            /// <summary>
+            /// v1.4 — per user line, the user's own words with times (from LyricAligner).
+            /// Index matches Lines. Empty when word-level alignment was not possible.
+            /// </summary>
+            public List<List<WordTiming>> LineWords { get; set; } = new();
+
+            /// <summary>v1.4 — share of the user's words matched to heard words (0..1), or -1 if not aligned by words.</summary>
+            public double AlignmentConfidence { get; set; } = -1;
+
+            /// <summary>v1.4 — the raw words Whisper heard (before alignment), for caching/re-alignment.</summary>
+            public List<WordTiming> HeardWords { get; set; } = new();
         }
 
         public class TimedLine
@@ -107,7 +125,7 @@ namespace UltraVideoEditor
 
         
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private static string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -195,7 +213,7 @@ namespace UltraVideoEditor
             }
 
             if (string.IsNullOrEmpty(ffmpegPath))
-                ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                ffmpegPath = AppPaths.FFmpeg;
 
             if (!File.Exists(ffmpegPath))
             {
@@ -227,8 +245,11 @@ namespace UltraVideoEditor
                 bool isFasterWhisper = whisperExe.ToLower().Contains("faster-whisper");
                 string whisperArgs = isFasterWhisper
                     ? $"\"{audioPath}\" --model {modelSize} --language {language} " +
-                      $"--output_format srt --output_dir \"{tempDir}\" " +
-                      $"--compute_type float16 " +
+                      // v1.4: "all" = SRT (lines) + JSON (word times for word sync / karaoke)
+                      $"--output_format all --word_timestamps True --output_dir \"{tempDir}\" " +
+                      // v1.4: "auto" = float16 on an NVIDIA card, int8/float32 on the CPU. A fixed
+                      // float16 fails on computers without CUDA.
+                      $"--compute_type auto " +
                       $"--beam_size 5 " +
                       $"--best_of 5 " +
                       $"--temperature 0 " +
@@ -238,13 +259,21 @@ namespace UltraVideoEditor
                       // BEZ OVOGA: Whisper halucinira tekst tokom 10s instrumentalnog uvoda
                       // i gura prvi titl na 00:06 umjesto na 00:12 kada glas stvarno pocinje.
                       $"--vad_filter True " +
-                      $"--vad_parameters \"threshold=0.6,min_silence_duration_ms=500\" " +
+                      // v1.4: faster-whisper-xxl has no --vad_parameters option (that one is from
+                      // whisperX); passing it made the program print its usage and stop, so no
+                      // subtitles were ever written. The real options:
+                      $"--vad_threshold 0.6 --vad_min_silence_duration_ms 500 " +
                       // condition_on_previous_text=False: svaki segment se dekodira nezavisno.
                       // Without this the model "copies" context from previous segment into silence
                       // and invents text not yet spoken — early-start bug.
-                      $"--condition_on_previous_text False"
+                      $"--condition_on_previous_text False " +
+                      // v1.4: separate the voice from the music first (MDX Kim_Vocal_2, built into
+                      // faster-whisper-xxl; the model is downloaded once on first use). On a song
+                      // this is the biggest single accuracy gain: Whisper no longer hears the
+                      // instruments as words or misses quiet lines. Dropped automatically if it fails.
+                      VocalExtractArg
                     : $"\"{audioPath}\" --model {modelSize} --language {language} " +
-                      $"--output_format srt --output_dir \"{tempDir}\" " +
+                      $"--output_format all --word_timestamps True --output_dir \"{tempDir}\" " +
                       // no_speech_threshold=0.6: openai-whisper ekvivalent VAD-a.
                       // Segments below threshold are marked as silence and skipped.
                       $"--no_speech_threshold 0.6 " +
@@ -252,43 +281,84 @@ namespace UltraVideoEditor
                       $"--condition_on_previous_text False " +
                       $"--temperature 0 --verbose False";
 
-                using var whisperProc = new Process
+                // v1.4: some faster-whisper-xxl builds reject "--output_format all" (argparse prints
+                // "usage: ..." and exits without writing anything). Try the richest output first
+                // and fall back step by step; only an argument error triggers the next attempt.
+                async Task<string> RunWhisperAsync(string args)
                 {
-                    StartInfo = new ProcessStartInfo(whisperExe, whisperArgs)
+                    using var whisperProc = new Process
                     {
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = Encoding.UTF8,
-                        StandardErrorEncoding = Encoding.UTF8
-                    }
-                };
+                        StartInfo = new ProcessStartInfo(whisperExe, args)
+                        {
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true,
+                            StandardOutputEncoding = Encoding.UTF8,
+                            StandardErrorEncoding = Encoding.UTF8
+                        }
+                    };
 
-                var stdErr = new StringBuilder();
-                whisperProc.ErrorDataReceived += (s, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
+                    var stdErr = new StringBuilder();
+                    whisperProc.ErrorDataReceived += (s, e) =>
                     {
-                        stdErr.AppendLine(e.Data);
-                        if (e.Data.Contains("%") || e.Data.Contains("Detecting"))
-                            progress?.Report($"Whisper: {e.Data.Trim()}");
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            stdErr.AppendLine(e.Data);
+                            if (e.Data.Contains("%") || e.Data.Contains("Detecting"))
+                                progress?.Report($"Whisper: {e.Data.Trim()}");
+                        }
+                    };
+
+                    whisperProc.Start();
+                    whisperProc.BeginErrorReadLine();
+                    whisperProc.DrainStdout();
+
+                    // WaitForExitAsync(ct) direktno reaguje na otkazivanje — nema polling latency
+                    try
+                    {
+                        await whisperProc.WaitForExitAsync(ct);
                     }
-                };
+                    catch (OperationCanceledException)
+                    {
+                        try { whisperProc.Kill(entireProcessTree: true); } catch { }
+                        throw;
+                    }
 
-                whisperProc.Start();
-                whisperProc.BeginErrorReadLine();
-                whisperProc.DrainStdout();
-
-                // WaitForExitAsync(ct) direktno reaguje na otkazivanje — nema polling latency
-                try
-                {
-                    await whisperProc.WaitForExitAsync(ct);
+                    return stdErr.ToString();
                 }
-                catch (OperationCanceledException)
+
+                string[] formatVariants =
                 {
-                    try { whisperProc.Kill(entireProcessTree: true); } catch { }
-                    throw;
+                    "--output_format all --word_timestamps True",
+                    "--output_format srt json --word_timestamps True",
+                    "--output_format srt"
+                };
+                string stdErrText = "";
+                bool WroteSomething() => Directory.GetFiles(tempDir, "*.srt").Length > 0 ||
+                                         Directory.GetFiles(tempDir, "*.json").Length > 0;
+                foreach (bool withVocals in new[] { true, false })
+                {
+                    if (!withVocals)
+                    {
+                        if (WroteSomething() || !whisperArgs.Contains(VocalExtractArg)) break;
+                        // v1.4: vocal separation failed (no internet for the first model download,
+                        // not enough memory...) — transcribe the full mix instead.
+                        AppLog.Warn("Whisper: vocal separation failed, transcribing without it. " + LastLine(stdErrText));
+                        progress?.Report("Whisper: retrying without vocal separation...");
+                        whisperArgs = whisperArgs.Replace(VocalExtractArg, "");
+                    }
+                    foreach (string variant in formatVariants)
+                    {
+                        string attemptArgs = whisperArgs.Replace("--output_format all --word_timestamps True", variant);
+                        stdErrText = await RunWhisperAsync(attemptArgs);
+                        ct.ThrowIfCancellationRequested();
+                        bool argumentError = stdErrText.IndexOf("usage:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                             stdErrText.IndexOf("unrecognized arguments", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                             stdErrText.IndexOf("invalid choice", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (WroteSomething() || !argumentError) break;
+                        progress?.Report("Whisper: retrying with simpler output options...");
+                    }
                 }
 
                 ct.ThrowIfCancellationRequested();
@@ -306,7 +376,7 @@ namespace UltraVideoEditor
 
                 if (srtPath == null || !File.Exists(srtPath))
                 {
-                    result.ErrorMessage = LF("at_no_srt", stdErr);
+                    result.ErrorMessage = LF("at_no_srt", stdErrText);
                     return result;
                 }
 
@@ -367,8 +437,16 @@ namespace UltraVideoEditor
 
                 result.Lines = timedLines;
                 result.FullText = string.Join("\n", timedLines.Select(l => l.Text));
+
+                // v1.4: word times (if Whisper wrote a JSON file) — used to re-align the
+                // lyrics later when the user corrects or re-splits lines, without re-running Whisper.
+                string wordsJson = Path.Combine(tempDir, audioName + ".json");
+                if (!File.Exists(wordsJson)) wordsJson = Directory.GetFiles(tempDir, "*.json").FirstOrDefault();
+                if (wordsJson != null && File.Exists(wordsJson))
+                    result.WordTimings = ParseWhisperJsonWords(wordsJson);
+
                 result.Success = true;
-                progress?.Report($"Gotovo — {timedLines.Count} linija prepoznato.");
+                progress?.Report(LanguageManager.F("loc_transcr_done", timedLines.Count));
             }
             catch (OperationCanceledException)
             {
@@ -414,7 +492,8 @@ namespace UltraVideoEditor
             string ffmpegPath = null,
             string modelSize = "small",
             IProgress<string> progress = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            bool allowRepeats = false)
         {
             var result = new TranscriptionResult();
 
@@ -432,7 +511,7 @@ namespace UltraVideoEditor
             }
 
             if (string.IsNullOrEmpty(ffmpegPath))
-                ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                ffmpegPath = AppPaths.FFmpeg;
 
             string tempDir = Path.Combine(Path.GetTempPath(), $"UVE_Align_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
@@ -440,7 +519,7 @@ namespace UltraVideoEditor
             try
             {
                 // Ekstrakt WAV ako je mp3/mp4
-                progress?.Report("Priprema audia za alignment...");
+                progress?.Report(LanguageManager.T("loc_transcr_prep_align"));
                 string wavPath = audioPath;
                 string ext = Path.GetExtension(audioPath).ToLower();
                 if (ext != ".wav")
@@ -468,15 +547,21 @@ namespace UltraVideoEditor
                                   $"--output_format json --output_dir \"{tempDir}\" " +
                                   $"--initial_prompt \"{promptEscaped}\" " +
                                   $"--word_timestamps True " +
-                                  $"--compute_type float16 --beam_size 5 --temperature 0";
+                                  $"--compute_type auto --beam_size 5 --temperature 0 " +
+                                  // v1.4: same anti-hallucination settings as TranscribeAsync —
+                                  // without them Whisper "hears" words in the instrumental intro.
+                                  $"--vad_filter True --condition_on_previous_text False " +
+                                  VocalExtractArg;   // v1.4: voice separated from the music first
                 }
                 else
                 {
                     // openai-whisper: --initial_prompt i --word_timestamps
+                    // v1.4: JSON instead of SRT — SRT has no word times, so the
+                    // word-level alignment could never run with openai-whisper.
                     whisperArgs = $"\"{wavPath}\" --model {modelSize} --language {language} " +
-                                  $"--output_format srt --output_dir \"{tempDir}\" " +
+                                  $"--output_format json --output_dir \"{tempDir}\" " +
                                   $"--initial_prompt \"{promptEscaped}\" " +
-                                  $"--word_timestamps True --verbose False";
+                                  $"--word_timestamps True --condition_on_previous_text False --verbose False";
                 }
 
                 progress?.Report($"Whisper alignment ({modelSize} model, listening to voice...)");
@@ -517,8 +602,11 @@ namespace UltraVideoEditor
                 // If JSON is not available (older Whisper version), try SRT fallback
                 if (jsonPath == null && srtPath == null)
                 {
-                    // Try again with SRT format
-                    whisperArgs = whisperArgs.Replace("--output_format json", "--output_format srt");
+                    // Try again with SRT format — and without vocal separation, in case that
+                    // was what failed (v1.4)
+                    if (whisperArgs.Contains(VocalExtractArg))
+                        AppLog.Warn("Whisper alignment: no output with vocal separation, retrying without it. " + LastLine(stderr.ToString()));
+                    whisperArgs = whisperArgs.Replace("--output_format json", "--output_format srt").Replace(VocalExtractArg, "");
                     using var proc2 = new Process
                     {
                         StartInfo = new ProcessStartInfo(whisperExe, whisperArgs)
@@ -541,6 +629,7 @@ namespace UltraVideoEditor
                     if (wordTimings.Count > 0)
                     {
                         result.WordTimings = wordTimings;
+                        result.HeardWords = wordTimings;
                         progress?.Report($"Word-level sync: {wordTimings.Count} words with timestamps.");
                     }
 
@@ -555,7 +644,13 @@ namespace UltraVideoEditor
                         return result;
                     }
 
-                    BuildAlignedLines(userLines, whisperSegments, result);
+                    // v1.4: word-level alignment of the user's exact lines (LyricAligner).
+                    // With allowRepeats (subtitles for a song) every repeat of a chorus gets its
+                    // own subtitle even though it was typed once. Falls back to the old
+                    // segment-ratio mapping only when too few words match.
+                    if (!(allowRepeats && TryApplySungAlignment(userLines, result.WordTimings, result, progress)) &&
+                        !TryApplyWordAlignment(userLines, result.WordTimings, result, progress))
+                        BuildAlignedLines(userLines, whisperSegments, result);
                 }
                 else if (srtPath != null)
                 {
@@ -582,6 +677,61 @@ namespace UltraVideoEditor
             finally { try { Directory.Delete(tempDir, true); } catch { } }
 
             return result;
+        }
+
+        /// <summary>
+        /// v1.4 — aligns the user's lines to heard words. On success fills result.Lines
+        /// (one per user line, user's text), result.LineWords and replaces result.WordTimings
+        /// with the user's own words, so later word lookups use the real lyric spelling.
+        /// </summary>
+        public static bool TryApplyWordAlignment(List<string> userLines, List<WordTiming> heardWords,
+                                                 TranscriptionResult result, IProgress<string> progress = null)
+        {
+            if (userLines == null || userLines.Count == 0 || heardWords == null || heardWords.Count == 0)
+                return false;
+
+            var aligned = LyricAligner.Align(userLines, heardWords);
+            result.AlignmentConfidence = aligned.Confidence;
+            if (!aligned.IsUsable)
+            {
+                progress?.Report($"Word alignment too uncertain ({aligned.Confidence:P0} of words matched).");
+                return false;
+            }
+
+            result.Lines = aligned.Lines.Select(l => new TimedLine
+            {
+                StartSeconds = l.Start,
+                EndSeconds = l.End,
+                Text = l.Text
+            }).ToList();
+            result.LineWords = aligned.Lines.Select(l => l.Words).ToList();
+            result.WordTimings = aligned.Lines.SelectMany(l => l.Words).ToList();
+            progress?.Report($"Lyrics aligned word by word: {aligned.Confidence:P0} of words matched.");
+            return true;
+        }
+
+        /// <summary>
+        /// v1.4 — lyrics as they are sung: typed lines matched to what was heard, repeats
+        /// included (see LyricAligner.AlignSung). Used when at least half of the typed lines
+        /// were found; otherwise the caller falls back to the once-per-line alignment.
+        /// </summary>
+        public static bool TryApplySungAlignment(List<string> userLines, List<WordTiming> heardWords,
+                                                 TranscriptionResult result, IProgress<string> progress = null)
+        {
+            if (userLines == null || userLines.Count == 0 || heardWords == null || heardWords.Count == 0)
+                return false;
+            var sung = LyricAligner.AlignSung(userLines, heardWords);
+            int distinct = sung.Select(l => l.LineIndex).Distinct().Count();
+            int typed = userLines.Count(l => !string.IsNullOrWhiteSpace(l));
+            if (sung.Count == 0 || distinct * 2 < typed) return false;
+
+            result.Lines = sung.Select(l => new TimedLine { StartSeconds = l.Start, EndSeconds = l.End, Text = l.Text }).ToList();
+            result.LineWords = sung.Select(l => l.Words).ToList();
+            result.WordTimings = sung.SelectMany(l => l.Words).ToList();
+            int words = sung.Sum(l => l.Words.Count), matched = sung.Sum(l => l.MatchedWords);
+            result.AlignmentConfidence = words > 0 ? (double)matched / words : 0;
+            progress?.Report($"Lyrics aligned as sung: {sung.Count} sung lines from {distinct} of {typed} typed lines.");
+            return true;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -664,54 +814,31 @@ namespace UltraVideoEditor
         // ══════════════════════════════════════════════════════════════════════
         private static List<WordTiming> ParseWhisperJsonWords(string jsonPath)
         {
+            // FIX (v1.4): parsed with Newtonsoft instead of regex. The regex expected one fixed
+            // key order and did not decode \uXXXX escapes — openai-whisper writes JSON with
+            // ensure_ascii, so "šuma" arrived as "\u0161uma" and the regex turned it into "u0161uma".
             var result = new List<WordTiming>();
             try
             {
-                string json = File.ReadAllText(jsonPath, Encoding.UTF8);
-
-                // Parsiraj bez System.Text.Json da ne zavisimo od verzije
-                // We look for all "words" arrays and extract word/start/end/probability
-                var wordMatches = Regex.Matches(json,
-                    @"\{[^}]*""word""\s*:\s*""([^""]+)""\s*,\s*""start""\s*:\s*([\d.]+)\s*,\s*""end""\s*:\s*([\d.]+)(?:\s*,\s*""probability""\s*:\s*([\d.]+))?[^}]*\}");
-
-                foreach (Match m in wordMatches)
+                var root = Newtonsoft.Json.Linq.JToken.Parse(File.ReadAllText(jsonPath, Encoding.UTF8));
+                foreach (var wordsArray in root.SelectTokens("$..words").OfType<Newtonsoft.Json.Linq.JArray>())
                 {
-                    string word = m.Groups[1].Value.Trim().ToLowerInvariant();
-                    // Ukloni interpunkciju
-                    word = Regex.Replace(word, @"[^\p{L}\p{N}]", "");
-                    if (string.IsNullOrEmpty(word)) continue;
-
-                    double.TryParse(m.Groups[2].Value, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out double start);
-                    double.TryParse(m.Groups[3].Value, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out double end);
-                    double prob = 1.0;
-                    if (m.Groups[4].Success)
-                        double.TryParse(m.Groups[4].Value, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out prob);
-
-                    result.Add(new WordTiming { Word = word, StartSecond = start, EndSecond = end, Probability = prob });
-                }
-
-                // Fallback: if the above regex does not fire, try an alternative format
-                // (faster-whisper may have a different key order)
-                if (result.Count == 0)
-                {
-                    var altMatches = Regex.Matches(json,
-                        @"""start""\s*:\s*([\d.]+)[^}]*""end""\s*:\s*([\d.]+)[^}]*""word""\s*:\s*""([^""]+)""");
-                    foreach (Match m in altMatches)
+                    foreach (var w in wordsArray.OfType<Newtonsoft.Json.Linq.JObject>())
                     {
-                        double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out double start);
-                        double.TryParse(m.Groups[2].Value, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out double end);
-                        string word = Regex.Replace(m.Groups[3].Value.Trim().ToLowerInvariant(), @"[^\p{L}\p{N}]", "");
-                        if (!string.IsNullOrEmpty(word))
-                            result.Add(new WordTiming { Word = word, StartSecond = start, EndSecond = end });
+                        string raw = (string)w["word"] ?? (string)w["text"] ?? "";
+                        string word = Regex.Replace(raw.Trim().ToLowerInvariant(), @"[^\p{L}\p{N}]", "");
+                        if (string.IsNullOrEmpty(word)) continue;
+                        double start = w["start"]?.Type is Newtonsoft.Json.Linq.JTokenType.Float or Newtonsoft.Json.Linq.JTokenType.Integer ? (double)w["start"] : -1;
+                        double end = w["end"]?.Type is Newtonsoft.Json.Linq.JTokenType.Float or Newtonsoft.Json.Linq.JTokenType.Integer ? (double)w["end"] : -1;
+                        if (start < 0) continue;
+                        if (end < start) end = start + 0.2;
+                        double prob = w["probability"]?.Type is Newtonsoft.Json.Linq.JTokenType.Float or Newtonsoft.Json.Linq.JTokenType.Integer ? (double)w["probability"] : 1.0;
+                        result.Add(new WordTiming { Word = word, StartSecond = start, EndSecond = end, Probability = prob });
                     }
                 }
+                result.Sort((a, b) => a.StartSecond.CompareTo(b.StartSecond));
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Reading Whisper word timings (JSON)", swallowed); }   // v1.4: was silent
             return result;
         }
 
@@ -724,22 +851,17 @@ namespace UltraVideoEditor
             var result = new List<TimedLine>();
             try
             {
-                string json = File.ReadAllText(jsonPath, Encoding.UTF8);
-                var segMatches = Regex.Matches(json,
-                    @"""start""\s*:\s*([\d.]+)\s*,\s*""end""\s*:\s*([\d.]+)\s*,\s*""text""\s*:\s*""([^""]+)""");
-
-                foreach (Match m in segMatches)
+                var root = Newtonsoft.Json.Linq.JToken.Parse(File.ReadAllText(jsonPath, Encoding.UTF8));
+                var segments = root["segments"] as Newtonsoft.Json.Linq.JArray;
+                if (segments == null) return result;
+                foreach (var seg in segments.OfType<Newtonsoft.Json.Linq.JObject>())
                 {
-                    double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out double start);
-                    double.TryParse(m.Groups[2].Value, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out double end);
-                    string text = m.Groups[3].Value.Trim();
-                    if (!string.IsNullOrEmpty(text))
-                        result.Add(new TimedLine { StartSeconds = start, EndSeconds = end, Text = text });
+                    string text = ((string)seg["text"] ?? "").Trim();
+                    if (string.IsNullOrEmpty(text) || seg["start"] == null || seg["end"] == null) continue;
+                    result.Add(new TimedLine { StartSeconds = (double)seg["start"], EndSeconds = (double)seg["end"], Text = text });
                 }
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Reading Whisper segments (JSON)", swallowed); }   // v1.4: was silent
             return result;
         }
 
@@ -788,7 +910,7 @@ namespace UltraVideoEditor
                     return Math.Max(0.0, silenceEnd - 0.05);
                 }
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Detecting the start of the vocals (silencedetect)", swallowed); }   // v1.4: was silent
             return 0.0;
         }
     }

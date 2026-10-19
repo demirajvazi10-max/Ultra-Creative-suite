@@ -40,6 +40,10 @@ namespace UltraVideoEditor
         public string Description { get; set; } = "";
         public List<string> AvailableImages { get; set; } = new List<string>();
         public List<string> AvailableEffects { get; set; } = new List<string> { "Fade In", "Fade Out", "Zoom In", "Zoom Out", "Slide Left", "Slide Right", "None" };
+
+        // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+        public override string ToString() =>
+            $"{ImageName}, {Duration:0.#} s, {Effect}" + (string.IsNullOrWhiteSpace(Description) ? "" : ", " + Description);
     }
 
     // Podaci za tekst na slici (overlay)
@@ -53,16 +57,37 @@ namespace UltraVideoEditor
         public bool Enabled { get; set; } = false;
     }
 
+    /// <summary>v1.4 (R4) — one described part of a clip.</summary>
+    public class FrameDescription
+    {
+        public double Start { get; set; }
+        public double End { get; set; }
+        public string Text { get; set; } = "";
+    }
+
     // Timeline Item with support for multiple tracks and keyframes
     public class TimelineItem
     {
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private static string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
         public double FixedPosition { get; set; } = 0;
         public string Path { get; set; } = "";
         public double Duration { get; set; } = 5.0;
+
+        /// <summary>
+        /// v1.4 — where in the SOURCE file this clip begins, in seconds (in-point).
+        /// 0 for a whole file. Set when a clip is cut (the second part continues where the
+        /// first ended) and for highlight segments. The render seeks here before playing.
+        /// </summary>
+        public double SourceOffset { get; set; } = 0;
+
+        /// <summary>v1.4 — xfade transition INTO the next clip (e.g. "slideleft"); null = automatic.</summary>
+        public string TransitionOut { get; set; }
+
+        /// <summary>v1.4 — length of that transition in seconds; 0 = automatic.</summary>
+        public double TransitionOutDuration { get; set; } = 0;
 
         // DODATO ZA SELEKCIJU
         public bool IsSelected { get; set; } = false;
@@ -95,9 +120,32 @@ namespace UltraVideoEditor
 
         public string AudioDescription { get; set; }
         public string AmbientSoundPath { get; set; } = "";
+
+        /// <summary>
+        /// v1.4 — the media file's path relative to the project file, written on every save.
+        /// When a project is moved to another folder, disk or computer, Path no longer exists
+        /// and the file is found again through this.
+        /// </summary>
+        public string RelativePath { get; set; } = "";
         public string ContentTag { get; set; }  // Hybrid Content Selector: Emotional|Portrait|Action|Nature
         public VideoEffectData VideoEffect { get; set; } = new VideoEffectData();
         public List<AnimationKeyframe> Keyframes { get; set; } = new List<AnimationKeyframe>();
+
+        /// <summary>
+        /// v1.4 (R4) — what is in the picture, part by part (times are seconds from the clip's
+        /// start on the timeline). Made by "Describe the clip by parts"; saved with the project.
+        /// </summary>
+        public List<FrameDescription> FrameDescriptions { get; set; }
+
+        /// <summary>v1.4 (R5) — volume over time; null/empty = the clip volume all the way.</summary>
+        public List<VolumePoint> VolumePoints { get; set; }
+
+        /// <summary>v1.4 (R5) — bass, treble, reverb and compressor of this clip (Effects tab).</summary>
+        public AudioSettingsData AudioFx { get; set; }
+
+        /// <summary>The saved picture description at a position inside the clip, or null.</summary>
+        public FrameDescription DescriptionAt(double positionInClip) =>
+            FrameDescriptions?.FirstOrDefault(d => positionInClip >= d.Start - 0.001 && positionInClip < d.End);
 
         [JsonIgnore]
         public string TrackName => TrackIndex switch
@@ -109,29 +157,31 @@ namespace UltraVideoEditor
             _ => $"Track {TrackIndex + 1}"
         };
 
+        // v1.4: extensions compared case-insensitively — phones and cameras write ".MP4",
+        // ".JPG", ".MOV"; those clips were treated as "unknown" (not video, not image)
+        // and skipped by the render and by most commands.
+        private string Ext => System.IO.Path.GetExtension(Path ?? "").ToLowerInvariant();
+
         [JsonIgnore]
         public string TypeIcon
         {
             get
             {
-                if (Path.EndsWith(".mp3") || Path.EndsWith(".wav") || Path.EndsWith(".m4a") || Path.EndsWith(".flac") || Path.EndsWith(".ogg"))
-                    return "🎵";
-                if (Path.EndsWith(".jpg") || Path.EndsWith(".png") || Path.EndsWith(".jpeg") || Path.EndsWith(".bmp"))
-                    return "🖼️";
-                if (Path.EndsWith(".mp4") || Path.EndsWith(".avi") || Path.EndsWith(".mov") || Path.EndsWith(".mkv"))
-                    return "🎬";
+                if (IsAudio) return "🎵";
+                if (IsImage) return "🖼️";
+                if (IsVideo) return "🎬";
                 return "📄";
             }
         }
 
         [JsonIgnore]
-        public bool IsAudio => Path.EndsWith(".mp3") || Path.EndsWith(".wav") || Path.EndsWith(".m4a") || Path.EndsWith(".flac") || Path.EndsWith(".ogg");
+        public bool IsAudio => Ext is ".mp3" or ".wav" or ".m4a" or ".flac" or ".ogg" or ".aac" or ".wma";
 
         [JsonIgnore]
-        public bool IsImage => Path.EndsWith(".jpg") || Path.EndsWith(".jpeg") || Path.EndsWith(".png") || Path.EndsWith(".bmp");
+        public bool IsImage => Ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
 
         [JsonIgnore]
-        public bool IsVideo => Path.EndsWith(".mp4") || Path.EndsWith(".avi") || Path.EndsWith(".mov") || Path.EndsWith(".mkv");
+        public bool IsVideo => Ext is ".mp4" or ".avi" or ".mov" or ".mkv" or ".webm" or ".m4v" or ".wmv";
 
         [JsonIgnore]
         public bool IsVideoTrack => TrackIndex == 0 || TrackIndex == 1;
@@ -193,6 +243,23 @@ namespace UltraVideoEditor
         public string Text { get; set; } = "";
         public double Start { get; set; } = 0;
         public double End { get; set; } = 5.0;
+
+        /// <summary>
+        /// v1.4 — optional karaoke timing: each word of Text with its time relative to Start.
+        /// When present (and karaoke is on), the render colours each word as it is sung.
+        /// Null for ordinary subtitles.
+        /// </summary>
+        public List<KaraokeWord> Words { get; set; }
+    }
+
+    /// <summary>v1.4 — one sung word for karaoke subtitles.</summary>
+    public class KaraokeWord
+    {
+        public string Text { get; set; } = "";
+        /// <summary>Seconds from the subtitle's Start to the moment the word is sung.</summary>
+        public double Offset { get; set; }
+        /// <summary>How long the word lasts, in seconds.</summary>
+        public double Duration { get; set; }
     }
 
     public class VideoEffectData

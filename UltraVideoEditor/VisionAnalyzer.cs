@@ -24,6 +24,9 @@ namespace UltraVideoEditor
         public string TopLabel { get; set; }
         public string[] Labels { get; set; }
         public bool OnnxUsed { get; set; }
+
+        /// <summary>v1.4 — true when the score comes from the vision AI (Qwen), not from the fallbacks.</summary>
+        public bool QwenUsed { get; set; }
         public string RejectReason { get; set; }
 
         /// <summary>
@@ -37,6 +40,12 @@ namespace UltraVideoEditor
         /// Koristi se za bonus score kada je stih pozitivnog sentimenta.
         /// </summary>
         public bool HasSmile { get; set; }
+
+        /// <summary>
+        /// Short plain-language description of what the clip shows (from Qwen).
+        /// Shown in the scene review so a blind user knows what is on screen.
+        /// </summary>
+        public string Description { get; set; }
     }
 
     public static class VisionAnalyzer
@@ -103,114 +112,43 @@ namespace UltraVideoEditor
             string mood = null,
             string context = null)
         {
+            // v1.4: a SHORT prompt. The old one had 93 lines of partly contradicting rules (about
+            // 2000 tokens): the 7B vision model needed 45-95 seconds per clip, and it copied the
+            // example "score":7 from the template into almost every answer (29 of 31 clips got 7.0).
+            // Now: a few clear rules, a score scale with meaning, and an example without numbers.
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine("You are a strict video quality reviewer for a family music video.");
-            sb.AppendLine("Analyze this image and respond ONLY in this exact JSON format (no markdown, no extra text):");
-            sb.AppendLine("{\"score\":7,\"outdoor\":true,\"children\":false,\"faces\":true,\"animals\":false,");
-            sb.AppendLine("\"warm\":true,\"motion\":false,\"luminance\":0.6,\"saturation\":0.5,\"sharpness\":70,");
-            sb.AppendLine("\"label\":\"park\",\"labels\":[\"park\",\"outdoor\",\"trees\",\"people\"],");
-            sb.AppendLine("\"retry\":false,\"reject\":null}");
-            sb.AppendLine();
+            sb.AppendLine("You check stock video clips for a children's music video (children 2-6 years old).");
             if (!string.IsNullOrWhiteSpace(lyricLine))
-                sb.AppendLine($"CURRENT LYRIC LINE: \"{lyricLine}\"");
-            sb.AppendLine("\nSEASONAL & MOOD RULES:");
-            string normSeason = (season ?? "").ToLower();
-            if (normSeason == "spring" || normSeason == "summer")
-            {
-                sb.AppendLine("- SEASON: spring/summer — PREFER warm, sunny, bright outdoor scenes.");
-                sb.AppendLine("- REJECT scenes that look cold, grey, wintry, or gloomy.");
-            }
-            else if (normSeason == "winter")
-            {
-                sb.AppendLine("- SEASON: winter — PREFER crisp bright white snow, clear sky, cheerful scenes.");
-                sb.AppendLine("- REJECT grey overcast winter scenes that look sad or depressing.");
-            }
-            else if (normSeason == "autumn")
-            {
-                sb.AppendLine("- SEASON: autumn — PREFER warm orange/red/golden leaves, cozy outdoor scenes.");
-                sb.AppendLine("- REJECT scenes that look cold, rainy, or melancholic.");
-            }
+                sb.AppendLine($"The clip is for this lyric line: \"{lyricLine}\"");
             else
-            {
-                sb.AppendLine("- PREFER bright, colorful, joyful scenes with good lighting.");
-            }
-            sb.AppendLine("\nABSOLUTE REJECT RULES (set reject to the reason, not null):");
-            sb.AppendLine("- scene looks sad, dark, gloomy, or depressing");
-            sb.AppendLine("- medical masks, surgical masks, face masks");
-            sb.AppendLine("- hockey, boxing, MMA, wrestling, or aggressive sport");
-            sb.AppendLine("- violence, weapons, blood, hospital, cemetery");
-            sb.AppendLine("- grainy, blurry, pixelated, or low quality image");
-            sb.AppendLine("- excessive motion blur or watery/compression artifacts");
-            sb.AppendLine("- poor contrast (washed out or crushed blacks)");
-            sb.AppendLine("- surveillance/security camera look");
-            sb.AppendLine("- text overlays, watermarks, or logos");
-            sb.AppendLine("- people posing directly at camera with forced/dental-commercial smile (posed stock look)");
-            sb.AppendLine("- corporate wellness, maternity lifestyle, or adult-only content (unless lyric demands it)");
-            sb.AppendLine("- image is 'airy and empty' with no clear subject or focal point");
-            // PATCH 10: Action Focus — cognitive adaptation for children up to age 6
-            sb.AppendLine("- CLUTTERED SCENE REJECT: scene with 20+ people in background where main subject is unclear — score max 4, set reject='cluttered background too busy'");
-            sb.AppendLine("- REJECT: visually noisy scenes with too many competing focal points (busy market, crowded festival, traffic intersection with many cars) — child loses attention");
-            sb.AppendLine("- REJECT: scenes where the main subject (child/animal) is surrounded by distracting unrelated elements that occupy more than 60% of the frame");
-            sb.AppendLine("- PREFER: clean backgrounds — single child on grass, child with one animal, child with one toy — simple, clear, focused");
-            sb.AppendLine("- PREFER: bokeh/shallow depth of field where background is soft — subject pops out clearly for young viewers");
-            sb.AppendLine("- pregnant belly, adult romance, or dating content");
-            // PATCH 8: Kids Edition — Extended reject rules for 2-6 year old target audience
-            sb.AppendLine("- gym equipment, weightlifting, bodybuilding, kettlebell, dumbbell — ANY fitness/gym scene");
-            sb.AppendLine("- pregnant belly or maternity photo — reject immediately even if visually appealing");
-            sb.AppendLine("- traffic jams, highway, crowded subway, metro, urban rush hour");
-            sb.AppendLine("- hospital, clinic, medical equipment, doctors, nurses, syringes");
-            sb.AppendLine("- corporate offices, business meetings, conference rooms");
-            sb.AppendLine("- dark/desaturated/vintage filter — must look VIBRANT and CLEAN, not washed out");
-            sb.AppendLine("- wide establishing shots where people appear smaller than 1/4 of frame height");
-            sb.AppendLine("- rapid camera shake, handheld shaky footage, aggressive zoom or whip-pan");
-            // PATCH 9: Anomaly-Fix "Kindergarten Precision"
-            sb.AppendLine("- ANOMALIJA 2 (REJECT): gramophone, turntable, vinyl record player, DJ mixer, mixing console, recording studio equipment, audio mixer, synthesizer, amplifier — child does NOT know what this is, reject immediately");
-            sb.AppendLine("- ANOMALIJA 1 (HARD REJECT, NO EXCEPTIONS): ANY person holding or swinging a kettlebell, dumbbell, barbell, or any metal weight — INSTANT REJECT score=1. ANY gym machine visible in frame — INSTANT REJECT. This is the #1 most critical rule. One frame with a weight = reject the entire clip.");
-            sb.AppendLine("- ANOMALIJA 3 (REJECT): urban cold shots — concrete skyline, busy street with cars, skyscrapers without greenery, cold/blue toned city shots");
-            sb.AppendLine("- COMPOSITION RULE: if subject is a child, child must occupy at least 30% of frame area. If child is smaller than 30% — score max 4, set retry:true");
-            sb.AppendLine("- WARM CONTINUITY: if previous clip was warm-toned, reject cold/blue-toned clips unless song is about snow or winter");
-            sb.AppendLine("\nKIDS EDITION — PREFER (target: 2-6 year olds):");
-            sb.AppendLine("- single clear subject in center of frame (child, animal, toy, flower)");
-            sb.AppendLine("- vibrant saturated colors WITHOUT neon/glitch effects — think Cocomelon palette");
-            sb.AppendLine("- animals: dogs, cats, birds, rabbits, ducks — NOT wild/aggressive animals");
-            sb.AppendLine("- playground equipment, swings, slides, balloons, bubbles");
-            sb.AppendLine("- warm family interactions: grandparent+child, parent+child, siblings playing");
-            sb.AppendLine("- REPLACEMENT for gym scene: children jumping in sand, running after butterfly, playing hopscotch, dancing in circle");
-            sb.AppendLine("- REPLACEMENT for gramophone: children clapping hands in rhythm, feet dancing on ground (close-up), children singing in circle");
-            sb.AppendLine("- Set score 9-10 for: child+animal interaction, child+grandparent, child blowing bubbles or playing with balloons");
-            sb.AppendLine("- Set score 9-10 for: child clearly occupying 30%+ of frame, warm sunlit colors, joyful expression");
-
-            // PATCH 10 / CANDID ONLY — eliminacija "Stock Look"
-            sb.AppendLine("\nCANDID ONLY RULE (strict — no exceptions):");
-            sb.AppendLine("- REJECT IMMEDIATELY: any ADULT (18+) looking directly into the lens AND smiling — this is the classic stock photo look, score=1, reject='adult looking at camera stock'");
-            sb.AppendLine("- REJECT: group of adults posing together looking at camera — score=1, reject='group pose stock'");
-            sb.AppendLine("- EXCEPTION: children looking at camera while laughing/playing is ACCEPTABLE — children are naturally curious");
-            sb.AppendLine("- PREFER: adults seen from behind, from the side, or interacting with children/each other");
-            sb.AppendLine("- PREFER: candid moments — adult kneeling to child level, holding child's hand, watching child play");
-            sb.AppendLine("- Set score 9-10 for: adult turned away from camera while child is visible and active in foreground");
-            sb.AppendLine("- Set score 9-10 for: any interaction scene where no one is looking at the camera");
-            sb.AppendLine("\nCANDID PREFERENCE (secondary):");
-            sb.AppendLine("- PREFER: people interacting with each other, not looking at camera");
-            sb.AppendLine("- PREFER: children at play, running, laughing naturally");
-            sb.AppendLine("- Set score higher (8-10) for candid unposed moments");
-
-            // Visual metaphor awareness
-            sb.AppendLine("\nMETAPHOR AWARENESS:");
-            sb.AppendLine("- If the scene could represent a feeling/emotion (joy, freedom, love), prefer it over literal objects");
-            sb.AppendLine("- 'Heart full of happiness' → child in embrace, NOT anatomical heart image");
-            sb.AppendLine("- Abstract or empty scenes score LOW even if technically sharp");
-
-            // Color temperature field
-            sb.AppendLine("\nAdd to JSON: \"warm\": true/false (is the color palette warm/golden or cool/blue?)");
-            sb.AppendLine("Add to JSON: \"smile\": true/false (are there visible smiling/joyful faces in the frame?)");
-            if (!string.IsNullOrWhiteSpace(lyricLine))
-            {
-                sb.AppendLine($"\nCONTEXTUAL LOGIC — lyric: \"{lyricLine}\"");
-                sb.AppendLine("- If the scene does NOT match the emotion/action of this lyric, set \"retry\":true");
-                sb.AppendLine("- Examples: lyric=walking/nature but scene=sport → retry:true");
-                sb.AppendLine("- Examples: lyric=joyful but scene=sad/dark → retry:true");
-            }
-            sb.AppendLine("\nJSON: score 1-10, booleans, luminance/saturation/sharpness, label, labels[], retry bool, reject string or null.");
+                sb.AppendLine("The clip is for an instrumental part (no lyrics): calm nature, a park, or gentle pets and farm animals WITHOUT children are fine here; wild animals (tigers, lions, wolves, bears) are NOT; judge beauty and mood.");
+            string normSeason = (season ?? "").ToLowerInvariant();
+            if (normSeason is "winter" or "spring" or "summer" or "autumn")
+                sb.AppendLine($"Season of this line: {normSeason}.");
+            if (!string.IsNullOrWhiteSpace(mood))
+                sb.AppendLine($"Mood of the song: {mood}.");
+            sb.AppendLine();
+            sb.AppendLine("REJECT (set \"reject\" to a short reason) if the clip shows any of:");
+            sb.AppendLine("hospital, illness, wheelchair, therapy; violence, weapons, fire, storms; alcohol, smoking, coffee makers;");
+            sb.AppendLine("construction, road works, warning signs, traffic, parking lots, motorbikes, trains, railways, industrial areas;");
+            sb.AppendLine("crowds of adults, aerial shots of people; cooking pots; icy cliffs or glaciers without children;");
+            sb.AppendLine("children looking at tablets, phones, computers or TV screens; wild animals such as tigers, lions, wolves or bears;");
+            sb.AppendLine("adults without a child (old people only together with a child); adult models posing at the camera;");
+            sb.AppendLine("dark, gloomy or sterile rooms, silhouettes against windows; buildings or columns as the subject;");
+            sb.AppendLine("cartoons, text, watermarks, blurry or low-quality video; gyms, masks, wild animals the lyric does not name.");
+            sb.AppendLine();
+            sb.AppendLine("SCORE 1-10 for how well the clip fits the lyric line for small children:");
+            sb.AppendLine("9-10: a child clearly does what the line says, bright and joyful; 7-8: a happy child or family scene that fits the mood;");
+            sb.AppendLine("5-6: pleasant but only loosely related; 3-4: hardly related or dull; 1-2: should be rejected.");
+            if (normSeason is "winter" or "autumn")
+                sb.AppendLine($"If the clip does not clearly look like {normSeason}, give at most 4 and set retry true.");
+            sb.AppendLine("Set \"retry\" true when the clip does not match the action or feeling of the line.");
+            sb.AppendLine();
+            sb.AppendLine("Answer ONLY with JSON, no other text, in this form (fill in your own values):");
+            sb.AppendLine("{\"score\":<1-10>,\"reject\":<null or \"reason\">,\"retry\":<true/false>,\"children\":<true/false>,\"outdoor\":<true/false>,");
+            sb.AppendLine("\"faces\":<true/false>,\"smile\":<true/false>,\"warm\":<true/false>,\"motion\":<true/false>,");
+            sb.AppendLine("\"label\":\"<main subject>\",\"labels\":[\"<up to 4 words>\"],");
+            sb.AppendLine("\"description\":\"<one short English sentence for a blind viewer, max 15 words>\"}");
             return sb.ToString();
         }
 
@@ -263,7 +201,7 @@ namespace UltraVideoEditor
 
                 if (!File.Exists(_modelPath))
                 {
-                    log?.Invoke("🧠 VisionAnalyzer: Preuzimam MobileNetV2 model (~14MB)...");
+                    log?.Invoke("🧠 VisionAnalyzer: Downloading the MobileNetV2 model (~14 MB)...");
                     bool downloaded = await DownloadFileAsync(MODEL_URL, _modelPath, ct);
                     if (!downloaded)
                     {
@@ -291,14 +229,14 @@ namespace UltraVideoEditor
                 if (_onnxAvailable)
                     log?.Invoke("✅ VisionAnalyzer: ONNX aktivan, " + (_labels?.Length ?? 0) + " labela");
                 else
-                    log?.Invoke(LanguageManager.GetText("va_onnx_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"));
+                    log?.Invoke(LanguageManager.GetText("va_onnx_error", LanguageManager.CurrentLanguage ?? "en"));
 
                 _initDone = true;
                 return _onnxAvailable;
             }
             catch (Exception ex)
             {
-                log?.Invoke(string.Format(LanguageManager.GetText("va_init_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"), ex.Message));
+                log?.Invoke(string.Format(LanguageManager.GetText("va_init_error", LanguageManager.CurrentLanguage ?? "en"), ex.Message));
                 _onnxAvailable = false;
                 _initDone = true;
                 return false;
@@ -423,9 +361,17 @@ namespace UltraVideoEditor
                     return await FfmpegAnalyze(videoPath, ffmpegPath, ct);
 
                 // ── Prioritet 1: Qwen2-VL via Ollama ────────────────────────
+                // FIX (v1.4): Qwen used to see ONE frame from second 1, squeezed to 224×224
+                // (the MobileNet input size, distorted from 16:9 to a square). Too small to
+                // see faces, smiles or a kettlebell, and blind to anything after second 1.
+                // Now Qwen gets a strip of 3 frames spread over the used part of the clip, at
+                // 448 px width, aspect ratio kept. The small 224 frame is still used for ONNX/metrics.
                 if (_qwenAvailable && _ollamaClient != null)
                 {
-                    var qwenResult = await QwenAnalyzeFrame(tempFrame, ct, lyricLine, season, mood, context);
+                    string sheet = tempFrame.Replace(".jpg", "_sheet.jpg");
+                    bool haveSheet = await ExtractContactSheet(videoPath, sheet, ffmpegPath, ct);
+                    var qwenResult = await QwenAnalyzeFrame(haveSheet ? sheet : tempFrame, ct, lyricLine, season, mood, context, multiFrame: haveSheet);
+                    try { if (File.Exists(sheet)) File.Delete(sheet); } catch { }
                     if (qwenResult != null)
                     {
                         // Dopunjavamo sa FFmpeg metrikama (luminance, saturation, sharpness)
@@ -474,7 +420,8 @@ namespace UltraVideoEditor
             string lyricLine = null,
             string season = null,
             string mood = null,
-            string context = null)
+            string context = null,
+            bool multiFrame = false)
         {
             try
             {
@@ -483,9 +430,12 @@ namespace UltraVideoEditor
                 string model = _resolvedQwenModel ?? QWEN_MODEL_ALT2;
 
                 // Koristimo dinamicki prompt ako imamo kontekst, inace fallback na staticki
-                string prompt = (lyricLine != null || season != null || mood != null)
-                    ? BuildContextualQwenPrompt(lyricLine, season, mood, context)
-                    : QWEN_PROMPT;
+                // v1.4: always the short contextual prompt (QWEN_PROMPT carried a fixed example score)
+                string prompt = BuildContextualQwenPrompt(lyricLine, season, mood, context);
+                if (multiFrame)
+                    prompt = "The image is a strip of 3 frames from the SAME video clip, left to right in time " +
+                             "(beginning, middle, end of the part that will be used). Judge the WHOLE clip: if ANY frame breaks a " +
+                             "reject rule, reject the clip. Describe the clip as a whole.\n\n" + prompt;
 
                 var (response, error) = await _ollamaClient.VisionAsyncEx(imagePath, prompt, model, ct);
                 if (!string.IsNullOrWhiteSpace(error))
@@ -496,7 +446,7 @@ namespace UltraVideoEditor
                 }
                 if (string.IsNullOrWhiteSpace(response))
                 {
-                    LogToMainWindowStatic("   ⚠️ Qwen: prazan odgovor");
+                    LogToMainWindowStatic("   ⚠️ Qwen: empty answer");
                     return null;
                 }
 
@@ -554,6 +504,10 @@ namespace UltraVideoEditor
 
                 double score     = GetDouble("score", 5.0);
                 string rejectStr = GetString("reject");
+                if (rejectStr != null && (rejectStr.Equals("null", StringComparison.OrdinalIgnoreCase) ||
+                                          rejectStr.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+                                          rejectStr.Trim().Length == 0 || rejectStr.StartsWith("<")))
+                    rejectStr = null;   // v1.4: "null" written as text is not a reason
 
                 // Primijeni iste filteri kao ONNX/FFmpeg path
                 string topLabel  = GetString("label") ?? "";
@@ -582,13 +536,101 @@ namespace UltraVideoEditor
                     TopLabel    = topLabel,
                     Labels      = labels,
                     OnnxUsed    = false,  // Qwen2-VL, ne ONNX
-                    RetryNeeded = retryNeeded
+                    QwenUsed    = true,
+                    RetryNeeded = retryNeeded,
+                    Description = GetString("description")
                 };
             }
             catch
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 3 frames side by side, 448 px wide each, aspect kept. The frames are spread over
+        /// the part of the clip that is actually used (the first ~6 s; scenes are cut from the
+        /// start of the clip): at 15 %, 50 % and 85 % of min(clip length, 6 s).
+        /// Returns false on any problem — the caller then falls back to the single frame.
+        /// </summary>
+        private static async Task<bool> ExtractContactSheet(
+            string videoPath, string outputPath, string ffmpegPath, CancellationToken ct)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return false;
+                if (File.Exists(outputPath)) File.Delete(outputPath);
+
+                double clipDur = await ProbeDurationAsync(videoPath, ffmpegPath, ct);
+                if (clipDur < 1.0) return false;   // unknown or very short → single frame is enough
+                double window = Math.Min(clipDur, 6.0);
+                double first = window * 0.15;
+                double gap = window * 0.35;
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+
+                string args = $"-nostdin -y -ss {first.ToString("F2", inv)} -i \"{videoPath}\" " +
+                              // tpad clones the last frame a little, otherwise fps drops the 3rd frame at EOF
+                              $"-vf \"tpad=stop_mode=clone:stop_duration={gap.ToString("F2", inv)},fps={(1.0 / gap).ToString("F4", inv)},scale=336:-2,tile=3x1\" -frames:v 1 -q:v 3 \"{outputPath}\"";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = ffmpegPath, Arguments = args,
+                    CreateNoWindow = true, UseShellExecute = false,
+                    RedirectStandardError = true, RedirectStandardOutput = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc == null) return false;
+                var se = proc.StandardError.ReadToEndAsync();
+                var so = proc.StandardOutput.ReadToEndAsync();
+
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(20));
+                try { await proc.WaitForExitAsync(timeout.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    ct.ThrowIfCancellationRequested();
+                    return false;
+                }
+
+                return proc.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1024;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { return false; }
+        }
+
+        /// <summary>Clip length in seconds via ffprobe (next to ffmpeg.exe); 0 when unknown.</summary>
+        private static async Task<double> ProbeDurationAsync(string videoPath, string ffmpegPath, CancellationToken ct)
+        {
+            try
+            {
+                string probe = Path.Combine(Path.GetDirectoryName(ffmpegPath) ?? "", "ffprobe.exe");
+                if (!File.Exists(probe)) return 0;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = probe,
+                    Arguments = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{videoPath}\"",
+                    CreateNoWindow = true, UseShellExecute = false,
+                    RedirectStandardError = true, RedirectStandardOutput = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc == null) return 0;
+                var so = proc.StandardOutput.ReadToEndAsync();
+                var se = proc.StandardError.ReadToEndAsync();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                try { await proc.WaitForExitAsync(timeout.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    ct.ThrowIfCancellationRequested();
+                    return 0;
+                }
+                string text = (await so).Trim();
+                return double.TryParse(text, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double d) ? d : 0;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { return 0; }
         }
 
         private static async Task<bool> ExtractFrame(
@@ -736,7 +778,9 @@ namespace UltraVideoEditor
 
             try
             {
-                string args = "-nostdin -i \"" + framePath + "\" -vf \"signalstats,blurdetect\" -f null -";
+                // v1.4: signalstats only stores its numbers as frame metadata — without metadata=print
+                // nothing was printed, so brightness and colour were always the defaults.
+                string args = "-nostdin -i \"" + framePath + "\" -vf \"signalstats,metadata=mode=print,blurdetect\" -f null -";
                 var psi = new ProcessStartInfo
                 {
                     FileName = ffmpegPath,
@@ -752,7 +796,7 @@ namespace UltraVideoEditor
                 await proc.WaitForExitAsync(ct);
 
                 double luminance = 128.0;
-                var lumMatch = Regex.Match(stderr, @"YAVG:([\d.]+)");
+                var lumMatch = Regex.Match(stderr, @"YAVG[=:]([\d.]+)");
                 if (lumMatch.Success)
                 {
                     double parsed;
@@ -765,7 +809,7 @@ namespace UltraVideoEditor
                 }
 
                 double saturation = 50.0;
-                var satMatch = Regex.Match(stderr, @"SATAVG:([\d.]+)");
+                var satMatch = Regex.Match(stderr, @"SATAVG[=:]([\d.]+)");
                 if (satMatch.Success)
                 {
                     double parsed;
@@ -777,7 +821,14 @@ namespace UltraVideoEditor
                     }
                 }
 
+                // v1.4: blurdetect prints "blur mean: X" (about 5 for a sharp frame, 25+ for a
+                // very soft one); it never printed "blur_ratio". Mapped to the old 0..1 ratio.
                 double blurRatio = 0.5;
+                var blurMeanMatch = Regex.Match(stderr, @"blur mean:\s*([\d.]+)");
+                if (blurMeanMatch.Success && double.TryParse(blurMeanMatch.Groups[1].Value,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double blurMean))
+                    blurRatio = Math.Clamp(blurMean * 0.035, 0.0, 1.0);
                 var blurMatch = Regex.Match(stderr, @"blur_ratio:([\d.]+)");
                 if (blurMatch.Success)
                 {
@@ -823,7 +874,7 @@ namespace UltraVideoEditor
             }
             catch
             {
-                return MakeResult(6.0, LanguageManager.GetText("va_analysis_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"));
+                return MakeResult(6.0, LanguageManager.GetText("va_analysis_error", LanguageManager.CurrentLanguage ?? "en"));
             }
         }
 

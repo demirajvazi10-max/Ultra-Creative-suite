@@ -11,7 +11,7 @@ namespace UltraVideoEditor
     public class OllamaClient
     {
         // Language helper
-        private static string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private static string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private static string L(string key) => LanguageManager.GetText(key, _LangCode);
         private static string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -113,6 +113,7 @@ namespace UltraVideoEditor
                     model = model,
                     prompt = prompt,
                     stream = false,
+                    keep_alive = "30m",   // v1.4: no reload between scenes
                     options = new
                     {
                         temperature = 0.3,
@@ -203,7 +204,7 @@ namespace UltraVideoEditor
                 }
 
                 if (imageBytes.Length < 100)
-                    return (null, $"Slika previse mala ({imageBytes.Length}B) — preskacemo");
+                    return (null, $"Image too small ({imageBytes.Length} B) — skipped");
 
                 imageArray = new[] { Convert.ToBase64String(imageBytes) };
             }
@@ -217,7 +218,11 @@ namespace UltraVideoEditor
                 options = new
                 {
                     temperature = 0.1,
-                    num_predict = imageArray == null ? 10 : 1000,
+                    // v1.4: the answer is a short JSON (about 150 tokens); 1000 let a rambling answer
+                    // run for half a minute. A fixed 4096 context keeps the KV cache small enough to
+                    // stay on the graphics card instead of spilling to the CPU.
+                    num_predict = imageArray == null ? 10 : 400,
+                    num_ctx     = 4096,
                     top_p       = 0.9
                 }
             };
@@ -261,7 +266,7 @@ namespace UltraVideoEditor
             }
 
             if (string.IsNullOrWhiteSpace(responseBody))
-                return (null, "Ollama vratila prazan body");
+                return (null, "Ollama returned an empty body");
 
             OllamaResponse result;
             try
@@ -282,7 +287,7 @@ namespace UltraVideoEditor
 
             string text = result?.response?.Trim();
             if (string.IsNullOrWhiteSpace(text))
-                return (null, "Ollama odgovorila ali 'response' polje je prazno");
+                return (null, "Ollama answered, but the 'response' field is empty");
 
             return (text, null);
         }
@@ -336,6 +341,9 @@ namespace UltraVideoEditor
         public string[] images  { get; set; }
         public bool     stream  { get; set; } = false;
         public object   options { get; set; }
+
+        /// <summary>v1.4 — keep the model in memory between clips (Ollama unloads it after 5 minutes by default).</summary>
+        public string   keep_alive { get; set; } = "30m";
     }
 
     // ── InstallerConfig ────────────────────────────────────────────────────────

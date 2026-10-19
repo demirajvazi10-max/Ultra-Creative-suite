@@ -26,7 +26,7 @@ namespace UltraVideoEditor
 
         static HardwareEncoderDetector()
         {
-            ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            ffmpegPath = AppPaths.FFmpeg;
         }
 
         /// <summary>

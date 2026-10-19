@@ -60,7 +60,8 @@
         <Border Grid.Row="4" Background="#1A2A1A" CornerRadius="4" Padding="10" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="Automatic layout:" Foreground="#81C784" FontWeight="Bold" Margin="0,0,0,6"/>
-                <TextBlock x:Name="txtAutoInfo" Foreground="#A5D6A7" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock x:Name="txtAutoInfo" Foreground="#A5D6A7" TextWrapping="Wrap" Margin="0,0,0,8"
+                           AutomationProperties.LiveSetting="Polite"/>
                 <Button x:Name="btnAutoPlace" Content="Evenly distribute ALL images along audio axis"
                         Click="AutoPlace_Click" Height="34" Background="#1B5E20" Foreground="{DynamicResource ButtonTextBrush}"
                         FontWeight="Bold"

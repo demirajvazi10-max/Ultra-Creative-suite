@@ -118,8 +118,7 @@ namespace UltraVideoEditor
             if (!File.Exists(job.SourceVideoPath))
                 throw new FileNotFoundException($"Source video not found: {job.SourceVideoPath}");
 
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath))
                 throw new FileNotFoundException("FFmpeg not found.");
 
@@ -295,7 +294,7 @@ namespace UltraVideoEditor
             var opts = new AccessibilityReportOptions
             {
                 ProjectName        = job.BaseName,
-                Language           = "sr",
+                Language           = (LanguageManager.CurrentLanguage == "sr" ? "sr" : "en"),   // v1.4: follows the app language
                 IncludeTtsSummary  = true,
                 IncludeNavMarkers  = true,
                 IncludeTransitions = job.Transitions?.Count > 0,
@@ -335,7 +334,7 @@ namespace UltraVideoEditor
             }
 
             sb.AppendLine();
-            sb.AppendLine($"Generisan: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
+            sb.AppendLine($"Generated: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
             return sb.ToString();
         }
 
@@ -373,7 +372,8 @@ namespace UltraVideoEditor
             {
                 string log = await errTask;
                 throw new InvalidOperationException(
-                    $"FFmpeg exit {proc.ExitCode}: {log.Split('\n').LastOrDefault()}");
+                    // v1.4: the last NON-empty line (the very last one is usually empty)
+                    $"FFmpeg exit {proc.ExitCode}: {log.Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Length > 0)}");
             }
         }
 

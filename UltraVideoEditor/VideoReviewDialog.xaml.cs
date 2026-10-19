@@ -23,7 +23,7 @@ namespace UltraVideoEditor
     public partial class VideoReviewDialog : Window
     {
         // ── Language helper ───────────────────────────────────────────────────
-        private string _lang => (WpfApplication.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _lang => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _lang);
 
         // ── State ─────────────────────────────────────────────────────────────
@@ -69,48 +69,9 @@ namespace UltraVideoEditor
         }
 
         // ── Finding ffmpeg.exe ───────────────────────────────────────────
-        private static string FindFfmpegPath()
-        {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-            // 1. Uz exe — podfolder Ffmpeg (originalna lokacija)
-            string[] localCandidates =
-            {
-                Path.Combine(baseDir, "Ffmpeg", "ffmpeg.exe"),
-                Path.Combine(baseDir, "ffmpeg", "ffmpeg.exe"),
-                Path.Combine(baseDir, "tools", "ffmpeg.exe"),
-                Path.Combine(baseDir, "ffmpeg.exe"),
-            };
-            foreach (string c in localCandidates)
-                if (File.Exists(c)) return c;
-
-            // 2. System PATH
-            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-            foreach (string dir in pathEnv.Split(';'))
-            {
-                try
-                {
-                    string c = Path.Combine(dir.Trim(), "ffmpeg.exe");
-                    if (File.Exists(c)) return c;
-                }
-                catch { }
-            }
-
-            // 3. Ceste instalacije
-            string[] wellKnown =
-            {
-                @"C:\ffmpeg\bin\ffmpeg.exe",
-                @"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
-                @"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
-                Path.Combine(Environment.GetFolderPath(
-                    Environment.SpecialFolder.LocalApplicationData), "ffmpeg", "bin", "ffmpeg.exe"),
-            };
-            foreach (string c in wellKnown)
-                if (File.Exists(c)) return c;
-
-            // Nije pronaden — vrati originalnu putanju kao placeholder za jasnu gresku
-            return Path.Combine(baseDir, "Ffmpeg", "ffmpeg.exe");
-        }
+        // v1.4: the same search (program folder, PATH, usual install folders) is now shared by
+        // the whole program in AppPaths.
+        private static string FindFfmpegPath() => AppPaths.FFmpeg;
 
         // ── Inicijalizacija Ollama ────────────────────────────────────────────
         private async Task InitOllamaAsync()
@@ -189,11 +150,15 @@ namespace UltraVideoEditor
             var main = WpfApplication.Current.MainWindow as MainWindow;
             if (main == null) return;
 
-            string lastExport = main.timelineItems
-                .Where(t => t.IsVideo && File.Exists(t.Path))
-                .OrderByDescending(t => File.GetLastWriteTime(t.Path))
-                .Select(t => t.Path)
-                .FirstOrDefault();
+            // v1.4: prefer the last rendered video (the button promises the export), and
+            // only fall back to the newest video clip on the timeline.
+            string lastExport = main.LastRenderedVideoPath;
+            if (string.IsNullOrEmpty(lastExport) || !File.Exists(lastExport))
+                lastExport = main.timelineItems
+                    .Where(t => t.IsVideo && File.Exists(t.Path))
+                    .OrderByDescending(t => File.GetLastWriteTime(t.Path))
+                    .Select(t => t.Path)
+                    .FirstOrDefault();
 
             if (!string.IsNullOrEmpty(lastExport))
             {
@@ -339,10 +304,15 @@ namespace UltraVideoEditor
 
         private void btnClose_Click(object sender, RoutedEventArgs e)
         {
-            _cts?.Cancel();
             Close();
-            // Shut down the STA thread Dispatcher so the thread does not stay alive
-            Dispatcher.InvokeShutdown();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            // v1.4: the window now lives on the main UI thread — just stop any running analysis
+            // (the old Dispatcher.InvokeShutdown() here would now close the whole program).
+            _cts?.Cancel();
+            base.OnClosed(e);
         }
 
         // ── Glavna analiza ────────────────────────────────────────────────────
@@ -457,7 +427,7 @@ namespace UltraVideoEditor
                 }
 
                 // ── Grupisi frameove u scene i prikazi ih ────────────────────
-                SetProgress(90, "Grupisem scene...");
+                SetProgress(90, LanguageManager.T("loc_grouping_scenes"));
                 var sceneGroups = GroupIntoScenes(frameResults);
 
                 int problemCount = 0;
@@ -771,7 +741,7 @@ namespace UltraVideoEditor
                         lyrCts.CancelAfter(TimeSpan.FromSeconds(60));
                         (raw, _) = await _ollama.VisionAsyncEx(framePath, prompt, model, lyrCts.Token);
                     }
-                    catch { }
+                    catch (Exception swallowed) { AppLog.Error("Video review: vision AI on a frame", swallowed); }   // v1.4: was silent
 
                     try { File.Delete(framePath); } catch { }
 
@@ -861,7 +831,7 @@ namespace UltraVideoEditor
                             problemCount++;
                             AddFinding(FindingItem.Problem(
                                 FormatTime(frames[j].ts), frames[j].ts,
-                                "🔁 Ponavljanje scene",
+                                LanguageManager.T("loc_scene_repeat"),
                                 $"Visually similar to frame at {FormatTime(frames[i].ts)} — same type of scene repeats."));
                         }
                     }
@@ -992,7 +962,7 @@ namespace UltraVideoEditor
                     System.Globalization.CultureInfo.InvariantCulture, out double d))
                     return d;
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Video review: reading the video length", swallowed); }   // v1.4: was silent
             return await GetDurationViaffmpegAsync(videoPath, ct);
         }
 
@@ -1022,7 +992,7 @@ namespace UltraVideoEditor
                          + int.Parse(m.Groups[3].Value)
                          + int.Parse(m.Groups[4].Value) / 100.0;
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Video review: reading a timestamp", swallowed); }   // v1.4: was silent
             return 0;
         }
 
@@ -1194,6 +1164,10 @@ namespace UltraVideoEditor
         public Visibility CanNavigate  { get; set; } = Visibility.Collapsed;
         public string  GoToAcc         { get; set; }
         public Brush   BackgroundColor { get; set; }
+
+        // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+        public override string ToString() =>
+            string.Join(", ", new[] { TimestampAcc, Title, Description }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         public static FindingItem Problem(string ts, double seconds, string title, string desc) => new()
         {

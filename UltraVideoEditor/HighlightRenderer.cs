@@ -53,7 +53,7 @@ namespace UltraVideoEditor
             if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                 Directory.CreateDirectory(outputDir);
 
-            progress?.Report((5, "Pripremam timeline items…"));
+            progress?.Report((5, LanguageManager.T("loc_preparing_items")));
 
             // 1 — Konverzija segmenata u TimelineItem listu
             var items = BuildTimelineItems(result.Segments, musicPath);
@@ -139,7 +139,7 @@ namespace UltraVideoEditor
                 Start            = 0.0,
                 End              = totalDuration,
                 Duration         = totalDuration,
-                Name             = $"Muzika — {Path.GetFileNameWithoutExtension(musicPath)}",
+                Name             = LanguageManager.F("loc_music_name", Path.GetFileNameWithoutExtension(musicPath)),
                 Type             = "Audio",
                 TrackIndex       = 2,
                 FixedPosition    = 0.0,

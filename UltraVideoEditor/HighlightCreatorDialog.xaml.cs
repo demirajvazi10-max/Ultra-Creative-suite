@@ -674,43 +674,8 @@ namespace UltraVideoEditor
                 return;
             }
 
-            var parent = Owner;
-            if (parent is MainWindow mainWindow)
-            {
-                double cursor = 0.0;
-                int added = 0;
-                foreach (var seg in _activeSegments.OrderBy(s => s.Order))
-                {
-                    var item = new TimelineItem
-                    {
-                        Path             = seg.SourcePath,
-                        Start            = seg.SourceStart,
-                        End              = seg.SourceEnd,
-                        Duration         = seg.Duration,
-                        Name             = $"Highlight {seg.Order:D2}",
-                        Type             = "Highlight",
-                        TrackIndex       = 0,
-                        FixedPosition    = cursor,
-                        UseFixedPosition = true,
-                        AccessibilityDescription =
-                            $"Highlight {seg.Order}, {seg.ContentDescription}, " +
-                            $"{seg.Duration:F1}s",
-                    };
-                    // AddTimelineItemExternal nije definisan -- koristimo DialogResult fallback
-                    added = 0;
-                    break;
-                }
-
-                if (added > 0)
-                {
-                    MessageBox.Show(
-                        $"Added {added} segments to the timeline.",
-                        "Timeline", MessageBoxButton.OK, MessageBoxImage.Information);
-                    Close();
-                    return;
-                }
-            }
-
+            // v1.4: the main window adds the segments (with their in-points) after this dialog
+            // closes; the old loop here never added anything.
             // Fallback: vrati kroz DialogResult
             DialogResult = true;
             Close();

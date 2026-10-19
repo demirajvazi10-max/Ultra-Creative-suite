@@ -77,5 +77,9 @@ namespace UltraVideoEditor
             BatchJobStatus.Skipped  => "⏭ Skipped",
             _                       => "?"
         };
+
+        // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+        public override string ToString() =>
+            $"{ProjectName}, {FormatId}, {Status}" + (string.IsNullOrEmpty(ErrorMessage) ? "" : ", " + ErrorMessage);
     }
 }

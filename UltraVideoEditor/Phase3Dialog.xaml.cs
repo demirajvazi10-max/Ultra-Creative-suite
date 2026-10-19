@@ -63,17 +63,15 @@ namespace UltraVideoEditor
 
         private void BtnPickFolder_Click(object sender, RoutedEventArgs e)
         {
-            // WPF nema FolderBrowserDialog — koristimo SaveFileDialog trik
-            var dlg = new SaveFileDialog
+            // v1.4: a real folder picker (.NET 8). The old "save a file named output_folder"
+            // trick was confusing, especially with a screen reader.
+            var dlg = new Microsoft.Win32.OpenFolderDialog
             {
-                Title            = "Select output folder (enter any file name)",
-                FileName         = "output_folder",
-                Filter           = "Folder|*.none",
-                CheckPathExists  = false,
-                CheckFileExists  = false,
+                Title = LanguageManager.T("loc_p3_pick_folder"),
+                InitialDirectory = Directory.Exists(TxtOutputFolder.Text) ? TxtOutputFolder.Text : ""
             };
             if (dlg.ShowDialog() == true)
-                TxtOutputFolder.Text = Path.GetDirectoryName(dlg.FileName) ?? TxtOutputFolder.Text;
+                TxtOutputFolder.Text = dlg.FolderName;
         }
 
         // ── Glavna akcija ─────────────────────────────────────────────
@@ -83,24 +81,23 @@ namespace UltraVideoEditor
             if (_running) return;
             if (_result == null || !_result.Success)
             {
-                MessageBox.Show("No valid HighlightResult.\n" +
-                                "Run Phase 1 and 2 before Phase 3.",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(LanguageManager.T("loc_p3_need_result"),
+                    LanguageManager.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             string outputFolder = TxtOutputFolder.Text.Trim();
             if (string.IsNullOrEmpty(outputFolder))
             {
-                MessageBox.Show("Please select an output folder.",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(LanguageManager.T("loc_p3_need_folder"),
+                    LanguageManager.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             _running          = true;
             _cts              = new CancellationTokenSource();
             BtnRun.IsEnabled  = false;
-            BtnClose.Content  = "⏹ Cancel";
+            BtnClose.Content  = LanguageManager.T("loc_cancel");
             BtnClose.Click   -= BtnClose_Click;
             BtnClose.Click   += BtnCancelRun_Click;
             ProgressPanel.Visibility = Visibility.Visible;
@@ -121,11 +118,11 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                SetProgress(0, "Cancelled.");
+                SetProgress(0, LanguageManager.T("loc_cancelled"));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Phase 3 — Error",
+                MessageBox.Show(ex.Message, LanguageManager.T("loc_p3_error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -134,7 +131,7 @@ namespace UltraVideoEditor
                 _cts?.Dispose();
                 _cts             = null;
                 BtnRun.IsEnabled = true;
-                BtnClose.Content = "Close";
+                BtnClose.Content = LanguageManager.T("loc_close");
                 BtnClose.Click  -= BtnCancelRun_Click;
                 BtnClose.Click  += BtnClose_Click;
             }
@@ -149,13 +146,23 @@ namespace UltraVideoEditor
             string baseName = $"highlight_{DateTime.Now:yyyyMMdd_HHmm}";
 
             // ── B: Tranzicije ─────────────────────────────────────────
-            progress.Report((5, "B — Analyzing transitions…"));
+            progress.Report((5, LanguageManager.T("loc_p3_transitions_analyzing")));
             List<TransitionDecision> transitions = null;
             if (ChkEnableTransitions.IsChecked == true)
             {
                 transitions = TransitionEngine.Decide(_result.Segments, _result.Beats);
-                progress.Report((12, $"B — {transitions.Count} prelaza odabrano."));
+                progress.Report((12, LanguageManager.F("loc_p3_transitions", transitions.Count)));
             }
+
+            // ── 0: Cut the highlight itself ───────────────────────────
+            // v1.4: everything below used to work on the whole SOURCE video, so the exports
+            // contained the full original instead of the highlight (and the music mix, which
+            // is highlight-long, did not match the picture).
+            progress.Report((13, LanguageManager.T("loc_p3_cutting")));
+            string highlightVideo = Path.Combine(outputFolder, $"{baseName}_highlight.mp4");
+            if (!await ExportHelpers.CutSegmentsAsync(_result.Segments, highlightVideo, ct))
+                throw new InvalidOperationException(LanguageManager.T("loc_p3_cut_failed"));
+            _sourceVideoPath = highlightVideo;
 
             // ── A: Audio miks ─────────────────────────────────────────
             AudioMixSettings audioSettings = BuildAudioSettings();
@@ -164,7 +171,7 @@ namespace UltraVideoEditor
             if (!string.IsNullOrEmpty(_musicPath) && File.Exists(_musicPath) &&
                 !string.IsNullOrEmpty(_sourceVideoPath) && File.Exists(_sourceVideoPath))
             {
-                progress.Report((15, "A — Smart audio miks…"));
+                progress.Report((15, LanguageManager.T("loc_p3_mix")));
                 mixedAudioPath = Path.Combine(outputFolder, $"{baseName}_mix.aac");
 
                 var audioProgress = new Progress<(int, string)>(p =>
@@ -184,17 +191,17 @@ namespace UltraVideoEditor
 
                 if (!mixResult.Success)
                 {
-                    progress.Report((40, $"A — Audio mix failed: {mixResult.Error}. Continuing without the mix."));
+                    progress.Report((40, LanguageManager.F("loc_p3_mix_failed", mixResult.Error)));
                     mixedAudioPath = null;
                 }
                 else
                 {
-                    progress.Report((40, $"A — Audio miks OK. LUFS: {mixResult.LUFSLevel:F1}"));
+                    progress.Report((40, LanguageManager.F("loc_p3_mix_ok", mixResult.LUFSLevel)));
                 }
             }
 
             // ── C: Accessibility Report ───────────────────────────────
-            progress.Report((42, "C — Generating accessibility report…"));
+            progress.Report((42, LanguageManager.T("loc_p3_report_gen")));
             string reportPath = Path.Combine(outputFolder, $"{baseName}_accessibility.txt");
 
             if (ChkGenReport.IsChecked == true)
@@ -202,7 +209,7 @@ namespace UltraVideoEditor
                 var reportOpts = new AccessibilityReportOptions
                 {
                     ProjectName        = baseName,
-                    Language           = "sr",
+                    Language           = (LanguageManager.CurrentLanguage == "sr" ? "sr" : "en"),   // v1.4: follows the app language
                     IncludeTtsSummary  = ChkTtsSummary.IsChecked == true,
                     IncludeNavMarkers  = ChkNavMarkers.IsChecked == true,
                     IncludeTransitions = transitions?.Count > 0,
@@ -216,11 +223,11 @@ namespace UltraVideoEditor
                     outputPath    : reportPath,
                     ct            : ct);
 
-                progress.Report((50, "C — Accessibility report generisan."));
+                progress.Report((50, LanguageManager.T("loc_p3_report_done")));
             }
 
             // ── D: Export Pipeline ────────────────────────────────────
-            progress.Report((52, "D — Pripremam export pipeline…"));
+            progress.Report((52, LanguageManager.T("loc_p3_export_prep")));
 
             var formats = new List<ExportFormat>();
             if (ChkExportYoutube.IsChecked == true)
@@ -234,7 +241,7 @@ namespace UltraVideoEditor
 
             if (formats.Count == 0)
             {
-                progress.Report((100, "No export formats selected."));
+                progress.Report((100, LanguageManager.T("loc_p3_no_formats")));
             }
             else
             {
@@ -260,7 +267,7 @@ namespace UltraVideoEditor
                 var exportResult = await ExportPipeline.ExportAllAsync(
                     job, exportProgress, ct);
 
-                progress.Report((100, $"Export complete: {exportResult.SuccessCount}/{formats.Count} formats."));
+                progress.Report((100, LanguageManager.F("loc_p3_export_done", exportResult.SuccessCount, formats.Count)));
 
                 // Show result
                 ShowExportSummary(exportResult, outputFolder);
@@ -289,9 +296,7 @@ namespace UltraVideoEditor
             }
 
             string icon = result.AllSucceeded ? "✅" : "⚠️";
-            string msg  = $"{icon} Export complete!\n\n" +
-                          $"Successful: {result.SuccessCount}/{result.Results.Count} formats\n" +
-                          $"Folder: {folder}\n\n";
+            string msg  = LanguageManager.F("loc_p3_summary", icon, result.SuccessCount, result.Results.Count, folder);
 
             foreach (var r in result.Results)
             {
@@ -301,7 +306,7 @@ namespace UltraVideoEditor
                 msg += $"{(r.Success ? "✅" : "❌")} {r.FormatId}{sz}\n";
             }
 
-            MessageBox.Show(msg, "Phase 3 — Export complete",
+            MessageBox.Show(msg, LanguageManager.T("loc_p3_done_title"),
                 MessageBoxButton.OK,
                 result.AllSucceeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
@@ -321,8 +326,8 @@ namespace UltraVideoEditor
             if (_running)
             {
                 var c = MessageBox.Show(
-                    "Operation in progress. Cancel and close?",
-                    "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    LanguageManager.T("loc_p3_busy_close"),
+                    LanguageManager.T("loc_confirm"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (c != MessageBoxResult.Yes) return;
                 _cts?.Cancel();
             }

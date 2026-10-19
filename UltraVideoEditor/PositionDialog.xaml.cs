@@ -11,13 +11,14 @@ namespace UltraVideoEditor
     public partial class PositionDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
         private readonly List<TimelineItem> _allItems;
         private readonly TimelineItem _currentItem;
         private readonly double _audioDuration;
+        private string _initialEnd = "", _initialDuration = "";
 
         public double SelectedPosition { get; private set; } = -1;
         public double SelectedDuration { get; private set; } = 5.0;
@@ -51,8 +52,10 @@ namespace UltraVideoEditor
             txtStart.Text = pos.ToString("F1", CultureInfo.InvariantCulture);
             txtEnd.Text = (pos + _currentItem.Duration).ToString("F1", CultureInfo.InvariantCulture);
             txtDuration.Text = _currentItem.Duration.ToString("F1", CultureInfo.InvariantCulture);
+            _initialEnd = txtEnd.Text;
+            _initialDuration = txtDuration.Text;
 
-            var images = _allItems.Where(i => i.IsImage || i.IsVideo).ToList();
+            var images = TrackVisuals();
             if (images.Count > 0 && _audioDuration > 0)
             {
                 double interval = _audioDuration / images.Count;
@@ -71,15 +74,14 @@ namespace UltraVideoEditor
         private void RefreshScheduleList()
         {
             lstSchedule.Items.Clear();
-            var images = _allItems
-                .Where(i => i.IsImage || i.IsVideo)
+            var images = TrackVisuals()
                 .OrderBy(i => i.UseFixedPosition && i.FixedPosition > 0 ? i.FixedPosition : i.Start)
                 .ToList();
 
             foreach (var img in images)
             {
                 double p = img.UseFixedPosition && img.FixedPosition > 0 ? img.FixedPosition : img.Start;
-                string mark = img == _currentItem ? " <-- OVA" : "";
+                string mark = img == _currentItem ? "  <-- (selected)" : "";
                 string desc = string.IsNullOrWhiteSpace(img.AudioDescription) ? ""
                     : " | " + img.AudioDescription.Substring(0, Math.Min(35, img.AudioDescription.Length)) + "...";
                 lstSchedule.Items.Add(
@@ -90,7 +92,7 @@ namespace UltraVideoEditor
 
         private void AutoPlace_Click(object sender, RoutedEventArgs e)
         {
-            var images = _allItems.Where(i => i.IsImage || i.IsVideo).ToList();
+            var images = TrackVisuals();
             if (images.Count == 0) return;
 
             double total = _audioDuration > 0 ? _audioDuration : images.Sum(i => i.Duration);
@@ -105,8 +107,15 @@ namespace UltraVideoEditor
             AutoPlaceAll = true;
             RefreshScheduleList();
             txtAutoInfo.Text = string.Format(
-                "Primenjen ravnomerni raspored: {0} slika, svaka po {1:F1} sekundi.", images.Count, step);
+                "Even distribution applied: {0} clips, {1:F1} seconds each. Press Apply to keep it or Cancel to undo.", images.Count, step);
         }
+
+        /// <summary>
+        /// v1.4: pictures and videos on the SAME track as the selected clip. Before, the even
+        /// distribution also scattered the overlays of Video 2 across the main track's timing.
+        /// </summary>
+        private List<TimelineItem> TrackVisuals() =>
+            _allItems.Where(i => (i.IsImage || i.IsVideo) && i.TrackIndex == _currentItem.TrackIndex).ToList();
 
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
@@ -125,8 +134,16 @@ namespace UltraVideoEditor
                 return;
             }
 
+            // v1.4: if the user changed only the End field, take the duration from it
+            // (before, a typed End time was silently ignored).
+            if (txtEnd.Text != _initialEnd && txtDuration.Text == _initialDuration &&
+                double.TryParse(txtEnd.Text.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double typedEnd) &&
+                typedEnd > start)
+            {
+                SelectedDuration = typedEnd - start;
+            }
             // Read duration
-            if (double.TryParse(txtDuration.Text.Replace(',', '.'),
+            else if (double.TryParse(txtDuration.Text.Replace(',', '.'),
                                 NumberStyles.Any, CultureInfo.InvariantCulture, out double dur) && dur > 0)
             {
                 SelectedDuration = dur;

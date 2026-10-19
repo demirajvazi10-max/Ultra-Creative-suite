@@ -142,6 +142,14 @@
                           Foreground="{DynamicResource TextPrimary}" IsChecked="False" Margin="0,0,0,8"
                           AutomationProperties.Name="Show lyrics on screen during video"/>
 
+                <CheckBox x:Name="chkKaraoke" Content="🌟 Karaoke: each word lights up while it is sung"
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="True" Margin="25,0,0,8"
+                          AutomationProperties.Name="Karaoke subtitles: each word lights up while it is sung. Works together with Show lyrics on screen."/>
+
+                <CheckBox x:Name="chkReviewScenes" Content="📋 Review scenes before building the video (hear what each clip shows, replace any clip)"
+                          Foreground="{DynamicResource TextPrimary}" IsChecked="True" Margin="0,0,0,8"
+                          AutomationProperties.Name="Review scenes before building the video. A list of all scenes opens, with what each clip shows, and you can replace any clip. Skipped when auto-render is on."/>
+
                 <CheckBox x:Name="chkTransitionSounds" Content="🔊 Sounds on scene change (pop/whoosh effects)" 
                           Foreground="{DynamicResource TextPrimary}" IsChecked="True" Margin="0,0,0,8"
                           AutomationProperties.Name="Add sounds during scene transitions"/>

@@ -51,6 +51,19 @@ namespace UltraVideoEditor
         private double _audioStartSeconds = 0.0;  // Seconds of silence at the start of the audio file
         private double _cutAdvanceMs = 120.0;      // ms ranije od beat peaka (default 120ms)
         private List<AITranscription.WordTiming> _wordTimings = new();  // Whisper word timestamps
+
+        // ── v1.4 lyric alignment ─────────────────────────────────────────────
+        // Raw words Whisper heard in the song (cached per audio file), so changing the
+        // lyrics text only needs a fast re-alignment, not a new Whisper run.
+        private List<AITranscription.WordTiming> _heardWords = null;
+        private string _heardWordsAudioPath = null;
+        // The exact lyrics text the current _lyricTimestamps belong to. If the text in
+        // the box differs (user edited/re-split lines), the timing is redone before generating.
+        private string _timedLyricsText = null;
+        // Per lyric line: the user's words with times (karaoke). Index = lyric line.
+        private List<List<AITranscription.WordTiming>> _lineWordTimings = null;
+        private bool _karaoke = true;
+        private bool _reviewScenes = true;
         private Dictionary<int, double> _lyricEndTimestamps = new Dictionary<int, double>(); // Whisper end times
         private readonly Dictionary<string, string> _lyricQueryCache
             = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // Refren cache
@@ -61,6 +74,7 @@ namespace UltraVideoEditor
         private MotionResult _lastClipMotion;
         private MotionResult _lastClipEndMotion;   // EndDirection prethodnog klipa za precizni jump-cut matching
         private double _lastDownloadedVisionScore = 6.0;
+        private string _lastDownloadedDescription = null;   // v1.4: Qwen's description of the chosen clip
         private bool _lastDownloadedIsStatic = false;
         private bool _lastDownloadedHasChildren = false;
         private bool _lastDownloadedIsOutdoor = false;
@@ -85,7 +99,7 @@ namespace UltraVideoEditor
         private string _cachedLang = "sr";
 
         private string _targetResolution => _cachedResolution;
-        private string _lang => _cachedLang;
+        private string _lang => LanguageManager.CurrentLanguage;   // v1.4: always the current UI language
 
         private void CacheResolutionFromUIThread()
         {
@@ -262,12 +276,13 @@ namespace UltraVideoEditor
                     string izvodjac = parts[0].Trim();
                     string naziv = parts[1].Trim();
                     txtOutroText.Text =
-                        naziv + " | Autor: " + izvodjac +
+                        naziv + " | " + LF("aic_outro_author", izvodjac) +
                         L("outro_subscribe");
                 }
                 else
                 {
-                    txtOutroText.Text = fileName;
+                    // v1.4: the outro is the closing credits, not the song title again
+                    txtOutroText.Text = L("aic_default_outro");
                 }
             }
 
@@ -368,7 +383,7 @@ namespace UltraVideoEditor
                 });
             });
 
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             try
             {
@@ -393,6 +408,14 @@ namespace UltraVideoEditor
                 for (int i = 0; i < result.Lines.Count; i++)
                     _lyricTimestamps[i] = result.Lines[i].StartSeconds;
 
+                // v1.4: keep what Whisper heard (word level). If the user now corrects the
+                // text, EnsureLyricTimingAsync re-aligns the corrected lines to these words.
+                _heardWords = result.WordTimings;
+                _heardWordsAudioPath = audioPath;
+                _wordTimings = result.WordTimings ?? new List<AITranscription.WordTiming>();
+                _lineWordTimings = null;
+                _timedLyricsText = null; // forces a word-level alignment at generation (fast, cached words)
+
                 if (txtTranscribeStatus != null)
                     txtTranscribeStatus.Text = $"✅ {result.Lines.Count} linija prepoznato";
 
@@ -407,6 +430,93 @@ namespace UltraVideoEditor
                 btnAutoTranscribe.IsEnabled = true;
                 btnAutoTranscribe.Content = "🎤 Transcribe from audio";
             }
+        }
+
+        // ── v1.4: lyric timing ────────────────────────────────────────────────
+        /// <summary>
+        /// Gives every lyric line in the box a real start time before the video is built.
+        ///  • Timing already belongs to exactly this text → nothing to do.
+        ///  • Whisper words for this song are cached (from "Transcribe" or an earlier run)
+        ///    → re-align the current lines to them (instant, no Whisper run).
+        ///  • Otherwise → Whisper forced alignment with the user's text as the prompt, then
+        ///    word-level alignment (LyricAligner).
+        /// If nothing works, stale timestamps that no longer match the lines are dropped,
+        /// so scenes are never synced to the wrong lines.
+        /// </summary>
+        private async Task EnsureLyricTimingAsync(string audioPath, CancellationToken ct)
+        {
+            var lines = _lyricLines ?? new List<string>();
+            if (lines.Count == 0 || string.IsNullOrEmpty(audioPath) || !File.Exists(audioPath)) return;
+
+            string textKey = string.Join("\n", lines);
+            if (_timedLyricsText == textKey && _lyricTimestamps.Count == lines.Count)
+                return;
+
+            // 1. Cached Whisper words for this exact audio file
+            if (_heardWords != null && _heardWords.Count > 0 &&
+                string.Equals(_heardWordsAudioPath, audioPath, StringComparison.OrdinalIgnoreCase))
+            {
+                var cached = new AITranscription.TranscriptionResult();
+                if (AITranscription.TryApplyWordAlignment(lines, _heardWords, cached))
+                {
+                    ApplyLyricTiming(cached, textKey);
+                    return;
+                }
+                LogToMainWindow($"🔤 Cached words matched only {cached.AlignmentConfidence:P0} of the lyrics — running Whisper alignment");
+            }
+
+            // 2. Whisper forced alignment
+            if (AITranscription.IsWhisperAvailable())
+            {
+                AnnounceToUser(L("aligning_lyrics"), 2);
+                var progress = new Progress<string>(msg => LogToMainWindow("   🔤 " + msg));
+                string ffmpegPath = AppPaths.FFmpeg;
+                var res = await AITranscription.ForcedAlignAsync(audioPath, lines, "sr", ffmpegPath, "large-v3", progress, ct);
+                ct.ThrowIfCancellationRequested();
+
+                if (res.HeardWords != null && res.HeardWords.Count > 0)
+                {
+                    _heardWords = res.HeardWords;
+                    _heardWordsAudioPath = audioPath;
+                }
+
+                if (res.Success && res.Lines.Count == lines.Count)
+                {
+                    ApplyLyricTiming(res, textKey);
+                    return;
+                }
+                LogToMainWindow($"⚠️ Lyric alignment failed: {res.ErrorMessage}");
+            }
+            else
+            {
+                LogToMainWindow("ℹ️ Whisper is not installed — lyric lines cannot be aligned to the song");
+            }
+
+            // 3. Nothing worked: never keep timestamps that belong to a different text
+            if (_lyricTimestamps.Count != lines.Count)
+            {
+                _lyricTimestamps.Clear();
+                _lineWordTimings = null;
+                _wordTimings = new List<AITranscription.WordTiming>();
+            }
+            AnnounceToUser(L("lyrics_not_aligned"));
+        }
+
+        private void ApplyLyricTiming(AITranscription.TranscriptionResult res, string textKey)
+        {
+            _lyricTimestamps.Clear();
+            for (int i = 0; i < res.Lines.Count; i++)
+                _lyricTimestamps[i] = res.Lines[i].StartSeconds;
+
+            _lineWordTimings = res.LineWords != null && res.LineWords.Count == res.Lines.Count ? res.LineWords : null;
+            _wordTimings = res.WordTimings ?? new List<AITranscription.WordTiming>();
+            _timedLyricsText = textKey;
+
+            string confidence = res.AlignmentConfidence >= 0 ? $"{res.AlignmentConfidence:P0}" : "—";
+            LogToMainWindow($"🔤 Lyrics aligned: {res.Lines.Count} lines, {_wordTimings.Count} words, matched {confidence}");
+            for (int i = 0; i < res.Lines.Count; i++)
+                LogToMainWindow($"   {FormatTime(res.Lines[i].StartSeconds)}  {res.Lines[i].Text}");
+            AnnounceToUser(LF("lyrics_aligned", res.Lines.Count, confidence));
         }
 
         private async void btnGenerate_Click(object sender, RoutedEventArgs e)
@@ -461,7 +571,7 @@ namespace UltraVideoEditor
                         Name = "🎵 AI-generated music",
                         Type = "Audio",
                         Volume = 100,
-                        TrackIndex = 1
+                        TrackIndex = 2
                     };
                     await Dispatcher.InvokeAsync(() => mainWindow.timelineItems.Add(newAudioItem));
 
@@ -500,6 +610,9 @@ namespace UltraVideoEditor
             }
 
             _showLyrics = chkShowLyrics.IsChecked == true;
+            _karaoke = chkKaraoke.IsChecked == true;
+            _reviewScenes = chkReviewScenes.IsChecked == true && chkAutoRender.IsChecked != true && !AutoRenderEnabled;
+            bool userTypedLyrics = !string.IsNullOrWhiteSpace(txtLyrics.Text);
             _cts = new CancellationTokenSource();
             _isRunning = true;
             btnGenerate.IsEnabled = false;
@@ -510,6 +623,11 @@ namespace UltraVideoEditor
 
             try
             {
+                // v1.4: make sure every lyric line has a real start time (word-level alignment
+                // of the user's own text), not an even spread over the song.
+                if (userTypedLyrics)
+                    await EnsureLyricTimingAsync(audioItem.Path, _cts.Token);
+
                 await ProcessVideoCreation(audioItem.Path, totalDuration);
             }
             catch (OperationCanceledException) { AnnounceToUser(L("operation_cancelled")); }
@@ -657,14 +775,25 @@ namespace UltraVideoEditor
             };
         }
 
+        // ── v1.4 DIRECTOR PASS ────────────────────────────────────────────────
+        // Before: lyrics were sent 4 lines at a time with no shared plan, every scene was
+        // planned in isolation (and the result was then mostly discarded by a filter bug and
+        // asked for AGAIN, line by line, in the scene loop). Now the model first fixes ONE
+        // visual identity for the whole video (main character, setting, palette) and plans all
+        // lines against it, 16 lines per call, carrying the identity and the chorus queries
+        // from batch to batch. Repeated lines (chorus) reuse the same query, so the video
+        // has a recurring visual motif. The scene loop uses these queries directly (no
+        // second Ollama call per line), which is also much faster.
         private async Task<List<SceneKeywords>> GenerateKeywordsPerLyric(List<string> lyrics, SongAnalysis analysis, CancellationToken ct)
         {
             var results = new List<SceneKeywords>();
             int total = lyrics.Count;
 
-            LogToMainWindow($"🎬 Generating visual keywords for {total} lines (LITERAL ACTION SYNC)...");
+            LogToMainWindow($"🎬 Director pass: planning {total} lines with one visual identity...");
 
-            int batchSize = 4;
+            int batchSize = 16;
+            string identityJson = null;                                     // fixed after the first batch
+            var chorusQueries = new Dictionary<string, string>(StringComparer.Ordinal); // normalized line → keywords
             for (int i = 0; i < total; i += batchSize)
             {
                 ct.ThrowIfCancellationRequested();
@@ -672,34 +801,70 @@ namespace UltraVideoEditor
                 int batchStart = i;
 
                 string batchText = string.Join("\n", batch.Select((l, idx) => $"{batchStart + idx + 1}. {l}"));
+                string fullSong = string.Join("\n", lyrics.Select((l, idx) => $"{idx + 1}. {l}"));
 
                 string prompt =
-                    "VIDEO DIRECTION - SYMBOLIC AND CONTEXTUAL INTERPRETATION\n\n" +
-                    "Song theme: " + analysis.Theme + " | Style: " + analysis.VisualStyle + " | Mood: " + analysis.Mood + "\n\n" +
-                    "Lyrics:\n" + batchText + "\n\n" +
-                    "STEP 1 - ACTION VERB: that ACTION must dominate the frame.\n" +
-                    "Examples: looking at the sky -> person looking up at sky\n" +
-                    "running through the field -> child running through meadow\n\n" +
-                    "STEP 2 - SYMBOLISM: focus on the ACTIVITY, not the literal object.\n" +
-                    "wearing a house on shirt -> child wearing graphic tee clothing\n\n" +
-                    "STEP 3 - VISUAL METAPHOR: find the EMOTION in a visual equivalent.\n" +
-                    "my heart is smiling -> child laughing sunlight warm rays\n" +
-                    "I feel light -> child arms open spinning outdoor freedom\n\n" +
-                    "RULES: specific action, faces with emotion.\n" +
-                    "FORBIDDEN: generic happy child in park, landscapes without a person.\n\n" +
-                    "Respond ONLY with JSON:\n[\n" +
-                    "  {\"line\": " + (batchStart + 1) + ", \"keywords\": \"primary EN query max 6 words\", \"fallback_keywords\": \"fallback EN max 5 words\", \"ambient\": \"sound\"},\n" +
-                    "  {\"line\": " + (batchStart + 2) + ", \"keywords\": \"...\", \"fallback_keywords\": \"...\", \"ambient\": \"...\"}\n]";
+                    "You are the DIRECTOR of a music video for a Serbian children's song (audience: children 2-6 years). " +
+                    "The video is cut from stock footage (Pixabay/Pexels). Plan ONE video search query per lyric line so the " +
+                    "whole video feels like ONE story, not random clips.\n\n" +
+                    "Song theme: " + analysis.Theme + " | Mood: " + analysis.Mood + " | Style: " + analysis.VisualStyle +
+                    " | Season: " + (analysis.Season ?? "none") + " | Setting: " + (analysis.Setting ?? "outdoors") + "\n\n" +
+                    "WHOLE SONG (for context):\n" + fullSong + "\n\n" +
+                    (identityJson == null
+                        ? "STEP 1 - VISUAL IDENTITY: choose main_character (e.g. \"little girl with pigtails\"), setting (e.g. \"sunny park\") and palette (e.g. \"warm golden\"). Keep it simple and filmable.\n"
+                        : "VISUAL IDENTITY (already chosen - keep it exactly): " + identityJson + "\n") +
+                    "STEP 2 - for EACH line below write:\n" +
+                    "- keywords: 3-6 English words for a stock VIDEO search: subject + action + place, concrete and filmable " +
+                    "(e.g. \"girl eating ice cream park\"). Show the ACTION of the line. Use the main character in most lines " +
+                    "so clips look like the same story. For feelings use a visual metaphor (\"my heart is smiling\" -> \"child laughing in sunlight\").\n" +
+                    "- fallback_keywords: a simpler 2-4 word alternative.\n" +
+                    "- ambient: the background sound of the scene in 2-3 English words (\"birds chirping\", \"children playing\", \"rain\", \"sea waves\", \"none\").\n" +
+                    "RULES: a repeated line (chorus) gets EXACTLY the same keywords every time. No adults-only content, offices, alcohol, " +
+                    "gyms, animation/cartoons, text, dark or scary scenes. Never write Serbian words in keywords.\n" +
+                    // v1.4 (Gemini review): keep every shot a children's shot
+                    "EVERY line's keywords contain a child (child, kid, girl, boy, toddler) - grandparents, mum or dad only TOGETHER " +
+                    "with the child (\"grandmother walking with granddaughter park\", never \"elderly couple\"). " +
+                    "When a line names a thing (ice cream, hot chocolate, tea, scooter, ball, dog), show the CHILD WITH THAT THING, " +
+                    "not the season or the place (\"zimi topli čaj\" -> \"child drinking hot chocolate mug\", not \"snowy mountain\"). " +
+                    "Never: hospitals, wheelchairs, therapy, construction, road works, warning signs, crowds, aerial shots of people, " +
+                    "coffee makers, ski lifts.\n\n" +
+                    "LINES TO PLAN NOW:\n" + batchText + "\n\n" +
+                    "Respond ONLY with JSON, no markdown:\n" +
+                    "{\"identity\":{\"main_character\":\"...\",\"setting\":\"...\",\"palette\":\"...\"},\"lines\":[" +
+                    "{\"line\":" + (batchStart + 1) + ",\"keywords\":\"...\",\"fallback_keywords\":\"...\",\"ambient\":\"...\"}]}";
 
                 try
                 {
                     AnnounceToUser(LF("ai_analyzing_lyrics", i + 1, Math.Min(i + batchSize, total)), 5 + (i * 20 / total));
                     string response = await _ollama.GenerateAsync(prompt, model: OllamaClient.QueryModel, ct: ct);
-                    string jsonStr = ExtractJson(response, isArray: true);
 
-                    if (!string.IsNullOrEmpty(jsonStr))
+                    // v1.4: the director answers with {"identity":{...},"lines":[...]};
+                    // a bare array (older style answer) is still accepted.
+                    List<SceneKeywords> batchResults = null;
+                    string objStr = ExtractJson(response);
+                    if (!string.IsNullOrEmpty(objStr) && objStr.TrimStart().StartsWith("{"))
                     {
-                        var batchResults = Newtonsoft.Json.JsonConvert.DeserializeObject<List<SceneKeywords>>(jsonStr);
+                        try
+                        {
+                            var obj = JObject.Parse(objStr);
+                            if (identityJson == null && obj["identity"] is JObject idObj && idObj.HasValues)
+                            {
+                                identityJson = idObj.ToString(Newtonsoft.Json.Formatting.None);
+                                LogToMainWindow($"🎭 Visual identity: {identityJson}");
+                            }
+                            if (obj["lines"] is JArray linesArr)
+                                batchResults = linesArr.ToObject<List<SceneKeywords>>();
+                        }
+                        catch (Exception exParse) { LogToMainWindow($"⚠️ Director JSON parse: {exParse.Message}"); }
+                    }
+                    if (batchResults == null)
+                    {
+                        string arrStr = ExtractJson(response, isArray: true);
+                        if (!string.IsNullOrEmpty(arrStr))
+                            batchResults = Newtonsoft.Json.JsonConvert.DeserializeObject<List<SceneKeywords>>(arrStr);
+                    }
+
+                    {
                         if (batchResults != null && batchResults.Count > 0)
                         {
                             foreach (var r in batchResults)
@@ -711,7 +876,11 @@ namespace UltraVideoEditor
                                     r.Keywords.Length < 5;
 
                                 bool hasCyrillic = r.Keywords?.Any(c => c > 0x400 && c < 0x500) ?? false;
-                                bool hasLatin = r.Keywords?.Any(c => "sdjcz".Contains(c)) ?? false; // simplified latin check
+                                // FIX (v1.4): this used to test for the plain letters s, d, j, c, z —
+                                // almost every English query contains one of them, so Ollama's
+                                // keywords were thrown away and replaced by the fallback nearly always.
+                                // The intent is to catch Serbian words, i.e. letters with diacritics.
+                                bool hasLatin = r.Keywords?.Any(c => "šđčćžŠĐČĆŽ".Contains(c)) ?? false;
 
                                 var genericPhrases = new[] { "happy child", "child playing", "children playing", "warm colors", "soft light" };
                                 bool isTooGeneric = genericPhrases.Any(p => r.Keywords?.ToLower() == p);
@@ -744,7 +913,9 @@ namespace UltraVideoEditor
                                 if (analysis?.Context != null && contextForbidden.TryGetValue(analysis.Context, out var ctxBad))
                                     hasContextForbidden = ctxBad.Any(w => r.Keywords?.ToLower().Contains(w) ?? false);
 
-                                if (isTemplate || hasCyrillic || hasLatin || isTooGeneric || hasAdultContent || hasContextForbidden)
+                                bool rejected = isTemplate || hasCyrillic || hasLatin || isTooGeneric || hasAdultContent || hasContextForbidden;
+                                r.FromAI = !rejected;
+                                if (rejected)
                                 {
                                     if (hasAdultContent)
                                         LogToMainWindow(LF("ai_bad_keywords", r.Line, r.Keywords));
@@ -759,9 +930,37 @@ namespace UltraVideoEditor
                                     }
                                 }
                             }
-                            results.AddRange(batchResults);
+                            // Chorus consistency: the same lyric line always gets the same query
                             foreach (var r in batchResults)
-                                LogToMainWindow($"   Line {r.Line}: action='{r.Keywords}', sound='{r.Ambient}'");
+                            {
+                                int li = r.Line - 1;
+                                if (li < 0 || li >= lyrics.Count || string.IsNullOrWhiteSpace(r.Keywords)) continue;
+                                string key = SerbianText.Normalize(lyrics[li]);
+                                if (chorusQueries.TryGetValue(key, out string firstQuery))
+                                    r.Keywords = firstQuery;
+                                else if (r.FromAI)
+                                    chorusQueries[key] = r.Keywords;
+                            }
+                            // Keep only lines of this batch, once each (the model sometimes repeats or invents lines)
+                            var accepted = batchResults
+                                .Where(r => r.Line >= batchStart + 1 && r.Line <= batchStart + batch.Count)
+                                .GroupBy(r => r.Line).Select(g => g.First())
+                                .ToList();
+                            results.AddRange(accepted);
+                            foreach (var r in accepted)
+                                LogToMainWindow($"   Line {r.Line}: action='{r.Keywords}', sound='{r.Ambient}'{(r.FromAI ? "" : " (fallback)")}");
+                            // Lines the model skipped get the rule-based fallback
+                            for (int idx = 0; idx < batch.Count; idx++)
+                            {
+                                int lineNo = batchStart + idx + 1;
+                                if (accepted.Any(r => r.Line == lineNo)) continue;
+                                results.Add(new SceneKeywords
+                                {
+                                    Line = lineNo,
+                                    Keywords = GenerateKeywordsFromLyric(batch[idx], analysis),
+                                    Ambient = InferAmbientFromLyric(batch[idx], analysis.Context)
+                                });
+                            }
                             continue;
                         }
                     }
@@ -1033,10 +1232,13 @@ namespace UltraVideoEditor
                 {"pliva","swimming"}, {"vozi","riding"}, {"nosi","carrying"},
                 {"grli","hugging"}, {"smeje","smiling"}, {"place","crying"},
 
-                // PATCH 2 — Seasonal Override: zima/sneg → summer/sunny
-                {"prolece","spring"}, {"prolece","spring"}, {"proljece","spring"},
+                // v1.4: "prolece" was listed twice. A duplicate key in this initializer throws
+                // "An item with the same key has already been added" the first time a scene
+                // needs a literal query (e.g. winter lines with clothing words), which stopped
+                // the whole video. Winter words now mean winter (see the season lock below).
+                {"prolece","spring"}, {"proljece","spring"},
                 {"leto","summer"}, {"ljeto","summer"}, {"jesen","autumn"},
-                {"zima","summer"}, {"sneg","sunny"}, {"snijeg","sunny"},
+                {"zima","winter"}, {"sneg","snow"}, {"snijeg","snow"},
                 {"kisa","rain"}, {"sunce","sun"}, {"vetar","wind"}, {"vjetar","wind"},
 
                 {"lopta","ball"}, {"igracka","toy"}, {"lutka","doll"},
@@ -1153,6 +1355,13 @@ namespace UltraVideoEditor
                 }
             }
 
+            // v1.4: the old "seasonal lock" removed snow/winter/cold from EVERY literal query, so a
+            // line like "Kad je zima, nosi čizme... na velikom snegu uživaj" got summer clips.
+            // When the current line is a winter line, winter words are allowed again.
+            if (string.Equals(_currentSeason, "winter", StringComparison.OrdinalIgnoreCase))
+                foreach (string w in new[] { "snow", "snowy", "winter", "ice", "icy", "frost", "frosty", "cold", "snowfall", "snowflake", "snowflakes" })
+                    excludedTerms.Remove(w);
+
             // STRICT NEGATIVE FILTERING: ukloni excluded termine iz query-ja
             englishWords.RemoveAll(w =>
                 excludedTerms.Any(ex => string.Equals(w, ex, StringComparison.OrdinalIgnoreCase)));
@@ -1237,7 +1446,7 @@ namespace UltraVideoEditor
 
         private string GenerateKeywordsFromLyric(string lyric, SongAnalysis analysis)
         {
-            string lower = lyric.ToLower();
+            string lower = StrictQueryEngine.Fold(lyric);   // v1.4: "čaj" and "caj" alike
 
             // ── KORAK 0: Subject Hierarchy — simbolika vs. bukvalnost ─────────
             // Detection of phrases where the noun is a DETAIL of clothing/object, not the primary subject
@@ -2016,201 +2225,84 @@ namespace UltraVideoEditor
                 _ => "child playing outdoor happy"
             };
         }
-        private string InferAmbientFromLyric(string lyric, string context)
+        // ── Ambient sound from lyric ─────────────────────────────────────────
+        // AMBIENT FIX (v1.4): the old version used lower.Contains("...") on the raw
+        // lyric. Two problems made the ambient track feel random:
+        //  • diacritics — "šuma", "kiša", "čizme", "rođendan" never matched;
+        //  • substrings — "led" matched "gledaj" (blizzard under a summer line),
+        //    "pas" matched "opasno"/"spasi" (dog bark), "grad" matched "nagrada"
+        //    (city traffic), "pjev" sent every "sing" line to bird chirps.
+        // Now the lyric is normalized (Cyrillic→Latin, no diacritics) and every rule
+        // matches only at the start of a word ('=' = whole word only).
+        // Rules are checked top to bottom; the first match wins.
+        private static readonly (string[] Stems, string Joyful, string Calm)[] _ambientRules =
         {
-            string lower = lyric.ToLower();
+            (new[] { "ptic", "ptica", "cvrkut", "lastavic", "vrab", "slavuj", "golub" }, "animal bird chirp", "animal bird chirp"),
+            (new[] { "=reka", "=reke", "=reci", "=reku", "rijek", "potok", "bujic", "izvor", "voda tec", "fontan", "cesm" }, "ambience creek stream", "ambience creek stream"),
+            (new[] { "=more", "=moru", "=morem", "plaz", "talas", "obal", "brod", "ocean" }, "ambience ocean shore", "ambience ocean shore"),
+            (new[] { "prska", "pljas", "=bara", "=bari", "=baru", "lokv" }, "liquid water splash", "liquid water splash"),
+            (new[] { "=kisa", "=kise", "=kisi", "=kisu", "kisic", "kisob", "pada kis", "kaplj", "mokr" }, "weather ambience rain drips", "weather ambience rain drips"),
+            (new[] { "grmljavin", "oluj", "munj", "=grom", "gromov" }, "weather ambience thunderstorm", "weather ambience thunderstorm"),
+            (new[] { "vetar", "vetr", "vjetar", "vjetr", "povetar", "povjetar", "duva" }, "ambience nature field windy", "weather ambience hurricane wind"),
+            (new[] { "zim", "sneg", "snez", "snijeg", "snjez", "mraz", "=led", "=leda", "=ledu", "leden", "mecav", "pahulj" }, "weather snow boots jumping", "weather ambience blizzard"),
+            (new[] { "cizm", "rukavic", "skafander", "=kapa", "=kapu", "kapic", "=sal", "=salom", "kaput" }, "weather snow footstep", "weather ambience blizzard"),
+            (new[] { "=suma", "=sume", "=sumi", "=sumu", "sumic", "sumsk", "drvec", "drvo", "grana", "grancic", "lisc", "lisk", "susti" }, "ambience nature trail", "ambience nature trail"),
+            (new[] { "prolec", "proljec", "cvet", "cvijet", "cvec", "cvijec", "procvat", "pupolj" }, "animal bird chirp", "animal bird chirp"),
+            (new[] { "=leto", "=leti", "=letu", "letnj", "=ljeto", "=ljeti", "ljetnj", "sunc", "suns", "topl", "vrucin", "cvrc" }, "animal ambience crickets", "animal ambience crickets"),
+            (new[] { "jesen", "lisce pada", "opada", "zlatn", "zuto lisc" }, "ambience dirt road woods", "ambience dirt road woods"),
+            (new[] { "trc", "trk", "skoc", "skac", "skak", "juri" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "smej", "smeh", "smij", "vesel", "haha", "raduj", "radost" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "setaj", "setnj", "setam", "hodaj", "hodam", "korak", "proset" }, "ambience nature trail", "ambience nature trail"),
+            (new[] { "igraj", "igram", "igrac", "igric", "=igra", "=igre", "=igri", "=igru", "zabav" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "tusir", "kupan", "kupam" }, "ambience children sprinkler", "ambience children sprinkler"),
+            (new[] { "=park", "=parku", "=parka", "parkic", "klackalic", "ljuljas", "ljuljaj", "tobogan", "peskovnik", "pjeskovnik" }, "ambience children group playground distant", "ambience children group playground distant"),
+            (new[] { "dvorist", "=basta", "=basti", "=bastu", "=vrt", "=vrtu", "vrtic" }, "ambience backyard road", "ambience backyard road"),
+            (new[] { "=grad", "=grada", "=gradu", "=gradom", "ulic", "sokak", "centar" }, "ambience downtown area", "ambience downtown area"),
+            (new[] { "=kuca", "=kuci", "=kucu", "=kucom", "=dom", "=domu", "=doma", "=soba", "=sobi", "=sobu", "unutra" }, "ambience backyard road", "ambience nature 180"),
+            (new[] { "planin", "=vrh", "=vrhu", "klisur", "pecin" }, "ambience nature field windy", "ambience nature field windy"),
+            (new[] { "movar", "mocvar", "ritov" }, "ambience nature near swamp", "ambience nature near swamp"),
+            (new[] { "sladoled" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "=caj", "=caja", "=caju", "kakao", "cokolad", "topli napit" }, "ambience backyard road", "ambience nature 180"),
+            (new[] { "tort", "kolac", "slatkis", "rodjendan", "rodendan" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "=pas", "=psa", "=psu", "=psi", "=pse", "psic", "kucic", "=kuce", "sten", "kuza" }, "animal dog bark", "animal dog bark"),
+            (new[] { "=maca", "=mace", "=maci", "=macu", "macak", "mack", "macic", "mjau", "mijau" }, "animal mammal cat domestic meow", "animal mammal cat domestic meow"),
+            (new[] { "konj", "konjic", "ponij" }, "animal horse canters", "animal horse canters"),
+            (new[] { "pcel", "leptir", "bubamar", "=buba", "=bube" }, "animal ambience crickets", "animal ambience crickets"),
+            (new[] { "=zaba", "=zabe", "zabic", "kvak", "krekec", "kreket" }, "animal frog chirp", "animal frog chirp"),
+            (new[] { "=zec", "=zeca", "zek", "zecic", "vever", "vjever", "jelen" }, "ambience nature trail", "ambience nature trail"),
+            (new[] { "livad", "=polje", "=polja", "=polju", "poljan" }, "ambience nature field windy", "ambience nature field windy"),
+            (new[] { "majmun", "dzungl" }, "animal ambience jungle", "animal ambience jungle"),
+            (new[] { "=mama", "=mamu", "=mami", "=mamom", "mamic", "majk", "=tata", "=tatu", "=tati", "=tatom", "tatic", "otac", "=oca" }, "ambience backyard road", "ambience backyard road"),
+            (new[] { "=baka", "=baku", "=baki", "bakic", "=deka", "=deda", "=dedu", "=deki", "dekic", "porodic" }, "ambience nature trail", "ambience nature trail"),
+            (new[] { "drugar", "prijatelj", "zajedno", "=svi", "=sve" }, "ambience children group playground", "ambience children group playground"),
+            (new[] { "spava", "zaspi", "laku noc", "=usni", "=san", "=snu", "sanja" }, "animal bird chirp", "ambience nature 180"),
+            (new[] { "=noc", "=noci", "=nocu", "nocas", "zvezd", "zvijezd", "mesec", "mjesec", "tisin" }, "animal bird chirp", "ambience night crickets"),
+            (new[] { "zdrav", "=jako", "snazn", "sport", "trening", "vezba", "vjezba" }, "ambience children group playground", "ambience children group playground"),
+        };
+
+        /// <summary>True when the lyric itself names something with a sound (a rule matched).</summary>
+        private bool TryInferAmbientFromLyric(string lyric, string context, out string ambient)
+        {
+            ambient = null;
+            string norm = SerbianText.Normalize(lyric);
             bool isJoyfulContext = context is "outdoor" or "health" or "fun" or "party"
                                              or "dance" or "seasons" or "animal" or "school";
 
-            if (lower.Contains("ptic") || lower.Contains("cvrkut") ||
-                lower.Contains("pjev") || lower.Contains("lastavic") ||
-                lower.Contains("vrabac") || lower.Contains("slavuj") ||
-                lower.Contains("paunov") || lower.Contains("golub"))
-                return "animal bird chirp";
+            foreach (var rule in _ambientRules)
+            {
+                if (SerbianText.HasAny(norm, rule.Stems))
+                {
+                    ambient = isJoyfulContext ? rule.Joyful : rule.Calm;
+                    return true;
+                }
+            }
+            return false;
+        }
 
-            if (lower.Contains("reka") || lower.Contains("rijeka") ||
-                lower.Contains("potok") || lower.Contains("bujica") ||
-                lower.Contains("izvor") || lower.Contains("voda tec") ||
-                lower.Contains("fontana") || lower.Contains("cesma"))
-                return "ambience creek stream";
-
-            if (lower.Contains("more") || lower.Contains("plaza") ||
-                lower.Contains("talas") || lower.Contains("obala") ||
-                lower.Contains("brod") || lower.Contains("ocean"))
-                return "ambience ocean shore";
-
-            if (lower.Contains("prska") || lower.Contains("pljas") ||
-                lower.Contains("bara") || lower.Contains("lokva"))
-                return "liquid water splash";
-
-            if (lower.Contains("kisa") || lower.Contains("pada kisa") ||
-                lower.Contains("kaplja") || lower.Contains("mokro") ||
-                lower.Contains("drizzle"))
-                return "weather ambience rain drips";
-
-            if (lower.Contains("grmljavina") || lower.Contains("oluja") ||
-                lower.Contains("munja") || lower.Contains("grom"))
-                return "weather ambience thunderstorm";
-
-            if (lower.Contains("vetar") || lower.Contains("vjetar") ||
-                lower.Contains("povjetarac") || lower.Contains("duva"))
-                return isJoyfulContext
-                    ? "ambience nature field windy"
-                    : "weather ambience hurricane wind";
-
-            if (lower.Contains("zima") || lower.Contains("sneg") ||
-                lower.Contains("snijeg") || lower.Contains("mraz") ||
-                lower.Contains("led") || lower.Contains("mecava"))
-                return isJoyfulContext
-                    ? "weather snow boots jumping"
-                    : "weather ambience blizzard";
-
-            if (lower.Contains("cizme") || lower.Contains("rukavice") ||
-                lower.Contains("skafander") || lower.Contains("kapu") ||
-                lower.Contains("sal") || lower.Contains("kaput"))
-                return isJoyfulContext
-                    ? "weather snow footstep"
-                    : "weather ambience blizzard";
-
-            if (lower.Contains("suma") ||
-                lower.Contains("drvec") || lower.Contains("grana") ||
-                lower.Contains("lisce") || lower.Contains("lisce") ||
-                lower.Contains("susti"))
-                return "ambience nature trail";
-
-            if (lower.Contains("proljec") || lower.Contains("prolec") ||
-                lower.Contains("cvijet") || lower.Contains("cvece") ||
-                lower.Contains("bujanje") || lower.Contains("procvat"))
-                return "animal bird chirp";
-
-            if (lower.Contains("leto") || lower.Contains("ljeto") ||
-                lower.Contains("sunce") || lower.Contains("toplo") ||
-                lower.Contains("vrucina") || lower.Contains("cvrcci"))
-                return "animal ambience crickets";
-
-            if (lower.Contains("jesen") || lower.Contains("lisce pada") ||
-                lower.Contains("opada") || lower.Contains("zlatno") ||
-                lower.Contains("zuto lisce"))
-                return "ambience dirt road woods";
-
-            if (lower.Contains("trci") || lower.Contains("trcanje") ||
-                lower.Contains("skoci") || lower.Contains("skaci") ||
-                lower.Contains("blistaj") || lower.Contains("juri"))
-                return "ambience children group playground";
-
-            if (lower.Contains("smej") || lower.Contains("smije") ||
-                lower.Contains("smeh") || lower.Contains("veselo") ||
-                lower.Contains("haha") || lower.Contains("raduj"))
-                return "ambience children group playground";
-
-            if (lower.Contains("setaj") || lower.Contains("setnja") ||
-                lower.Contains("hodaj") || lower.Contains("korak") ||
-                lower.Contains("prosetaj") || lower.Contains("idi"))
-                return "ambience nature trail";
-
-            if (lower.Contains("igraj") || lower.Contains("igra ") ||
-                lower.Contains("igrice") || lower.Contains("zabav"))
-                return "ambience children group playground";
-
-            if (lower.Contains("prskal") || lower.Contains("tusir") ||
-                lower.Contains("kupan"))
-                return "ambience children sprinkler";
-
-            if (lower.Contains("park") || lower.Contains("parkic") ||
-                lower.Contains("klackalica") || lower.Contains("ljuljaska") ||
-                lower.Contains("tobogan") || lower.Contains("peskovnik"))
-                return "ambience children group playground distant";
-
-            if (lower.Contains("dvorist") || lower.Contains("bast") ||
-                lower.Contains("vrt"))
-                return "ambience backyard road";
-
-            if (lower.Contains("grad") || lower.Contains("ulica") ||
-                lower.Contains("sokak") || lower.Contains("centar"))
-                return "ambience downtown area";
-
-            if (lower.Contains("kuca") ||
-                lower.Contains("dom") || lower.Contains("soba") ||
-                lower.Contains("unutra") || lower.Contains("topla"))
-                return isJoyfulContext
-                    ? "ambience backyard road"
-                    : "ambience nature 180";
-
-            if (lower.Contains("planina") || lower.Contains("vrh") ||
-                lower.Contains("klisura") || lower.Contains("pecina"))
-                return "ambience nature field windy";
-
-            if (lower.Contains("movar") || lower.Contains("bara") ||
-                lower.Contains("ritov"))
-                return "ambience nature near swamp";
-
-            if (lower.Contains("sladoled"))
-                return "ambience children group playground";
-
-            if (lower.Contains("caj") || lower.Contains("kakao") ||
-                lower.Contains("cokolada") || lower.Contains("topli napit"))
-                return isJoyfulContext
-                    ? "ambience backyard road"
-                    : "ambience nature 180";
-
-            if (lower.Contains("torta") || lower.Contains("kolac") ||
-                lower.Contains("slatkis") || lower.Contains("rocendan"))
-                return "ambience children group playground";
-
-            if (lower.Contains("pas") || lower.Contains("kucic") ||
-                lower.Contains("stene"))
-                return "animal dog bark";
-
-            if (lower.Contains("maca") || lower.Contains("macka") ||
-                lower.Contains("mace"))
-                return "animal mammal cat domestic meow";
-
-            if (lower.Contains("konj") || lower.Contains("konjanik"))
-                return "animal horse canters";
-
-            if (lower.Contains("pcela") || lower.Contains("leptir") ||
-                lower.Contains("buba"))
-                return "animal ambience crickets";
-
-            if (lower.Contains("zaba") || lower.Contains("kvakav"))
-                return "animal frog chirp";
-
-            if (lower.Contains("zec") || lower.Contains("vjeverica") ||
-                lower.Contains("jelenic"))
-                return "ambience nature trail";
-
-            if (lower.Contains("majmun") || lower.Contains("dzungla"))
-                return "animal ambience jungle";
-
-            if (lower.Contains("mama") || lower.Contains("majka") ||
-                lower.Contains("tata") || lower.Contains("otac"))
-                return "ambience backyard road";
-
-            if (lower.Contains("baka") || lower.Contains("deka") ||
-                lower.Contains("porodic"))
-                return "ambience nature trail";
-
-            if (lower.Contains("drugar") || lower.Contains("prijatelj") ||
-                lower.Contains("zajedno") || lower.Contains("svi"))
-                return "ambience children group playground";
-
-            if (lower.Contains("spavaj") || lower.Contains("zaspi") ||
-                lower.Contains("laku noc") || lower.Contains("usni") ||
-                lower.Contains("san ") || lower.Contains("sanjaj"))
-                return isJoyfulContext
-                    ? "animal bird chirp"
-                    : "ambience nature 180";
-
-            if (lower.Contains("noc") || lower.Contains("zvijezd") ||
-                lower.Contains("mesec") || lower.Contains("tisina"))
-                return isJoyfulContext
-                    ? "animal bird chirp"
-                    : "ambience night crickets";
-
-            if (lower.Contains("zdravo") || lower.Contains("zdravlje") ||
-                lower.Contains("jako") || lower.Contains("snazno") ||
-                lower.Contains("sport") || lower.Contains("trening"))
-                return "ambience children group playground";
+        private string InferAmbientFromLyric(string lyric, string context)
+        {
+            if (TryInferAmbientFromLyric(lyric, context, out string fromLyric))
+                return fromLyric;
 
             return context switch
             {
@@ -2251,7 +2343,7 @@ namespace UltraVideoEditor
                     if (start >= 0 && end > start) return text.Substring(start, end - start + 1);
                 }
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Extracting JSON from the AI answer", swallowed); }   // v1.4: was silent
             return null;
         }
 
@@ -2302,6 +2394,7 @@ namespace UltraVideoEditor
                     Location = analysis.Setting ?? "outdoor",
                     Keywords = keywords,
                     FallbackKeywords = fallbackKw,
+                    KeywordsFromDirector = kw?.FromAI == true,
                     AmbientSound = ambient
                 });
             }
@@ -2372,7 +2465,7 @@ namespace UltraVideoEditor
 
         private string ExtractActionFromLyric(string lyric)
         {
-            string lower = lyric.ToLower();
+            string lower = StrictQueryEngine.Fold(lyric);
 
             if (lower.Contains("trci") || lower.Contains("trcanje") || lower.Contains("juri")) return "running";
             if (lower.Contains("setaj") || lower.Contains("seta") || lower.Contains("setnja") || lower.Contains("sece") || lower.Contains("hoda")) return "walking";
@@ -2702,9 +2795,7 @@ namespace UltraVideoEditor
 
                                 LogToMainWindow($"🎵 Downloading background music: {hit["title"]?.ToString() ?? searchQuery}");
 
-                                using var dlStream = await _dlHttpClient.GetStreamAsync(audioUrl, ct);
-                                using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                                await dlStream.CopyToAsync(fileStream, ct);
+                                await DownloadToFileAsync(audioUrl, outputPath, ct);   // v1.4: the file is closed before anyone reads it
 
                                 double duration = hit["duration"]?.Value<double>() ?? 0;
                                 if (duration < targetDuration && duration > 0)
@@ -2733,7 +2824,7 @@ namespace UltraVideoEditor
         private async Task<string> LoopAudio(string audioPath, double targetDuration, string tempDir, CancellationToken ct)
         {
             string outputPath = Path.Combine(tempDir, $"looped_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3");
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             if (!File.Exists(ffmpegPath))
                 return audioPath;
@@ -2765,7 +2856,7 @@ namespace UltraVideoEditor
         {
             try
             {
-                string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegPath = AppPaths.FFmpeg;
                 if (!File.Exists(ffmpegPath)) return 180.0;
 
                 string args = $"-nostdin -i \"{audioPath}\" -f null -";
@@ -2807,8 +2898,26 @@ namespace UltraVideoEditor
 
         #region Audio Processing (Lokalni zvukovi — bez Freesound)
 
+        // AMBIENT FIX (v1.4): one sound file per ambient type for the whole video.
+        // Before, every scene got its own temp copy, so MixAmbientWithMusic could not
+        // tell that two neighbouring scenes use the SAME sound — it restarted the
+        // recording from second 0 with a fade-out/fade-in on every cut (2-4 s), which
+        // was heard as a stuttering, "pumping" background. With one path per type,
+        // neighbouring scenes are merged into one continuous ambient region.
+        private readonly Dictionary<string, string> _ambientFileByType =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         private async Task<string> GetAmbientSoundPath(string soundType, string tempDir, CancellationToken ct)
         {
+            string requested = soundType;
+            soundType = MapToAmbientBed(soundType, _detectedContext);
+            if (!string.IsNullOrEmpty(requested) && !string.Equals(requested, soundType, StringComparison.OrdinalIgnoreCase))
+                LogToMainWindow($"🔊 Ambient '{requested}' → '{soundType}' (a continuous background recording instead of a single sound effect)");
+            if (!string.IsNullOrEmpty(soundType) &&
+                _ambientFileByType.TryGetValue(soundType, out string cachedPath) &&
+                File.Exists(cachedPath))
+                return cachedPath;
+
             LogToMainWindow($"🔊 GetAmbientSoundPath: soundType='{soundType}', context='{_detectedContext}', AmbientSoundsEnabled={_enableAmbientSounds}");
 
             if (!_enableAmbientSounds || string.IsNullOrEmpty(soundType) || soundType == "none")
@@ -2820,6 +2929,7 @@ namespace UltraVideoEditor
             string localPath = await GetLocalAmbientSound(soundType, tempDir);
             if (localPath != null)
             {
+                _ambientFileByType[soundType] = localPath;
                 LogToMainWindow($"✅ Local ambient sound: {localPath}");
                 return localPath;
             }
@@ -2828,12 +2938,44 @@ namespace UltraVideoEditor
             return null;
         }
 
+        // AMBIENT FIX (v1.4): maps the AI's free-text ambient description to one of the
+        // known sound categories. Word-start matching instead of Contains(): before,
+        // "freedom"/"random" matched "dom" (indoor), "train"/"brain" matched "rain",
+        // "location"/"education" matched "cat", and the English word "more" matched
+        // the Serbian "more" (sea) — so the AI's suggestion was often turned into
+        // something unrelated.
+        private static readonly (string[] Stems, string Result)[] _aiAmbientRules =
+        {
+            (new[] { "ptic", "bird", "cvrkut", "chirp", "=suma", "=sume", "forest", "drvec", "tree", "priro", "grana" }, "animal bird chirp"),
+            (new[] { "=park", "setnj", "staz", "trail", "pjescan", "pescan", "korak", "footstep", "hodanj", "walk" }, "ambience nature trail"),
+            (new[] { "djec", "dec", "dete", "djet", "child", "kid", "=igre", "playground", "play", "kretanj", "trcanj" }, "ambience children group playground"),
+            (new[] { "zim", "snijeg", "sneg", "snow", "winter", "hladn", "mraz", "frost" }, "weather snow boots jumping"),
+            (new[] { "=kisa", "=kise", "rain", "kaplj", "drip", "mokr" }, "weather ambience rain drips"),
+            (new[] { "grmlj", "thunder", "oluj", "storm", "munj" }, "weather ambience thunderstorm"),
+            (new[] { "vetar", "vetr", "vjetar", "vjetr", "wind", "breez", "povetar", "povjetar" }, "ambience nature field windy"),
+            (new[] { "=voda", "=vode", "water", "potok", "rijek", "=reka", "stream", "creek", "river" }, "ambience creek stream"),
+            (new[] { "=more", "=moru", "ocean", "=sea", "plaz", "beach", "talas", "wave", "shore" }, "ambience ocean shore"),
+            (new[] { "=kuca", "=kuci", "restoran", "indoor", "=dom", "=domu", "=soba", "=sobi", "room", "home" }, "ambience backyard road"),
+            (new[] { "=ljeto", "=leto", "summer", "sunc", "sunny", "topl", "warm", "cvrc", "cricket" }, "animal ambience crickets"),
+            (new[] { "=noc", "=noci", "night", "zvezd", "zvijezd", "star", "mesec", "mjesec", "moon" }, "ambience night crickets"),
+            (new[] { "dzungl", "jungle", "tropsk", "tropic", "majmun", "monkey" }, "animal ambience jungle"),
+            (new[] { "=pas", "=psa", "dog", "puppy", "kucic", "bark" }, "animal dog bark"),
+            (new[] { "konj", "horse", "kopit", "hoof", "hooves" }, "animal horse canters"),
+            (new[] { "=macka", "=maca", "macak", "=cat", "=cats", "kitten", "meow" }, "animal mammal cat domestic meow"),
+            (new[] { "=zaba", "frog" }, "animal frog chirp"),
+        };
+
         private string NormalizeAmbientFromAI(string aiAmbient, string lyric, string context)
         {
             if (string.IsNullOrWhiteSpace(aiAmbient))
                 return InferAmbientFromLyric(lyric, context);
 
-            string lower = aiAmbient.ToLower();
+            // The lyric itself is the most reliable signal: if it clearly names
+            // something with a sound (rain, dog, sea...), trust it over the AI.
+            if (TryInferAmbientFromLyric(lyric, context, out string fromLyric))
+                return fromLyric;
+
+            string lower = aiAmbient.ToLowerInvariant().Trim();
 
             var knownTypes = new[] {
                 "animal bird", "ambience creek", "ambience stream", "ambience ocean",
@@ -2848,77 +2990,12 @@ namespace UltraVideoEditor
             if (knownTypes.Any(k => lower.StartsWith(k)))
                 return aiAmbient;
 
-            if (lower.Contains("ptic") || lower.Contains("bird") ||
-                lower.Contains("cvrkut") || lower.Contains("sume") ||
-                lower.Contains("suma") || lower.Contains("drvec") ||
-                lower.Contains("prirode") || lower.Contains("grana"))
-                return "animal bird chirp";
-
-            if (lower.Contains("park") || lower.Contains("setanj") ||
-                lower.Contains("staza") || lower.Contains("pjescan") ||
-                lower.Contains("koraka") || lower.Contains("hodanj"))
-                return "ambience nature trail";
-
-            if (lower.Contains("djec") || lower.Contains("djet") || lower.Contains("child") ||
-                lower.Contains("igre") || lower.Contains("playground") ||
-                lower.Contains("kretanj") || lower.Contains("trcanj"))
-                return "ambience children group playground";
-
-            if (lower.Contains("zim") || lower.Contains("snijeg") || lower.Contains("sneg") ||
-                lower.Contains("snow") || lower.Contains("hlad") || lower.Contains("mraz"))
-                return "weather snow boots jumping";
-
-            if (lower.Contains("kisa") || lower.Contains("rain") ||
-                lower.Contains("kaplja") || lower.Contains("mokro"))
-                return "weather ambience rain drips";
-
-            if (lower.Contains("grmlj") || lower.Contains("thunder") ||
-                lower.Contains("oluja") || lower.Contains("munja"))
-                return "weather ambience thunderstorm";
-
-            if (lower.Contains("vetar") || lower.Contains("wind") ||
-                lower.Contains("vjetar") || lower.Contains("povjetar"))
-                return "ambience nature field windy";
-
-            if (lower.Contains("voda") || lower.Contains("water") ||
-                lower.Contains("potok") || lower.Contains("rijeka") ||
-                lower.Contains("reka") || lower.Contains("stream"))
-                return "ambience creek stream";
-
-            if (lower.Contains("more") || lower.Contains("ocean") ||
-                lower.Contains("plaza") || lower.Contains("talas"))
-                return "ambience ocean shore";
-
-            if (lower.Contains("kuc") || lower.Contains("restoran") || lower.Contains("indoor") ||
-                lower.Contains("topli") || lower.Contains("dom") || lower.Contains("soba"))
-                return "ambience backyard road";
-
-            if (lower.Contains("ljeto") || lower.Contains("leto") || lower.Contains("summer") ||
-                lower.Contains("sunce") || lower.Contains("toplo") || lower.Contains("cvrcci"))
-                return "animal ambience crickets";
-
-            if (lower.Contains("noc") || lower.Contains("night") ||
-                lower.Contains("zvijezd") || lower.Contains("mesec"))
-                return "ambience night crickets";
-
-            if (lower.Contains("dzungla") || lower.Contains("jungle") ||
-                lower.Contains("tropsk") || lower.Contains("majmun"))
-                return "animal ambience jungle";
-
-            if (lower.Contains("pas") || lower.Contains("dog") ||
-                lower.Contains("kucic") || lower.Contains("bark"))
-                return "animal dog bark";
-
-            if (lower.Contains("konj") || lower.Contains("horse") ||
-                lower.Contains("kopita"))
-                return "animal horse canters";
-
-            if (lower.Contains("macka") || lower.Contains("cat") ||
-                lower.Contains("maca") || lower.Contains("meow"))
-                return "animal mammal cat domestic meow";
-
-            if (lower.Contains("zaba") || lower.Contains("frog"))
-                return "animal frog chirp";
+            string norm = SerbianText.Normalize(aiAmbient);
+            foreach (var rule in _aiAmbientRules)
+            {
+                if (SerbianText.HasAny(norm, rule.Stems))
+                    return rule.Result;
+            }
 
             return InferAmbientFromLyric(lyric, context);
         }
@@ -2958,6 +3035,12 @@ namespace UltraVideoEditor
             return index;
         }
 
+        private static readonly HashSet<string> _genericSoundWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ambience", "ambient", "animal", "weather", "liquid", "area", "distant", "light", "heavy",
+            "single", "small", "large", "medium", "loop", "the", "and", "with", "from", "mammal", "carnivore"
+        };
+
         private static string FindBestMatch(Dictionary<string, List<string>> index,
                                             IEnumerable<string> queryTags,
                                             HashSet<string> usedFiles = null)
@@ -2972,28 +3055,114 @@ namespace UltraVideoEditor
             if (queryList.Count == 0) return null;
 
             string bestFile = null;
-            int bestScore = 0;
+            double bestScore = 0;
 
+            // v1.4: words that are in hundreds of file names ("Ambience ...", "Animal ...",
+            // "Weather ...") count very little, and a file needs at least one specific word.
+            // Before, "ambience" alone scored as much as "crickets", every "Ambience ..." file
+            // tied, and the first one in the folder won — a lullaby got an air conditioner or
+            // an auto repair shop as its background sound.
             foreach (var (file, tags) in index)
             {
                 if (usedFiles != null && usedFiles.Contains(file)) continue;
 
                 int score = 0;
+                bool specific = false;
                 foreach (string q in queryList)
                 {
-                    if (tags.Any(t => t == q)) score += 3;
-                    else if (tags.Any(t => t.Contains(q) || q.Contains(t))) score += 1;
+                    bool generic = _genericSoundWords.Contains(q);
+                    if (tags.Any(t => t == q))
+                    {
+                        score += generic ? 1 : 6;
+                        specific |= !generic;
+                    }
+                    else if (!generic && q.Length >= 4 && tags.Any(t => t.Length >= 4 && (t.StartsWith(q) || q.StartsWith(t))))
+                    {
+                        score += 2;
+                        specific = true;
+                    }
                 }
 
-                if (score > bestScore)
+                // ties go to the file with fewer extra words ("Ambience Nature 180" before
+                // "Ambience Nature Trail 180" when the request is "ambience nature 180")
+                double ranked = score - tags.Count * 0.01;
+                if (specific && ranked > bestScore)
                 {
-                    bestScore = score;
+                    bestScore = ranked;
                     bestFile = file;
                 }
             }
 
             return bestScore > 0 ? bestFile : null;
         }
+
+        // v1.4 — the background of a scene must be a CONTINUOUS recording (a field, a creek,
+        // crickets at night). The library has hundreds of one-shot effects too (one bird chirp
+        // of half a second, one dog bark, one footstep in snow). The mixer loops the chosen file
+        // for the whole scene, so a one-shot became a machine-gun of the same chirp — that is
+        // why the ambient sounds felt "pointless". Every category is mapped here to a bed that
+        // exists in the library, and calm songs only get calm beds.
+        private static readonly string[] _calmBeds =
+        {
+            "ambience nature 180", "ambience wind with crickets", "ambience night crickets",
+            "ambience creek", "ambience stream", "ambience nature trail", "ambience wind blowing through trees",
+            "weather ambience rain drips", "ambience nature near water", "ambience nature near swamp",
+            "ambience ocean shore", "ambience nature field windy", "animal ambience crickets near a stream"
+        };
+
+        internal static string MapToAmbientBed(string soundType, string context)
+        {
+            if (string.IsNullOrWhiteSpace(soundType) || soundType == "none") return soundType;
+            string s = soundType.ToLowerInvariant();
+            bool calm = context is "lullaby" or "sad" or "love" or "calm";
+            string bed;
+
+            if (s.Contains("frog") || s.Contains("toad") || s.Contains("swamp")) bed = "ambience nature near swamp";
+            else if (s.Contains("bird") || s.Contains("spring") || s.Contains("morning") ||
+                     (s.Contains("chirp") && !s.Contains("cricket"))) bed = "ambience nature 180";
+            else if (s.Contains("dog") || s.Contains("bark") || s.Contains("cat") || s.Contains("meow") ||
+                     s.Contains("horse") || s.Contains("mammal") || s.Contains("canter")) bed = "ambience nature trail";
+            else if (s.Contains("blizzard") || s.Contains("hurricane"))
+                bed = calm ? "ambience wind blowing through trees" : "weather ambience wind blizzard snow";
+            else if (s.Contains("snow") || s.Contains("winter") || s.Contains("boots") || s.Contains("footstep"))
+                bed = "ambience wind blowing through trees";
+            else if (s.Contains("splash") || s.Contains("liquid")) bed = "ambience nature near water";
+            else if (s.Contains("creek") || s.Contains("stream") || s.Contains("river")) bed = "ambience creek";
+            else if (s.Contains("thunder") || s.Contains("storm"))
+                bed = calm ? "weather ambience rain drips" : "weather ambience rain thunderstorm";
+            else if (s.Contains("backyard")) bed = "ambience nature 180";   // the only backyard bed is next to a road
+            else if (s.Contains("night") || s.Contains("cricket"))
+                bed = calm ? "ambience wind with crickets" : "ambience night crickets";
+            else if (s.Contains("windy") || s.Contains("wind")) bed = calm ? "ambience wind blowing through trees" : "ambience nature field windy";
+            else bed = soundType;
+
+            if (context == "lullaby" && !_calmBeds.Any(b => bed.StartsWith(b, StringComparison.OrdinalIgnoreCase)))
+                bed = "ambience nature 180";
+            return bed;
+        }
+
+        /// <summary>v1.4 — length of a sound file in seconds, from its header (WAV) or its size (others).</summary>
+        private static double EstimateSoundSeconds(string file)
+        {
+            try
+            {
+                var fi = new FileInfo(file);
+                if (fi.Extension.Equals(".wav", StringComparison.OrdinalIgnoreCase) && fi.Length > 44)
+                {
+                    using var fs = File.OpenRead(file);
+                    var hdr = new byte[36];
+                    if (fs.Read(hdr, 0, 36) == 36)
+                    {
+                        int byteRate = BitConverter.ToInt32(hdr, 28);
+                        if (byteRate > 0) return (fi.Length - 44) / (double)byteRate;
+                    }
+                }
+                return fi.Length / 24000.0;   // about 192 kbps for compressed files
+            }
+            catch { return 0; }
+        }
+
+        private static Dictionary<string, List<string>> _bedIndex = null;
 
         private async Task<string> GetLocalAmbientSound(string soundType, string tempDir)
         {
@@ -3010,13 +3179,16 @@ namespace UltraVideoEditor
 
             if (_soundIndex.Count == 0)
             {
-                LogToMainWindow($"⚠️ Assets/Sounds/ prazan ili ne postoji");
+                LogToMainWindow($"⚠️ Assets/Sounds/ is empty or missing");
                 return null;
             }
 
-            bool isOutdoorContext = _detectedContext is "outdoor" or "health" or "fun" or "party"
-                                    or "dance" or "seasons" or "animal" or "school" or "nature"
-                                    or "adventure" or "love" or "";
+            // v1.4: machines, shops and vehicles are never right for a children's song — the
+            // filter now applies to every song (before, a lullaby or a sad song skipped it),
+            // unless the AI explicitly asked for a city sound.
+            bool isOutdoorContext = !soundType.Contains("downtown", StringComparison.OrdinalIgnoreCase) &&
+                                    !soundType.Contains("city", StringComparison.OrdinalIgnoreCase) &&
+                                    !soundType.Contains("traffic", StringComparison.OrdinalIgnoreCase);
 
             var outdoorBlacklistTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -3136,11 +3308,23 @@ namespace UltraVideoEditor
                     foreach (string s in syns) expandedTags.Add(s);
             }
 
-            Dictionary<string, List<string>> filteredIndex = _soundIndex;
+            // v1.4: only continuous recordings of at least 15 seconds can be a scene's background
+            lock (_soundIndexLock)
+            {
+                if (_bedIndex == null)
+                {
+                    _bedIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var (file, tags) in _soundIndex)
+                        if (EstimateSoundSeconds(file) >= 15) _bedIndex[file] = tags;
+                    LogToMainWindow($"🔊 Background recordings (15 s or longer): {_bedIndex.Count} of {_soundIndex.Count} sound files");
+                }
+            }
+
+            Dictionary<string, List<string>> filteredIndex = _bedIndex;
             if (isOutdoorContext && outdoorBlacklistTags.Count > 0)
             {
-                filteredIndex = new Dictionary<string, List<string>>(_soundIndex.Count, StringComparer.OrdinalIgnoreCase);
-                foreach (var (file, tags) in _soundIndex)
+                filteredIndex = new Dictionary<string, List<string>>(_bedIndex.Count, StringComparer.OrdinalIgnoreCase);
+                foreach (var (file, tags) in _bedIndex)
                 {
                     string fileName = Path.GetFileNameWithoutExtension(file).ToLower();
                     bool isBlacklisted = outdoorBlacklistTags.Any(bt =>
@@ -3148,16 +3332,20 @@ namespace UltraVideoEditor
                     if (!isBlacklisted)
                         filteredIndex[file] = tags;
                 }
-                LogToMainWindow($"🔊 Outdoor filter active: {filteredIndex.Count}/{_soundIndex.Count} files in search");
+                LogToMainWindow($"🔊 Filter active: {filteredIndex.Count}/{_bedIndex.Count} background recordings in search");
             }
 
-            string found = FindBestMatch(filteredIndex, expandedTags);
+            // v1.4: a file whose name starts with the requested words wins outright
+            // ("ambience nature 180" → "Ambience Nature 180 01.wav"); the synonym search
+            // below is only for requests that name no file directly.
+            string wanted = soundType.Trim().ToLowerInvariant();
+            string found = filteredIndex.Keys
+                .Where(f => Path.GetFileNameWithoutExtension(f).ToLowerInvariant().StartsWith(wanted))
+                .OrderBy(f => Path.GetFileName(f).Length)
+                .FirstOrDefault()
+                ?? FindBestMatch(filteredIndex, expandedTags);
 
-            if (found == null && filteredIndex.Count < _soundIndex.Count)
-            {
-                LogToMainWindow($"⚠️ Blacklist filter returned no result — trying full index");
-                found = FindBestMatch(_soundIndex, expandedTags);
-            }
+            // v1.4: no fallback to the unfiltered library — no sound is better than a machine hum.
 
             if (found != null)
             {
@@ -3199,7 +3387,7 @@ namespace UltraVideoEditor
             string ext = Path.GetExtension(found);
             string outputPath = Path.Combine(tempDir, $"sfx_{Guid.NewGuid().ToString().Substring(0, 8)}{ext}");
             await Task.Run(() => File.Copy(found, outputPath, true));
-            LogToMainWindow($"🎵 SFX: '{Path.GetFileName(found)}' za '{sfxType}'");
+            LogToMainWindow($"🎵 SFX: '{Path.GetFileName(found)}' for '{sfxType}'");
             return outputPath;
         }
 
@@ -3221,6 +3409,66 @@ namespace UltraVideoEditor
             return sb.ToString();
         }
 
+        // ── Ambient mix (rewritten in v1.4) ───────────────────────────────────
+        // What was wrong before, and what this version does instead:
+        //  1. Every scene (2-4 s) restarted its ambient file from second 0 with its own
+        //     fade-in/out, even when the next scene used the same sound → audible
+        //     stutter / "pumping". Now neighbouring scenes with the same sound become ONE
+        //     continuous region, started at a random point inside the recording.
+        //  2. Ambient was placed at TIMELINE time (logo + title + scene time) inside the
+        //     song file, so every sound came in later than its picture by the logo+title
+        //     length. Positions are now the scene's time in the song.
+        //  3. The mix was cut with -t <effective duration>, then the render cut the start
+        //     again with -ss → the last seconds of the SONG were lost whenever ambient
+        //     sounds were on. The mix now keeps the full song length.
+        //  4. The mix was encoded to MP3 and the render encoded it again (AAC) — two lossy
+        //     passes over the song. The mix is now lossless WAV.
+        //  5. Ambient now ducks under the music (sidechain on the vocal band), so it
+        //     fills pauses and the instrumental parts instead of competing with the voice.
+        //  6. aloop with a 2-billion-sample buffer per scene was slow and memory-hungry and
+        //     often hit the 120 s timeout (silent fallback to music without ambient).
+        //     Inputs now loop with -stream_loop, and a failure is announced, not silent.
+        private sealed class AmbientRegion
+        {
+            public string Path;
+            public double Start;   // seconds in the RAW music file
+            public double End;
+        }
+
+        /// <summary>v1.4 — resampling to 48 kHz with a long (high-quality) filter instead of the default one.</summary>
+        private const string HqResample = "aresample=48000:filter_size=64:phase_shift=10:cutoff=0.97";
+
+        /// <summary>v1.4 — average loudness of a sound file in dB (FFmpeg volumedetect); NaN when unknown.</summary>
+        private async Task<double> MeasureMeanVolumeDb(string path)
+        {
+            try
+            {
+                string ffmpeg = AppPaths.FFmpeg;
+                if (!File.Exists(ffmpeg) || !File.Exists(path)) return double.NaN;
+                var psi = new ProcessStartInfo(ffmpeg, $"-nostdin -i \"{path}\" -vn -af volumedetect -f null -")
+                {
+                    CreateNoWindow = true, UseShellExecute = false,
+                    RedirectStandardError = true, RedirectStandardOutput = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc == null) return double.NaN;
+                var errTask = proc.StandardError.ReadToEndAsync();
+                var outTask = proc.StandardOutput.ReadToEndAsync();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                try { await proc.WaitForExitAsync(cts.Token); }
+                catch (OperationCanceledException) { try { proc.Kill(true); } catch { } return double.NaN; }
+                string err = await errTask;
+                var m = System.Text.RegularExpressions.Regex.Match(err, @"mean_volume:\s*(-?[\d.]+)\s*dB");
+                return m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double db)
+                    ? db : double.NaN;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Measuring loudness of {Path.GetFileName(path)}: {ex.Message}");
+                return double.NaN;
+            }
+        }
+
         private async Task<string> MixAmbientWithMusic(string musicPath, List<StoryScene> scenes, double totalDuration, string tempDir)
         {
             if (!_enableAmbientSounds || scenes.All(s => string.IsNullOrEmpty(s.AmbientPath)))
@@ -3229,91 +3477,187 @@ namespace UltraVideoEditor
                 return musicPath;
             }
 
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath)) return musicPath;
 
-            double ambientVolume = _detectedContext switch
+            // v1.4: how far BELOW the song the background sits, in dB of average loudness.
+            // Before, a fixed gain (0.14-0.26) was applied to recordings that are quiet to begin
+            // with (a field, wind, crickets), and the result was ducked further under the music —
+            // the background was practically inaudible. Now every recording is measured and set
+            // to this distance from the song, whatever its own level.
+            double ambientBelowSongDb = _detectedContext switch
             {
-                "lullaby" => 0.18,
-                "sad" => 0.20,
-                "love" => 0.22,
-                "nature" => 0.27,
-                "outdoor" => 0.27,
-                "health" => 0.27,
-                "adventure" => 0.30,
-                "christmas" => 0.30,
-                "party" => 0.38,
-                "dance" => 0.38,
-                "fun" => 0.30,
-                _ => 0.27
+                "lullaby" => 20,
+                "sad" => 19,
+                "love" => 19,
+                "nature" => 14,
+                "outdoor" => 15,
+                "health" => 15,
+                "adventure" => 14,
+                "christmas" => 15,
+                "party" => 15,
+                "dance" => 16,
+                "fun" => 15,
+                _ => 16
             };
-            LogToMainWindow($"🔊 Mixing ambient sounds: {scenes.Count(s => !string.IsNullOrEmpty(s.AmbientPath))} sounds, gain={ambientVolume:F2}");
-
-            var filterParts = new List<string>();
-            var inputs = new List<string>();
-
-            inputs.Add($"-i \"{musicPath}\"");
-            filterParts.Add($"[0:a]volume=1.0[a0]");
-
-
-            int ambientIndex = 1;
-
-            for (int i = 0; i < scenes.Count; i++)
+            double musicMeanDb = await MeasureMeanVolumeDb(musicPath);
+            var fileMeanDb = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            double RegionGain(string path)
             {
-                if (!string.IsNullOrEmpty(scenes[i].AmbientPath) && File.Exists(scenes[i].AmbientPath))
+                if (!fileMeanDb.TryGetValue(path, out double own) || double.IsNaN(own) || double.IsNaN(musicMeanDb))
+                    return 0.35;   // could not measure — a safe middle value
+                double targetDb = musicMeanDb - ambientBelowSongDb;
+                // v1.4: up to ×16 (+24 dB) — several field recordings are very quiet and hit the old ×8 limit
+                return Math.Clamp(Math.Pow(10, (targetDb - own) / 20.0), 0.05, 16.0);
+            }
+
+            // The mix is the song file with ambience added, and the song is placed on the
+            // timeline at the cursor — so a scene's ambience goes exactly at the scene's time
+            // IN THE SONG (scene.StartTime), no extra offset.
+            double ssOffset = 0.0;
+
+            // ── 0. v1.4: one background per part of the song (about 15-20 s) ────
+            // A different background every few seconds sounded random, and "keep the previous
+            // sound" let the FIRST line decide for a minute (one "winter" word → wind over the
+            // spring and summer lines). Now the scenes are grouped into parts of at least
+            // 15 seconds, and in each part the sound that fits most of its lines (by time) wins.
+            {
+                var withSound = scenes
+                    .Where(s => !string.IsNullOrEmpty(s.AmbientPath) && File.Exists(s.AmbientPath))
+                    .OrderBy(s => s.StartTime)
+                    .ToList();
+                const double PartSeconds = 15.0;
+                int idx = 0;
+                while (idx < withSound.Count)
                 {
-                    inputs.Add($"-i \"{scenes[i].AmbientPath}\"");
-                    double startTime = _timelineCursorOffset + scenes[i].StartTime;
-                    double duration = scenes[i].Duration;
-                    string startMs = ((long)(startTime * 1000)).ToString();
-                    double endTime = startTime + duration;
-
-                    bool hasPrevAmbient = i > 0 && !string.IsNullOrEmpty(scenes[i - 1].AmbientPath);
-                    bool hasNextAmbient = i < scenes.Count - 1 && !string.IsNullOrEmpty(scenes[i + 1].AmbientPath);
-
-                    // Dinamicki fade: 25% trajanja scene, min 0.3s max 1.5s
-                    double fadeInDuration = hasPrevAmbient
-                        ? Math.Clamp(duration * 0.30, 0.5, 1.5)
-                        : Math.Clamp(duration * 0.15, 0.2, 0.6);
-                    double fadeOutDuration = hasNextAmbient
-                        ? Math.Clamp(duration * 0.30, 0.5, 1.5)
-                        : Math.Clamp(duration * 0.20, 0.3, 1.0);
-
-                    // AFADE FIX: afade measures position in samples from the START OF STREAM, not on timeline.
-                    // After asetpts=PTS-STARTPTS, stream starts from t=0.
-                    // Stari kod koristio st=startTime (npr. 86.7s) unutar streama koji traje 1.6s —
-                    // FFmpeg was speeding up audio to "catch" that position → birds sounded like mice.
-                    // Fix: st=0 za fade-in (odmah), st=(duration-fadeOut) za fade-out (relativno).
-                    filterParts.Add(
-                        $"[{ambientIndex}:a]" +
-                        $"aloop=loop=-1:size=2e+09," +
-                        $"atrim=duration={duration.ToString("F3", CultureInfo.InvariantCulture)}," +
-                        $"asetpts=PTS-STARTPTS," +
-                        $"afade=t=in:st=0:d={fadeInDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
-                        $"afade=t=out:st={(Math.Max(0, duration - fadeOutDuration)).ToString("F3", CultureInfo.InvariantCulture)}:d={fadeOutDuration.ToString("F2", CultureInfo.InvariantCulture)}," +
-                        $"volume={ambientVolume.ToString("F2", CultureInfo.InvariantCulture)}," +
-                        $"adelay={startMs}|{startMs}[a{ambientIndex}]");
-
-                    ambientIndex++;
-                    LogToMainWindow($"🔊 Scene {i + 1}: ambient start={startTime:F1}s dur={duration:F1}s");
+                    var part = new List<StoryScene>();
+                    double partStart = withSound[idx].StartTime, partEnd = partStart;
+                    while (idx < withSound.Count && (part.Count == 0 || partEnd - partStart < PartSeconds))
+                    {
+                        part.Add(withSound[idx]);
+                        partEnd = withSound[idx].StartTime + withSound[idx].Duration;
+                        idx++;
+                    }
+                    string winner = part
+                        .GroupBy(s => s.AmbientPath, StringComparer.OrdinalIgnoreCase)
+                        .OrderByDescending(g => g.Sum(s => s.Duration))
+                        .ThenBy(g => part.FindIndex(s => string.Equals(s.AmbientPath, g.Key, StringComparison.OrdinalIgnoreCase)))
+                        .First().Key;
+                    foreach (var s in part) s.AmbientPath = winner;
                 }
             }
 
-            if (ambientIndex == 1) return musicPath;
+            // ── 1. Merge neighbouring scenes that use the same sound ─────────────
+            const double MergeGap = 1.0;     // scenes closer than this share one region
+            var regions = new List<AmbientRegion>();
+            foreach (var sc in scenes
+                .Where(s => !string.IsNullOrEmpty(s.AmbientPath) && File.Exists(s.AmbientPath) && s.Duration > 0.05)
+                .OrderBy(s => s.StartTime))
+            {
+                double start = sc.StartTime + ssOffset;
+                double end = start + sc.Duration;
+                var last = regions.Count > 0 ? regions[regions.Count - 1] : null;
+                if (last != null &&
+                    string.Equals(last.Path, sc.AmbientPath, StringComparison.OrdinalIgnoreCase) &&
+                    start - last.End <= MergeGap)
+                {
+                    last.End = Math.Max(last.End, end);
+                }
+                else
+                {
+                    regions.Add(new AmbientRegion { Path = sc.AmbientPath, Start = start, End = end });
+                }
+            }
 
-            string allInputs = string.Join(" ", inputs);
-            string filterGraph = string.Join(";", filterParts);
+            if (regions.Count == 0) return musicPath;
 
-            var mixInputs = new List<string>();
-            mixInputs.Add("[a0]");
-            for (int i = 1; i < ambientIndex; i++)
-                mixInputs.Add($"[a{i}]");
+            int sceneCount = scenes.Count(s => !string.IsNullOrEmpty(s.AmbientPath));
+            LogToMainWindow($"🔊 Mixing ambient sounds: {sceneCount} scenes → {regions.Count} continuous regions, {ambientBelowSongDb:F0} dB below the song (song average {musicMeanDb:F1} dB)");
 
-            string mixFilter = string.Join("", mixInputs);
-            string outputPath = Path.Combine(tempDir, $"mixed_audio_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3");
+            // ── 2. Build the filter graph ────────────────────────────────────────
+            var inv = CultureInfo.InvariantCulture;
+            var inputs = new List<string> { $"-i \"{musicPath}\"" };
+            var filterParts = new List<string>
+            {
+                // Music: one copy for the mix, one (vocal band) as the ducking key
+                // v1.4: 48 kHz with a high-quality resampler (the old plain 44.1 kHz step resampled
+                // a 48 kHz song twice and dulled it), float all the way.
+                $"[0:a]{HqResample},aformat=sample_fmts=fltp:channel_layouts=stereo,asplit=2[mus][key0]",
+                "[key0]highpass=f=250,lowpass=f=3500[key]"
+            };
 
-            string args = $"-nostdin {allInputs} -filter_complex \"{filterGraph};{mixFilter}amix=inputs={mixInputs.Count}:duration=first:normalize=0\" -t {totalDuration.ToString(CultureInfo.InvariantCulture)} -y \"{outputPath}\"";
+            var rng = new Random();
+            var fileDurations = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            const double Overlap = 0.4;      // neighbouring regions overlap → natural crossfade
 
+            for (int r = 0; r < regions.Count; r++)
+            {
+                var reg = regions[r];
+                bool hasPrev = r > 0 && regions[r - 1].End >= reg.Start - MergeGap;
+                bool hasNext = r < regions.Count - 1 && regions[r + 1].Start <= reg.End + MergeGap;
+
+                double start = Math.Max(0, reg.Start - (hasPrev ? Overlap : 0));
+                double end = reg.End + (hasNext ? Overlap : 0);
+                double dur = Math.Max(0.2, end - start);
+
+                if (!fileDurations.TryGetValue(reg.Path, out double fileDur))
+                {
+                    fileDur = await GetAudioDuration(reg.Path);
+                    fileDurations[reg.Path] = fileDur;
+                }
+                // Start somewhere inside the recording (not always at second 0), but
+                // leave room so the region does not need to loop if the file is long enough.
+                // GetAudioDuration returns exactly 180.0 when it cannot read the file — then don't seek.
+                bool durationKnown = fileDur > 0 && Math.Abs(fileDur - 180.0) > 0.001;
+                double maxOffset = durationKnown ? Math.Max(0, fileDur - dur - 0.5) : 0;
+                double seek = maxOffset > 0.5 ? Math.Round(rng.NextDouble() * maxOffset, 2) : 0;
+
+                double fadeIn = Math.Min(hasPrev ? Overlap * 2 : 0.8, dur / 3);
+                double fadeOut = Math.Min(hasNext ? Overlap * 2 : 1.2, dur / 3);
+                long delayMs = (long)Math.Round(start * 1000);
+
+                if (!fileMeanDb.ContainsKey(reg.Path))
+                    fileMeanDb[reg.Path] = await MeasureMeanVolumeDb(reg.Path);
+                inputs.Add($"-stream_loop -1 -ss {seek.ToString("F2", inv)} -i \"{reg.Path}\"");
+                int k = r + 1;
+                filterParts.Add(
+                    $"[{k}:a]{HqResample},aformat=sample_fmts=fltp:channel_layouts=stereo," +
+                    $"atrim=duration={dur.ToString("F3", inv)},asetpts=PTS-STARTPTS," +
+                    $"afade=t=in:st=0:d={fadeIn.ToString("F2", inv)}," +
+                    $"afade=t=out:st={Math.Max(0, dur - fadeOut).ToString("F3", inv)}:d={fadeOut.ToString("F2", inv)}," +
+                    $"volume={RegionGain(reg.Path).ToString("F3", inv)}," +
+                    $"adelay={delayMs}:all=1[amb{k}]");
+
+                LogToMainWindow($"🔊 Region {r + 1}: {Path.GetFileName(reg.Path)} {start:F1}s–{end:F1}s (from {seek:F1}s in file), gain ×{RegionGain(reg.Path):F2}");
+            }
+
+            // All ambient regions → one bed, padded with silence to the full song length so the
+            // ducking filter gets two inputs of the same length (both end together).
+            double musicDur = await GetAudioDuration(musicPath);
+            string padToSong = musicDur > 1 && Math.Abs(musicDur - 180.0) > 0.001
+                ? $",apad=whole_dur={musicDur.ToString("F3", inv)}"
+                : "";
+            if (regions.Count == 1)
+                filterParts.Add($"[amb1]anull{padToSong}[bed]");
+            else
+                filterParts.Add(string.Concat(Enumerable.Range(1, regions.Count).Select(k => $"[amb{k}]")) +
+                                $"amix=inputs={regions.Count}:duration=longest:normalize=0{padToSong}[bed]");
+
+            // Duck the bed when the voice/music is loud, then mix with the song
+            // v1.4: gentle ducking (at most about 6 dB, and only when the singing band is loud).
+            // ratio=5 at a 0.04 threshold kept the bed pushed down for the whole song.
+            filterParts.Add("[bed][key]sidechaincompress=threshold=0.12:ratio=2.5:attack=40:release=600:makeup=1[bedduck]");
+            // v1.4: no limiter here any more. alimiter's default auto-level pumped the whole song
+            // up and down; the float WAV below cannot clip, and the final render has a gentle
+            // peak limiter (level=disabled) at the very end.
+            filterParts.Add("[mus][bedduck]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[out]");
+
+            string outputPath = Path.Combine(tempDir, $"mixed_audio_{Guid.NewGuid().ToString().Substring(0, 8)}.wav");
+            string args = $"-nostdin -y {string.Join(" ", inputs)} " +
+                          $"-filter_complex \"{string.Join(";", filterParts)}\" " +
+                          $"-map \"[out]\" -c:a pcm_f32le -ar 48000 \"{outputPath}\"";
+
+            var stderr = new StringBuilder();
             using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -3326,29 +3670,37 @@ namespace UltraVideoEditor
                     RedirectStandardOutput = true
                 }
             };
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (stderr) stderr.AppendLine(e.Data); };
+            process.OutputDataReceived += (s, e) => { };
 
             process.Start();
             process.BeginErrorReadLine();
             process.BeginOutputReadLine();
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
             try
             {
                 await process.WaitForExitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
-                LogToMainWindow("⚠️ Audio mixing exceeded timeout (120s) - using original music");
-                try { process.Kill(); } catch { }
+                try { process.Kill(entireProcessTree: true); } catch { }
+                LogToMainWindow("⚠️ Audio mixing exceeded timeout (300s) - using original music");
+                AnnounceToUser(L("ambient_mix_failed"));
                 return musicPath;
             }
 
-            if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+            if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
             {
-                LogToMainWindow($"✅ Ambient sounds successfully mixed (gain={ambientVolume:F2}, crossfade=1s)");
+                LogToMainWindow($"✅ Ambient sounds mixed: {regions.Count} regions, ducking under the vocals, lossless WAV");
                 return outputPath;
             }
 
+            string tail;
+            lock (stderr) tail = stderr.ToString();
+            if (tail.Length > 600) tail = tail.Substring(tail.Length - 600);
+            LogToMainWindow($"⚠️ Ambient mixing failed (exit {process.ExitCode}) - using original music. FFmpeg: {tail}");
+            AnnounceToUser(L("ambient_mix_failed"));
             return musicPath;
         }
 
@@ -3572,7 +3924,7 @@ namespace UltraVideoEditor
             LogToMainWindow($"👤 Glavni lik: {storyBoard.MainCharacter}");
             LogToMainWindow($"🎬 Tema: {storyBoard.OverallTheme}");
 
-            string ffmpegForBeat = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegForBeat = AppPaths.FFmpeg;
             _beatInfo = await BeatDetection.AnalyzeAudio(audioPath, ffmpegForBeat, _cts?.Token ?? CancellationToken.None);
             if (_beatInfo.IsValid)
                 LogToMainWindow($"🥁 Beat detection: {_beatInfo.BPM:F0} BPM, {_beatInfo.BeatTimes.Count} udaraca, confidence={_beatInfo.Confidence:F2}");
@@ -3609,6 +3961,7 @@ namespace UltraVideoEditor
             }
 
             _lyricQueryCache.Clear();  // reset refrain cache za svaki novi video
+            _ambientFileByType.Clear(); // AMBIENT FIX: new video → new temp folder → fresh sound choices
 
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX active" : "🧠 VisionAnalyzer: FFmpeg mod");
@@ -3760,7 +4113,12 @@ namespace UltraVideoEditor
                         ? _lyricTimestamps[si + 1]
                         : sc.StartTime + MAX_LYRIC_SCENE_DURATION;
                     double rawDur = Math.Max(1.0, Math.Round(nxt - sc.StartTime, 2));
-                    sc.Duration = Math.Min(MAX_LYRIC_SCENE_DURATION, rawDur);
+                    // v1.4: the scene lasts until the next line starts. MAX_LYRIC_SCENE_DURATION is
+                    // the longest single SHOT, not the longest scene: a long line (slow lullaby,
+                    // instrumental after it) is filled with several clips (montage) below.
+                    // Before, the scene was cut to one shot and the render then had to loop that
+                    // one 6-second clip for up to 40 seconds.
+                    sc.Duration = Math.Min(60.0, rawDur);
 
                     if (_beatInfo != null && _beatInfo.IsValid && _beatInfo.BeatTimes?.Count > 4)
                     {
@@ -4009,7 +4367,9 @@ namespace UltraVideoEditor
                 int bRollCount = Math.Max(1, (int)Math.Ceiling(remainingDuration / bRollDurationPerClip));
                 double actualDurationPerClip = remainingDuration / bRollCount;
 
-                LogToMainWindow($"🎬 Kreiranje {bRollCount} B-roll kadrova za instrumentalni dio (po {actualDurationPerClip:F1}s)");
+                LogToMainWindow($"🎬 Creating {bRollCount} B-roll shots for the instrumental part ({actualDurationPerClip:F1}s each)");
+                _currentLyric = null;          // v1.4: instrumental — the vision AI judges mood, not a lyric
+                _lyricNamesSeason = false;
 
                 double introPortion = Math.Min(remainingDuration * 0.4, 10.0);
                 int introClips = Math.Max(1, (int)Math.Ceiling(introPortion / actualDurationPerClip));
@@ -4150,6 +4510,8 @@ namespace UltraVideoEditor
                         "nature forest peaceful morning"
                     };
 
+                    _currentLyric = null;      // v1.4: the outro is instrumental, not the last lyric line
+                    _lyricNamesSeason = false;
                     for (int i = 0; i < outroClips; i++)
                     {
                         string kw = bRollKeywords[(introClips + i) % bRollKeywords.Count];
@@ -4203,7 +4565,7 @@ namespace UltraVideoEditor
                         // Last 3 shots get fade-out tag for gradual ending
                         bool isFadeOutClip = (i >= outroClips - 3);
                         string outroDesc = isFadeOutClip
-                            ? (i == outroClips - 1 ? "🎵 Outro - kraj|fadeout=1" : "🎵 Outro - fadeout|fadeout=1")
+                            ? (i == outroClips - 1 ? "🎵 Outro - end|fadeout=1" : "🎵 Outro - fadeout|fadeout=1")
                             : "🎵 Outro - instrumental";
 
                         _segments.Add(new TimelineSegment
@@ -4229,6 +4591,7 @@ namespace UltraVideoEditor
             {
                 string mediaType = (cmbMediaType.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "video";
                 int count = storyBoard.Scenes.Count;
+                _currentSeason = string.IsNullOrEmpty(_detectedSeason) ? null : _detectedSeason; // start from the song's season
 
                 for (int i = 0; i < count; i++)
                 {
@@ -4273,7 +4636,8 @@ namespace UltraVideoEditor
                     // Each lyric can mention a different season — we do not hardcode a global one
                     // "Leti kupite sladoled" → summer, "Kad je zima nosi cizme" → winter
                     string lyricSeason = StrictQueryEngine.DetectSeasonFromLyric(lyricForQuery);
-                    LogToMainWindow($"   🗓 Sezona: globalna={_songContext.Season}, po stihu={lyricSeason ?? "nema"}");
+                    _lyricNamesSeason = lyricSeason != null;   // v1.4: strict season for this line's clips
+                    LogToMainWindow($"   🗓 Season: song={_songContext.Season}, this line={lyricSeason ?? "none"}");
 
                     // FIX-SEASON: Uvijek sinkronizuj _currentSeason sa lyric sezonom
                     // Ranije: mijenjalo se samo ako lyricSeason != globalna sezona
@@ -4295,7 +4659,7 @@ namespace UltraVideoEditor
                                 Theme = _songContext.Theme,
                                 VisualStyle = _songContext.VisualStyle
                             };
-                            LogToMainWindow($"   🗓 ✅ Sezona promijenjena na: {lyricSeason}");
+                            LogToMainWindow($"   🗓 ✅ Season changed to: {lyricSeason}");
                         }
                     }
                     // Ako lyricSeason == null → _currentSeason ostaje isti kao prethodni stih (ispravno)
@@ -4318,8 +4682,46 @@ namespace UltraVideoEditor
                         }
                     }
 
+                    // v1.4 LAYER 0: the director pass already planned this line against the
+                    // whole song (one visual identity, chorus = same query). Use it directly —
+                    // no second Ollama call per line. The literal ActionMap hit is kept as the
+                    // next attempt below instead of overriding the director.
+                    if (scene.KeywordsFromDirector && !string.IsNullOrWhiteSpace(scene.Keywords))
+                    {
+                        string directed = StrictQueryEngine.FilterOllamaQuery(scene.Keywords, _songContext);
+                        if (!string.IsNullOrEmpty(directed))
+                            primaryQuery = StrictQueryEngine.ValidateAndFilter(directed, _songContext);
+                        if (!string.IsNullOrEmpty(primaryQuery))
+                            LogToMainWindow($"   🎬 Director query: '{primaryQuery}'");
+                    }
+
+                    // v1.4 LITERAL FIRST: when the line names a concrete thing a child can see (ice cream,
+                    // hot chocolate, a scooter, a ball, a dog...), that thing is shown — the director's
+                    // mood shot is not. Gemini's review: "leti kupite sladoled, zimi topli čaj, može i
+                    // topla čokolada" showed a snowy mountain with a ski lift and a French press.
+                    // Deterministic, so a repeated chorus still gets the same picture.
+                    if (!string.IsNullOrEmpty(actionMapDirectHit) &&
+                        SerbianText.HasAny(SerbianText.Normalize(lyricForQuery), _concreteThingStems) &&
+                        !string.Equals(primaryQuery, actionMapDirectHit, StringComparison.OrdinalIgnoreCase))
+                    {
+                        LogToMainWindow($"   🎯 The line names a concrete thing — '{actionMapDirectHit}' instead of '{primaryQuery}'");
+                        primaryQuery = actionMapDirectHit;
+                    }
+
+                    // v1.4 CHILD IN EVERY SHOT: a director query without a child ("elderly couple
+                    // walking", "snowy mountain") brought therapy, crowds and ski lifts. The literal
+                    // query is used instead when there is one, otherwise a child is added to the search.
+                    if (!string.IsNullOrEmpty(primaryQuery) && !MentionsChild(primaryQuery))
+                    {
+                        string before = primaryQuery;
+                        primaryQuery = !string.IsNullOrEmpty(actionMapDirectHit) && MentionsChild(actionMapDirectHit)
+                            ? actionMapDirectHit
+                            : primaryQuery + " with child";
+                        LogToMainWindow($"   👧 No child in '{before}' → '{primaryQuery}'");
+                    }
+
                     // LAYER 1: Ollama — with semantic classification of the lyric (FIX Tag-Semantic Gap)
-                    if (_ollamaRunning)
+                    if (_ollamaRunning && string.IsNullOrEmpty(primaryQuery))
                     {
                         try
                         {
@@ -4357,7 +4759,7 @@ namespace UltraVideoEditor
                             {
                                 // FIX-OLLAMA-DEBUG: Log raw output to see why it is being rejected
                                 string rawPreview = string.IsNullOrWhiteSpace(ollamaRaw)
-                                    ? "(prazan odgovor)"
+                                    ? "(empty answer)"
                                     : ollamaRaw.Substring(0, Math.Min(80, ollamaRaw.Length)).Replace("\n", "↵").Replace("\r", "");
                                 LogToMainWindow($"   ⚠️ Ollama did not return a usable query | Raw: '{rawPreview}'");
                             }
@@ -4417,14 +4819,13 @@ namespace UltraVideoEditor
                             _currentSceneIndex - lastUsed < QUERY_COOLDOWN_SCENES)
                         {
                             // Ista tema se ponovila prebrzo — varira query sa energy/season kontekstom
-                            string variant = _currentSeason switch
-                            {
-                                "winter" => $"{primaryQuery} snow frost winter",
-                                "summer" => $"{primaryQuery} sunshine golden hour",
-                                "spring" => $"{primaryQuery} blooming fresh spring",
-                                "autumn" => $"{primaryQuery} golden leaves autumn",
-                                _ => $"{primaryQuery} different angle perspective"
-                            };
+                            // v1.4: the variant no longer adds season words — "child drinking hot chocolate"
+                            // + "snow frost winter" found ski slopes and cable cars. Already used clips are
+                            // skipped anyway, so the same search simply gives the next clip.
+                            string variant = primaryQuery.Contains("child", StringComparison.OrdinalIgnoreCase) ||
+                                             primaryQuery.Contains("kid", StringComparison.OrdinalIgnoreCase)
+                                ? primaryQuery
+                                : $"{primaryQuery} children";
                             LogToMainWindow($"   🔄 Cooldown variant (theme '{queryTheme}' was scene {lastUsed}): '{variant}'");
                             primaryQuery = variant;
                         }
@@ -4438,10 +4839,14 @@ namespace UltraVideoEditor
 
                     // Setujemo instance fields da budu dostupni unutar SearchAndDownloadMedia
                     _currentLyric = scene.Description;
-                    _currentSeason = _detectedSeason;
+                    // FIX (v1.4): this line used to reset _currentSeason to the song's global
+                    // season right here — after the per-lyric season had been detected above
+                    // and just before the search. So "Kad je zima..." still searched and
+                    // filtered for spring clips. _currentSeason now keeps the lyric's season
+                    // (or the previous lyric's, if this line names none).
 
                     LogToMainWindow($"🎬 Scene {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
-                    LogToMainWindow($"   📝 Stih: '{(lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)}'");
+                    LogToMainWindow($"   📝 Lyric: '{(lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)}'");
                     LogToMainWindow($"   🎯 Query: '{primaryQuery}'" + (multiMatches.Count > 1 ? $" (+ {multiMatches.Count - 1} multi-anchor)" : ""));
 
                     // ── HYBRID CONTENT SELECTOR ────────────────────────────────────────────────
@@ -4461,83 +4866,126 @@ namespace UltraVideoEditor
 
                     string mediaPath = null;
 
-                    var subSceneQueries = DetectSubSceneQueries(scene.Description, styleConsistency);
-                    if (subSceneQueries != null && subSceneQueries.Count >= 2 && mediaType == "video")
+                    // v1.4: an unexpected error while finding media for ONE scene used to end the
+                    // whole video. Now it is logged, and the scene falls back to the safe query.
+                    try
                     {
-                        LogToMainWindow($"   🎬 Sub-scene detection: {subSceneQueries.Count} visual objects → clip montage");
-                        mediaPath = await BuildSubSceneVideo(subSceneQueries, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
-                        if (mediaPath != null)
-                            LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} clips");
-                        else
-                            LogToMainWindow($"   ⚠ Sub-scene video failed, using the standard path");
+                        var subSceneQueries = DetectSubSceneQueries(scene.Description, styleConsistency);
+                        if (subSceneQueries != null && subSceneQueries.Count >= 2 && mediaType == "video")
+                        {
+                            LogToMainWindow($"   🎬 Sub-scene detection: {subSceneQueries.Count} visual objects → clip montage");
+                            mediaPath = await BuildSubSceneVideo(subSceneQueries, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
+                            if (mediaPath != null)
+                                LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} clips");
+                            else
+                                LogToMainWindow($"   ⚠ Sub-scene video failed, using the standard path");
+                        }
+
+                        // v1.4: a scene longer than two shots becomes a montage of video clips (a single
+                        // photo or clip would otherwise be stretched or looped across the whole line)
+                        bool longScene = scene.Duration > MAX_LYRIC_SCENE_DURATION * 2;
+                        if (longScene && effectiveMediaType == "photo")
+                        {
+                            effectiveMediaType = "video";
+                            LogToMainWindow($"   🎞 Scene {i + 1}: {scene.Duration:F1}s long → several video clips instead of one photo");
+                        }
+
+                        // ── ZERO-FALLBACK: Multi-anchor za duge scene ─────────────────────────
+                        // If there are multiple hard-coded maps for this lyric → montage.
+                        // Ako postoji samo jedna → jedini API poziv.
+                        // If there is no map (primaryQuery from BuildLiteral) → one attempt then black screen.
+                        // v1.4: only when the sub-scene montage above did not already make the scene —
+                        // before, a finished montage was thrown away and a second one was downloaded.
+                        if (string.IsNullOrEmpty(mediaPath) &&
+                            multiMatches.Count >= 2 && effectiveMediaType == "video" && scene.Duration > 4.0)
+                        {
+                            LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded queries → clip montage");
+                            mediaPath = await BuildSubSceneVideo(multiMatches, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
+                            if (mediaPath != null)
+                                LogToMainWindow($"   ✅ Multi-anchor video created");
+                        }
+
+                        if (string.IsNullOrEmpty(mediaPath) && effectiveMediaType == "video" &&
+                            scene.Duration > Math.Max(6.0, MAX_LYRIC_SCENE_DURATION * 1.5) && !string.IsNullOrEmpty(primaryQuery))
+                        {
+                            // Long scene → try multi-clip with same query
+                            mediaPath = await SearchAndDownloadMultipleMedia(
+                                primaryQuery, primaryQuery, effectiveMediaType,
+                                scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
+                        }
+
+                        // ── 3-ATTEMPT SYSTEM ─────────────────────────────────────────────────
+                        // Attempt 1: primaryQuery (Ollama/map)
+                        // Attempt 2: SmartFallback (contextual)
+                        // Attempt 3: Absolute safe query
+                        // Qwen screening is built into SearchAndDownloadMedia —
+                        // it rejects bad clips and looks for better ones within the same search.
+                        // This system changes THE QUERY ITSELF between attempts.
+                        // Never black screen — at least one attempt always gives a result.
+                        // ─────────────────────────────────────────────────────────────────────
+                        var queryAttempts = new List<string>();
+                        if (!string.IsNullOrEmpty(primaryQuery))
+                            queryAttempts.Add(primaryQuery);
+                        // v1.4: the literal ActionMap hit and the director's own fallback come before
+                        // the generic SmartFallback (FallbackKeywords was planned but never used).
+                        if (!string.IsNullOrEmpty(actionMapDirectHit) && !queryAttempts.Contains(actionMapDirectHit))
+                            queryAttempts.Add(actionMapDirectHit);
+                        string directorFallback = StrictQueryEngine.ValidateAndFilter(
+                            StrictQueryEngine.FilterOllamaQuery(scene.FallbackKeywords, _songContext), _songContext);
+                        if (!string.IsNullOrEmpty(directorFallback) && !queryAttempts.Contains(directorFallback))
+                            queryAttempts.Add(directorFallback);
+                        queryAttempts.Add(StrictQueryEngine.GetSmartFallback(_songContext));
+                        // v1.4: the last, safe attempt keeps the line's season — a winter line that found
+                        // nothing ended with no picture at all ("children playing outdoor sunny" is never
+                        // a winter clip, so the strict season check refused it too)
+                        queryAttempts.Add(_currentSeason switch
+                        {
+                            "winter" => "children playing in snow",
+                            "autumn" => "children playing autumn leaves",
+                            _ => "children playing outdoor sunny"
+                        });
+
+                        for (int attempt = 0; attempt < queryAttempts.Count && string.IsNullOrEmpty(mediaPath); attempt++)
+                        {
+                            string attemptQuery = queryAttempts[attempt];
+                            string attemptLabel = attempt == 0 ? $"Attempt 1/{queryAttempts.Count} (primary)" :
+                                                  attempt == queryAttempts.Count - 1 ? $"Attempt {attempt + 1}/{queryAttempts.Count} (safe)" :
+                                                                $"Attempt {attempt + 1}/{queryAttempts.Count} (fallback)";
+                            LogToMainWindow($"   🔍 {attemptLabel}: '{attemptQuery}'");
+
+                            // FIX-SEASON-OBJECT: Some objects exist in all seasons (ice cream, tea, playing)
+                            // ali Pixabay klipovi za njih mogu imati winter/summer tag koji se mimoilazi.
+                            // For object queries → disable strictSeason filter so it doesn't reject valid clips.
+                            bool seasonNeutralQuery = new[] {
+                                "ice cream", "eating", "drinking", "tea", "hot chocolate",
+                                "playing indoor", "birthday", "cake", "food"
+                            }.Any(k => attemptQuery.ToLower().Contains(k));
+
+                            mediaPath = await SearchAndDownloadMedia(
+                                attemptQuery, _pixabayMinHeight, effectiveMediaType,
+                                _cts?.Token ?? CancellationToken.None, scene.Duration,
+                                strictSeasonFilter: !seasonNeutralQuery);
+                            if (!string.IsNullOrEmpty(mediaPath))
+                                LogToMainWindow($"   ✅ {attemptLabel} successful");
+                            else
+                                LogToMainWindow($"   ⚠️ {attemptLabel} did not return any media");
+                        }
                     }
-
-                    double effectiveDuration = Math.Min(scene.Duration, MAX_LYRIC_SCENE_DURATION);
-                    if (effectiveDuration != scene.Duration)
+                    catch (Exception sceneEx) when (sceneEx is not OperationCanceledException)
                     {
-                        LogToMainWindow($"   ⚠️ Scene {i + 1}: Duration {scene.Duration:F1}s → limited to {effectiveDuration:F1}s (MAX_LYRIC_SCENE_DURATION)");
-                        scene.Duration = effectiveDuration;
-                    }
-
-                    // ── ZERO-FALLBACK: Multi-anchor za duge scene ─────────────────────────
-                    // If there are multiple hard-coded maps for this lyric → montage.
-                    // Ako postoji samo jedna → jedini API poziv.
-                    // If there is no map (primaryQuery from BuildLiteral) → one attempt then black screen.
-                    if (multiMatches.Count >= 2 && effectiveMediaType == "video" && scene.Duration > 4.0)
-                    {
-                        LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded queries → clip montage");
-                        mediaPath = await BuildSubSceneVideo(multiMatches, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
-                        if (mediaPath != null)
-                            LogToMainWindow($"   ✅ Multi-anchor video created");
-                    }
-
-                    if (string.IsNullOrEmpty(mediaPath) && effectiveMediaType == "video" && scene.Duration > 6.0 && !string.IsNullOrEmpty(primaryQuery))
-                    {
-                        // Long scene → try multi-clip with same query
-                        mediaPath = await SearchAndDownloadMultipleMedia(
-                            primaryQuery, primaryQuery, effectiveMediaType,
-                            scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
-                    }
-
-                    // ── 3-ATTEMPT SYSTEM ─────────────────────────────────────────────────
-                    // Attempt 1: primaryQuery (Ollama/map)
-                    // Attempt 2: SmartFallback (contextual)
-                    // Attempt 3: Absolute safe query
-                    // Qwen screening is built into SearchAndDownloadMedia —
-                    // it rejects bad clips and looks for better ones within the same search.
-                    // This system changes THE QUERY ITSELF between attempts.
-                    // Never black screen — at least one attempt always gives a result.
-                    // ─────────────────────────────────────────────────────────────────────
-                    var queryAttempts = new List<string>();
-                    if (!string.IsNullOrEmpty(primaryQuery))
-                        queryAttempts.Add(primaryQuery);
-                    queryAttempts.Add(StrictQueryEngine.GetSmartFallback(_songContext));
-                    queryAttempts.Add("children playing outdoor sunny");
-
-                    for (int attempt = 0; attempt < queryAttempts.Count && string.IsNullOrEmpty(mediaPath); attempt++)
-                    {
-                        string attemptQuery = queryAttempts[attempt];
-                        string attemptLabel = attempt == 0 ? "Attempt 1 (primary)" :
-                                              attempt == 1 ? "Attempt 2 (SmartFallback)" :
-                                                            "Attempt 3 (safe)";
-                        LogToMainWindow($"   🔍 {attemptLabel}: '{attemptQuery}'");
-
-                        // FIX-SEASON-OBJECT: Some objects exist in all seasons (ice cream, tea, playing)
-                        // ali Pixabay klipovi za njih mogu imati winter/summer tag koji se mimoilazi.
-                        // For object queries → disable strictSeason filter so it doesn't reject valid clips.
-                        bool seasonNeutralQuery = new[] {
-                            "ice cream", "eating", "drinking", "tea", "hot chocolate",
-                            "playing indoor", "birthday", "cake", "food"
-                        }.Any(k => attemptQuery.ToLower().Contains(k));
-
-                        mediaPath = await SearchAndDownloadMedia(
-                            attemptQuery, _pixabayMinHeight, effectiveMediaType,
-                            _cts?.Token ?? CancellationToken.None, scene.Duration,
-                            strictSeasonFilter: !seasonNeutralQuery);
-                        if (!string.IsNullOrEmpty(mediaPath))
-                            LogToMainWindow($"   ✅ {attemptLabel} successful");
-                        else
-                            LogToMainWindow($"   ⚠️ {attemptLabel} did not return any media");
+                        AppLog.Error($"AI creator: finding media for scene {i + 1}", sceneEx);
+                        LogToMainWindow($"   ⚠️ Scene {i + 1}: error while searching ({sceneEx.Message}) — trying the safe query");
+                        mediaPath = null;
+                        try
+                        {
+                            mediaPath = await SearchAndDownloadMedia(
+                                "children playing outdoor sunny", _pixabayMinHeight, effectiveMediaType,
+                                _cts?.Token ?? CancellationToken.None, scene.Duration, strictSeasonFilter: false);
+                        }
+                        catch (Exception safeEx) when (safeEx is not OperationCanceledException)
+                        {
+                            AppLog.Error($"AI creator: safe query for scene {i + 1}", safeEx);
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(mediaPath))
@@ -4585,6 +5033,9 @@ namespace UltraVideoEditor
                             StartTime = scene.StartTime,
                             Description = scene.Description,
                             LyricText = _showLyrics ? _lyricLines[i] : "",
+                            LyricIndex = i,
+                            Query = primaryQuery,
+                            VisionDescription = _lastDownloadedDescription,
                             AmbientSoundPath = ambientPath,
                             Energy = scene.Energy,
                             Emotion = scene.Emotion,
@@ -4607,21 +5058,24 @@ namespace UltraVideoEditor
                     await Task.Delay(300, _cts?.Token ?? CancellationToken.None);
                 }
 
-                if (_segments.Any(s => !string.IsNullOrEmpty(s.AmbientSoundPath)) && _enableAmbientSounds)
-                {
-                    for (int idx = 0; idx < storyBoard.Scenes.Count && idx < _segments.Count; idx++)
-                    {
-                        if (!string.IsNullOrEmpty(_segments[idx].AmbientSoundPath))
-                            storyBoard.Scenes[idx].AmbientPath = _segments[idx].AmbientSoundPath;
-                    }
+                // AMBIENT FIX (v1.4): the old block here copied _segments[idx].AmbientSoundPath
+                // into storyBoard.Scenes[idx]. But _segments also contains the intro and
+                // instrumental b-roll segments (added before the lyric loop) and skips scenes
+                // with no media, so the indexes did not line up: lyric scenes received the
+                // ambient sound of a DIFFERENT scene (e.g. a blizzard under a summer line).
+                // scene.AmbientPath is already set directly in the loop above, so nothing
+                // needs to be copied here.
+                if (_enableAmbientSounds && storyBoard.Scenes.Any(sc => !string.IsNullOrEmpty(sc.AmbientPath)))
                     LogToMainWindow("🔊 Ambient sounds prepared — mixing with the video timeline in progress...");
-
-                }
 
                 if (_segments.Count >= 8)
                 {
+                    // v1.4: only instrumental b-roll may be dropped. Removing a LYRIC scene left a line
+                    // of the song without its own picture (the previous shot just ran longer) — clips
+                    // below 4 can no longer get in anyway, so a 4-5 lyric clip stays.
                     var lowQuality = _segments
-                        .Where(s => s.VisionScore < 5.5 && !string.IsNullOrEmpty(s.Path) && File.Exists(s.Path))
+                        .Where(s => s.VisionScore < 5.5 && (s.Description ?? "").StartsWith("🎵") &&
+                                    !string.IsNullOrEmpty(s.Path) && File.Exists(s.Path))
                         .OrderBy(s => s.VisionScore)
                         .Take(Math.Min(2, _segments.Count - 6))
                         .ToList();
@@ -4647,7 +5101,7 @@ namespace UltraVideoEditor
                     var seg = _segments[si];
                     string hasMedia = string.IsNullOrEmpty(seg.Path) || !File.Exists(seg.Path)
                         ? "❌ NO MEDIA" : "✅";
-                    string lyric = !string.IsNullOrEmpty(seg.LyricText) ? $" | Stih: \"{seg.LyricText}\"" : "";
+                    string lyric = !string.IsNullOrEmpty(seg.LyricText) ? $" | Lyric: \"{seg.LyricText}\"" : "";
                     double displayStart = DISPLAY_CURSOR + seg.StartTime;
                     LogToMainWindow($"  [{si + 1:D2}] {hasMedia} {FormatTime(displayStart)}-{FormatTime(displayStart + seg.Duration)} " +
                                    $"({seg.Duration:F1}s) — {seg.Description}{lyric}");
@@ -4659,6 +5113,16 @@ namespace UltraVideoEditor
                     LogToMainWindow($"⚠ {missingCount} scenes have no media — will be skipped in render");
                 else
                     LogToMainWindow($"✅ All scenes have media. Starting render...");
+
+                // v1.4 SCENE REVIEW: hear what every clip shows and replace any of them
+                // before the video is assembled (skipped for auto-render / unattended runs).
+                if (_reviewScenes && _segments.Any(s => s.LyricIndex >= 0 && !string.IsNullOrEmpty(s.Path)))
+                {
+                    AnnounceToUser(L("review_scenes_open"), 96);
+                    bool proceed = ShowSceneReview();
+                    if (!proceed)
+                        throw new OperationCanceledException();
+                }
 
                 GenerateValidationReport();
 
@@ -4692,40 +5156,11 @@ namespace UltraVideoEditor
                 btnGenerate.IsEnabled = true;
                 btnGenerate.Content = "🎬 CREATE VIDEO";
 
-                // CLEANUP: Delete _tempVideoFolder with all downloaded and processed clips.
-                // We wait briefly for RenderEngine to finish writing files, then verify output exists.
-                string folderToClean = _tempVideoFolder;
-                string outputForCheck = AutoRenderOutputPath;
-                if (!string.IsNullOrEmpty(folderToClean) && Directory.Exists(folderToClean))
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            // Wait 3s for RenderEngine to finish flushing to disk
-                            await Task.Delay(3000);
-
-                            // Delete only if render output exists and is not empty (> 5 MB)
-                            bool outputOk = !string.IsNullOrEmpty(outputForCheck)
-                                && File.Exists(outputForCheck)
-                                && new FileInfo(outputForCheck).Length > 5_000_000;
-
-                            if (outputOk)
-                            {
-                                Directory.Delete(folderToClean, true);
-                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Deleted temp folder: {folderToClean}");
-                            }
-                            else
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[Cleanup] Skipping deletion — output not confirmed: {outputForCheck}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[Cleanup] Error deleting {folderToClean}: {ex.Message}");
-                        }
-                    });
-                }
+                // v1.4 CLEANUP: only what the timeline does NOT use is deleted. Before, the whole
+                // temporary folder was deleted after the auto-render — the clips the timeline
+                // still pointed to went with it, so the project could not be rendered or saved
+                // again — while rejected downloads in the project folder were never deleted.
+                DeleteUnusedMedia(_tempVideoFolder);
             }
         }
 
@@ -4831,7 +5266,7 @@ namespace UltraVideoEditor
             double humanPresenceRatio = (double)childrenCount / totalSegs;
             LogToMainWindow($"  👧 Children/Family shots: {childrenCount}/{totalSegs}" +
                 (childrenCount == 0 ? " ⚠️ No children in the footage!" :
-                 humanPresenceRatio < 0.70 ? $" ⚠️ Samo {humanPresenceRatio:P0} — cilj je min. 70%!" :
+                 humanPresenceRatio < 0.70 ? $" ⚠️ Only {humanPresenceRatio:P0} — the goal is at least 70%!" :
                  $" ✅ ({humanPresenceRatio:P0})"));
             LogToMainWindow($"  🎬 Static shots (Ken Burns applied): {staticCount}/{totalSegs}");
             LogToMainWindow($"  ⚡ High energy (scene 4-5): {highEnergy} scenes");
@@ -4872,7 +5307,9 @@ namespace UltraVideoEditor
             try
             {
                 string args = $"-nostdin -i \"{videoPath}\" " +
-                              $"-vf \"select=eq(n\\,5),signalstats=stat=tout+brng\" " +
+                              // v1.4: metadata=print — signalstats prints nothing on its own, so this
+                              // check never saw a number and let every dark clip through
+                              $"-vf \"select=eq(n\\,5),signalstats,metadata=mode=print\" -frames:v 1 " +
                               $"-f null -";
 
                 var psi = new ProcessStartInfo(ffmpegPath, args)
@@ -4889,14 +5326,15 @@ namespace UltraVideoEditor
                 await proc.WaitForExitAsync(ct);
                 string output = seTask.Result + soTask.Result;
 
-                var yavgMatch = System.Text.RegularExpressions.Regex.Match(output, @"YAVG:(\d+\.?\d*)");
+                var yavgMatch = System.Text.RegularExpressions.Regex.Match(output, @"YAVG[=:](\d+\.?\d*)");
                 if (yavgMatch.Success && double.TryParse(yavgMatch.Groups[1].Value,
                     System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out double yavg))
                 {
-                    if (yavg < 40)
+                    // v1.4: 60 instead of 40 — silhouettes against windows and dim rooms passed before
+                    if (yavg < 60)
                     {
-                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — too dark (min=40)");
+                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — too dark (min=60)");
                         return false;
                     }
                     if (yavg > 235)
@@ -4906,17 +5344,20 @@ namespace UltraVideoEditor
                     }
                 }
 
-                var ravgMatch = System.Text.RegularExpressions.Regex.Match(output, @"RAVG:(\d+\.?\d*)");
-                var gavgMatch = System.Text.RegularExpressions.Regex.Match(output, @"GAVG:(\d+\.?\d*)");
-                if (ravgMatch.Success && gavgMatch.Success)
+                // v1.4: signalstats has no RAVG/GAVG, so the pink check never ran. A pink cast is a
+                // high red-difference (V) together with a not-low blue-difference (U); orange (V high,
+                // U low) is warm light and stays allowed.
+                var uavgMatch = System.Text.RegularExpressions.Regex.Match(output, @"UAVG[=:](\d+\.?\d*)");
+                var vavgMatch = System.Text.RegularExpressions.Regex.Match(output, @"VAVG[=:](\d+\.?\d*)");
+                if (uavgMatch.Success && vavgMatch.Success)
                 {
-                    double ravg = double.Parse(ravgMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    double gavg = double.Parse(gavgMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    double pinkDiff = ravg - gavg;
+                    double uavg = double.Parse(uavgMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double vavg = double.Parse(vavgMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double pinkDiff = vavg - 128;
 
-                    if (pinkDiff > 18)
+                    if (pinkDiff > 14 && uavg >= 126)
                     {
-                        LogToMainWindow($"   📊 Tint R-G={pinkDiff:F1} — pink content (max=18)");
+                        LogToMainWindow($"   📊 Pink colour cast (V={vavg:F0}, U={uavg:F0})");
                         return false;
                     }
                 }
@@ -4937,7 +5378,7 @@ namespace UltraVideoEditor
             try
             {
                 string outputPath = Path.Combine(tempDir, $"trimmed_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4");
-                string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegPath = AppPaths.FFmpeg;
                 if (!File.Exists(ffmpegPath)) return inputPath;
 
                 double actualDuration = await GetVideoDuration(inputPath);
@@ -4979,7 +5420,7 @@ namespace UltraVideoEditor
 
                     args = $"-ss 0 -i \"{inputPath}\" -t {targetDuration.ToString(CultureInfo.InvariantCulture)} " +
                            $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
-                           $"{encArgs} -vsync cfr -pix_fmt yuv420p -an -avoid_negative_ts make_zero -y \"{outputPath}\"";
+                           $"{encArgs} -fps_mode cfr -pix_fmt yuv420p -an -avoid_negative_ts make_zero -y \"{outputPath}\"";
                     LogToMainWindow($"   ✂ Trim+normalizacija FPS: {actualDuration:F1}s → {targetDuration:F1}s @ 25fps [{_targetResolution}]");
                 }
                 else
@@ -5028,7 +5469,7 @@ namespace UltraVideoEditor
         {
             try
             {
-                string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpegPath = AppPaths.FFmpeg;
                 if (!File.Exists(ffmpegPath)) return 5.0;
 
                 string args = $"-nostdin -i \"{videoPath}\" -f null -";
@@ -5068,37 +5509,13 @@ namespace UltraVideoEditor
 
         private async Task<string> SearchAndDownloadMedia(string keywords, int minWidth, string mediaType, CancellationToken ct, double minDurationSeconds = 0, bool strictSeasonFilter = true)
         {
+            _lastDownloadedDescription = null; // v1.4: never show the previous clip's description
             // ZERO-FALLBACK guard: null keywords → immediately null (caller will GenerateBlackFrame)
             if (string.IsNullOrWhiteSpace(keywords)) return null;
             LogToMainWindow($"🔍 SearchAndDownloadMedia: '{keywords.Substring(0, Math.Min(60, keywords.Length))}...', type={mediaType}");
 
-            string apiKey = null;
-            try
-            {
-                string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-                string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-
-                if (File.Exists(keyFile))
-                {
-                    byte[] encrypted = File.ReadAllBytes(keyFile);
-                    byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-                    apiKey = Encoding.UTF8.GetString(decrypted).Trim();
-                    LogToMainWindow($"✅ API key loaded, length: {apiKey.Length}");
-                }
-                else
-                {
-                    string txtFile = Path.Combine(settingsPath, "pixabay_key.txt");
-                    if (File.Exists(txtFile))
-                    {
-                        apiKey = File.ReadAllText(txtFile).Trim();
-                        LogToMainWindow($"✅ API key loaded from TXT, length: {apiKey.Length}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToMainWindow($"❌ Error reading API key: {ex.Message}");
-            }
+            // v1.4: one shared Pixabay key (the same one the Media providers window edits)
+            string apiKey = MediaProviderSettings.LoadPixabayKey();
 
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -5110,16 +5527,8 @@ namespace UltraVideoEditor
                     if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ApiKey))
                     {
                         newKey = dlg.ApiKey;
-                        try
-                        {
-                            string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-                            Directory.CreateDirectory(settingsPath);
-                            string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-                            byte[] data = Encoding.UTF8.GetBytes(newKey);
-                            byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
-                            File.WriteAllBytes(keyFile, encrypted);
-                        }
-                        catch (Exception ex) { LogToMainWindow($"❌ Save error: {ex.Message}"); }
+                        if (!MediaProviderSettings.SavePixabayKey(newKey))
+                            LogToMainWindow("❌ The Pixabay key could not be saved.");
                         apiKey = newKey;
                     }
                 });
@@ -5151,11 +5560,18 @@ namespace UltraVideoEditor
                         }
                         else
                         {
-                            // Take the first meaningful word from the query + "children outdoor"
-                            var firstWord = keywords
-                                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                .FirstOrDefault(t => t.Length > 3) ?? keywords.Split(' ')[0];
-                            searchQ = firstWord + " children outdoor";
+                            // v1.4: the second try keeps the CONCRETE words of the search and drops the
+                            // generic ones ("family buying ice cream" → "buying ice cream child").
+                            // Before it kept only the first word + "children outdoor", so "family buying
+                            // ice cream" became "family children outdoor" — and a montage part about ice
+                            // cream could end up with a train or a railway.
+                            var generic = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                            { "child", "children", "kid", "kids", "girl", "boy", "family", "happy", "outdoor", "outdoors",
+                              "park", "playing", "cute", "little", "with", "the", "and", "together", "sunny", "warm",
+                              "soft", "cinematic", "lighting", "light", "candid", "moment", "closeup", "close" };
+                            var concrete = keywords.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Where(t => t.Length > 2 && !generic.Contains(t)).Take(3).ToList();
+                            searchQ = concrete.Count > 0 ? string.Join(" ", concrete) + " child" : "children outdoor";
                         }
 
                         // Page rotation — when all results have been seen, we take the next page
@@ -5223,6 +5639,7 @@ namespace UltraVideoEditor
                             int startIdx = _queryUseCount[queryKey] % sortedHits.Count;
                             _queryUseCount[queryKey]++;
 
+                            int analyzedHere = 0;
                             for (int hitOffset = 0; hitOffset < sortedHits.Count; hitOffset++)
                             {
                                 int hitIdx = (startIdx + hitOffset) % sortedHits.Count;
@@ -5237,7 +5654,14 @@ namespace UltraVideoEditor
                                 var videos = hit["videos"] as JObject;
                                 if (videos == null) continue;
 
-                                string[] formats = { "large", "medium", "small" };
+                                // v1.4: ONE download per clip, in Full HD. Before, a clip rejected after
+                                // download (shot type, vision, brightness) was downloaded again in the next
+                                // size and rejected again for the same reason — up to three times, starting
+                                // with the 4K "large" file. One test video downloaded 1061 files (30 GB).
+                                string[] formats = new[] { "medium", "large", "small" }
+                                    .Where(f => !string.IsNullOrEmpty(videos[f]?["url"]?.ToString()))
+                                    .Take(1)
+                                    .ToArray();
                                 foreach (var fmt in formats)
                                 {
                                     var videoObj = videos[fmt];
@@ -5253,6 +5677,9 @@ namespace UltraVideoEditor
                                     }
 
                                     string hitTags = hit["tags"]?.ToString()?.ToLower() ?? "";
+                                    // v1.4: a line about tea or hot chocolate may show a cosy home (a mug,
+                                    // the family, a fireplace) even in an "outdoor" song
+                                    bool warmDrinkLine = IsWarmDrinkLyric(_currentLyric);
 
                                     string[] contextBadTags;
                                     switch (_detectedContext)
@@ -5372,12 +5799,32 @@ namespace UltraVideoEditor
                                     bool hasChildContext = hitTags.Contains("child") || hitTags.Contains("kid")
                                                         || hitTags.Contains("baby") || hitTags.Contains("toddler")
                                                         || hitTags.Contains("parent") || hitTags.Contains("mother")
-                                                        || hitTags.Contains("father") || hitTags.Contains("grandparent")
+                                                        || hitTags.Contains("father")
                                                         || hitTags.Contains("teacher") || hitTags.Contains("family");
+                                    // v1.4: "grandparent" no longer counts as a child — old people
+                                    // without a child in the picture are filtered below.
                                     bool adultWithoutChild = hasAdult && !hasChildContext;
+                                    // v1.4: the lyric's own season is checked from the tags BEFORE downloading
+                                    // (it used to be checked only after the download and the vision analysis)
+                                    // Winter and autumn must be visible (snow, leaves); for spring and summer
+                                    // an ordinary green, sunny clip is fine, only the cold seasons are refused.
+                                    string tagSeason = SeasonFromTags(hitTags);
+                                    bool coldLine = _currentSeason is "winter" or "autumn";
+                                    if (_lyricNamesSeason && strictSeasonFilter &&
+                                        !string.IsNullOrEmpty(_currentSeason) && _currentSeason != "none" &&
+                                        (coldLine ? tagSeason != _currentSeason : tagSeason is "winter" or "autumn") &&
+                                        hitOffset < sortedHits.Count - 2)
+                                    {
+                                        LogToMainWindow($"   🗓 Not a {_currentSeason} clip (tags) — skipped without downloading");
+                                        continue;
+                                    }
+
+                                    bool notForKids = IskraKidsSafeQuery.IsUnsuitableForKids(hitTags, _currentLyric, out string notForKidsReason);
+                                    if (notForKids)
+                                        LogToMainWindow($"   ⏭ Not for a children's video ({notForKidsReason})");
                                     bool hasBadTag = universalBadTags.Any(t => hitTags.Contains(t))
-                                                  || contextBadTags.Any(t => hitTags.Contains(t))
-                                                  || adultWithoutChild;
+                                                  || contextBadTags.Where(t => !(warmDrinkLine && IsCozyTag(t))).Any(t => hitTags.Contains(t))
+                                                  || adultWithoutChild || notForKids;
                                     if (hasBadTag)
                                     {
                                         LogToMainWindow($"   ⏭ Skipping inappropriate content (tags: {hitTags.Substring(0, Math.Min(60, hitTags.Length))})");
@@ -5387,15 +5834,12 @@ namespace UltraVideoEditor
                                     _usedMediaUrls.Add(dlUrl);
 
                                     string fileName = $"AI_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4";
-                                    string fullPath = Path.Combine(GetCurrentProjectFolder(), fileName);
+                                    string fullPath = NewDownloadPath(fileName);
 
-                                    LogToMainWindow($"   ⬇ Preuzimam video hit {hitIdx + 1}/{sortedHits.Count} (format: {fmt}): {dlUrl.Substring(dlUrl.LastIndexOf('/') + 1)}");
-                                    using var dlStream = await _dlHttpClient.GetStreamAsync(dlUrl, ct);
-                                    using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                                    await dlStream.CopyToAsync(fileStream, ct);
+                                    LogToMainWindow($"   ⬇ Downloading video hit {hitIdx + 1}/{sortedHits.Count} (format: {fmt}): {dlUrl.Substring(dlUrl.LastIndexOf('/') + 1)}");
+                                    await DownloadToFileAsync(dlUrl, fullPath, ct);   // v1.4: the file is closed before anyone reads it
 
-                                    string ffmpegForBright = System.IO.Path.Combine(
-                                        AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                                    string ffmpegForBright = AppPaths.FFmpeg;
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegForBright, ct);
                                     if (!brightnessOk && hitOffset < sortedHits.Count - 2)
                                     {
@@ -5405,14 +5849,31 @@ namespace UltraVideoEditor
                                         continue;
                                     }
 
-                                    string ffmpegForVision = System.IO.Path.Combine(
-                                        AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                                    string ffmpegForVision = AppPaths.FFmpeg;
 
                                     // Prosljedjujemo stih i kontekst — Qwen koristi Dynamic Mood Alignment
                                     // _currentLyric i _currentSeason se setuju u scene loopu (AIVideoCreator)
+                                    // v1.4 CANDIDATE BUDGET: every analysed clip costs a download and about half a
+                                    // minute of the vision AI. Style rules (shot sizes, camera motion, indoor/outdoor,
+                                    // brightness jumps, the AI's "could fit better") may reject the first three clips;
+                                    // from the fourth on they are only preferences. Content rules (unsafe content, the
+                                    // vision AI's reject, a season the lyric names) always apply. Before, one 3-second
+                                    // intro shot took 13 minutes, and 3.5 hours were not enough for 8 scenes.
+                                    analyzedHere++;
+                                    bool relax = analyzedHere > 3;
+                                    // v1.4: at most 6 vision analyses per search — after that the next query layer
+                                    // (simpler search words) has a better chance than more results of this one
+                                    if (analyzedHere > 6)
+                                    {
+                                        LogToMainWindow("   ⏭ Six clips analysed for this search without a good one — trying a simpler search");
+                                        try { File.Delete(fullPath); } catch { }
+                                        _usedMediaUrls.Remove(dlUrl);
+                                        break;
+                                    }
+                                    var visionClock = System.Diagnostics.Stopwatch.StartNew();
                                     var vision = await VisionAnalyzer.AnalyzeClipAsync(
                                         fullPath, ffmpegForVision, ct,
-                                        lyricLine: _currentLyric,
+                                        lyricLine: VisionLyricContext(),
                                         season: _currentSeason,
                                         mood: _detectedMood,
                                         context: _detectedContext);
@@ -5450,7 +5911,7 @@ namespace UltraVideoEditor
                                             vision.IsOutdoor = true;
                                     }
 
-                                    if (vision.RetryNeeded && hitOffset < sortedHits.Count - 2)
+                                    if (vision.RetryNeeded && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         string lyricPreview = _currentLyric?.Length > 40 ? _currentLyric.Substring(0, 40) + "..." : _currentLyric;
                                         LogToMainWindow($"   🔄 Qwen: scene doesn't match the lyric '{lyricPreview}' — looking for a better clip...");
@@ -5459,7 +5920,12 @@ namespace UltraVideoEditor
                                         continue;
                                     }
 
-                                    if (vision.Score < 4.0 && hitOffset < hits.Count - 2)
+                                    // v1.4: a clip the vision AI scores below 4 (or rejects) is NEVER used. Before,
+                                    // the last two results of a search were taken even when the AI had rejected them
+                                    // (11 clips with score 1.0 got into one video, two of them were then cut out again
+                                    // by the quality gate, leaving holes). Now the search moves on to the next, simpler
+                                    // query instead.
+                                    if (vision.Score < 4.0)
                                     {
                                         LogToMainWindow($"   ⚠ VisionScore {vision.Score:F1}/10 — odbacujem ({vision.RejectReason}), trazim bolji...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5472,7 +5938,10 @@ namespace UltraVideoEditor
                                     // PATCH 8 — Safe Motion Filter (Kids Edition)
                                     // Odbacujemo klipove sa prevelikim kretanjem kamere — vizuelni zamor kod dece 2-6g
                                     // HasStrongMotion = Magnitude > 30 (threshold je u MotionResult)
-                                    if (clipMotion.HasStrongMotion && hitOffset < sortedHits.Count - 2)
+                                    // v1.4: off for now. The motion analysis works since this version, but its
+                                    // scale is not calibrated yet (most ordinary clips measured 100 of 100), and this
+                                    // rule threw away 37 clips in one test — each after a full vision analysis.
+                                    if (false && clipMotion.HasStrongMotion)
                                     {
                                         LogToMainWindow($"   🚫 KidsFilter: Camera motion too aggressive (mag:{clipMotion.Magnitude:F0}) — rejecting for children's video...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5495,7 +5964,7 @@ namespace UltraVideoEditor
                                                             l.ToLower().Contains("flamingo") || l.ToLower().Contains("wildlife")));
                                     bool isFrozenClip = clipMotion.Direction == MotionDirection.Static &&
                                                         clipMotion.Magnitude < 3.0;
-                                    if (isAnimalClip && isFrozenClip && hitOffset < sortedHits.Count - 3)
+                                    if (isAnimalClip && isFrozenClip && hitOffset < sortedHits.Count - 3 && !relax)
                                     {
                                         LogToMainWindow($"   🐦 FrozenAnimal: animal shot with no motion (mag:{clipMotion.Magnitude:F1}) — looking for animated clip...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5509,7 +5978,7 @@ namespace UltraVideoEditor
                                     var prevForMatch = _lastClipEndMotion ?? _lastClipMotion;
                                     bool motionOk = MotionResult.IsCompatible(prevForMatch, clipMotion);
 
-                                    if (!motionOk && hitOffset < sortedHits.Count - 2)
+                                    if (!motionOk && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         LogToMainWindow("   Motion mismatch (end:" + (prevForMatch?.EndDirection.ToString() ?? "null") + " -> start:" + clipMotion.Direction + ") -- trazim bolji...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5532,7 +6001,7 @@ namespace UltraVideoEditor
                                                                  !hitTagsForShot.Contains("flower") &&
                                                                  !hitTagsForShot.Contains("garden") &&
                                                                  !hitTagsForShot.Contains("park");
-                                    if (isTooWideWithoutChild && hitOffset < sortedHits.Count - 2)
+                                    if (isTooWideWithoutChild && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         LogToMainWindow($"   📐 PATCH9 30%Rule: wide shot without children — too static for ages 2-6, looking for medium/close shot...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5543,18 +6012,23 @@ namespace UltraVideoEditor
                                              hitTagsForShot.Contains("face") || vision.HasChildren)
                                         shotType = "close";
 
+                                    // v1.4 NOTE: the two shot-size rules below are switched off. A clip with a child
+                                    // counts as "close", and every lyric clip must show a child, so "no two close shots in
+                                    // a row" rejected almost every clip (101 rejections and 89 "bridge" rejections in one
+                                    // test, each after a full download and vision analysis). The director's plan and the
+                                    // vision AI already vary the shots.
                                     // Bridge logika: wide→close ili close→wide je preskok — treba medium
                                     bool needsBridge = (_lastShotType == "wide" && shotType == "close") ||
                                                        (_lastShotType == "close" && shotType == "wide");
-                                    if (needsBridge && hitOffset < sortedHits.Count - 2)
+                                    if (false && needsBridge) // v1.4: off — see the note above
                                     {
-                                        LogToMainWindow($"   🌉 Bridge: {_lastShotType}→{shotType} je ekstreman preskok — trazim medium plan...");
+                                        LogToMainWindow($"   🌉 Bridge: {_lastShotType}→{shotType} is too big a jump — looking for a medium shot...");
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
                                     }
 
-                                    if (shotType == _lastShotType && _lastShotType != "" && hitOffset < sortedHits.Count - 2)
+                                    if (false && shotType == _lastShotType) // v1.4: off — see the note above
                                     {
                                         LogToMainWindow($"   🎬 Shot composition: dva uzastopna '{shotType}' — trazim drugi tip...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5565,24 +6039,7 @@ namespace UltraVideoEditor
                                     // ── Temporal Seasonal Grouping ────────────────────────────────
                                     // ── STRICT SEASONAL MATCHING ──────────────────────────────────
                                     // Detect clip season based on tags (extended set for better detection)
-                                    string clipSeasonTag = "none";
-                                    if (hitTagsForShot.Contains("snow") || hitTagsForShot.Contains("winter") ||
-                                        hitTagsForShot.Contains("frost") || hitTagsForShot.Contains("ice") ||
-                                        hitTagsForShot.Contains("frozen") || hitTagsForShot.Contains("cold") ||
-                                        hitTagsForShot.Contains("blizzard") || hitTagsForShot.Contains("snowflake"))
-                                        clipSeasonTag = "winter";
-                                    else if (hitTagsForShot.Contains("autumn") || hitTagsForShot.Contains("fall") ||
-                                             hitTagsForShot.Contains("leaves") || hitTagsForShot.Contains("foliage") ||
-                                             hitTagsForShot.Contains("orange leaves") || hitTagsForShot.Contains("maple"))
-                                        clipSeasonTag = "autumn";
-                                    else if (hitTagsForShot.Contains("spring") || hitTagsForShot.Contains("blossom") ||
-                                             hitTagsForShot.Contains("bloom") || hitTagsForShot.Contains("cherry blossom") ||
-                                             hitTagsForShot.Contains("tulip") || hitTagsForShot.Contains("daffodil"))
-                                        clipSeasonTag = "spring";
-                                    else if (hitTagsForShot.Contains("summer") || hitTagsForShot.Contains("beach") ||
-                                             hitTagsForShot.Contains("tropical") || hitTagsForShot.Contains("heat") ||
-                                             hitTagsForShot.Contains("swimming pool") || hitTagsForShot.Contains("sunbath"))
-                                        clipSeasonTag = "summer";
+                                    string clipSeasonTag = SeasonFromTags(hitTagsForShot);   // v1.4: whole words, ice cream is not winter
 
                                     // STRICT FILTER: odbaci klip koji nije "none" i nije ciljana sezona pesme
                                     // IZNIMKA 1: B-roll klipovi (strictSeasonFilter=false) — ne filtriramo
@@ -5605,6 +6062,16 @@ namespace UltraVideoEditor
                                         if (!compatibleSeasons)
                                             strictSeasonReject = true;
                                     }
+
+                                    // v1.4: when THIS line names its season ("Kad je zima nosi čizme",
+                                    // "na velikom snegu"), every clip of the line must clearly show that
+                                    // season — no "close enough" autumn leaves and no clips without any
+                                    // season (ants, lemons, green leaves under a winter line). The last
+                                    // two results stay allowed so the scene never ends up empty.
+                                    if (!strictSeasonReject && _lyricNamesSeason && strictSeasonFilter &&
+                                        _currentSeason is "winter" or "autumn" &&
+                                        clipSeasonTag != _currentSeason && hitOffset < sortedHits.Count - 2)
+                                        strictSeasonReject = true;
 
                                     if (strictSeasonReject)
                                     {
@@ -5631,7 +6098,7 @@ namespace UltraVideoEditor
                                             seasonClash = true;
                                     }
 
-                                    if (seasonClash && hitOffset < sortedHits.Count - 2)
+                                    if (seasonClash && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         LogToMainWindow($"   🗓 Seasonal clash ({_lastSeasonTag} → {clipSeasonTag}) — looking for consistent clip...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5655,7 +6122,7 @@ namespace UltraVideoEditor
                                         bool isPortraitStock = vision.Labels.Any(l => l.Contains("portrait")) &&
                                                                !vision.HasChildren; // portret bez djece = stock odrasli
                                         bool rejectStock = (adultLookingAtCamera || isPortraitStock)
-                                                           && hitOffset < sortedHits.Count - 2;
+                                                           && hitOffset < sortedHits.Count - 2 && !relax;
                                         if (rejectStock)
                                         {
                                             LogToMainWindow($"   📸 PATCH10 Candid: rejecting 'commercial/stock' shot (adult posing) — looking for authentic moment...");
@@ -5720,10 +6187,11 @@ namespace UltraVideoEditor
                                         _currentLyric.ToLower().Contains("uzin") || _currentLyric.ToLower().Contains("kuci") ||
                                         _currentLyric.ToLower().Contains("kuca") || _currentLyric.ToLower().Contains("soba") ||
                                         _currentLyric.ToLower().Contains("lunch") || _currentLyric.ToLower().Contains("home") ||
-                                        _currentLyric.ToLower().Contains("dinner") || _currentLyric.ToLower().Contains("snack"));
+                                        _currentLyric.ToLower().Contains("dinner") || _currentLyric.ToLower().Contains("snack") ||
+                                        IsWarmDrinkLyric(_currentLyric));   // v1.4: tea / hot chocolate at home
                                     bool indoorClash = thisClipIsIndoor && outdoorContext &&
                                                        _lastClipWasOutdoor && !lyricAllowsIndoor &&
-                                                       hitOffset < sortedHits.Count - 2;
+                                                       hitOffset < sortedHits.Count - 2 && !relax;
                                     if (indoorClash)
                                     {
                                         LogToMainWindow($"   🏠 PATCH10 Indoor/Outdoor: outdoor song, indoor shot ({hitTagsForShot.Substring(0, Math.Min(30, hitTagsForShot.Length))}) — lookim outdoor kadar...");
@@ -5737,7 +6205,7 @@ namespace UltraVideoEditor
                                     bool tempClash = clipIsCold && !clipIsWarm &&
                                                      !hitTagsForShot.Contains("snow") && !hitTagsForShot.Contains("winter") &&
                                                      !(_detectedContext == "winter" || _detectedSeason == "winter");
-                                    if (tempClash && hitOffset < sortedHits.Count - 2)
+                                    if (tempClash && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         LogToMainWindow($"   🌡 PATCH9 Warm Filter: cold/blue palette — not OK for children's video, looking for warmer shot...");
                                         try { File.Delete(fullPath); } catch { }
@@ -5752,7 +6220,7 @@ namespace UltraVideoEditor
                                         double avgLum = _recentLuminance.Average();
                                         double lumDrop = avgLum - vision.Luminance;
                                         // Reject if more than 0.20 darker than average (significant drop)
-                                        if (lumDrop > 0.20 && hitOffset < sortedHits.Count - 2)
+                                        if (lumDrop > 0.20 && hitOffset < sortedHits.Count - 2 && !relax)
                                         {
                                             LogToMainWindow($"   ☀ PATCH10 ToneMatch: shot too dark (lum:{vision.Luminance:F2} vs avg:{avgLum:F2}) — looking for warmer shot...");
                                             try { File.Delete(fullPath); } catch { }
@@ -5797,11 +6265,12 @@ namespace UltraVideoEditor
                                         }
                                     }
 
-                                    string visionTag = vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : "FFmpeg";
-                                    LogToMainWindow($"   ✅ Score {finalScore:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Shot:{shotType} | Season:{clipSeasonTag} | " +
+                                    string visionTag = vision.QwenUsed ? "Qwen" : vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : ("FFmpeg" + (string.IsNullOrEmpty(vision.RejectReason) ? "" : $": {vision.RejectReason}"));
+                                    LogToMainWindow($"   ✅ Score {finalScore:F1}/10 [{visionTag}, {visionClock.Elapsed.TotalSeconds:F0}s, candidate {analyzedHere}] | Motion:{clipMotion.Direction} | Shot:{shotType} | Season:{clipSeasonTag} | " +
                                         $"Children:{vision.HasChildren} Outdoor:{vision.IsOutdoor} Smile:{vision.HasSmile}");
 
                                     _lastDownloadedVisionScore = finalScore;
+                                    _lastDownloadedDescription = vision.Description;
                                     _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
                                                               || clipMotion.Direction == MotionDirection.Static;
                                     _lastDownloadedHasChildren = vision.HasChildren;
@@ -5836,14 +6305,22 @@ namespace UltraVideoEditor
                                     LogToMainWindow($"   ⏭ Skipping already used image (hit {hitIdx + 1})");
                                     continue;
                                 }
+                                // v1.4: pictures were not checked at all (only videos were) — the
+                                // wheelchair/therapy shot in the grandparents line came this way.
+                                string imgTags = hit["tags"]?.ToString()?.ToLower() ?? "";
+                                if (!IskraKidsSafeQuery.IsHitSafe(imgTags) ||
+                                    IskraKidsSafeQuery.IsUnsuitableForKids(imgTags, _currentLyric, out _))
+                                {
+                                    IskraKidsSafeQuery.IsUnsuitableForKids(imgTags, _currentLyric, out string imgReason);
+                                    LogToMainWindow($"   ⏭ Picture not for a children's video ({imgReason ?? imgTags.Substring(0, Math.Min(50, imgTags.Length))})");
+                                    continue;
+                                }
 
                                 _usedMediaUrls.Add(dlUrl);
                                 string fileName = $"AI_{Guid.NewGuid().ToString().Substring(0, 8)}.jpg";
-                                string fullPath = Path.Combine(GetCurrentProjectFolder(), fileName);
+                                string fullPath = NewDownloadPath(fileName);
 
-                                using var dlStream = await _dlHttpClient.GetStreamAsync(dlUrl, ct);
-                                using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                                await dlStream.CopyToAsync(fileStream, ct);
+                                await DownloadToFileAsync(dlUrl, fullPath, ct);   // v1.4: the file is closed before anyone reads it
                                 return fullPath;
                             }
                             LogToMainWindow($"   ⚠ All images for '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' already used");
@@ -5906,7 +6383,7 @@ namespace UltraVideoEditor
 
                             if (safeResults.Count == 0)
                             {
-                                LogToMainWindow($"   ⏭ [{provider.Name}] 0 kids-safe rezultata za ovaj query");
+                                LogToMainWindow($"   ⏭ [{provider.Name}] 0 kid-safe results for this query");
                                 continue;
                             }
 
@@ -5953,17 +6430,15 @@ namespace UltraVideoEditor
                                 }.Any(k => resultTagsLower.Contains(k));
 
                                 string fileName = $"AI_px_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4";
-                                string fullPath = Path.Combine(GetCurrentProjectFolder(), fileName);
+                                string fullPath = NewDownloadPath(fileName);
 
                                 try
                                 {
-                                    LogToMainWindow($"   ⬇ [{provider.Name}] Preuzimam: {pexelsDlFile.Substring(0, Math.Min(40, pexelsDlFile.Length))}");
+                                    LogToMainWindow($"   ⬇ [{provider.Name}] Downloading: {pexelsDlFile.Substring(0, Math.Min(40, pexelsDlFile.Length))}");
                                     _usedMediaUrls.Add(result.DownloadUrl);
                                     if (pexelsDedupeKey != null) _usedMediaUrls.Add(pexelsDedupeKey);
 
-                                    using var dlStream = await _dlHttpClient.GetStreamAsync(result.DownloadUrl, ct);
-                                    using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                                    await dlStream.CopyToAsync(fileStream, ct);
+                                    await DownloadToFileAsync(result.DownloadUrl, fullPath, ct);   // v1.4: the file is closed before anyone reads it
 
                                     if (!File.Exists(fullPath) || new FileInfo(fullPath).Length < 1000)
                                     {
@@ -5973,8 +6448,7 @@ namespace UltraVideoEditor
                                         continue;
                                     }
 
-                                    string ffmpegPath = System.IO.Path.Combine(
-                                        AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                                    string ffmpegPath = AppPaths.FFmpeg;
 
                                     // Brightness check
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegPath, ct);
@@ -5990,7 +6464,7 @@ namespace UltraVideoEditor
                                     // Vision analiza
                                     var vision = await VisionAnalyzer.AnalyzeClipAsync(
                                         fullPath, ffmpegPath, ct,
-                                        lyricLine: _currentLyric,
+                                        lyricLine: VisionLyricContext(),
                                         season: _currentSeason,
                                         mood: _detectedMood,
                                         context: _detectedContext);
@@ -6042,10 +6516,11 @@ namespace UltraVideoEditor
                                             finalScore = Math.Min(10.0, vision.Score + 1.5);
                                     }
 
-                                    string visionTag = vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : "FFmpeg";
+                                    string visionTag = vision.QwenUsed ? "Qwen" : vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : ("FFmpeg" + (string.IsNullOrEmpty(vision.RejectReason) ? "" : $": {vision.RejectReason}"));
                                     LogToMainWindow($"   ✅ [{provider.Name}] Score {finalScore:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Children:{vision.HasChildren}");
 
                                     _lastDownloadedVisionScore = finalScore;
+                                    _lastDownloadedDescription = vision.Description;
                                     _lastDownloadedIsStatic = clipMotion.Direction == MotionDirection.Unknown
                                                               || clipMotion.Direction == MotionDirection.Static;
                                     _lastDownloadedHasChildren = vision.HasChildren;
@@ -6261,16 +6736,20 @@ namespace UltraVideoEditor
                 }
 
                 if (_showLyrics && !string.IsNullOrEmpty(segment.LyricText))
-                    await Dispatcher.InvokeAsync(() => mainWindow.AddSubtitle(segment.LyricText, newItem.Start, newItem.End));
+                {
+                    var karaokeWords = BuildKaraokeWords(segment);
+                    await Dispatcher.InvokeAsync(() => mainWindow.AddSubtitle(segment.LyricText, newItem.Start, newItem.End, karaokeWords));
+                }
 
                 if (newItem.End > maxEnd) maxEnd = newItem.End;
             }
 
             double totalDuration = maxEnd;
 
-            string outroText = string.IsNullOrEmpty(txtOutroText.Text) ?
-                "Author: Iskra Ajvazi. Music and lyrics: Iskra Ajvazi. For more wonderful songs, follow our YouTube channel: @Rastimo uz Iskru" :
-                txtOutroText.Text;
+            // v1.4: the default outro follows the program language
+            string outroText = string.IsNullOrWhiteSpace(txtOutroText.Text) ?
+                LanguageManager.T("aic_default_outro") :
+                txtOutroText.Text.Trim();
 
             double outroDuration = 7;
             double outroStart = maxEnd;
@@ -6282,7 +6761,7 @@ namespace UltraVideoEditor
                 Duration = outroDuration,
                 Start = outroStart,
                 End = outroStart + outroDuration,
-                Name = "Outro text",
+                Name = $"Outro text: {outroText}",
                 Type = "Image",
                 Volume = 100,
                 TrackIndex = 0,
@@ -6301,9 +6780,16 @@ namespace UltraVideoEditor
                         audioItem.Path = _ambientAudioPath;
                         LogToMainWindow("🎵 Using mixed audio with ambient sounds");
                     }
-                    audioItem.Start = 0;
-                    audioItem.End = totalDuration;
-                    audioItem.Duration = totalDuration;
+                    // v1.4 TIMELINE SYNC: every scene sits at cursor + (its time in the song), so the
+                    // song itself starts at the cursor (after logo and title). It was placed at 0,
+                    // which made the pictures run late by the logo+title length — and the old
+                    // timeline refresh then moved the song after the last picture anyway.
+                    audioItem.TrackIndex = 2;
+                    audioItem.UseFixedPosition = true;
+                    audioItem.FixedPosition = _timelineCursorOffset;
+                    audioItem.Start = _timelineCursorOffset;
+                    audioItem.Duration = Math.Max(1.0, totalDuration - _timelineCursorOffset);
+                    audioItem.End = audioItem.Start + audioItem.Duration;
                 }
             });
 
@@ -6312,6 +6798,7 @@ namespace UltraVideoEditor
                 .OrderBy(i => i.Start)
                 .ToList();
 
+            double _lastTransitionSoundAt = double.MinValue;
             for (int i = 0; i < videoImageItems.Count - 1; i++)
             {
                 var currentItem = videoImageItems[i];
@@ -6352,14 +6839,20 @@ namespace UltraVideoEditor
                     LogToMainWindow($"   🔄 Hybrid crossfade 1000ms: {currentItem.Type}({currentContentTag ?? "?"}) → {nextItem.Type}({nextContentTag ?? "?"})");
                 // ─────────────────────────────────────────────────────────────────────
 
-                bool addTransitionSound = _enableTransitionSounds && transEnergy >= 3;
+                // v1.4: no pops or whooshes in calm songs (a lullaby full of pops sounded broken),
+                // at most one every 8 seconds elsewhere, and quieter than before (they were
+                // 55-85 %, louder than the singing).
+                bool calmSong = _detectedContext is "lullaby" or "sad" or "love" or "calm" or "nature";
+                bool addTransitionSound = _enableTransitionSounds && !calmSong && transEnergy >= 3 &&
+                                          currentItem.End - _lastTransitionSoundAt >= 8.0;
+                if (addTransitionSound) _lastTransitionSoundAt = currentItem.End;
                 string soundType = transEnergy >= 4 ? "whoosh" : "pop";
                 int transitionVolume = transEnergy switch
                 {
-                    5 => 85,
-                    4 => 75,
-                    3 => 65,
-                    _ => 55
+                    5 => 40,
+                    4 => 35,
+                    3 => 30,
+                    _ => 25
                 };
                 double transitionDuration = transEnergy >= 4 ? 0.55 : 0.4;
 
@@ -6382,7 +6875,7 @@ namespace UltraVideoEditor
                                 Name = $"🔊 {(soundType == "whoosh" ? "Whoosh" : "Pop")}",
                                 Type = "Audio",
                                 Volume = transitionVolume,
-                                TrackIndex = 1
+                                TrackIndex = 3
                             }));
                         }
                     }
@@ -6407,12 +6900,27 @@ namespace UltraVideoEditor
                                 Name = "🔊 Pop",
                                 Type = "Audio",
                                 Volume = transitionVolume,
-                                TrackIndex = 1
+                                TrackIndex = 3
                             }));
                         }
                     }
                 }
             }
+
+            // v1.4: pin every generated clip to its computed time. Without this the timeline
+            // refresh re-laid them end to end and all lyric timing (and the gaps between
+            // lines) was lost before the render even started.
+            await Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var it in mainWindow.timelineItems)
+                {
+                    bool generated = it.Type == "Video" || it.Type == "Image" || (it.Name ?? "").StartsWith("🔊");
+                    if (!generated || it.UseFixedPosition) continue;
+                    it.UseFixedPosition = true;
+                    it.FixedPosition = Math.Max(0, it.Start);
+                    if ((it.Name ?? "").StartsWith("🔊")) it.TrackIndex = 3;
+                }
+            });
 
             LogToMainWindow("🎬 Updating timeline view...");
             await Dispatcher.InvokeAsync(() => mainWindow.UpdateTimelineDisplay());
@@ -6426,6 +6934,90 @@ namespace UltraVideoEditor
                 L("creator_finished_title"), MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
             Close();
+        }
+
+        /// <summary>v1.4 — opens the scene review; true = build the video, false = cancel.</summary>
+        private bool ShowSceneReview()
+        {
+            if (!Dispatcher.CheckAccess())
+                return Dispatcher.Invoke(new Func<bool>(ShowSceneReview));
+
+            var lyricScenes = _segments
+                .Where(s => s.LyricIndex >= 0 && !string.IsNullOrEmpty(s.Path))
+                .OrderBy(s => s.StartTime)
+                .ToList();
+
+            var dlg = new SceneReviewDialog(lyricScenes, _lyricLines, RerollSceneAsync, FormatTime)
+            {
+                Owner = this
+            };
+            return dlg.ShowDialog() == true;
+        }
+
+        /// <summary>
+        /// v1.4 — finds a NEW clip for one scene (the current one is already marked as used,
+        /// so the search never returns it again), trims it to the scene length and updates the
+        /// segment in place. Returns false when nothing suitable was found (old clip is kept).
+        /// </summary>
+        private async Task<bool> RerollSceneAsync(TimelineSegment seg, string query)
+        {
+            var ct = _cts?.Token ?? CancellationToken.None;
+            string q = StrictQueryEngine.ValidateAndFilter(query, _songContext);
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                LogToMainWindow($"🚫 Scene review: query '{query}' rejected by the safety filter");
+                return false;
+            }
+
+            string ext = Path.GetExtension(seg.Path ?? "").ToLowerInvariant();
+            string mediaType = ext is ".jpg" or ".jpeg" or ".png" or ".bmp" ? "photo" : "video";
+
+            if (seg.LyricIndex >= 0 && seg.LyricIndex < _lyricLines.Count)
+                _currentLyric = _lyricLines[seg.LyricIndex];
+
+            LogToMainWindow($"🔁 Scene review: new clip for line {seg.LyricIndex + 1} with '{q}'");
+            string path = await SearchAndDownloadMedia(q, _pixabayMinHeight, mediaType, ct, seg.Duration, strictSeasonFilter: false);
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return false;
+
+            string finalPath = path;
+            if (mediaType == "video")
+            {
+                double videoDuration = await GetVideoDuration(path);
+                if (videoDuration > seg.Duration + 0.5)
+                    finalPath = await TrimVideoToDuration(path, seg.Duration, _tempVideoFolder);
+            }
+
+            seg.Path = finalPath;
+            seg.Query = q;
+            seg.VisionDescription = _lastDownloadedDescription;
+            seg.VisionScore = _lastDownloadedVisionScore;
+            seg.IsStaticClip = _lastDownloadedIsStatic;
+            seg.HasChildren = _lastDownloadedHasChildren;
+            seg.IsOutdoor = _lastDownloadedIsOutdoor;
+            LogToMainWindow($"   ✅ Replaced: {Path.GetFileName(finalPath)} (score {seg.VisionScore:F1}) — {seg.VisionDescription}");
+            return true;
+        }
+
+        /// <summary>
+        /// v1.4 — karaoke timing for a lyric segment: the line's words with times relative to
+        /// the subtitle start. The subtitle starts at the segment's StartTime, so a word's
+        /// offset is simply (word time − segment StartTime). Null when karaoke is off or the
+        /// line has no word timing (then a plain subtitle is drawn).
+        /// </summary>
+        private List<KaraokeWord> BuildKaraokeWords(TimelineSegment segment)
+        {
+            if (!_karaoke || _lineWordTimings == null) return null;
+            if (segment.LyricIndex < 0 || segment.LyricIndex >= _lineWordTimings.Count) return null;
+            var words = _lineWordTimings[segment.LyricIndex];
+            if (words == null || words.Count == 0) return null;
+
+            return words.Select(w => new KaraokeWord
+            {
+                Text = w.Word,
+                Offset = Math.Max(0, w.StartSecond - segment.StartTime),
+                Duration = Math.Max(0.05, w.EndSecond - w.StartSecond)
+            }).ToList();
         }
 
         private void AddSmoothFadeOut(TimelineItem item, double duration)
@@ -6471,7 +7063,7 @@ namespace UltraVideoEditor
             TransitionType.SlideDown => "slidedown",
             TransitionType.WipeLeft => "wipeleft",
             TransitionType.WipeRight => "wiperight",
-            TransitionType.ZoomIn => "zoom",
+            TransitionType.ZoomIn => "zoomin",   // v1.4: "zoom" is not a valid xfade name
             TransitionType.Crossfade => "fade",
             TransitionType.Fade => "fade",
             _ => "fade"
@@ -6543,53 +7135,20 @@ namespace UltraVideoEditor
 
         private string FormatTime(double seconds) => TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss");
 
-        private string GetPixabayApiKey()
-        {
-            try
-            {
-                string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-                string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-
-                if (File.Exists(keyFile))
-                {
-                    byte[] encrypted = File.ReadAllBytes(keyFile);
-                    byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-                    return Encoding.UTF8.GetString(decrypted).Trim();
-                }
-
-                string txtFile = Path.Combine(settingsPath, "pixabay_key.txt");
-                if (File.Exists(txtFile))
-                    return File.ReadAllText(txtFile).Trim();
-            }
-            catch (Exception ex)
-            {
-                AnnounceToUser(LF("pixabay_key_read_error", ex.Message));
-            }
-            return null;
-        }
+        // v1.4: one shared Pixabay key store (see MediaProviderSettings.LoadPixabayKey)
+        private string GetPixabayApiKey() => MediaProviderSettings.LoadPixabayKey();
 
         private void SavePixabayApiKey(string key)
         {
-            try
-            {
-                string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-                Directory.CreateDirectory(settingsPath);
-                string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-                byte[] data = Encoding.UTF8.GetBytes(key);
-                byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(keyFile, encrypted);
-            }
-            catch (Exception ex)
-            {
-                AnnounceToUser(LF("pixabay_key_save_error", ex.Message));
-            }
+            if (!MediaProviderSettings.SavePixabayKey(key))
+                AnnounceToUser(LF("pixabay_key_save_error", "—"));
         }
 
         #region Mood Color Grading i Gradient Fallback
 
         private async Task<string> GenerateMoodGradient(string mood, double duration, string tempDir)
         {
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath)) return null;
 
             string color = mood?.ToLower() switch
@@ -6642,7 +7201,7 @@ namespace UltraVideoEditor
         /// </summary>
         private async Task<string> GenerateBlackFrame(double duration, string tempDir)
         {
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath)) return null;
 
             string outputPath = Path.Combine(tempDir, $"black_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4");
@@ -6779,7 +7338,7 @@ namespace UltraVideoEditor
         private List<string> DetectSubSceneQueries(string lyric, string style)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return null;
-            string lower = lyric.ToLower();
+            string lower = StrictQueryEngine.Fold(lyric);
 
             bool hasWinterClothing = (lower.Contains("cizme") || lower.Contains("izme")) &&
                                      (lower.Contains("rukavice") || lower.Contains("skafander") ||
@@ -6897,10 +7456,19 @@ namespace UltraVideoEditor
             double clipDur = Math.Max(1.5, Math.Round(totalDuration / queries.Count, 1));
             var clipPaths = new List<string>();
 
-            foreach (var query in queries)
+            foreach (var rawQuery in queries)
             {
                 ct.ThrowIfCancellationRequested();
-                string path = await SearchAndDownloadMedia(query, _pixabayMinHeight, "video", ct, clipDur);
+                // v1.4: every montage clip is a children's shot too (the montage searches skipped the
+                // "child in every shot" rule, which is where the steaming pot, the parking lot and
+                // the meerkat came from)
+                string query = MentionsChild(rawQuery) ? rawQuery : rawQuery + " child";
+                // v1.4: the vision AI judges this montage part by what IT must show, not by the
+                // whole line (an ice-cream clip scored 1/10 because the line also names tea)
+                _montageFocus = rawQuery;
+                string path;
+                try { path = await SearchAndDownloadMedia(query, _pixabayMinHeight, "video", ct, clipDur); }
+                finally { _montageFocus = null; }
                 if (path == null) continue;
 
                 double actualDur = await GetVideoDuration(path);
@@ -6912,7 +7480,7 @@ namespace UltraVideoEditor
             if (clipPaths.Count == 0) return null;
             if (clipPaths.Count == 1) return clipPaths[0];
 
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath)) return clipPaths[0];
 
             string concatFile = Path.Combine(tempDir, $"subscene_{Guid.NewGuid().ToString().Substring(0, 8)}.txt");
@@ -6925,7 +7493,7 @@ namespace UltraVideoEditor
             string args = $"-nostdin -f concat -safe 0 -i \"{concatFile}\" " +
                           $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                           $"-c:v h264_nvenc -preset p2 -rc vbr -cq 23 -b:v 0 -profile:v high -level 4.1 " +
-                          $"-vsync cfr -r 25 -an -y \"{outputPath}\"";
+                          $"-fps_mode cfr -r 25 -an -y \"{outputPath}\"";
             var proc = new System.Diagnostics.Process
             {
                 StartInfo = new System.Diagnostics.ProcessStartInfo
@@ -6945,6 +7513,27 @@ namespace UltraVideoEditor
             await proc.WaitForExitAsync(ct);
             bool ok = proc.ExitCode == 0;
 
+            // v1.4: the montage was NVENC-only; without an NVIDIA card (or when NVENC refuses) it
+            // fell back to the first clip alone. Retry once on the CPU encoder.
+            if (!ok || !File.Exists(outputPath) || new FileInfo(outputPath).Length <= 1000)
+            {
+                string cpuArgs = args.Replace("-c:v h264_nvenc -preset p2 -rc vbr -cq 23 -b:v 0", "-c:v libx264 -preset veryfast -crf 21");
+                using var proc2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffmpegPath, Arguments = cpuArgs, CreateNoWindow = true, UseShellExecute = false,
+                    RedirectStandardError = true, RedirectStandardOutput = true
+                });
+                if (proc2 != null)
+                {
+                    var so2 = proc2.StandardOutput.ReadToEndAsync();
+                    var se2 = proc2.StandardError.ReadToEndAsync();
+                    await Task.WhenAll(so2, se2);
+                    await proc2.WaitForExitAsync(ct);
+                    ok = proc2.ExitCode == 0;
+                    if (!ok) AppLog.Warn("Montage (concat) failed on GPU and CPU: " + LastLines(se2.Result));
+                }
+            }
+
             if (ok && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
                 return outputPath;
 
@@ -6961,7 +7550,8 @@ namespace UltraVideoEditor
             // ZERO-FALLBACK guard: null keywords → odmah null
             if (string.IsNullOrWhiteSpace(keywords)) return null;
             int clipCount = Math.Max(2, (int)Math.Ceiling(targetDuration / 5.0));
-            clipCount = Math.Min(clipCount, 4);
+            // v1.4: up to 8 clips (was 4) — scenes now last the whole line, up to 60 s
+            clipCount = Math.Min(clipCount, 8);
 
             double clipDuration = targetDuration / clipCount;
             var clipPaths = new List<string>();
@@ -6982,7 +7572,7 @@ namespace UltraVideoEditor
             if (clipPaths.Count == 0) return null;
             if (clipPaths.Count == 1) return clipPaths[0];
 
-            string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
             if (!File.Exists(ffmpegPath)) return clipPaths[0];
 
             string concatList = Path.Combine(tempDir, $"multiclip_{Guid.NewGuid().ToString().Substring(0, 8)}.txt");
@@ -7005,7 +7595,7 @@ namespace UltraVideoEditor
             string args = $"-nostdin -f concat -safe 0 -i \"{concatList}\" " +
                           $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                           $"-c:v h264_nvenc -preset p2 -rc vbr -cq 23 -b:v 0 -profile:v high -level 4.1 " +
-                          $"-vsync cfr -r 25 -an -y \"{outputPath}\"";
+                          $"-fps_mode cfr -r 25 -an -y \"{outputPath}\"";
 
             var proc = new System.Diagnostics.Process
             {
@@ -7034,7 +7624,7 @@ namespace UltraVideoEditor
                 string argsCpu = $"-nostdin -f concat -safe 0 -i \"{concatList}\" " +
                                  $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                                  $"-c:v libx264 -preset fast -crf 23 -profile:v high -level 4.1 " +
-                                 $"-vsync cfr -r 25 -an -y \"{outputPath}\"";
+                                 $"-fps_mode cfr -r 25 -an -y \"{outputPath}\"";
                 var proc2 = new System.Diagnostics.Process
                 {
                     StartInfo = new System.Diagnostics.ProcessStartInfo
@@ -7082,6 +7672,141 @@ namespace UltraVideoEditor
             return clipPaths[0];
         }
         #endregion
+        // v1.4 — every candidate clip or picture downloaded in this run. Rejected candidates
+        // (wrong content, too dark, not chosen) used to stay in the project folder for ever:
+        // one test project collected more than 1000 clips (27 GB). At the end of a run every
+        // download the timeline does not use is deleted.
+        private readonly List<string> _downloadsThisRun = new();
+
+        // v1.4 — what the current montage part must show (null outside montages)
+        private string _montageFocus;
+
+        /// <summary>v1.4 — the lyric text the vision AI judges a clip against (plus the montage part, if any).</summary>
+        private string VisionLyricContext()
+        {
+            if (string.IsNullOrEmpty(_montageFocus)) return _currentLyric;
+            return (string.IsNullOrEmpty(_currentLyric) ? "" : _currentLyric + " — ") +
+                   $"this clip is ONE part of a montage for this line and only needs to show: {_montageFocus}";
+        }
+
+        // v1.4 — the current lyric line names its own season (see the strict season check)
+        private bool _lyricNamesSeason;
+
+        // v1.4 — word starts of things a child can see in a picture (see LITERAL FIRST)
+        private static readonly string[] _concreteThingStems =
+        {
+            "sladoled", "cokolad", "=caj", "=caja", "=caju", "=cajem", "kakao", "tort", "kolac", "jabuk", "banan",
+            "jagod", "lubenic", "=sok", "=soka", "mlek", "mlijek", "=pica", "=picu", "pizz", "sendvic",
+            "romobil", "bicikl", "rolsul", "trotinet", "lopt", "balon", "zmaj", "igrack", "autic",
+            "ljuljas", "tobogan", "klackalic", "peskar", "pjeskar", "kisobran", "cizm", "rukavic",
+            "skafander", "=kapu", "=kapa", "=sal", "jakn",
+            "=pas", "=psa", "psic", "=maca", "mack", "macic", "=zec", "zecic", "patk", "ptic",
+            "leptir", "konj", "=riba", "ribic", "pcel", "bubamar"
+        };
+
+        /// <summary>v1.4 — the season a stock clip shows, from its tags (same words as the strict season check).</summary>
+        private static string SeasonFromTags(string t)
+        {
+            // whole words only, and "ice cream" is not ice: before, an ice-cream clip counted as
+            // winter and "waterfall" as autumn
+            t = System.Text.RegularExpressions.Regex.Replace((t ?? "").ToLowerInvariant(), @"ice[\s-]?creams?|iced\b", " ");
+            bool Has(params string[] words) => words.Any(w =>
+                System.Text.RegularExpressions.Regex.IsMatch(t, $@"\b{System.Text.RegularExpressions.Regex.Escape(w)}\b"));
+            if (Has("snow", "winter", "frost", "ice", "frozen", "cold", "blizzard", "snowflake", "snowflakes")) return "winter";
+            if (Has("autumn", "fall", "leaves", "foliage", "maple")) return "autumn";
+            if (Has("spring", "blossom", "blossoms", "bloom", "tulip", "tulips", "daffodil")) return "spring";
+            if (Has("summer", "beach", "tropical", "heat", "swimming pool", "sunbath")) return "summer";
+            return "none";
+        }
+
+        private static bool IsWarmDrinkLyric(string lyric) =>
+            !string.IsNullOrEmpty(lyric) &&
+            SerbianText.HasAny(SerbianText.Normalize(lyric), "=caj", "=caja", "=caju", "=cajem", "cokolad", "kakao", "topli napit", "toplo mleko", "toplo mlijeko");
+
+        private static bool IsCozyTag(string tag) =>
+            tag.Contains("fireplace") || tag.Contains("cozy") || tag.Contains("hot drink") || tag.Contains("tea") ||
+            tag.Contains("candle") || tag.Contains("living room") || tag.Contains("indoor");
+
+        private static bool MentionsChild(string query) =>
+            System.Text.RegularExpressions.Regex.IsMatch(query ?? "",
+                @"\b(child|children|kid|kids|toddler|baby|babies|boy|girl|family|grandchild|grandchildren|preschool|kindergarten)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// v1.4 — downloads to a file and CLOSES it before returning. Before, the file was opened with
+        /// "using var" and FileShare.None, so it stayed locked (and partly unflushed) until the end of the
+        /// loop iteration. FFmpeg could not open the clip for the brightness check, the vision AI (Qwen)
+        /// and the motion analysis — every clip got the fallback score 6.0/10 and "Motion: Unknown", and
+        /// the AI never actually looked at a single clip.
+        /// </summary>
+        private async Task DownloadToFileAsync(string url, string path, CancellationToken ct)
+        {
+            using (var dlStream = await _dlHttpClient.GetStreamAsync(url, ct))
+            using (var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, true))
+            {
+                await dlStream.CopyToAsync(fileStream, ct);
+                await fileStream.FlushAsync(ct);
+            }
+        }
+
+        private static string LastLines(string text, int n = 3) =>
+            string.Join(" | ", (text ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).TakeLast(n));
+
+        private string NewDownloadPath(string fileName)
+        {
+            string path = Path.Combine(GetCurrentProjectFolder(), fileName);
+            lock (_downloadsThisRun) _downloadsThisRun.Add(path);
+            return path;
+        }
+
+        /// <summary>
+        /// v1.4 — deletes the downloads of this run and the temporary files of this run that no
+        /// timeline item uses. What the timeline uses stays (the project keeps working, and
+        /// saving copies the temporary files into the project's media folder).
+        /// </summary>
+        private void DeleteUnusedMedia(string tempFolder)
+        {
+            try
+            {
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                Dispatcher.Invoke(() =>
+                {
+                    if (WpfApp.Current.MainWindow is MainWindow mw)
+                        foreach (var it in mw.timelineItems)
+                        {
+                            if (!string.IsNullOrEmpty(it.Path)) used.Add(Path.GetFullPath(it.Path));
+                            if (!string.IsNullOrEmpty(it.AmbientSoundPath)) used.Add(Path.GetFullPath(it.AmbientSoundPath));
+                        }
+                });
+
+                var candidates = new List<string>();
+                lock (_downloadsThisRun) { candidates.AddRange(_downloadsThisRun); _downloadsThisRun.Clear(); }
+                if (!string.IsNullOrEmpty(tempFolder) && Directory.Exists(tempFolder))
+                    candidates.AddRange(Directory.GetFiles(tempFolder, "*", SearchOption.AllDirectories));
+
+                int deleted = 0;
+                long bytes = 0;
+                foreach (string f in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        if (!File.Exists(f) || used.Contains(Path.GetFullPath(f))) continue;
+                        long len = new FileInfo(f).Length;
+                        File.Delete(f);
+                        deleted++;
+                        bytes += len;
+                    }
+                    catch (Exception ex) { AppLog.Warn($"Could not delete the unused file {f}: {ex.Message}"); }
+                }
+                if (deleted > 0)
+                    LogToMainWindow($"🧹 Removed {deleted} unused downloads and temporary files ({bytes / (1024.0 * 1024.0):F0} MB)");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Removing unused downloads", ex);
+            }
+        }
+
         private string GetCurrentProjectFolder()
         {
             string folder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -7094,6 +7819,16 @@ namespace UltraVideoEditor
                 });
             }
             catch { }
+            // v1.4: with a project that was never saved the main window has no folder (""), so
+            // clips were downloaded to "AI_xxxx.mp4" — a RELATIVE path in whatever the current
+            // directory was. The render (which runs FFmpeg from the TEMP folder) then could not
+            // find them ("Error opening input files"). Use this run's temp folder instead; it is
+            // copied into the project folder when the project is saved.
+            if (string.IsNullOrWhiteSpace(folder) || !Path.IsPathRooted(folder))
+            {
+                folder = !string.IsNullOrEmpty(_tempVideoFolder) ? _tempVideoFolder : Path.GetTempPath();
+                Directory.CreateDirectory(folder);
+            }
             return folder;
         }
 
@@ -7198,6 +7933,8 @@ namespace UltraVideoEditor
         public string Keywords { get; set; }
         /// <summary>Asocijativni fallback query ako primarni nema rezultata (iz AI interpretacije).</summary>
         public string FallbackKeywords { get; set; }
+        /// <summary>v1.4 — Keywords came from the director pass (whole-song plan) and passed validation.</summary>
+        public bool KeywordsFromDirector { get; set; }
         public string AmbientSound { get; set; }
         public double StartTime { get; set; }
         public double Duration { get; set; }
@@ -7244,6 +7981,14 @@ namespace UltraVideoEditor
         public string ContentTag { get; set; }
         /// <summary>Per-stih sentiment polaritet — Positive/Negative/Neutral.</summary>
         public string Sentiment { get; set; } = "Neutral";
+
+        // ── v1.4 ──
+        /// <summary>Index of the lyric line this segment shows, or -1 for intro/instrumental b-roll.</summary>
+        public int LyricIndex { get; set; } = -1;
+        /// <summary>The search query that found this clip (shown and editable in scene review).</summary>
+        public string Query { get; set; }
+        /// <summary>What the clip shows, as described by the vision AI (for the blind user).</summary>
+        public string VisionDescription { get; set; }
     }
 
     public class SongAnalysis
@@ -7275,6 +8020,9 @@ namespace UltraVideoEditor
         public string FallbackKeywords { get; set; }
         [Newtonsoft.Json.JsonProperty("ambient")]
         public string Ambient { get; set; }
+        /// <summary>v1.4 — true when the keywords came from the AI director and passed validation.</summary>
+        [Newtonsoft.Json.JsonIgnore]
+        public bool FromAI { get; set; }
     }
 
     #endregion

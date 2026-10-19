@@ -20,8 +20,7 @@ namespace UltraVideoEditor
             IProgress<(int JobIndex, BatchExportJob Job, string Message)> progress,
             CancellationToken ct = default)
         {
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             for (int i = 0; i < jobs.Count; i++)
             {
@@ -47,9 +46,9 @@ namespace UltraVideoEditor
                     if (items.Count == 0)
                         throw new InvalidOperationException("Project has no clips.");
 
-                    // Reconstruct timeline positions
-                    double t = 0;
-                    foreach (var item in items) { item.Start = t; item.End = t + item.Duration; t += item.Duration; }
+                    // v1.4: same layout as the editor (tracks in parallel, fixed positions kept).
+                    // The old loop put every clip of every track end to end.
+                    TimelineLayout.Recalculate(items);
 
                     // 2 — Output folder
                     Directory.CreateDirectory(job.OutputFolder);
@@ -71,13 +70,11 @@ namespace UltraVideoEditor
 
                     if (job.FormatId == "mp3")
                     {
+                        // v1.4: audio-only export (the renderer was called with resolution
+                        // "audio", which it cannot parse — MP3 batch jobs always failed)
                         outPath = Path.Combine(job.OutputFolder, $"{baseName}_audio.mp3");
-                        await renderEngine.RenderSimpleAsync(
-                            items, outPath, "MP3", renderProgress,
-                            projectData.Subtitles ?? new List<SubtitleItem>(),
-                            exportSettings, ct,
-                            useGPU: false, resolution: "audio",
-                            fastRender: false, enableSubtitles: false);
+                        bool ok = await ExportHelpers.ExportAudioOnlyAsync(items, outPath, ct);
+                        if (!ok) throw new InvalidOperationException("No audio clip in the project.");
                     }
                     else
                     {
@@ -87,13 +84,13 @@ namespace UltraVideoEditor
                             projectData.Subtitles ?? new List<SubtitleItem>(),
                             exportSettings, ct,
                             useGPU: false, resolution: resolution,
-                            fastRender: false, enableSubtitles: false);
+                            fastRender: false, enableSubtitles: true);   // v1.4: the project's subtitles are part of the video
                     }
 
                     job.OutputFile  = outPath;
                     job.Status      = BatchJobStatus.Done;
                     job.ProgressPct = 100;
-                    progress?.Report((i, job, $"✅ {job.ProjectName} — gotovo!"));
+                    progress?.Report((i, job, LanguageManager.F("loc_job_done", job.ProjectName)));
                 }
                 catch (OperationCanceledException)
                 {

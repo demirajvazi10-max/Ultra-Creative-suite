@@ -252,7 +252,7 @@ namespace UltraVideoEditor
                 if (File.Exists(txtPath))
                     return File.ReadAllText(txtPath).Trim();
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Reading a media provider key", swallowed); }   // v1.4: was silent
             return null;
         }
 
@@ -271,6 +271,33 @@ namespace UltraVideoEditor
             }
             catch { return false; }
         }
+
+        /// <summary>
+        /// v1.4 — THE Pixabay key for the whole program. The AI creator, Video Engine and the
+        /// Pixabay search used to read an older file (pixabay_key.bin) while the Media providers
+        /// window used this store, so a key changed in one place did not apply in the others.
+        /// An old key is moved over once.
+        /// </summary>
+        public static string LoadPixabayKey()
+        {
+            string key = LoadKey("Pixabay");
+            if (!string.IsNullOrEmpty(key)) return key;
+            try
+            {
+                string oldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
+                string bin = Path.Combine(oldDir, "pixabay_key.bin");
+                string txt = Path.Combine(oldDir, "pixabay_key.txt");
+                if (File.Exists(bin))
+                    key = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(bin), null, DataProtectionScope.CurrentUser)).Trim();
+                else if (File.Exists(txt))
+                    key = File.ReadAllText(txt).Trim();
+            }
+            catch (Exception ex) { AppLog.Error("Reading the old Pixabay key", ex); }
+            if (!string.IsNullOrEmpty(key)) SaveKey("Pixabay", key);
+            return string.IsNullOrEmpty(key) ? null : key;
+        }
+
+        public static bool SavePixabayKey(string key) => !string.IsNullOrWhiteSpace(key) && SaveKey("Pixabay", key);
 
         /// <summary>Delete API key (deactivates provider).</summary>
         public static void DeleteKey(string providerName)
@@ -618,7 +645,7 @@ namespace UltraVideoEditor
                 if (!string.IsNullOrEmpty(key))
                     MediaProviderSettings.SaveKey("Pixabay", key);
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Moving the old Pixabay key", swallowed); }   // v1.4: was silent
         }
     }
     // ══════════════════════════════════════════════════════════════════════════

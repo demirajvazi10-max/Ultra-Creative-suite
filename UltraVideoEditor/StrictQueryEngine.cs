@@ -123,12 +123,12 @@ namespace UltraVideoEditor
         public static LyricTagType ClassifyLyric(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return LyricTagType.Narrative;
-            string lower = lyric.ToLower();
+            string lower = Fold(lyric);   // v1.4: "caj" and "čaj" match the same key
 
             // Action — ako ima match u _actionMap, stih je akcioni
             foreach (var kv in _actionMap)
             {
-                int idx = lower.IndexOf(kv.Key.ToLower(), StringComparison.OrdinalIgnoreCase);
+                int idx = lower.IndexOf(Fold(kv.Key), StringComparison.Ordinal);
                 if (idx < 0) continue;
                 bool leftOk  = idx == 0 || !char.IsLetter(lower[idx - 1]);
                 bool rightOk = idx + kv.Key.Length >= lower.Length || !char.IsLetter(lower[idx + kv.Key.Length]);
@@ -565,14 +565,14 @@ namespace UltraVideoEditor
             { "sladoled",    "child eating ice cream" },
             { "sladoleda",   "child eating ice cream" },
             { "sladoledom",  "child eating ice cream" },
-            { "čaj",         "child drinking hot tea cup" },
-            { "čaja",        "child drinking hot tea cup" },
-            { "čajem",       "child drinking hot tea cup" },
-            { "čokolada",    "child hot chocolate cup cozy" },
-            { "čokoladu",    "child hot chocolate cup cozy" },
-            { "čokoladom",   "child hot chocolate cup cozy" },
-            { "topla",       "child hot drink cup cozy winter" },
-            { "topli",       "child hot drink cup cozy winter" },
+            { "čaj",         "child drinking warm tea mug" },
+            { "čaja",        "child drinking warm tea mug" },
+            { "čajem",       "child drinking warm tea mug" },
+            { "čokolada",    "child drinking hot chocolate mug" },
+            { "čokoladu",    "child drinking hot chocolate mug" },
+            { "čokoladom",   "child drinking hot chocolate mug" },
+            { "topla",       "child drinking hot chocolate mug" },
+            { "topli",       "child drinking hot chocolate mug" },
             { "jabuka",      "child eating apple healthy" },
             { "jabuku",      "child eating apple healthy" },
             { "jabuke",      "child eating apple healthy" },
@@ -1034,7 +1034,7 @@ namespace UltraVideoEditor
         public static string GetHardCodedQuery(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return null;
-            string lower = lyric.ToLower();
+            string lower = Fold(lyric);   // v1.4: "caj" and "čaj" match the same key
 
             // Bonus by category — more concrete object = higher bonus
             // Ovo osigurava da "sladoled" pobedi "leti" u istom stihu
@@ -1062,8 +1062,8 @@ namespace UltraVideoEditor
             var results = new List<(int pos, int len, int score, string query)>();
             foreach (var kv in _actionMap)
             {
-                string keyLower = kv.Key.ToLower();
-                int idx = lower.IndexOf(keyLower, StringComparison.OrdinalIgnoreCase);
+                string keyLower = Fold(kv.Key);
+                int idx = lower.IndexOf(keyLower, StringComparison.Ordinal);
                 if (idx < 0) continue;
                 bool leftOk  = idx == 0 || !char.IsLetter(lower[idx - 1]);
                 bool rightOk = idx + kv.Key.Length >= lower.Length ||
@@ -1075,7 +1075,7 @@ namespace UltraVideoEditor
 
                 // Bonus za konkretnu kategoriju
                 foreach (var bonus in categoryBonus)
-                    if (keyLower == bonus.Key.ToLower() || keyLower.StartsWith(bonus.Key.ToLower()))
+                    if (keyLower == Fold(bonus.Key) || keyLower.StartsWith(Fold(bonus.Key)))
                     { score += bonus.Value; break; }
 
                 results.Add((idx, kv.Key.Length, score, kv.Value));
@@ -1093,15 +1093,37 @@ namespace UltraVideoEditor
         // ══════════════════════════════════════════════════════════════════════
         //  GetAllHardCodedMatches — svi matchevi za multi-anchor scene
         // ══════════════════════════════════════════════════════════════════════
+        /// <summary>
+        /// v1.4 — lower case without Serbian diacritics, one letter for one letter (positions stay
+        /// the same). The keyword map is written with č, ć, š, ž, đ, but typed lyrics are often
+        /// without them ("caj", "cokolada"), so those words were never found and the line fell back
+        /// to its season word ("zimi" → snowy mountain instead of hot chocolate).
+        /// </summary>
+        internal static string Fold(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var chars = text.ToLowerInvariant().ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+                chars[i] = chars[i] switch { 'č' => 'c', 'ć' => 'c', 'š' => 's', 'ž' => 'z', 'đ' => 'd', _ => chars[i] };
+            return new string(chars);
+        }
+
+        private static readonly HashSet<string> _seasonOnlyQueries = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "spring flowers children park", "spring flowers outdoor nature", "autumn leaves children park",
+            "autumn leaves park outdoor", "winter snow children outdoor", "winter outdoor snow nature",
+            "summer sunny children outdoor"
+        };
+
         public static List<string> GetAllHardCodedMatches(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return new List<string>();
-            string lower = lyric.ToLower();
+            string lower = Fold(lyric);   // v1.4: "caj" and "čaj" match the same key
 
             var results = new List<(int pos, int len, string query)>();
             foreach (var kv in _actionMap)
             {
-                int idx = lower.IndexOf(kv.Key.ToLower(), StringComparison.OrdinalIgnoreCase);
+                int idx = lower.IndexOf(Fold(kv.Key), StringComparison.Ordinal);
                 if (idx < 0) continue;
                 bool leftOk  = idx == 0 || !char.IsLetter(lower[idx - 1]);
                 bool rightOk = idx + kv.Key.Length >= lower.Length ||
@@ -1117,7 +1139,13 @@ namespace UltraVideoEditor
                 if (!clean.Any(c => c.pos <= r.pos && r.pos < c.pos + c.len))
                     clean.Add(r);
 
-            return clean.Select(r => r.query).ToList();
+            var queries = clean.Select(r => r.query).ToList();
+            // v1.4: "Leti kupite sladoled, zimi neki topli čaj" is about ice cream and tea — the
+            // season words only say WHEN. When a line names real things, the season-only shots
+            // (snowy mountain, sunny meadow) are left out of its montage.
+            if (queries.Any(q => !_seasonOnlyQueries.Contains(q)))
+                queries = queries.Where(q => !_seasonOnlyQueries.Contains(q)).ToList();
+            return queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -1126,12 +1154,12 @@ namespace UltraVideoEditor
         public static (string query, int position) GetBestMatchForLyric(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return (null, -1);
-            string lower = lyric.ToLower();
+            string lower = Fold(lyric);   // v1.4: "caj" and "čaj" match the same key
 
             (string query, int position, int keyLen) best = (null, -1, 0);
             foreach (var kv in _actionMap)
             {
-                int idx = lower.IndexOf(kv.Key.ToLower(), StringComparison.OrdinalIgnoreCase);
+                int idx = lower.IndexOf(Fold(kv.Key), StringComparison.Ordinal);
                 if (idx < 0) continue;
                 bool leftOk  = idx == 0 || !char.IsLetter(lower[idx - 1]);
                 bool rightOk = idx + kv.Key.Length >= lower.Length ||
@@ -1178,14 +1206,14 @@ namespace UltraVideoEditor
         public static string DetectSeasonFromLyric(string lyric)
         {
             if (string.IsNullOrWhiteSpace(lyric)) return null;
-            string lower = lyric.ToLower();
+            string lower = Fold(lyric);   // v1.4: "cizme" and "čizme" alike
 
             // If the lyric mentions multiple seasons at once → do not override the global
             // "During spring and autumn, cold winters and warm summers" → null (all seasons, keep global)
             int seasonMentions = 0;
             var allSeasonWords = new[] { "zima","zime","zimi","sneg","snijeg","snegu","leto","ljeto","leti","ljeti","leta","proleće","proljeće","proleća","proljeća","jesen","jeseni" };
             foreach (var w in allSeasonWords) {
-                int idx = lower.IndexOf(w);
+                int idx = lower.IndexOf(Fold(w));
                 if (idx >= 0 && (idx == 0 || !char.IsLetter(lower[idx-1])) &&
                     (idx + w.Length >= lower.Length || !char.IsLetter(lower[idx+w.Length])))
                     seasonMentions++;
@@ -1199,7 +1227,7 @@ namespace UltraVideoEditor
                 "čizme","rukavice","skafander","mraz","led","sanjkanje","klizanje",
                 "grudvanje","grudvu","sanka"
             };
-            if (winterWords.Any(w => { int i = lower.IndexOf(w); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
+            if (winterWords.Any(w => { int i = lower.IndexOf(Fold(w)); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
                 return "winter";
 
             // Letnji signali
@@ -1207,7 +1235,7 @@ namespace UltraVideoEditor
                 "leto","ljeto","leti","ljeti","leta","sladoled","plaža","more","plivanje",
                 "sunce","suncu","sunčano","vrućina","vruće"
             };
-            if (summerWords.Any(w => { int i = lower.IndexOf(w); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
+            if (summerWords.Any(w => { int i = lower.IndexOf(Fold(w)); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
                 return "summer";
 
             // Spring signals
@@ -1215,14 +1243,14 @@ namespace UltraVideoEditor
                 "proleće","proljeće","proleća","proljeća","prolećem",
                 "cvet","cvijet","cveće","cvijeće","livada","trava"
             };
-            if (springWords.Any(w => { int i = lower.IndexOf(w); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
+            if (springWords.Any(w => { int i = lower.IndexOf(Fold(w)); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
                 return "spring";
 
             // Jesenji signali
             var autumnWords = new[] {
                 "jesen","jeseni","jesenjem","lišće","list","listovi"
             };
-            if (autumnWords.Any(w => { int i = lower.IndexOf(w); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
+            if (autumnWords.Any(w => { int i = lower.IndexOf(Fold(w)); return i>=0 && (i==0||!char.IsLetter(lower[i-1])) && (i+w.Length>=lower.Length||!char.IsLetter(lower[i+w.Length])); }))
                 return "autumn";
 
             return null; // stih ne pominje sezonu — zadržava globalnu

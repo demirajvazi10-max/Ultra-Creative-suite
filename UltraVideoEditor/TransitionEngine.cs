@@ -188,7 +188,7 @@ namespace UltraVideoEditor
             return $"{current.ContentDescription} → {next.ContentDescription} | " +
                    $"Motion: {current.Motion?.HasStrongMotion.ToString() ?? "?"}/{next.Motion?.HasStrongMotion.ToString() ?? "?"} | " +
                    $"Arc: {current.ArcBonus:F0}/{next.ArcBonus:F0} | " +
-                   $"Odabrano: {type}";
+                   $"Chosen: {type}";
         }
 
         // ── Helpers ──────────────────────────────────────────────────

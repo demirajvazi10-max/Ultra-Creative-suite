@@ -37,8 +37,9 @@ namespace UltraVideoEditor
         private void SaveSettings()
         {
             Settings.Format = ((ComboBoxItem)cmbFormat.SelectedItem).Content.ToString();
-            string quality = ((ComboBoxItem)cmbQuality.SelectedItem).Content.ToString();
-            Settings.Quality = quality == "Nizak" ? "Low" : (quality == "Visok" ? "High" : "Medium");
+            // v1.4: by position — the labels are "Low/Medium/High" but the code compared them
+            // with the Serbian words "Nizak/Visok", so the quality was always Medium.
+            Settings.Quality = cmbQuality.SelectedIndex switch { 0 => "Low", 2 => "High", _ => "Medium" };
             Settings.ExportAudioOnly = chkAudioOnly.IsChecked == true;
         }
 

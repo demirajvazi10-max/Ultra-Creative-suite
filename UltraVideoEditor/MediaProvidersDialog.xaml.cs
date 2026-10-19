@@ -17,7 +17,7 @@ namespace UltraVideoEditor
     public partial class MediaProvidersDialog : Window
     {
         private string _lang =>
-            (WpfApp.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+            LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _lang);
 
         private readonly AIVideoCreator _creator;
@@ -145,7 +145,7 @@ namespace UltraVideoEditor
             {
                 Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
             }
-            catch { }
+            catch (Exception swallowed) { AppLog.Error("Opening a provider link", swallowed); }   // v1.4: was silent
             e.Handled = true;
         }
 

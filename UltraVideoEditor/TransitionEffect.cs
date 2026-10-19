@@ -42,25 +42,34 @@ namespace UltraVideoEditor
             _ => "📄"
         };
 
+        /// <summary>
+        /// v1.4 — FFmpeg xfade name for a transition type. "zoom" (used before) is not a valid
+        /// xfade transition and made the whole crossfade pass fail.
+        /// Fade In/Out = through black; Crossfade = the two clips blend.
+        /// </summary>
+        public static string ToXfadeName(TransitionType t) => t switch
+        {
+            TransitionType.Fade       => "fadeblack",
+            TransitionType.Crossfade  => "fade",
+            TransitionType.SlideLeft  => "slideleft",
+            TransitionType.SlideRight => "slideright",
+            TransitionType.SlideUp    => "slideup",
+            TransitionType.SlideDown  => "slidedown",
+            TransitionType.WipeLeft   => "wipeleft",
+            TransitionType.WipeRight  => "wiperight",
+            TransitionType.WipeUp     => "wipeup",
+            TransitionType.WipeDown   => "wipedown",
+            TransitionType.ZoomIn     => "zoomin",
+            TransitionType.ZoomOut    => "circleclose",
+            _ => "fade"
+        };
+
         public string FFmpegFilter
         {
             get
             {
-                string transitionType = Type switch
-                {
-                    TransitionType.Fade       => "fade",
-                    TransitionType.Crossfade  => "fade",
-                    TransitionType.SlideLeft  => "slideleft",
-                    TransitionType.SlideRight => "slideright",
-                    TransitionType.SlideUp    => "slideup",
-                    TransitionType.SlideDown  => "slidedown",
-                    TransitionType.WipeLeft   => "wipeleft",
-                    TransitionType.WipeRight  => "wiperight",
-                    TransitionType.ZoomIn     => "zoom",
-                    TransitionType.ZoomOut    => "zoom",
-                    _ => "fade"
-                };
-                return $"xfade=transition={transitionType}:duration={Duration}:offset={Duration}";
+                string d = Duration.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return $"xfade=transition={ToXfadeName(Type)}:duration={d}:offset={d}";
             }
         }
 

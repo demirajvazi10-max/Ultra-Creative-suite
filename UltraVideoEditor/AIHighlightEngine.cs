@@ -94,8 +94,7 @@ namespace UltraVideoEditor
             CancellationToken ct = default)
         {
             bool videoOnly = string.IsNullOrEmpty(musicPath);
-            string ffmpegPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+            string ffmpegPath = AppPaths.FFmpeg;
 
             if (!File.Exists(videoPath))  return Fail($"Video file not found: {videoPath}");
             if (!videoOnly && !File.Exists(musicPath)) return Fail($"Audio file not found: {musicPath}");
@@ -549,26 +548,26 @@ namespace UltraVideoEditor
             sb.AppendLine("║      AI HIGHLIGHT ENGINE v2 — REPORT                  ║");
             sb.AppendLine("╚══════════════════════════════════════════════════════╝");
             sb.AppendLine();
-            sb.AppendLine("📹 ULAZNI PODACI");
+            sb.AppendLine("📹 INPUT");
             sb.AppendLine($"   Video:  {Path.GetFileName(videoPath)}");
-            sb.AppendLine($"   Muzika: {(string.IsNullOrEmpty(musicPath) ? "— (video-only mod)" : Path.GetFileName(musicPath))}");
+            sb.AppendLine($"   Music:  {(string.IsNullOrEmpty(musicPath) ? "— (video only)" : Path.GetFileName(musicPath))}");
             sb.AppendLine($"   Target: {FormatTime(result.TargetDuration)}");
             sb.AppendLine();
 
-            sb.AppendLine("🎵 ANALIZA RITMA");
+            sb.AppendLine("🎵 RHYTHM ANALYSIS");
             if (result.Beats?.IsValid == true)
             {
                 sb.AppendLine($"   BPM:          {result.BPM:F1}");
-                sb.AppendLine($"   Takt:         {result.Beats.TimeSignature}");
+                sb.AppendLine($"   Meter:        {result.Beats.TimeSignature}");
                 sb.AppendLine($"   Beat interval:{result.Beats.BeatInterval:F3}s");
-                sb.AppendLine($"   Mod:          {(result.Beats.PianoMode ? "Piano/melodijski" : "Perkusivni")}");
+                sb.AppendLine($"   Mode:         {(result.Beats.PianoMode ? "Piano/melodic" : "Percussive")}");
                 sb.AppendLine($"   Cut advance:  {result.Beats.CutAdvanceMs:F0}ms");
             }
             else sb.AppendLine("   Beat detection was not available.");
             sb.AppendLine();
 
             sb.AppendLine("✂️  SELECTED HIGHLIGHTS");
-            sb.AppendLine($"   Segmenata:  {result.Segments.Count}");
+            sb.AppendLine($"   Segments:   {result.Segments.Count}");
             sb.AppendLine($"   Duration:   {FormatTime(result.TotalDuration)} / {FormatTime(result.TargetDuration)}");
             sb.AppendLine();
 
@@ -579,20 +578,20 @@ namespace UltraVideoEditor
                     : $"{seg.Motion.Direction} (mag {seg.Motion.Magnitude:F0})";
 
                 sb.AppendLine($"  [{seg.Order:D2}]  {FormatTime(seg.SourceStart)} → {FormatTime(seg.SourceEnd)}  ({seg.Duration:F2}s)");
-                sb.AppendLine($"        Skor:    {seg.ImportanceScore:F0}/100  (arc bonus: +{seg.ArcBonus:F0})");
+                sb.AppendLine($"        Score:   {seg.ImportanceScore:F0}/100  (arc bonus: +{seg.ArcBonus:F0})");
                 sb.AppendLine($"        Content: {seg.ContentDescription}");
                 sb.AppendLine($"        Arc:     {seg.ArcDescription}");
-                sb.AppendLine($"        Kamera:  {motionDesc}");
+                sb.AppendLine($"        Camera:  {motionDesc}");
                 if (seg.FrameScores.Count > 0)
                 {
                     string fsStr = string.Join(" | ", seg.FrameScores.Select(s => $"{s:F0}"));
-                    sb.AppendLine($"        Frejmovi:{fsStr}");
+                    sb.AppendLine($"        Frames:  {fsStr}");
                 }
-                sb.AppendLine($"        Beat rez:{FormatTime(seg.BeatTimestamp)}");
+                sb.AppendLine($"        Beat cut:{FormatTime(seg.BeatTimestamp)}");
             }
             sb.AppendLine();
 
-            sb.AppendLine("📊 STATISTIKE");
+            sb.AppendLine("📊 STATISTICS");
             if (result.Segments.Count > 0)
             {
                 double avgScore  = result.Segments.Average(s => s.ImportanceScore);
@@ -605,13 +604,13 @@ namespace UltraVideoEditor
 
                 sb.AppendLine($"   Average score:       {avgScore:F1}/100");
                 sb.AppendLine($"   Average arc bonus:   +{avgArc:F1}");
-                sb.AppendLine($"   Segmenata sa arc-om: {withArc}/{result.Segments.Count}");
-                sb.AppendLine($"   Sa licima:           {withFaces}/{result.Segments.Count}");
-                sb.AppendLine($"   Pokrivenost targeta: {coverage:F1}%");
+                sb.AppendLine($"   Segments with arc:   {withArc}/{result.Segments.Count}");
+                sb.AppendLine($"   With faces:          {withFaces}/{result.Segments.Count}");
+                sb.AppendLine($"   Target coverage:     {coverage:F1}%");
             }
             sb.AppendLine();
             sb.AppendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            sb.AppendLine($"Generisan: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
+            sb.AppendLine($"Generated: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
             sb.AppendLine("Ultra Creative Suite — AI Highlight Engine v2 (Phase 2)");
             return sb.ToString();
         }

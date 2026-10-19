@@ -19,7 +19,7 @@ namespace UltraVideoEditor
     public partial class PixabaySearchDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -42,35 +42,18 @@ namespace UltraVideoEditor
             if (!string.IsNullOrEmpty(savedKey))
             {
                 _apiKey = savedKey;
-                txtApiKey.Password = "••••••••";
-                txtApiKey.IsEnabled = false;
+                // v1.4: the field stays usable — typing a new key replaces the saved one
+                // (it used to be locked, so a wrong or expired key could not be changed here).
+                System.Windows.Automation.AutomationProperties.SetHelpText(txtApiKey,
+                    "A Pixabay key is already saved. Type a new key here only if you want to replace it.");
                 txtSearch.Focus();
             }
         }
 
-        private string GetPixabayApiKey()
-        {
-            string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-            string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-            if (!File.Exists(keyFile)) return null;
-            try
-            {
-                byte[] encrypted = File.ReadAllBytes(keyFile);
-                byte[] decrypted = System.Security.Cryptography.ProtectedData.Unprotect(encrypted, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                return System.Text.Encoding.UTF8.GetString(decrypted);
-            }
-            catch { return null; }
-        }
+        // v1.4: one shared Pixabay key store (see MediaProviderSettings.LoadPixabayKey)
+        private string GetPixabayApiKey() => MediaProviderSettings.LoadPixabayKey();
 
-        private void SavePixabayApiKey(string key)
-        {
-            string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraVideoEditor");
-            Directory.CreateDirectory(settingsPath);
-            string keyFile = Path.Combine(settingsPath, "pixabay_key.bin");
-            byte[] data = System.Text.Encoding.UTF8.GetBytes(key);
-            byte[] encrypted = System.Security.Cryptography.ProtectedData.Protect(data, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(keyFile, encrypted);
-        }
+        private void SavePixabayApiKey(string key) => MediaProviderSettings.SavePixabayKey(key);
 
         private void cmbMediaType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -94,12 +77,12 @@ namespace UltraVideoEditor
 
         private async void btnSearch_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_apiKey) && !string.IsNullOrEmpty(txtApiKey.Password))
+            // v1.4: a key typed in the field always wins and replaces the saved one
+            if (!string.IsNullOrWhiteSpace(txtApiKey.Password))
             {
-                _apiKey = txtApiKey.Password;
+                _apiKey = txtApiKey.Password.Trim();
                 SavePixabayApiKey(_apiKey);
-                txtApiKey.IsEnabled = false;
-                txtApiKey.Password = "••••••••";
+                txtApiKey.Password = "";
             }
 
             if (string.IsNullOrEmpty(_apiKey))
@@ -217,12 +200,12 @@ namespace UltraVideoEditor
                             lstResults.Items.Add(item);
                         }
 
-                        txtSelectedInfo.Text = LF("psd_found_results", hits.Count);
+                        AnnounceInfo(LF("psd_found_results", hits.Count));
                     }
                     else
                     {
                         lstResults.Items.Add(L("psd_no_results_msg"));
-                        txtSelectedInfo.Text = "No results for this search.";
+                        AnnounceInfo(L("psd_no_results_msg"));
                     }
                 }
             }
@@ -230,8 +213,16 @@ namespace UltraVideoEditor
             {
                 lstResults.Items.Clear();
                 lstResults.Items.Add(LF("psd_error_item", ex.Message));
-                txtSelectedInfo.Text = LF("generic_error", ex.Message);
+                AnnounceInfo(LF("generic_error", ex.Message));
             }
+        }
+
+        /// <summary>v1.4: search results / errors are spoken (the text used to change silently).</summary>
+        private void AnnounceInfo(string message)
+        {
+            txtSelectedInfo.Text = message;
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(txtSelectedInfo);
+            peer?.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
         }
 
         private string GetSelectedTag(ComboBox combo, string defaultValue)
@@ -282,7 +273,7 @@ namespace UltraVideoEditor
             try
             {
                 btnDownload.IsEnabled = false;
-                btnDownload.Content = $"⏳ Preuzimam {selectedItems.Count} stavki...";
+                btnDownload.Content = LanguageManager.F("loc_downloading_n", selectedItems.Count);
 
                 string projectFolder = GetCurrentProjectFolder();
                 DownloadedMediaPaths.Clear();
@@ -354,7 +345,13 @@ namespace UltraVideoEditor
         public int Downloads { get; set; }
         public string User { get; set; }
         public bool IsVideo { get; set; }
-    
+
+        // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+        public override string ToString() =>
+            $"{(IsVideo ? "Video" : "Image")}: {Title}" +
+            (string.IsNullOrEmpty(Duration) ? "" : $", {Duration}") +
+            (string.IsNullOrEmpty(Dimensions) ? "" : $", {Dimensions}") +
+            $", {Likes} likes, {Downloads} downloads, author {User}";
     
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {

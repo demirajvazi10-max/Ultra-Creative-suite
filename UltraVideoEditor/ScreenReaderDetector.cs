@@ -76,5 +76,43 @@ namespace UltraVideoEditor
 
             return false;
         }
+
+        /// <summary>v1.4 (R6) — which reader is running; refreshed at most every 15 seconds.</summary>
+        public enum Reader { None, Jaws, Nvda, Narrator, Other }
+
+        private static Reader _reader = Reader.None;
+        private static long _readerCheckedAt = long.MinValue;
+
+        /// <summary>
+        /// The screen reader in use. JAWS wins when several run at once, because the app's
+        /// announcements were built and tested with JAWS (live regions); NVDA and Narrator get
+        /// UI Automation notifications instead, which both read reliably.
+        /// </summary>
+        public static Reader CurrentReader()
+        {
+            long now = System.Environment.TickCount64;
+            if (now - _readerCheckedAt < 15000) return _reader;
+            _readerCheckedAt = now;
+            bool jaws = false, nvda = false, narrator = false;
+            try
+            {
+                foreach (var proc in System.Diagnostics.Process.GetProcesses())
+                {
+                    try
+                    {
+                        string name = proc.ProcessName?.ToLowerInvariant() ?? "";
+                        if (name.StartsWith("jfw") || name == "fusion") jaws = true;
+                        else if (name == "nvda") nvda = true;
+                        else if (name == "narrator") narrator = true;
+                    }
+                    catch { }
+                    finally { proc.Dispose(); }
+                }
+            }
+            catch { }
+            _reader = jaws ? Reader.Jaws : nvda ? Reader.Nvda : narrator ? Reader.Narrator
+                    : IsScreenReaderFlagSet() ? Reader.Other : Reader.None;
+            return _reader;
+        }
     }
 }

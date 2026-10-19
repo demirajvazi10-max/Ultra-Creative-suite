@@ -15,7 +15,7 @@ namespace UltraVideoEditor
     public partial class VideoEngineDialog : Window
     {
         // Language helper
-        private string _LangCode => (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en";
+        private string _LangCode => LanguageManager.CurrentLanguage ?? "en";
         private string L(string key) => LanguageManager.GetText(key, _LangCode);
         private string LF(string key, params object[] args) => string.Format(LanguageManager.GetText(key, _LangCode), args);
 
@@ -39,6 +39,11 @@ namespace UltraVideoEditor
             public string    VibeLabel   { get; set; }
             public ShotData  Data        { get; set; }
             public LyricShot Shot        { get; set; }
+
+            // v1.4: list items use ToString() as their screen-reader name (otherwise the class name is read)
+            public override string ToString() =>
+                string.Join(", ", new[] { Timestamp, ChorusLabel, Shot?.Lyric, VibeLabel }
+                    .Where(s => !string.IsNullOrWhiteSpace(s)));
         }
 
         // ── Konstruktor ──────────────────────────────────────────────
@@ -63,7 +68,7 @@ namespace UltraVideoEditor
 
             if (_ollamaAvailable)
             {
-                txtOllamaInfo.Text          = "Ollama aktivna — AI ce generisati query-je";
+                txtOllamaInfo.Text          = LanguageManager.T("loc_ollama_active");
                 txtOllamaInfo.Foreground    = System.Windows.Media.Brushes.LightGreen;
                 chkUseOllama.IsChecked      = true;
                 chkUseOllama.IsEnabled      = true;
@@ -234,8 +239,8 @@ namespace UltraVideoEditor
 
                     var shot = _shots[i];
                     int pct  = 15 + (i * 80 / total);
-                    Announce($"Kadar {i+1}/{total}: preuzimam '{shot.Data.SearchQuery}' " +
-                             $"[{shot.Data.ShotType}, v{shot.Data.VibeScore}]...", pct);
+                    Announce(LanguageManager.F("loc_shot_downloading", i + 1, total, shot.Data.SearchQuery,
+                             shot.Data.ShotType, shot.Data.VibeScore), pct);
 
                     string path = await DownloadMedia(
                         shot.Data.SearchQuery,
@@ -290,7 +295,10 @@ namespace UltraVideoEditor
 
                 // Remove existing video/image clips
                 var existing = mainWin.timelineItems
-                    .Where(i => (i.IsImage || i.IsVideo) && !i.IsAudio)
+                    // v1.4: only the main video track (overlays on Video 2 stay), plus the
+                    // ambient clips a previous Video Engine run added.
+                    .Where(i => ((i.IsImage || i.IsVideo) && !i.IsAudio && i.TrackIndex == 0) ||
+                                (i.TrackIndex == 3 && (i.Name ?? "").StartsWith("🔊 Video Engine")))
                     .ToList();
                 foreach (var item in existing)
                     mainWin.timelineItems.Remove(item);
@@ -320,6 +328,27 @@ namespace UltraVideoEditor
                         AudioDescription  = $"{shot.Data.ShotType}, vibe {shot.Data.VibeScore}/10: {shot.Lyric}",
                         AmbientSoundPath  = ambientForShot
                     });
+
+                    // v1.4: the chosen ambient sound was only stored on the clip
+                    // (AmbientSoundPath), which the renderer never reads — so it was never
+                    // heard. Put it on Audio 2 under the shot instead, quietly.
+                    if (!string.IsNullOrEmpty(ambientForShot) && File.Exists(ambientForShot))
+                    {
+                        mainWin.timelineItems.Add(new TimelineItem
+                        {
+                            Path             = ambientForShot,
+                            Duration         = shot.Duration,
+                            Start            = cursor,
+                            End              = cursor + shot.Duration,
+                            Name             = "🔊 Video Engine: " + Path.GetFileNameWithoutExtension(ambientForShot),
+                            Type             = "Audio",
+                            Volume           = 25,
+                            TrackIndex       = 3,
+                            UseFixedPosition = true,
+                            FixedPosition    = cursor,
+                            VideoEffect      = new VideoEffectData()
+                        });
+                    }
 
                     if (showTitles && !string.IsNullOrEmpty(shot.Lyric))
                         mainWin.AddSubtitle(shot.Lyric, cursor, cursor + shot.Duration);
@@ -484,46 +513,11 @@ namespace UltraVideoEditor
 
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-        private string ReadPixabayKey()
-        {
-            try
-            {
-                string dir  = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "UltraVideoEditor");
-                string bin  = Path.Combine(dir, "pixabay_key.bin");
-                if (File.Exists(bin))
-                {
-                    byte[] enc = File.ReadAllBytes(bin);
-                    byte[] dec = System.Security.Cryptography.ProtectedData.Unprotect(
-                        enc, null,
-                        System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                    return System.Text.Encoding.UTF8.GetString(dec).Trim();
-                }
-                string txt = Path.Combine(dir, "pixabay_key.txt");
-                if (File.Exists(txt)) return File.ReadAllText(txt).Trim();
-            }
-            catch { }
-            return null;
-        }
+        // v1.4: one shared Pixabay key store (see MediaProviderSettings.LoadPixabayKey)
+        private string ReadPixabayKey() => MediaProviderSettings.LoadPixabayKey();
 
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-        private void SavePixabayKey(string key)
-        {
-            try
-            {
-                string dir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "UltraVideoEditor");
-                Directory.CreateDirectory(dir);
-                byte[] data = System.Text.Encoding.UTF8.GetBytes(key);
-                byte[] enc  = System.Security.Cryptography.ProtectedData.Protect(
-                    data, null,
-                    System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(Path.Combine(dir, "pixabay_key.bin"), enc);
-            }
-            catch { }
-        }
+        private void SavePixabayKey(string key) => MediaProviderSettings.SavePixabayKey(key);
 
         private static string FormatTime(double s)
             => TimeSpan.FromSeconds(s).ToString(@"m\:ss");

@@ -111,7 +111,7 @@
                     </ComboBox>
 
                     <TextBlock Text="⭐ Editors Choice:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
-                    <CheckBox x:Name="chkEditorsChoice" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimary}"/>
+                    <CheckBox x:Name="chkEditorsChoice" AutomationProperties.Name="Editors choice only" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimary}"/>
                 </StackPanel>
 
                 <!-- Red 5: Video filteri (prikazuju se samo kad je video tip) -->
@@ -174,6 +174,7 @@
         <!-- Info o odabranim stavkama -->
         <Border Grid.Row="4" Background="#1A3A1A" CornerRadius="4" Padding="8" Margin="0,10,0,10">
             <TextBlock x:Name="txtSelectedInfo" Foreground="#C8E6C9" FontSize="11" TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
                        Text="Select one or more items (Ctrl+click or Shift+click)"/>
         </Border>
 

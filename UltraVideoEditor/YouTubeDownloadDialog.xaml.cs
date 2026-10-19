@@ -74,8 +74,7 @@ namespace UltraVideoEditor
         private static readonly string ManagedDenoExe = Path.Combine(ManagedDenoDir, "deno.exe");
 
         // FFmpeg koji je već upakovan uz Ultra Video Editor.
-        private static readonly string BundledFfmpegExe = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+        private static readonly string BundledFfmpegExe = AppPaths.FFmpeg;
 
         private static readonly string DownloadFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),

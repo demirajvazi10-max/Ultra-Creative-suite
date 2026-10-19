@@ -51,7 +51,7 @@ namespace UltraVideoEditor
                 }
 
                 // FFmpeg konkatenira frejmove u video
-                string ffmpeg = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Ffmpeg", "ffmpeg.exe");
+                string ffmpeg = AppPaths.FFmpeg;
                 string args   = $"-nostdin -framerate {FPS} -i \"{tempDir}\\frame_%06d.png\" " +
                                 $"-c:v libx264 -pix_fmt yuv420p -y \"{outputPath}\"";
 
@@ -76,7 +76,7 @@ namespace UltraVideoEditor
                 stdoutTask.Wait();
 
                 if (proc.ExitCode != 0)
-                    throw new Exception(string.Format(LanguageManager.GetText("sae_ffmpeg_error", (System.Windows.Application.Current?.MainWindow as MainWindow)?._currentLanguage ?? "en"), stderrTask.Result.Substring(0, Math.Min(300, stderrTask.Result.Length))));
+                    throw new Exception(string.Format(LanguageManager.GetText("sae_ffmpeg_error", LanguageManager.CurrentLanguage ?? "en"), stderrTask.Result.Substring(0, Math.Min(300, stderrTask.Result.Length))));
             }
             finally
             {

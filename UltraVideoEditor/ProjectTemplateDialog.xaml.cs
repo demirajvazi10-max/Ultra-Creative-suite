@@ -73,7 +73,7 @@ namespace UltraVideoEditor
                             File.ReadAllText(file));
                         if (t != null) _templates.Add(t);
                     }
-                    catch { }
+                    catch (Exception swallowed) { AppLog.Error("Loading a project template", swallowed); }   // v1.4: was silent
                 }
             }
             RefreshList();

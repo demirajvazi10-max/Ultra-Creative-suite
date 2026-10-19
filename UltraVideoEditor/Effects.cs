@@ -4,7 +4,10 @@ namespace UltraVideoEditor
 {
     public static class VideoEffects
     {
-        public static string GetFFmpegFilter(VideoEffectData effect)
+        public static string GetFFmpegFilter(VideoEffectData effect) => GetFFmpegFilter(effect, includeSpeed: true);
+
+        /// <summary>v1.4 — the render applies speed itself (it also changes how much of the source is read).</summary>
+        public static string GetFFmpegFilter(VideoEffectData effect, bool includeSpeed)
         {
             if (effect == null) return "";
             string filter = "";
@@ -16,7 +19,7 @@ namespace UltraVideoEditor
                 filter += $"eq=brightness={brightness.ToString(CultureInfo.InvariantCulture)}:contrast={contrast.ToString(CultureInfo.InvariantCulture)},";
             }
             if (effect.Blur > 0) filter += $"boxblur={effect.Blur.ToString(CultureInfo.InvariantCulture)},";
-            if (effect.Speed != 1.0) filter += $"setpts={(1.0 / effect.Speed).ToString(CultureInfo.InvariantCulture)}*PTS,";
+            if (includeSpeed && effect.Speed != 1.0) filter += $"setpts={(1.0 / effect.Speed).ToString(CultureInfo.InvariantCulture)}*PTS,";
 
             return filter.TrimEnd(',');
         }

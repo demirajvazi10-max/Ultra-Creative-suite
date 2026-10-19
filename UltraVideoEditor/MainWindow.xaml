@@ -96,10 +96,18 @@
                 <Separator/>
                 <MenuItem x:Name="mnuSetDuration" Tag="mnu_set_duration" InputGestureText="Ctrl+D" Click="SetClipDuration_Click"/>
                 <MenuItem x:Name="mnuSetVolume" Tag="menu_set_volume" InputGestureText="Ctrl+Alt+V" Click="SetClipVolume_Click"/>
+                <MenuItem x:Name="mnuVolPoint" Tag="mnu_vol_point" InputGestureText="Ctrl+Shift+V" Click="AddVolumePoint_Click"/>
+                <MenuItem x:Name="mnuVolRead" Tag="mnu_vol_read" Click="ReadVolumeCurve_Click"/>
+                <MenuItem x:Name="mnuVolClear" Tag="mnu_vol_clear" Click="ClearVolumeCurve_Click"/>
+                <MenuItem x:Name="mnuDuck" Tag="mnu_duck" Click="DuckMusic_Click"/>
+                <Separator/>
+                <MenuItem x:Name="mnuSetSpeed" Tag="mnu_set_speed" InputGestureText="Ctrl+Alt+S" Click="SetClipSpeed_Click"/>
+                <MenuItem x:Name="mnuPlayMix" Tag="🎧|mnu_play_mix" InputGestureText="Ctrl+Shift+Space" Click="PlayMix_Click"/>
+                <MenuItem x:Name="mnuMixShots" Tag="mnu_mix_shots" IsCheckable="True" IsChecked="True" Click="ToggleMixShotAnnouncements_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuAddMarker" Tag="marker" InputGestureText="Ctrl+M" Click="AddMarker_Click"/>
                 <MenuItem x:Name="mnuNextMarker" Tag="mw_next_marker" InputGestureText="Ctrl+Shift+N" Click="NextMarker_Click"/>
-                <MenuItem x:Name="mnuPrevMarker" Tag="mnu_prev_marker" InputGestureText="Ctrl+Shift+P" Click="PrevMarker_Click"/>
+                <MenuItem x:Name="mnuPrevMarker" Tag="mnu_prev_marker" InputGestureText="Ctrl+Shift+," Click="PrevMarker_Click"/>
                 <MenuItem x:Name="mnuClearMarkers" Tag="mw_clear_markers" Click="ClearAllMarkers_Click"/>
             </MenuItem>
             <MenuItem x:Name="mnuAI" Tag="mw_ai_menu">
@@ -108,6 +116,11 @@
                           Header="🔍 AI Video Review"
                           AutomationProperties.Name="Open AI Video Review — Qwen2-VL analyzes the finished video"/>
                 <MenuItem x:Name="mnuClipDescriptions" Tag="👁|mnu_clip_desc" Click="DescribeAllClips_Click"/>
+                <MenuItem x:Name="mnuDescFrame" Tag="👁|mnu_desc_frame" InputGestureText="Ctrl+Shift+F" Click="DescribeFrameHere_Click"/>
+                <MenuItem x:Name="mnuDescParts" Tag="mnu_desc_parts" InputGestureText="Ctrl+Alt+D" Click="DescribeClipParts_Click"/>
+                <MenuItem x:Name="mnuDescAllMine" Tag="mnu_desc_all_mine" Click="DescribeAllMyClips_Click"/>
+                <MenuItem x:Name="mnuDescStop" Tag="mnu_desc_stop" Click="StopDescribing_Click"/>
+                <MenuItem x:Name="mnuDescFollow" Tag="mnu_desc_follow" IsCheckable="True" IsChecked="True" Click="ToggleAnnounceDescriptions_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuGenerateVoice" Tag="mw_generate_voice" Click="GenerateVoice_Click"/>
                 <MenuItem x:Name="mnuGenerateFrames" Tag="mw_generate_frames" Click="GenerateAI_Click"/>
@@ -187,6 +200,7 @@
                 <MenuItem x:Name="mnuManual" Tag="mw_manual" Click="ShowUserManual_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuUpdates" Tag="mw_updates" Click="CheckForUpdates_Click"/>
+                <MenuItem x:Name="mnuOpenLogs" Tag="mw_open_logs" Click="OpenLogFolder_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuAbout" Tag="mw_about" Click="ShowAbout_Click"/>
             </MenuItem>
@@ -356,7 +370,7 @@
                                 <Button x:Name="btnSyncLyrics" Content="🎤 SYNC LYRICS" Click="SyncLyrics_Click" Height="40" Background="{DynamicResource WarningBrush}" FontWeight="Bold" Margin="0,10"/>
                                 <ProgressBar x:Name="prgSync" Height="6" Visibility="Collapsed"/>
                                 <TextBlock x:Name="txtSyncStatus" Foreground="Yellow"/>
-                                <ListBox x:Name="lstAutoSubtitles" Height="80" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="0,10"/>
+                                <ListBox x:Name="lstAutoSubtitles" AutomationProperties.Name="Synchronized lyric lines" Height="80" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" Margin="0,10"/>
                                 <Button x:Name="btnAddSyncedSubtitles" Content="➕ ADD SUBTITLES" Click="AddSyncedSubtitles_Click" Height="35" Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"/>
                             </StackPanel>
                         </Border>
@@ -422,7 +436,7 @@
                             <Button x:Name="btnAddSubtitle" Content="➕ ADD SUBTITLE" Click="AddSubtitle_Click" Width="120" Height="35" Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}"/>
                         </StackPanel>
                     </StackPanel>
-                    <ListBox x:Name="lstSubtitles" Grid.Row="1" Background="{DynamicResource PanelBg}" Foreground="{DynamicResource TextPrimary}"/>
+                    <ListBox x:Name="lstSubtitles" AutomationProperties.Name="Subtitles on the timeline" Grid.Row="1" Background="{DynamicResource PanelBg}" Foreground="{DynamicResource TextPrimary}"/>
                     <Button x:Name="btnClearSubtitles" Content="🗑 CLEAR ALL SUBTITLES" Click="ClearSubtitles_Click" Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" Height="40" Margin="0,10,0,0"/>
                 </Grid>
             </TabItem>
@@ -592,6 +606,7 @@
             <Button x:Name="btnSeekBack" Tag="⏪|seek_back" Click="SeekBack_Click" Width="70" Height="35" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"/>
             <Button x:Name="btnPlay" Tag="▶|play" Click="TogglePlay_Click" Width="90" Height="35" Margin="5,0" Background="#1A237E" Foreground="{DynamicResource ButtonTextBrush}"/>
             <Button x:Name="btnSeekForward" Tag="⏩|seek_forward" Click="SeekForward_Click" Width="70" Height="35" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"/>
+            <Button x:Name="btnPlayMix" Tag="🎧|play_mix|Ctrl+Shift+Space" Click="PlayMix_Click" MinWidth="120" Height="35" Margin="5,0,0,0" Padding="8,0" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"/>
             <TextBlock x:Name="txtCurrentPosition" Foreground="Yellow" Text="0:00 / 0:00" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="12"/>
             <TextBlock x:Name="txtMarkerStatus" Foreground="{DynamicResource WarningBrush}" Text="" VerticalAlignment="Center" Margin="15,0,0,0"/>
         </StackPanel>
