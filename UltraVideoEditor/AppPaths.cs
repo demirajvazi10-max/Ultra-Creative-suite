@@ -137,6 +137,24 @@ namespace UltraVideoEditor
             }
         }
 
+        /// <summary>
+        /// v1.4 — the ambient sound library downloaded from Adobe by the installer or by
+        /// Help → Download the sound library (%LOCALAPPDATA%\UltraVideoEditor\Sounds; the program
+        /// folder under Program Files cannot be written without administrator rights).
+        /// </summary>
+        public static string DownloadedSoundsDir => System.IO.Path.Combine(DataDir, "Sounds");
+
+        /// <summary>v1.4 — every folder with ambient sounds: Assets\Sounds next to the program and the downloaded library.</summary>
+        public static IEnumerable<string> SoundDirs
+        {
+            get
+            {
+                string local = System.IO.Path.Combine(BaseDir, "Assets", "Sounds");
+                if (Directory.Exists(local)) yield return local;
+                if (Directory.Exists(DownloadedSoundsDir)) yield return DownloadedSoundsDir;
+            }
+        }
+
         public static string AutosaveDir
         {
             get

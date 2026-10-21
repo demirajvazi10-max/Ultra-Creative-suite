@@ -237,6 +237,7 @@ namespace UltraVideoEditor
                 SetupTransitionContextMenus();
 
                 InitNativeListView();
+                InitGraphicTimeline();   // v1.4 (R7)
                 _selectionDebounceTimer = new System.Windows.Forms.Timer();
                 _selectionDebounceTimer.Interval = 400;
                 _selectionDebounceTimer.Tick += (s, e) =>
@@ -809,13 +810,23 @@ namespace UltraVideoEditor
             Dispatcher.BeginInvoke(new Action(UpdatePositionDisplay));   // v1.4: player thread → queue
         }
 
+        // v1.4: the position announcement while playing is OFF by default (it talked every
+        // 10 seconds without being asked); when turned on it speaks every 30 seconds.
+        // The choice is remembered in position_announce.cfg next to theme.cfg.
+        private bool _positionAnnounceOn = false;
+        private static string PositionCfgPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "position_announce.cfg");
+
         private void InitPositionAnnouncer()
         {
+            try { _positionAnnounceOn = File.Exists(PositionCfgPath) && File.ReadAllText(PositionCfgPath).Trim() == "on"; }
+            catch (Exception ex) { AppLog.Error("Reading the position announcement setting", ex); }
+            if (mnuPositionAnnounce != null) mnuPositionAnnounce.IsChecked = _positionAnnounceOn;
+
             positionAnnounceTimer = new System.Windows.Threading.DispatcherTimer();
-            positionAnnounceTimer.Interval = TimeSpan.FromSeconds(10);
+            positionAnnounceTimer.Interval = TimeSpan.FromSeconds(30);
             positionAnnounceTimer.Tick += (s, e) =>
             {
-                if (isPlaying && accessibilityMode)
+                if (isPlaying && accessibilityMode && _positionAnnounceOn)
                 {
                     try
                     {
@@ -825,8 +836,44 @@ namespace UltraVideoEditor
                 }
             };
             // Start timer immediately if accessibility mode is enabled
-            if (accessibilityMode)
+            if (accessibilityMode && _positionAnnounceOn)
                 positionAnnounceTimer.Start();
+            StartScreenReaderWatch();
+        }
+
+        private void TogglePositionAnnounce_Click(object sender, RoutedEventArgs e)
+        {
+            _positionAnnounceOn = !_positionAnnounceOn;
+            if (mnuPositionAnnounce != null) mnuPositionAnnounce.IsChecked = _positionAnnounceOn;
+            try { File.WriteAllText(PositionCfgPath, _positionAnnounceOn ? "on" : "off"); }
+            catch (Exception ex) { AppLog.Error("Saving the position announcement setting", ex); }
+            if (_positionAnnounceOn && accessibilityMode) positionAnnounceTimer?.Start(); else positionAnnounceTimer?.Stop();
+            LogMessage(L(_positionAnnounceOn ? "pos_announce_on" : "pos_announce_off"), true);
+        }
+
+        // ── v1.4: a screen reader started AFTER the program ─────────────────────
+        // The mode was chosen once at startup, so JAWS/NVDA started later found a silent
+        // program until Ctrl+Shift+A. Every 10 seconds the program now looks for a reader and
+        // switches to Accessibility mode by itself — unless you chose Sighted or Low vision
+        // yourself while a reader was running.
+        private bool _modeChosenByUser = false;
+        private System.Windows.Threading.DispatcherTimer _readerWatch;
+
+        private void StartScreenReaderWatch()
+        {
+            _readerWatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            _readerWatch.Tick += (s, e) =>
+            {
+                if (_uiMode != UIMode.Sighted || _modeChosenByUser) return;
+                var reader = ScreenReaderDetector.CurrentReader();
+                if (reader == ScreenReaderDetector.Reader.Jaws || reader == ScreenReaderDetector.Reader.Nvda ||
+                    reader == ScreenReaderDetector.Reader.Narrator)
+                {
+                    SetUIMode(UIMode.Accessibility, announce: false, byUser: false);
+                    LogMessage(L("reader_detected_switch"), true);
+                }
+            };
+            _readerWatch.Start();
         }
         public void UpdateTimelineDisplay()
         {
@@ -835,6 +882,7 @@ namespace UltraVideoEditor
 
         private void UpdateMarkerDisplay()
         {
+            graphicTimeline?.InvalidateVisual();
             if (txtMarkerStatus != null)
                 txtMarkerStatus.Text = markers.Count > 0 ? $"📍 {markers.Count}" : "";
         }
@@ -1269,7 +1317,18 @@ namespace UltraVideoEditor
                     Contrast = source.VideoEffect.Contrast,
                     Blur = source.VideoEffect.Blur,
                     Speed = source.VideoEffect.Speed
-                } : null
+                } : null,
+                // v1.4 (R4/R5): without these, Ctrl+Z after trimming, a speed change or "lower the
+                // music under speech" also threw away the volume points, audio effects and descriptions
+                VolumePoints = source.VolumePoints?.Select(p => new VolumePoint { Time = p.Time, Volume = p.Volume }).ToList(),
+                AudioFx = source.AudioFx == null ? null : new AudioSettingsData
+                {
+                    BassBoost = source.AudioFx.BassBoost,
+                    TrebleBoost = source.AudioFx.TrebleBoost,
+                    ReverbAmount = source.AudioFx.ReverbAmount,
+                    CompressorEnabled = source.AudioFx.CompressorEnabled
+                },
+                FrameDescriptions = source.FrameDescriptions?.Select(d => new FrameDescription { Start = d.Start, End = d.End, Text = d.Text }).ToList()
             };
             foreach (var kf in source.Keyframes)
             {
@@ -1634,6 +1693,19 @@ namespace UltraVideoEditor
                     }
                 }
 
+                // v1.4: check the SHA-256 before running the installer (it gets administrator rights)
+                string problem = await UpdateChecker.VerifyAsync(update, tempPath);
+                if (problem != null)
+                {
+                    try { File.Delete(tempPath); } catch { }
+                    AppLog.Error("Update check", new Exception(problem));
+                    WpfMessageBox.Show(string.Format(L("update_verify_failed"), problem), L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    if (!string.IsNullOrEmpty(update.HtmlUrl))
+                        try { Process.Start(new ProcessStartInfo(update.HtmlUrl) { UseShellExecute = true }); } catch { }
+                    return;
+                }
+                LogMessage(L("update_verified"), true);
+
                 LogMessage(L("update_installing"), true);
                 WpfMessageBox.Show(L("update_installing"), L("updates_title"), MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -1653,6 +1725,85 @@ namespace UltraVideoEditor
         /// read-only text field (JAWS/NVDA read it line by line with the arrow keys), the links are
         /// buttons that open the default browser. Escape closes it.
         /// </summary>
+        // ── v1.4: ambient sound library straight from Adobe ─────────────────────
+        private Process _soundDownload;
+
+        /// <summary>
+        /// Help → Download the sound library from Adobe. Runs Tools\DownloadAdobeSounds.ps1 in the
+        /// background (Adobe's free Audition sound effects, Adobe's server and licence, converted to
+        /// OGG) and announces each step. Editing goes on meanwhile; clicking again while it runs says so.
+        /// </summary>
+        private async void DownloadAdobeSounds_Click(object sender, RoutedEventArgs e)
+        {
+            if (_soundDownload != null && !_soundDownload.HasExited) { LogMessage(L("snd_running"), true); return; }
+            string script = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "DownloadAdobeSounds.ps1");
+            if (!File.Exists(script)) { LogMessage(LF("snd_failed", script), true); return; }
+            if (!AppPaths.FFmpegAvailable) { LogMessage(LF("snd_failed", "FFmpeg"), true); return; }
+            if (WpfMessageBox.Show(L("snd_confirm"), L("snd_title"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+            var psi = new ProcessStartInfo("powershell.exe",
+                $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{script}\" -Dest \"{AppPaths.DownloadedSoundsDir}\" -Ffmpeg \"{AppPaths.FFmpeg}\"")
+            {
+                UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true
+            };
+            try
+            {
+                _soundDownload = Process.Start(psi);
+                _soundDownload.DrainStderr();
+                LogMessage(L("snd_started"), true);
+                string line, last = null;
+                int lastQuarter = -1;
+                while ((line = await _soundDownload.StandardOutput.ReadLineAsync()) != null)
+                {
+                    line = line.Trim();
+                    if (line.StartsWith("STEP ")) LogMessage(LF("snd_step", line.Substring(5)), true);
+                    else if (line.StartsWith("PROGRESS "))
+                    {
+                        // "PROGRESS Weather 50/200": spoken at every quarter, written every time
+                        var m = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)/(\d+)$");
+                        int q = m.Success && int.Parse(m.Groups[2].Value) > 0 ? int.Parse(m.Groups[1].Value) * 4 / int.Parse(m.Groups[2].Value) : -1;
+                        LogMessage(LF("snd_step", line.Substring(9)), q != lastQuarter && q > 0);
+                        lastQuarter = q;
+                    }
+                    else if (line.StartsWith("ERROR ")) LogMessage(LF("snd_failed", line.Substring(6)), true);
+                    else if (line.StartsWith("DONE")) last = line;
+                }
+                await _soundDownload.WaitForExitAsync();
+                AIVideoCreator.ResetSoundIndex();
+                LocalSoundLibrary.ResetIndex();
+                var parts = (last ?? "").Split(' ');
+                if (parts.Length >= 3 && parts[0] == "DONE")
+                    LogMessage(LF("snd_done", parts[1], parts[2]), true);
+                else
+                    LogMessage(L("snd_partial"), true);
+                PlayBeep();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Downloading the Adobe sound library", ex);
+                LogMessage(LF("snd_failed", ex.Message), true);
+            }
+            finally { _soundDownload = null; }
+        }
+
+        /// <summary>v1.4 — opens THIRD-PARTY-NOTICES.md (next to the program) in the default text viewer.</summary>
+        private void ShowThirdPartyNotices_Click(object sender, RoutedEventArgs e)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "THIRD-PARTY-NOTICES.md");
+            try
+            {
+                if (!File.Exists(path)) throw new FileNotFoundException(path);
+                // .md has no default app on many computers: open it with Notepad, which every Windows has
+                Process.Start(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Opening the third-party licences", ex);
+                LogMessage(LF("about_open_failed", "https://github.com/demirajvazi10-max/Ultra-Creative-suite/blob/main/UltraVideoEditor/THIRD-PARTY-NOTICES.md"), true);
+            }
+        }
+
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
             var links = new (string Key, string Url)[]
@@ -2289,6 +2440,219 @@ namespace UltraVideoEditor
         }
 
         // ══════════════════════════════════════════════════════════════
+        // v1.4 (roadmap 4.2) — AUDIO DESCRIPTION FOR VIEWERS
+        // ══════════════════════════════════════════════════════════════
+
+        private string _lastRenderPath;
+        private string _adScript;
+
+        private void OpenAudioDescription_Click(object sender, RoutedEventArgs e)
+        {
+            if (timelineItems.Count == 0) { LogMessage(L("mix_nothing"), true); return; }
+            RecalculatePositions();
+
+            // where singing or speech is heard: the subtitles (lyrics) and the voice clips
+            IEnumerable<(double, double)> Busy()
+            {
+                foreach (var s in subtitles) yield return (s.Start, s.End);
+                var music = timelineItems.Where(i => i.IsAudio).OrderByDescending(i => i.Duration).FirstOrDefault();
+                foreach (var v in timelineItems.Where(i => i.IsAudio && !ReferenceEquals(i, music) && i.Volume > 0 &&
+                                                           !(i.Name ?? "").StartsWith("🔊") && !(i.Name ?? "").StartsWith("🌳") &&
+                                                           !RenderEngine.IsAiCreatorClip(i)))
+                    yield return (v.Start, v.Start + v.Duration);
+            }
+
+            string video = _lastRenderPath;
+            if (string.IsNullOrEmpty(video) || !File.Exists(video))
+            {
+                string guess = string.IsNullOrEmpty(currentProjectFolder) ? null : Path.Combine(currentProjectFolder, "izlazni_video.mp4");
+                video = guess != null && File.Exists(guess) ? guess : "";
+            }
+            var win = new AudioDescriptionWindow(this, timelineItems, Busy, video, _adScript, msg => LogMessage(msg, true));
+            win.ShowDialog();
+            _adScript = win.ScriptText;
+            UpdateTimelineDisplay();   // descriptions made on the way are shown in the list
+            _pendingPlaybackItem = null;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // v1.4 (R7) — GRAPHIC TIMELINE FOR SIGHTED EDITORS (mouse)
+        // A second view of the same clips: everything goes through the same data, undo and list.
+        // ══════════════════════════════════════════════════════════════
+
+        private System.Windows.Threading.DispatcherTimer _graphicTimer;
+        private double _graphicLastPlayhead = -1;
+
+        private void InitGraphicTimeline()
+        {
+            if (graphicTimeline == null) return;
+            graphicTimeline.Items = () => timelineItems;
+            graphicTimeline.PlayheadTime = () => GraphicPlayhead();
+            graphicTimeline.Markers = () => markers;
+            graphicTimeline.ClipClicked += GraphicClipClicked;
+            graphicTimeline.TimeClicked += GraphicTimeClicked;
+            graphicTimeline.ClipMoved += GraphicClipMoved;
+            graphicTimeline.ClipTrimmed += GraphicClipTrimmed;
+            graphicTimeline.ZoomRequested += d => { if (d > 0) ZoomIn_Click(null, null); else ZoomOut_Click(null, null); };
+            graphicTimeline.InfoChanged += s => { if (txtGraphicInfo != null) txtGraphicInfo.Text = s; };
+            if (svGraphicTimeline != null)
+                svGraphicTimeline.ScrollChanged += (s, e) =>
+                {
+                    graphicTimeline.ScrollOffset = e.HorizontalOffset;
+                    graphicTimeline.InvalidateVisual();
+                };
+
+            // the playhead moves ten times a second; while playing, the view scrolls along
+            _graphicTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _graphicTimer.Tick += (s, e) =>
+            {
+                if (pnlGraphicTimeline == null || pnlGraphicTimeline.Visibility != Visibility.Visible) return;
+                double ph = GraphicPlayhead();
+                if (Math.Abs(ph - _graphicLastPlayhead) < 0.02) return;
+                _graphicLastPlayhead = ph;
+                graphicTimeline.InvalidateVisual();
+                if (isPlaying && svGraphicTimeline != null)
+                {
+                    double x = GraphicTimeline.LabelWidth + ph * graphicTimeline.PixelsPerSecond;
+                    double left = svGraphicTimeline.HorizontalOffset, view = svGraphicTimeline.ViewportWidth;
+                    if (view > 0 && (x < left + GraphicTimeline.LabelWidth || x > left + view - 40))
+                        svGraphicTimeline.ScrollToHorizontalOffset(Math.Max(0, x - GraphicTimeline.LabelWidth - 60));
+                }
+            };
+            _graphicTimer.Start();
+            RefreshGraphicTimeline();
+        }
+
+        private double GraphicPlayhead() =>
+            _mixPreviewActive || _playingItem != null ? TimelinePosition : (SelectedClip()?.Start ?? 0);
+
+        private void RefreshGraphicTimeline()
+        {
+            if (graphicTimeline == null) return;
+            graphicTimeline.PixelsPerSecond = 20 * zoomLevel;
+            graphicTimeline.Selected = SelectedClip();
+            graphicTimeline.Refresh();
+        }
+
+        /// <summary>Selects a clip in the clip list without starting it (the graphic view decides what plays).</summary>
+        private void SelectClipInList(TimelineItem item)
+        {
+            if (nativeListView == null || item == null) return;
+            if (currentTrackFilter != -1 && item.TrackIndex != currentTrackFilter)
+            {
+                currentTrackFilter = -1;
+                if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 4;
+                UpdateTimelineDisplay();
+            }
+            foreach (WinForms.ListViewItem li in nativeListView.Items)
+            {
+                if (!ReferenceEquals(li.Tag, item)) continue;
+                nativeListView.SelectedItems.Clear();
+                li.Selected = true;
+                li.Focused = true;
+                li.EnsureVisible();
+                break;
+            }
+            _pendingPlaybackItem = null;
+            graphicTimeline.Selected = item;
+            graphicTimeline.InvalidateVisual();
+        }
+
+        /// <summary>Puts the playhead at a timeline time: in the montage mix, or in the clip under it.</summary>
+        private void SeekTimelineTo(double t, TimelineItem clip, bool play)
+        {
+            if (_mixPreviewActive && _currentMedia != null)
+            {
+                if (PlayerEnded) RestartAt(t, play);
+                else
+                {
+                    _mediaPlayer.Time = (long)(t * 1000);
+                    currentPlaybackPosition = t;
+                    if (play && !isPlaying) { _mediaPlayer.Play(); SetPlayingUi(true); }
+                }
+                return;
+            }
+            if (clip == null) return;
+            PlaySelectedItem(clip, Math.Clamp(t - clip.Start, 0, Math.Max(0, clip.Duration - 0.05)), startPaused: !play);
+        }
+
+        private void GraphicClipClicked(TimelineItem item, double posInClip, bool doubleClick)
+        {
+            SelectClipInList(item);
+            SeekTimelineTo(item.Start + posInClip, item, play: doubleClick);
+            if (txtGraphicInfo != null) txtGraphicInfo.Text = $"{item.Name}  —  {FormatTimeDetailed(item.Start + posInClip)}";
+        }
+
+        private void GraphicTimeClicked(double t)
+        {
+            var clip = TimelineMixPreview.VideoAt(timelineItems, t) ??
+                       timelineItems.FirstOrDefault(i => t >= i.Start && t < i.Start + i.Duration);
+            if (clip != null && !_mixPreviewActive) SelectClipInList(clip);
+            SeekTimelineTo(t, clip, play: false);
+        }
+
+        private void GraphicClipMoved(TimelineItem item, double newStart, int newTrack)
+        {
+            SaveState();
+            item.TrackIndex = newTrack;
+            item.UseFixedPosition = true;
+            item.FixedPosition = newStart;
+            UpdateTimelineDisplay();
+            _pendingPlaybackItem = null;
+            SelectClipInList(item);
+            LogMessage(LF("gt_moved", Path.GetFileNameWithoutExtension(item.Name ?? ""), FormatTimeDetailed(item.Start), item.TrackName.Replace("🎬 ", "").Replace("🎵 ", "")), true);
+        }
+
+        private void GraphicClipTrimmed(TimelineItem item, double newStart, double newOffset, double newDuration)
+        {
+            SaveState();
+            double shift = newStart - item.Start;
+            if (Math.Abs(shift) > 0.001)
+            {
+                item.UseFixedPosition = true;   // the left edge moved: the clip keeps its new place
+                item.FixedPosition = newStart;
+                ShiftClipContent(item, shift);
+            }
+            item.SourceOffset = newOffset;
+            item.Duration = newDuration;
+            UpdateTimelineDisplay();
+            _pendingPlaybackItem = null;
+            SelectClipInList(item);
+            LogMessage(LF("gt_trimmed", Path.GetFileNameWithoutExtension(item.Name ?? ""), FormatTimeDetailed(item.Start), FormatTimeDetailed(item.Duration)), true);
+        }
+
+        /// <summary>
+        /// When the start of a clip is cut off (or put back), its volume points and picture
+        /// descriptions move with the material they belong to.
+        /// </summary>
+        private static void ShiftClipContent(TimelineItem item, double shift)
+        {
+            if (item.VolumePoints != null)
+            {
+                foreach (var p in item.VolumePoints) p.Time -= shift;
+                item.VolumePoints = item.VolumePoints.Where(p => p.Time >= -0.001 && p.Time <= item.Duration + 0.001).ToList();
+                if (item.VolumePoints.Count == 0) item.VolumePoints = null;
+            }
+            if (item.FrameDescriptions != null)
+            {
+                foreach (var d in item.FrameDescriptions) { d.Start -= shift; d.End -= shift; }
+                item.FrameDescriptions = item.FrameDescriptions.Where(d => d.End > 0.05).ToList();
+                foreach (var d in item.FrameDescriptions) d.Start = Math.Max(0, d.Start);
+            }
+        }
+
+        private void ToggleGraphicTimeline_Click(object sender, RoutedEventArgs e)
+        {
+            bool show = pnlGraphicTimeline.Visibility != Visibility.Visible;
+            pnlGraphicTimeline.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            splGraphicTimeline.Visibility = pnlGraphicTimeline.Visibility;
+            rowGraphicTimeline.Height = show ? new GridLength(262) : new GridLength(0);
+            if (sender is MenuItem mi) mi.IsChecked = show;
+            if (show) RefreshGraphicTimeline();
+            LogMessage(L(show ? "gt_shown" : "gt_hidden"), true);
+        }
+
+        // ══════════════════════════════════════════════════════════════
         // v1.4 (R5) — PRECISE EDITING FROM THE KEYBOARD
         //   J / K / L   shuttle back / stop / forward (press again for 2× and 4×)
         //   , and .     one frame back / forward (the player pauses)
@@ -2516,6 +2880,7 @@ namespace UltraVideoEditor
             {
                 if (!item.IsImage) item.SourceOffset += pos * ClipSpeed(item);
                 item.Duration = before - pos;
+                ShiftClipContent(item, pos);   // volume points and descriptions stay on the same picture/sound
             }
             else
             {
@@ -4125,6 +4490,7 @@ namespace UltraVideoEditor
                 if (File.Exists(outputPath))
                 {
                     long fileSize = new FileInfo(outputPath).Length;
+                    _lastRenderPath = outputPath;   // v1.4 (4.2): the audio description starts from this video
                     LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
                     txtRenderStatus.Text = "Auto-Render complete!";
                     PlayBeep();
@@ -4339,6 +4705,7 @@ namespace UltraVideoEditor
                 {
                     long fileSize = new FileInfo(outputPath).Length;
                     string summary = BuildExportSummary();
+                    _lastRenderPath = outputPath;   // v1.4 (4.2): the audio description starts from this video
                     LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
                     if (!string.IsNullOrWhiteSpace(summary))
                         LogMessage(summary, true);
@@ -4387,16 +4754,30 @@ namespace UltraVideoEditor
         /// menu items / Ctrl+Shift+A, so there's exactly one code path that can
         /// get the banner out of sync with the actual mode.
         /// </summary>
-        private void SetUIMode(UIMode mode, bool announce = true)
+        private string _themeBeforeLowVision;
+
+        private void SetUIMode(UIMode mode, bool announce = true, bool byUser = true)
         {
+            UIMode previous = _uiMode;
             _uiMode = mode;
+            if (byUser) _modeChosenByUser = true;
+
+            // v1.4: leaving Low vision gives back the theme you had before (it stayed high contrast)
+            if (previous == UIMode.LowVision && mode != UIMode.LowVision && _themeBeforeLowVision != null)
+            {
+                _currentTheme = _themeBeforeLowVision;
+                _themeBeforeLowVision = null;
+                ApplyTheme();
+            }
+            if (mode == UIMode.LowVision && previous != UIMode.LowVision)
+                _themeBeforeLowVision = _currentTheme;
 
             switch (mode)
             {
                 case UIMode.Accessibility:
                     borderAccessibilityStatus.Visibility = Visibility.Visible;
                     txtAccessibilityStatus.Text = "♿ ACCESSIBILITY MODE ON";
-                    try { positionAnnounceTimer?.Start(); } catch { }
+                    try { if (_positionAnnounceOn) positionAnnounceTimer?.Start(); } catch { }
                     if (announce) LogMessage(L("accessibility_on"), true);
                     break;
 
@@ -4410,7 +4791,8 @@ namespace UltraVideoEditor
                     ApplyTheme();
                     UiScaling.SetScale(_lowVisionScale);
                     ApplyNativeListViewScale(_lowVisionScale);
-                    if (announce) LogMessage("Low vision mode on", true);
+                    // v1.4: this message is said even though Low vision mode itself does not speak
+                    if (announce) { LogMessage("Low vision mode on", false); AnnounceModeChange("Low vision mode on"); }
                     break;
 
                 case UIMode.Sighted:
@@ -4422,7 +4804,8 @@ namespace UltraVideoEditor
                     // this, leaving Low Vision would leave everything enlarged.
                     UiScaling.SetScale(1.0);
                     ApplyNativeListViewScale(1.0);
-                    if (announce) LogMessage(L("accessibility_off"), true);
+                    // v1.4: said aloud once more — the mode being left was the one that speaks
+                    if (announce) { LogMessage(L("accessibility_off"), false); AnnounceModeChange(L("accessibility_off")); }
                     break;
             }
 
@@ -4442,13 +4825,20 @@ namespace UltraVideoEditor
         /// low vision can't be inferred the same way — the user turns that on
         /// manually from the View menu.
         /// </summary>
+        /// <summary>Speaks a mode change even when the new mode is a silent one.</summary>
+        private void AnnounceModeChange(string message)
+        {
+            try { if (ScreenReaderDetector.CurrentReader() != ScreenReaderDetector.Reader.None) AnnounceToJaws(message); }
+            catch (Exception ex) { AppLog.Error("Announcing the mode change", ex); }
+        }
+
         private void DetectAndApplyInitialMode()
         {
             bool screenReaderDetected = false;
             try { screenReaderDetected = ScreenReaderDetector.IsScreenReaderActive(); }
             catch { }
 
-            SetUIMode(screenReaderDetected ? UIMode.Accessibility : UIMode.Sighted, announce: false);
+            SetUIMode(screenReaderDetected ? UIMode.Accessibility : UIMode.Sighted, announce: false, byUser: false);
             LogMessage(screenReaderDetected
                 ? "Screen reader detected — starting in Accessibility mode."
                 : "No screen reader detected — starting in Sighted mode.", true);
@@ -6047,6 +6437,7 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
                 _pendingPlaybackItem = item;
+                if (graphicTimeline != null) { graphicTimeline.Selected = item; graphicTimeline.InvalidateVisual(); }
             }
 
             Dispatcher.BeginInvoke(new Action(() =>
@@ -6289,6 +6680,7 @@ namespace UltraVideoEditor
                 }
 
                 LogMessage(string.Format(L("listview_refreshed"), filteredItems.Count), false);
+                RefreshGraphicTimeline();   // v1.4 (R7): the graphic view follows every list change
             }
             catch (Exception ex)
             {

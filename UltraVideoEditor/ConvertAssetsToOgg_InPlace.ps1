@@ -35,6 +35,14 @@ $vorbisQuality = 4
 
 $ffmpegPath = "C:\Users\Ajvazi\source\repos\UltraVideoEditor\bin\Debug\net8.0-windows\Ffmpeg\ffmpeg.exe"
 
+# v1.4: if that path does not exist, look for ffmpeg.exe in the build folders and on PATH
+if (-not (Test-Path $ffmpegPath)) {
+    $found = Get-ChildItem -Path ".\bin" -Recurse -Filter "ffmpeg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $ffmpegPath = $found.FullName }
+    elseif (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue) { $ffmpegPath = (Get-Command ffmpeg.exe).Source }
+}
+Write-Host "Using FFmpeg: $ffmpegPath"
+
 # --- Sanity checks ------------------------------------------------------------
 if (-not (Test-Path $sourceDir)) {
     Write-Host "ERROR: '$sourceDir' not found. Run this script from the folder that contains Assets." -ForegroundColor Red
@@ -101,6 +109,22 @@ if ($failed.Count -gt 0) {
         Write-Host "  $f"
     }
 }
+
+# --- v1.4: stale copies in the build output ------------------------------------
+# Visual Studio copies Assets next to the .exe (bin\Debug\...\Assets). It does not remove
+# files there, so the old .wav copies would stay beside the new .ogg ones and the program
+# would see every sound twice. A .wav in bin is sent to the Recycle Bin when its .ogg exists
+# in the project's Assets folder; the next build copies the .ogg files.
+$srcRoot = (Resolve-Path $sourceDir).Path
+$stale = 0
+Get-ChildItem -Path ".\bin" -Recurse -Filter "*.wav" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '\\Assets\\' } |
+    ForEach-Object {
+        $rel = $_.FullName.Substring($_.FullName.IndexOf('\Assets\') + 8)
+        $ogg = [System.IO.Path]::ChangeExtension((Join-Path $srcRoot $rel), ".ogg")
+        if (Test-Path $ogg) { Send-ToRecycleBin -Path $_.FullName; $stale++ }
+    }
+if ($stale -gt 0) { Write-Host "Removed $stale old .wav copies from the build folder (Recycle Bin)." -ForegroundColor Green }
 
 $newSize = (Get-ChildItem $sourceDir -Recurse -Filter "*.ogg" -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ""

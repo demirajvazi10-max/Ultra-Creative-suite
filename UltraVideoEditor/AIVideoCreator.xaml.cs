@@ -3164,6 +3164,12 @@ namespace UltraVideoEditor
 
         private static Dictionary<string, List<string>> _bedIndex = null;
 
+        /// <summary>v1.4 — forget the sound indexes (after the library was downloaded from Adobe).</summary>
+        public static void ResetSoundIndex()
+        {
+            lock (_soundIndexLock) { _soundIndex = null; _bedIndex = null; }
+        }
+
         private async Task<string> GetLocalAmbientSound(string soundType, string tempDir)
         {
             string soundsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Sounds");
@@ -3172,7 +3178,10 @@ namespace UltraVideoEditor
             {
                 if (_soundIndex == null)
                 {
-                    _soundIndex = BuildSoundIndex(soundsDir);
+                    // v1.4: Assets\Sounds and the library downloaded from Adobe
+                    _soundIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (string dir in AppPaths.SoundDirs.DefaultIfEmpty(soundsDir))
+                        foreach (var kv in BuildSoundIndex(dir)) _soundIndex[kv.Key] = kv.Value;
                     LogToMainWindow($"🎵 Sound index: {_soundIndex.Count} files in Assets/Sounds/");
                 }
             }
@@ -3397,7 +3406,7 @@ namespace UltraVideoEditor
             string soundsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Sounds");
             string sfxDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "SFX");
 
-            var allDirs = new[] { ("Sounds", soundsDir), ("SFX", sfxDir) };
+            var allDirs = new[] { ("Sounds", soundsDir), ("Sounds (Adobe download)", AppPaths.DownloadedSoundsDir), ("SFX", sfxDir) };
             foreach (var (label, dir) in allDirs)
             {
                 if (!Directory.Exists(dir)) continue;
@@ -3714,16 +3723,20 @@ namespace UltraVideoEditor
 
             if (_transitionSoundCache.TryGetValue(type, out string cachedSource) && File.Exists(cachedSource))
             {
-                string copyPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3");
+                string copyPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}{Path.GetExtension(cachedSource)}");
                 File.Copy(cachedSource, copyPath, true);
                 return copyPath;
             }
 
-            string soundFile = type == "pop" ? "transition-pop.mp3" : "transition-whoosh.mp3";
-            string localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Sounds", soundFile);
+            // v1.4: the sound library may be converted to OGG (ConvertAssetsToOgg) — look for any format
+            string soundBase = type == "pop" ? "transition-pop" : "transition-whoosh";
+            string soundsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Sounds");
+            string localPath = new[] { soundsDir, AppPaths.DownloadedSoundsDir }
+                .SelectMany(dir => new[] { ".mp3", ".ogg", ".wav", ".flac" }.Select(ext => Path.Combine(dir, soundBase + ext)))
+                .FirstOrDefault(File.Exists) ?? Path.Combine(soundsDir, soundBase + ".mp3");
             if (File.Exists(localPath))
             {
-                string outputPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3");
+                string outputPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}{Path.GetExtension(localPath)}");
                 File.Copy(localPath, outputPath, true);
                 _transitionSoundCache[type] = outputPath;
                 return outputPath;

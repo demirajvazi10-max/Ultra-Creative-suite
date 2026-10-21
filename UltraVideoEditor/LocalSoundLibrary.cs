@@ -35,12 +35,25 @@ namespace UltraVideoEditor
 
         // ── Inicijalizacija / skeniranje ──────────────────────────────────────
 
+        /// <summary>v1.4 — forget the index (after the library was downloaded from Adobe).</summary>
+        public static void ResetIndex()
+        {
+            lock (_lock) { _ambientIndex = null; _sfxIndex = null; }
+        }
+
         private static void EnsureIndexed()
         {
             lock (_lock)
             {
                 if (_ambientIndex != null) return;
-                _ambientIndex = BuildIndex(_soundsDir);
+                // v1.4: Assets\Sounds and the library downloaded from Adobe (AppPaths.SoundDirs)
+                _ambientIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (string dir in AppPaths.SoundDirs.DefaultIfEmpty(_soundsDir))
+                    foreach (var kv in BuildIndex(dir))
+                    {
+                        if (_ambientIndex.TryGetValue(kv.Key, out var list)) list.AddRange(kv.Value);
+                        else _ambientIndex[kv.Key] = new List<string>(kv.Value);
+                    }
                 _sfxIndex     = BuildIndex(_sfxDir);
             }
         }

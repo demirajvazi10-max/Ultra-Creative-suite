@@ -13,7 +13,7 @@
 		     Naslov prozora i "About" dijalog čitaju ovu vrednost u runtime-u
 		     (MainWindow.xaml.cs -> GetAppVersion()), tako da se nigde više ne
 		     ručno kuca broj verzije. -->
-		<Version>1.4.0</Version>
+		<Version>1.4.5</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -52,6 +52,10 @@
 	    <Generator>ResXFileCodeGenerator</Generator>
 	    <LastGenOutput>Resources.Designer.cs</LastGenOutput>
 	  </EmbeddedResource>
+		<!-- v1.4: third-party licences ship next to the program (Help → Third-party licences) -->
+		<None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+		<!-- v1.4: downloads the ambient sound library from Adobe (installer task and Help menu) -->
+		<None Update="Tools\DownloadAdobeSounds.ps1" CopyToOutputDirectory="PreserveNewest" />
 		<Content Include="Assets\Sounds\**\*.*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>

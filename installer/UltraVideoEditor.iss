@@ -128,6 +128,10 @@ english.WhisperTaskName=Install AI transcription/subtitles feature (~1.3 GB down
 german.WhisperTaskName=KI-Transkriptions-/Untertitelfunktion installieren (~1,3 GB Download)
 serbian.WhisperTaskName=Instaliraj AI transkripciju/titlove (preuzimanje ~1.3 GB)
 
+english.AdobeSoundsTaskName=Download the ambient sound library from Adobe for the AI music video creator (~3.7 GB download, ~350 MB on disk, can take a long time)
+german.AdobeSoundsTaskName=Umgebungsgeräusch-Bibliothek von Adobe für den KI-Musikvideo-Ersteller herunterladen (~3,7 GB Download, ~350 MB auf der Festplatte, kann lange dauern)
+serbian.AdobeSoundsTaskName=Preuzmi biblioteku ambijentalnih zvukova sa Adobe-a za AI kreator spotova (preuzimanje ~3.7 GB, na disku ~350 MB, moze dugo da traje)
+
 english.DesktopIconGroup=Additional icons:
 german.DesktopIconGroup=Zusätzliche Symbole:
 serbian.DesktopIconGroup=Dodatne ikone:
@@ -143,6 +147,14 @@ serbian.DesktopIconTaskName=Napravi ikonu na radnoj povrsini
 ; silently for everyone. The user consciously opts in here. See
 ; InstallDependencies below for the actual download/extract logic.
 Name: "whisper"; Description: "{cm:WhisperTaskName}"; Flags: unchecked
+
+; v1.4: the ambient sound library is NOT shipped with the program (Adobe's licence
+; does not allow sharing the sound files as a standalone package). When ticked,
+; Tools\DownloadAdobeSounds.ps1 downloads Adobe Audition's free sound effects
+; straight from Adobe, converts them to OGG and keeps only those (~350 MB) in
+; %LOCALAPPDATA%\UltraVideoEditor\Sounds. Can also be done later from the app's
+; Help menu. Unchecked: ~3.7 GB is a conscious choice.
+Name: "adobesounds"; Description: "{cm:AdobeSoundsTaskName}"; Flags: unchecked
 
 ; Standard Inno pattern: desktop icon is opt-in via checkbox, Start Menu
 ; entry stays unconditional (see [Icons] below — only the desktop one
@@ -616,6 +628,23 @@ begin
       Exec(ExpandConstant('{tmp}\vlc_installer.exe'), '/S', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       if not (FileExists(VlcPath) or FileExists(VlcPath86)) then
         MsgBox('VLC could not be confirmed installed. You can install it manually from videolan.org — the app will still work, but video preview needs VLC.', mbInformation, MB_OK);
+    end;
+
+    // ── v1.4 optional: ambient sound library straight from Adobe ─────────
+    // Needs FFmpeg (installed just above). Runs in a visible window so the progress
+    // can be followed (also with a screen reader); placed before Ollama, because a
+    // failed Ollama install ends this procedure early.
+    if IsTaskSelected('adobesounds') and FileExists(FfmpegDestDir + '\ffmpeg.exe') then
+    begin
+      StatusPage.SetText('Downloading the sound library from Adobe...',
+                         'About 3.7 GB, converted to OGG as it goes. This can take a long time.');
+      Exec('powershell.exe',
+           '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\Tools\DownloadAdobeSounds.ps1') + '"' +
+           ' -Dest "' + ExpandConstant('{localappdata}\UltraVideoEditor\Sounds') + '"' +
+           ' -Ffmpeg "' + FfmpegDestDir + '\ffmpeg.exe"',
+           '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode);
+      if ResultCode <> 0 then
+        MsgBox('The sound library could not be downloaded completely. You can finish it later from the app: Help - Download the sound library from Adobe.', mbInformation, MB_OK);
     end;
 
     if not FileExists(OllamaExe) then

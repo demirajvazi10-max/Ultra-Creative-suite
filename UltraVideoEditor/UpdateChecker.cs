@@ -25,6 +25,10 @@ namespace UltraVideoEditor
             public string TagName { get; set; }
             public string HtmlUrl { get; set; }
             public string DownloadUrl { get; set; }
+            /// <summary>v1.4 — expected SHA-256 of the installer (lower-case hex), or null when GitHub gave none.</summary>
+            public string Sha256 { get; set; }
+            /// <summary>v1.4 — address of a "&lt;installer&gt;.sha256" file published next to it, if any.</summary>
+            public string Sha256Url { get; set; }
         }
 
         /// <summary>
@@ -64,7 +68,7 @@ namespace UltraVideoEditor
                 if (releaseVersion.CompareTo(normalizedCurrent) <= 0)
                     return null;
 
-                string downloadUrl = null;
+                string downloadUrl = null, sha = null, shaUrl = null, exeName = null;
                 if (release["assets"] is JArray assets)
                 {
                     foreach (var asset in assets)
@@ -72,10 +76,19 @@ namespace UltraVideoEditor
                         string name = asset["name"]?.Value<string>() ?? "";
                         if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                         {
+                            exeName = name;
                             downloadUrl = asset["browser_download_url"]?.Value<string>();
+                            // GitHub publishes "digest": "sha256:<hex>" for every release asset
+                            string digest = asset["digest"]?.Value<string>() ?? "";
+                            if (digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                                sha = digest.Substring(7).Trim().ToLowerInvariant();
                             break;
                         }
                     }
+                    if (exeName != null)
+                        foreach (var asset in assets)
+                            if (string.Equals(asset["name"]?.Value<string>(), exeName + ".sha256", StringComparison.OrdinalIgnoreCase))
+                                shaUrl = asset["browser_download_url"]?.Value<string>();
                 }
 
                 return new UpdateInfo
@@ -83,11 +96,38 @@ namespace UltraVideoEditor
                     Version = releaseVersion,
                     TagName = tag,
                     HtmlUrl = release["html_url"]?.Value<string>(),
-                    DownloadUrl = downloadUrl
+                    DownloadUrl = downloadUrl,
+                    Sha256 = sha,
+                    Sha256Url = shaUrl
                 };
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// v1.4 — the downloaded installer is started only when its SHA-256 matches the one GitHub
+        /// published for that release (asset digest, or the .sha256 file next to the installer).
+        /// Before, any file that came down the wire was run with administrator rights.
+        /// Returns null when it matches, otherwise the reason it must not be run.
+        /// </summary>
+        public static async Task<string> VerifyAsync(UpdateInfo update, string filePath)
+        {
+            string expected = update?.Sha256;
+            if (string.IsNullOrEmpty(expected) && !string.IsNullOrEmpty(update?.Sha256Url))
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("UltraVideoEditor");
+                string text = await http.GetStringAsync(update.Sha256Url);
+                expected = (text ?? "").Trim().Split(' ', '\t', '\r', '\n')[0].ToLowerInvariant();
+            }
+            if (string.IsNullOrEmpty(expected) || expected.Length != 64)
+                return "no checksum was published for this release";
+
+            using var stream = System.IO.File.OpenRead(filePath);
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            string actual = Convert.ToHexString(await sha.ComputeHashAsync(stream)).ToLowerInvariant();
+            return actual == expected ? null : "the downloaded file does not match the published checksum";
         }
 
         // System.Version poredi Major.Minor.Build.Revision - AssemblyVersion izveden iz

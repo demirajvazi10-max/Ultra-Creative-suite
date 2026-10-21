@@ -70,6 +70,16 @@ jobs:
             "/DMyAppSourceDir=${{ github.workspace }}\publish" `
             installer\UltraVideoEditor.iss
 
+      # v1.4: SHA-256 otisak instalera ide uz release, a program ga proverava pre nego
+      # sto pokrene preuzeto azuriranje (pored "digest" polja koje GitHub sam objavljuje).
+      - name: SHA-256 otisak instalera
+        shell: pwsh
+        run: |
+          Get-ChildItem installer/Output/UltraVideoEditorSetup-*.exe | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($_.Name)" | Out-File -Encoding ascii -NoNewline "$($_.FullName).sha256"
+          }
+
       - name: Kreiraj GitHub Release i uploaduj
         uses: softprops/action-gh-release@v2
         with:
@@ -108,7 +118,9 @@ jobs:
 
             ---
             *Built with GitHub Actions | [Dokumentacija](https://github.com/demirajvazi10-max/Ultra-Creative-suite)*
-          files: installer/Output/UltraVideoEditorSetup-*.exe
+          files: |
+            installer/Output/UltraVideoEditorSetup-*.exe
+            installer/Output/UltraVideoEditorSetup-*.exe.sha256
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
         env:

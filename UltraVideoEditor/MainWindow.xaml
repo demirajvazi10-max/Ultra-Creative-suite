@@ -55,6 +55,7 @@
                 <MenuItem x:Name="mnuShowAllTracks" Tag="menu_show_all_tracks" Click="ShowAllTracks_Click"/>
                 <MenuItem x:Name="mnuShowVideoOnly" Tag="menu_show_video_only" Click="ShowVideoTracksOnly_Click"/>
                 <MenuItem x:Name="mnuShowAudioOnly" Tag="menu_show_audio_only" Click="ShowAudioTracksOnly_Click"/>
+                <MenuItem x:Name="mnuShowGraphicTimeline" Tag="mnu_show_graphic_timeline" IsCheckable="True" IsChecked="True" Click="ToggleGraphicTimeline_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuDisplayMode" Tag="mnu_display_mode">
                     <MenuItem x:Name="mnuModeSighted" Tag="mode_sighted" IsCheckable="True" Click="SetModeSighted_Click"/>
@@ -64,6 +65,7 @@
                     <MenuItem x:Name="mnuLowVisionTextInc" Tag="mode_low_vision_text_inc" InputGestureText="Ctrl+Shift+Plus" Click="IncreaseLowVisionTextSize_Click"/>
                     <MenuItem x:Name="mnuLowVisionTextDec" Tag="mode_low_vision_text_dec" InputGestureText="Ctrl+Shift+Minus" Click="DecreaseLowVisionTextSize_Click"/>
                 </MenuItem>
+                <MenuItem x:Name="mnuPositionAnnounce" Tag="mnu_position_announce" IsCheckable="True" Click="TogglePositionAnnounce_Click"/>
                 <MenuItem x:Name="mnuLogWindow" Tag="mnu_log_window" InputGestureText="Ctrl+Shift+L" Click="ShowLogWindow_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuLanguage" Tag="mnu_language">
@@ -120,6 +122,7 @@
                 <MenuItem x:Name="mnuDescParts" Tag="mnu_desc_parts" InputGestureText="Ctrl+Alt+D" Click="DescribeClipParts_Click"/>
                 <MenuItem x:Name="mnuDescAllMine" Tag="mnu_desc_all_mine" Click="DescribeAllMyClips_Click"/>
                 <MenuItem x:Name="mnuDescStop" Tag="mnu_desc_stop" Click="StopDescribing_Click"/>
+                <MenuItem x:Name="mnuAudioDescription" Tag="🔈|mnu_audio_description" Click="OpenAudioDescription_Click"/>
                 <MenuItem x:Name="mnuDescFollow" Tag="mnu_desc_follow" IsCheckable="True" IsChecked="True" Click="ToggleAnnounceDescriptions_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuGenerateVoice" Tag="mw_generate_voice" Click="GenerateVoice_Click"/>
@@ -202,6 +205,8 @@
                 <MenuItem x:Name="mnuUpdates" Tag="mw_updates" Click="CheckForUpdates_Click"/>
                 <MenuItem x:Name="mnuOpenLogs" Tag="mw_open_logs" Click="OpenLogFolder_Click"/>
                 <Separator/>
+                <MenuItem x:Name="mnuDownloadSounds" Tag="mnu_download_sounds" Click="DownloadAdobeSounds_Click"/>
+                <MenuItem x:Name="mnuThirdParty" Tag="mnu_third_party" Click="ShowThirdPartyNotices_Click"/>
                 <MenuItem x:Name="mnuAbout" Tag="mw_about" Click="ShowAbout_Click"/>
             </MenuItem>
         </Menu>
@@ -289,7 +294,15 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <Border Grid.Row="2" Background="{DynamicResource PanelBg}" CornerRadius="5" BorderBrush="#333" BorderThickness="1">
+                    <!-- v1.4 (R7): the accessible clip list on top, the graphical timeline for the mouse
+                         below it; a splitter between them changes their heights. -->
+                    <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition x:Name="rowGraphicTimeline" Height="262" MinHeight="0"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="{DynamicResource PanelBg}" CornerRadius="5" BorderBrush="#333" BorderThickness="1">
                         <wfhost:WindowsFormsHost x:Name="wfhTimeline" Margin="2">
                             <wf:ListView x:Name="timelineListView" 
                                          View="Details"
@@ -313,6 +326,16 @@
                             </wf:ListView>
                         </wfhost:WindowsFormsHost>
                     </Border>
+                    <GridSplitter x:Name="splGraphicTimeline" Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Background="#333" Focusable="False"
+                                  ResizeDirection="Rows" AutomationProperties.Name="Splitter between the clip list and the graphic timeline"/>
+                    <DockPanel x:Name="pnlGraphicTimeline" Grid.Row="2">
+                        <TextBlock x:Name="txtGraphicInfo" DockPanel.Dock="Bottom" Foreground="{DynamicResource TextPrimary}" FontSize="11" Margin="4,2" Text=" "/>
+                        <ScrollViewer x:Name="svGraphicTimeline" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Disabled"
+                                      Focusable="False" Background="#161616">
+                            <local:GraphicTimeline x:Name="graphicTimeline" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                        </ScrollViewer>
+                    </DockPanel>
+                    </Grid>
 
                     <TextBlock x:Name="txtTimelineInfo" Grid.Row="3" Foreground="{DynamicResource AccentBrush}" Text="Total clips: 0 | Total duration: 0:00 | Zoom: 1.0x" Margin="0,10,0,0"/>
                 </Grid>
