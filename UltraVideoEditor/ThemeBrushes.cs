@@ -10,7 +10,7 @@ namespace UltraVideoEditor
     public static class ThemeBrushes
     {
         private static System.Windows.Media.Brush Get(string key, string fallbackHex)
-        {
+            {
             var res = System.Windows.Application.Current?.Resources[key] as System.Windows.Media.Brush;
             if (res != null) return res;
             try { return (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(fallbackHex); }

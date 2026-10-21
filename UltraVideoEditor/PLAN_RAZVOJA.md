@@ -267,7 +267,9 @@ Ako zvuci još nisu u OGG formatu, skripta ConvertAssetsToOgg koju već imaš mo
 Srednji posao.
 
 ### 2.4 Prevod do kraja
-**Status: delimično urađeno 13. oktobra 2026.** Sve što je u tim delovima ostalo na srpskom (poruke koje čitač izgovara, napredak u Fazi 3, dijalozi, izveštaji, log) sada je prevedeno ili prati jezik programa. Engleski tekst u XAML-u ovih prozora (natpisi dugmadi i polja) još nije preveden na srpski i nemački.
+**Status: urađeno 21. oktobra 2026 (osim stavki u padajućim listama).** Sve poruke glavnog prozora (status, log, poruke koje čitač izgovara) idu preko ključeva u LanguageManager-u, na sva tri jezika. Tekst iz XAML-a svih prozora prevodi XamlTranslator (tabela UiTranslations, oko 850 redova): natpisi, dugmad, naslovi, saveti i imena za čitače ekrana, pri otvaranju prozora i pri promeni jezika. Ostaju na engleskom: stavke u padajućim listama (kod ih čita kao vrednosti) i primeri komandi za Timeline AI. Nazivi koje program daje klipovima još nisu urađeni.
+
+Raniji status: **delimično urađeno 13. oktobra 2026.** Sve što je u tim delovima ostalo na srpskom (poruke koje čitač izgovara, napredak u Fazi 3, dijalozi, izveštaji, log) sada je prevedeno ili prati jezik programa. Engleski tekst u XAML-u ovih prozora (natpisi dugmadi i polja) još nije preveden na srpski i nemački.
 Glavni prozor, AI kreator, YouTube dijalog i pregled scena su prevedeni na sva tri jezika. Bez prevoda, sa tekstom upisanim na engleskom (ponegde i na srpskom), ostali su:
 - grupni izvoz, kolor grejding;
 - Highlight i Faza 3;

@@ -204,7 +204,7 @@ namespace UltraVideoEditor
                     isPlaying = true;
                     // v1.4: player events arrive on the player's own thread — queue UI work
                     Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "⏸ " + L("pause"); }));
-                    LogMessage("Playback started", false);
+                    LogMessage(L("msg_playback_started"), false);
                 };
                 // v1.4: a file opened paused (":start-paused", used after the end) reports Playing
                 // first; the Paused event puts the state right again
@@ -217,7 +217,7 @@ namespace UltraVideoEditor
                 {
                     isPlaying = false;
                     Dispatcher.BeginInvoke(new Action(() => { if (btnPlay != null) btnPlay.Content = "▶ " + L("play"); }));
-                    LogMessage("Playback stopped", false);
+                    LogMessage(L("msg_playback_stopped"), false);
                 };
                 _mediaPlayer.EndReached += (s, e) =>
                 {
@@ -267,7 +267,7 @@ namespace UltraVideoEditor
                     if (_currentLanguage == "sr" && rbSrb != null) rbSrb.IsChecked = true;
                     LoadSavedTheme();
                     DetectAndApplyInitialMode();
-                    LogMessage("System ready...", true);
+                    LogMessage(L("msg_program_is_ready"), true);
                     // v1.4: offer to restore work lost in a crash, then keep autosaving
                     OfferAutosaveRecovery();
                     StartAutosave();
@@ -323,6 +323,10 @@ namespace UltraVideoEditor
                 nativeListView.Columns[5].Text = L("listview_col_end");
                 nativeListView.Columns[6].Text = L("listview_col_audio_desc");
             }
+            if (nativeListView != null) nativeListView.AccessibleName = L("acc_clip_list");
+
+            // v1.4.5: the texts written in the XAML of every open window (dialogs included)
+            XamlTranslator.TranslateAllWindows(_currentLanguage);
 
             UpdateTimelineDisplay();
         }
@@ -434,17 +438,17 @@ namespace UltraVideoEditor
             }
         }
 
-        private void SetLanguageSerbian_Click(object sender, RoutedEventArgs e) { _currentLanguage = "sr"; ApplyLanguage(); LogMessage("Language: Serbian", true); }
-        private void SetLanguageEnglish_Click(object sender, RoutedEventArgs e) { _currentLanguage = "en"; ApplyLanguage(); LogMessage("Language: English", true); }
-        private void SetLanguageGerman_Click(object sender, RoutedEventArgs e) { _currentLanguage = "de"; ApplyLanguage(); LogMessage("Language: German", true); }
+        private void SetLanguageSerbian_Click(object sender, RoutedEventArgs e) { _currentLanguage = "sr"; ApplyLanguage(); LogMessage(L("msg_language_serbian"), true); }
+        private void SetLanguageEnglish_Click(object sender, RoutedEventArgs e) { _currentLanguage = "en"; ApplyLanguage(); LogMessage(L("msg_language_english"), true); }
+        private void SetLanguageGerman_Click(object sender, RoutedEventArgs e) { _currentLanguage = "de"; ApplyLanguage(); LogMessage(L("msg_language_german"), true); }
 
         // ── TEME ────────────────────────────────────────────────────
         private void SetThemeDark_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "dark"; ApplyTheme(); LogMessage("Theme: Dark", true); }
+        { _currentTheme = "dark"; ApplyTheme(); LogMessage(L("msg_theme_dark"), true); }
         private void SetThemeContrast_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "contrast"; ApplyTheme(); LogMessage("Theme: High contrast", true); }
+        { _currentTheme = "contrast"; ApplyTheme(); LogMessage(L("msg_theme_high_contrast"), true); }
         private void SetThemeLight_Click(object sender, System.Windows.RoutedEventArgs e)
-        { _currentTheme = "light"; ApplyTheme(); LogMessage("Theme: Light", true); }
+        { _currentTheme = "light"; ApplyTheme(); LogMessage(L("msg_theme_light"), true); }
 
         private void ApplyTheme()
         {
@@ -480,7 +484,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception swallowed) { AppLog.Error("Saving the theme", swallowed); }   // v1.4: was silent
             }
-            catch (Exception ex) { LogMessage("Error applying theme: " + ex.Message, false); }
+            catch (Exception ex) { LogMessage(LF("msg_theme_error", ex.Message), false); }
         }
 
         private void LoadSavedTheme()
@@ -505,7 +509,7 @@ namespace UltraVideoEditor
         private void SaveApiKey(string keyName, string apiKey)
         {
             if (!KeyStore.Save(keyName, apiKey))
-                LogMessage($"The key '{keyName}' could not be saved. Details are in the log file.", true);
+                LogMessage(LF("msg_the_key_could_not_be_saved", keyName), true);
         }
 
         /// <summary>
@@ -597,7 +601,7 @@ namespace UltraVideoEditor
                 });
 
                 // v1.4: logged, not spoken — the AI creator adds dozens of lines at once
-                LogMessage($"📝 Titl: {text} ({FormatTime(startTime)} - {FormatTime(endTime)})", false);
+                LogMessage(LF("msg_subtitle", text, FormatTime(startTime), FormatTime(endTime)), false);
             }
             catch (Exception ex)
             {
@@ -653,7 +657,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView != null)
             {
-                nativeListView.AccessibleName = "List of clips on the timeline. Use arrow keys to navigate. Enter or Space to play. Page Up/Down to scroll quickly. Delete to remove.";
+                nativeListView.AccessibleName = L("acc_clip_list");
             }
             AutomationProperties.SetName(btnPlay, "Play or pause, Ctrl Space");
             AutomationProperties.SetName(btnRenderTool, "Render project, Ctrl R");
@@ -1113,7 +1117,7 @@ namespace UltraVideoEditor
             _savedSnapshot = null;
             UpdateTimelineDisplay();
             lstSubtitles.Items.Clear();
-            LogMessage("New project created", true);
+            LogMessage(L("msg_new_project_created"), true);
         }
 
         /// <summary>v1.4 — writes the project to <paramref name="path"/> and remembers it for Ctrl+S.</summary>
@@ -1190,7 +1194,7 @@ namespace UltraVideoEditor
                 }
                 item.Path = dest;
             }
-            LogMessage($"{copied.Count} temporary media files were copied into the project folder ({Path.GetFileName(mediaDir)}).", true);
+            LogMessage(LF("msg_temporary_media_files_were_copied_into", copied.Count, Path.GetFileName(mediaDir)), true);
         }
 
         private void SaveProject_Click(object sender, RoutedEventArgs e)
@@ -1396,7 +1400,7 @@ namespace UltraVideoEditor
                 undoStack.Push(currentCopy);
                 timelineItems = next;
                 UpdateTimelineDisplay();
-                LogMessage("Redone", true);
+                LogMessage(L("msg_redone"), true);
                 PlayBeep();
             }
             else LogMessage(L("no_more_redo2"), true);
@@ -1410,17 +1414,17 @@ namespace UltraVideoEditor
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
                 _copiedClip = DeepCloneTimelineItem(item);
-                LogMessage($"Copied clip: {item.Name}", true);
+                LogMessage(LF("msg_copied_clip", item.Name), true);
                 PlayBeep();
             }
-            else LogMessage("No clip selected to copy", true);
+            else LogMessage(L("msg_no_clip_selected_to_copy"), true);
         }
 
         private void PasteClip_Click(object sender, RoutedEventArgs e)
         {
             if (_copiedClip == null)
             {
-                LogMessage("No copied clip to paste", true);
+                LogMessage(L("msg_no_copied_clip_to_paste"), true);
                 return;
             }
             SaveState();
@@ -1428,7 +1432,7 @@ namespace UltraVideoEditor
             newClip.Name = _copiedClip.Name + " (kopija)";
             timelineItems.Add(newClip);
             UpdateTimelineDisplay();
-            LogMessage("Clip pasted", true);
+            LogMessage(L("msg_clip_pasted"), true);
             PlayBeep();
         }
 
@@ -1442,12 +1446,12 @@ namespace UltraVideoEditor
                     {
                         item.Selected = true;
                     }
-                    LogMessage($"Selected {nativeListView.Items.Count} clips", true);
+                    LogMessage(LF("msg_selected_clips", nativeListView.Items.Count), true);
                     PlayBeep();
                 }
                 else
                 {
-                    LogMessage("No clips to select", true);
+                    LogMessage(L("msg_no_clips_to_select"), true);
                 }
             }
             catch (Exception ex)
@@ -1460,7 +1464,7 @@ namespace UltraVideoEditor
         {
             markers.Clear();
             UpdateMarkerDisplay();
-            LogMessage("All markers deleted", true);
+            LogMessage(L("msg_all_markers_deleted"), true);
             PlayBeep();
         }
 
@@ -1468,7 +1472,7 @@ namespace UltraVideoEditor
         {
             zoomLevel = 1.0;
             UpdateZoomDisplay();
-            LogMessage("Zoom resetovan na 1.0x", true);
+            LogMessage(L("msg_zoom_reset_to_1_0x"), true);
         }
 
         private void ShowLogWindow_Click(object sender, RoutedEventArgs e)
@@ -1477,7 +1481,7 @@ namespace UltraVideoEditor
             {
                 _logWindow.Show();
                 _logWindow.Activate();
-                LogMessage("Log window opened", true);
+                LogMessage(L("msg_log_window_opened"), true);
             }
         }
 
@@ -1487,7 +1491,7 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
             if (cmbTrackSelector != null)
                 cmbTrackSelector.SelectedIndex = 4;
-            LogMessage("Showing all tracks", true);
+            LogMessage(L("msg_showing_all_tracks"), true);
         }
 
         private void ShowVideoTracksOnly_Click(object sender, RoutedEventArgs e)
@@ -1496,7 +1500,7 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
             if (cmbTrackSelector != null)
                 cmbTrackSelector.SelectedIndex = 0;
-            LogMessage("Prikazane samo video trake", true);
+            LogMessage(L("msg_showing_video_tracks_only"), true);
         }
 
         private void ShowAudioTracksOnly_Click(object sender, RoutedEventArgs e)
@@ -1505,7 +1509,7 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
             if (cmbTrackSelector != null)
                 cmbTrackSelector.SelectedIndex = 2;
-            LogMessage("Prikazane samo audio trake", true);
+            LogMessage(L("msg_showing_audio_tracks_only"), true);
         }
 
         private void MoveClipUp_Click(object sender, RoutedEventArgs e)
@@ -1515,7 +1519,7 @@ namespace UltraVideoEditor
                 SaveState();
                 item.TrackIndex--;
                 UpdateTimelineDisplay();
-                LogMessage($"Clip moved to track {item.TrackIndex + 1}", true);
+                LogMessage(LF("msg_clip_moved_to_track", item.TrackIndex + 1), true);
                 PlayBeep();
             }
             else LogMessage(L("cant_move_higher"), true);
@@ -1528,7 +1532,7 @@ namespace UltraVideoEditor
                 SaveState();
                 item.TrackIndex++;
                 UpdateTimelineDisplay();
-                LogMessage($"Clip moved to track {item.TrackIndex + 1}", true);
+                LogMessage(LF("msg_clip_moved_to_track", item.TrackIndex + 1), true);
                 PlayBeep();
             }
             else LogMessage(L("cant_move_lower"), true);
@@ -1545,10 +1549,10 @@ namespace UltraVideoEditor
                     item.VideoEffect.Contrast = 0;
                     item.VideoEffect.Blur = 0;
                 }
-                LogMessage($"Effects reset on {item.Name}", true);
+                LogMessage(LF("msg_effects_reset_on", item.Name), true);
                 PlayBeep();
             }
-            else LogMessage("Select a clip first", true);
+            else LogMessage(L("msg_select_a_clip_first"), true);
         }
 
         private void ShowVideoEffectsTab_Click(object sender, RoutedEventArgs e) => tabEffects.IsSelected = true;
@@ -1561,11 +1565,11 @@ namespace UltraVideoEditor
         {
             if (markers.Count == 0)
             {
-                LogMessage("No markers", true);
+                LogMessage(L("msg_no_markers"), true);
                 return;
             }
             string markerList = string.Join(", ", markers.Select(m => FormatTime(m)));
-            WpfMessageBox.Show($"Markers:\n{markerList}", "Marker list", MessageBoxButton.OK, MessageBoxImage.Information);
+            WpfMessageBox.Show(LF("msg_markers", markerList), "Marker list", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ToggleGPUAcceleration_Click(object sender, RoutedEventArgs e)
@@ -1916,7 +1920,7 @@ namespace UltraVideoEditor
             if (e.Data.GetDataPresent(WpfDataFormats.FileDrop))
             {
                 e.Effects = WpfDragDropEffects.Copy;
-                if (accessibilityMode) LogMessage("Drag files to add them to the timeline", true);
+                if (accessibilityMode) LogMessage(L("msg_drag_files_to_add_them_to"), true);
             }
             else
             {
@@ -1948,7 +1952,7 @@ namespace UltraVideoEditor
             string[] files = (string[])e.Data.GetData(WpfDataFormats.FileDrop);
             if (files == null || files.Length == 0)
             {
-                if (accessibilityMode) LogMessage("No files", true);
+                if (accessibilityMode) LogMessage(L("msg_no_files"), true);
                 return;
             }
             var supportedExtensions = new[] { ".mp4", ".avi", ".mov", ".mkv", ".mp3", ".wav", ".m4a", ".flac", ".ogg", ".jpg", ".jpeg", ".png", ".bmp" };
@@ -1958,7 +1962,7 @@ namespace UltraVideoEditor
                 if (accessibilityMode) LogMessage(L("unsupported_file"), true);
                 return;
             }
-            if (accessibilityMode) LogMessage($"Adding {validFiles.Length} files...", true);
+            if (accessibilityMode) LogMessage(LF("msg_adding_files", validFiles.Length), true);
             SaveState();
             int videoCount = 0, audioCount = 0, imageCount = 0;
             foreach (string file in validFiles)
@@ -2009,7 +2013,7 @@ namespace UltraVideoEditor
                 }
             }
             UpdateTimelineDisplay();
-            if (accessibilityMode) LogMessage($"Added: {videoCount} video, {audioCount} audio, {imageCount} images", true);
+            if (accessibilityMode) LogMessage(LF("msg_added_video_audio_images", videoCount, audioCount, imageCount), true);
             PlayBeep();
             e.Handled = true;
         }
@@ -2053,7 +2057,7 @@ namespace UltraVideoEditor
             {
                 zoomLevel = Math.Max(0.5, zoomLevel - 0.5);
                 UpdateZoomDisplay();
-                LogMessage($"Zoom smanjen {zoomLevel:F1}x", false);
+                LogMessage(LF("msg_zoomed_out_to_x", zoomLevel), false);
             }
         }
 
@@ -2069,7 +2073,7 @@ namespace UltraVideoEditor
                 markers.Sort();
                 UpdateMarkerDisplay();
                 string inClip = _playingItem != null ? $" ({_playingItem.Name}, {FormatTimeDetailed(currentPlaybackPosition)})" : "";
-                LogMessage($"Marker added {FormatTimeDetailed(t)}{inClip}", true);
+                LogMessage(LF("msg_marker_added", FormatTimeDetailed(t), inClip), true);
                 PlayBeep();
             }
         }
@@ -2117,7 +2121,7 @@ namespace UltraVideoEditor
 
         private void NextMarker_Click(object sender, RoutedEventArgs e)
         {
-            if (markers.Count == 0) { LogMessage("No markers", true); return; }
+            if (markers.Count == 0) { LogMessage(L("msg_no_markers"), true); return; }
             double now = TimelinePosition;
             bool found = markers.Any(m => m > now + 0.1);
             double next = found ? markers.First(m => m > now + 0.1) : markers[0];
@@ -2128,7 +2132,7 @@ namespace UltraVideoEditor
 
         private void PrevMarker_Click(object sender, RoutedEventArgs e)
         {
-            if (markers.Count == 0) { LogMessage("No markers", true); return; }
+            if (markers.Count == 0) { LogMessage(L("msg_no_markers"), true); return; }
             double now = TimelinePosition;
             bool found = markers.Any(m => m < now - 0.1);
             double prev = found ? markers.Last(m => m < now - 0.1) : markers[markers.Count - 1];
@@ -2141,7 +2145,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
 
@@ -2276,7 +2280,7 @@ namespace UltraVideoEditor
         {
             if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
             RecalculatePositions();
@@ -2322,11 +2326,11 @@ namespace UltraVideoEditor
                     SaveState();   // v1.4: only when something changes (Cancel left an empty undo step)
                     item.Duration = dialog.Duration;
                     UpdateTimelineDisplay();
-                    LogMessage($"Duration changed to {FormatTime(item.Duration)}", true);
+                    LogMessage(LF("msg_duration_changed_to", FormatTime(item.Duration)), true);
                     PlayBeep();
                 }
             }
-            else LogMessage("Select a clip first", true);
+            else LogMessage(L("msg_select_a_clip_first"), true);
         }
 
         private async void SetClipVolume_Click(object sender, RoutedEventArgs e)
@@ -2344,7 +2348,7 @@ namespace UltraVideoEditor
                     if (_mediaPlayer != null && _mediaPlayer.IsPlaying) _mediaPlayer.Volume = (int)item.Volume;
                 }
             }
-            else LogMessage("Select a clip first", true);
+            else LogMessage(L("msg_select_a_clip_first"), true);
         }
 
         private void RemoveFromTimeline_Click(object sender, RoutedEventArgs e)
@@ -2354,7 +2358,7 @@ namespace UltraVideoEditor
                 SaveState();
                 timelineItems.Remove(item);
                 UpdateTimelineDisplay();
-                LogMessage("Clip deleted", true);
+                LogMessage(L("msg_clip_deleted"), true);
                 PlayBeep();
             }
         }
@@ -2371,7 +2375,7 @@ namespace UltraVideoEditor
             }
             if (_currentMedia == null)
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
             if (isPlaying)
@@ -2398,7 +2402,7 @@ namespace UltraVideoEditor
                 if (_mixPreviewActive)
                     LogMessage(LF("mix_resumed", FormatTime(currentPlaybackPosition)), true);
                 else if (selItem != null)
-                    LogMessage($"Playing: {selItem.Name}, duration {FormatTime(selItem.Duration)}", true);
+                    LogMessage(LF("msg_playing_duration", selItem.Name, FormatTime(selItem.Duration)), true);
                 else
                     LogMessage(L("playback_started_msg"), true);
             }
@@ -2448,7 +2452,8 @@ namespace UltraVideoEditor
 
         private void OpenAudioDescription_Click(object sender, RoutedEventArgs e)
         {
-            if (timelineItems.Count == 0) { LogMessage(L("mix_nothing"), true); return; }
+            // v1.4.5: works with an empty timeline too (someone may use the editor only for
+            // audio description: open the window, choose any video, describe it)
             RecalculatePositions();
 
             // where singing or speech is heard: the subtitles (lyrics) and the voice clips
@@ -2462,13 +2467,21 @@ namespace UltraVideoEditor
                     yield return (v.Start, v.Start + v.Duration);
             }
 
-            string video = _lastRenderPath;
+            // v1.4.5: the video can be a clip from the timeline as well as the finished render.
+            // A video clip selected in the list comes first, then the last render.
+            var timelineVideos = timelineItems
+                .Where(i => i.IsVideo && !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path))
+                .GroupBy(i => i.Path, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
+                .Select(i => ($"{i.Name} ({FormatTime(i.Start)})", i.Path)).ToList();
+            var sel = SelectedClip();
+            string video = sel != null && sel.IsVideo && File.Exists(sel.Path) ? sel.Path : _lastRenderPath;
             if (string.IsNullOrEmpty(video) || !File.Exists(video))
             {
                 string guess = string.IsNullOrEmpty(currentProjectFolder) ? null : Path.Combine(currentProjectFolder, "izlazni_video.mp4");
-                video = guess != null && File.Exists(guess) ? guess : "";
+                video = guess != null && File.Exists(guess) ? guess
+                      : timelineVideos.Count == 1 ? timelineVideos[0].Item2 : "";
             }
-            var win = new AudioDescriptionWindow(this, timelineItems, Busy, video, _adScript, msg => LogMessage(msg, true));
+            var win = new AudioDescriptionWindow(this, timelineItems, Busy, video, _adScript, msg => LogMessage(msg, false), timelineVideos);
             win.ShowDialog();
             _adScript = win.ScriptText;
             UpdateTimelineDisplay();   // descriptions made on the way are shown in the list
@@ -2898,7 +2911,7 @@ namespace UltraVideoEditor
         {
             if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
             if (item.IsAudio || item.IsImage) { LogMessage(L("speed_video_only"), true); return; }
@@ -3363,7 +3376,7 @@ namespace UltraVideoEditor
             currentTrackFilter = 1;
             if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 1;
             UpdateTimelineDisplay();
-            LogMessage("Video 2 track selected. New videos and images are added to it; Ctrl+Up / Ctrl+Down moves a clip between tracks.", true);
+            LogMessage(L("msg_video_2_track_selected_new_videos"), true);
             PlayBeep();
         }
 
@@ -3372,7 +3385,7 @@ namespace UltraVideoEditor
             currentTrackFilter = 3;
             if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 3;
             UpdateTimelineDisplay();
-            LogMessage("Audio 2 track selected. New audio is added to it; Ctrl+Up / Ctrl+Down moves a clip between tracks.", true);
+            LogMessage(L("msg_audio_2_track_selected_new_audio"), true);
             PlayBeep();
         }
 
@@ -3382,7 +3395,7 @@ namespace UltraVideoEditor
             {
                 currentTrackFilter = int.Parse(item.Tag.ToString());
                 UpdateTimelineDisplay();
-                LogMessage($"Showing track: {((ComboBoxItem)cmbTrackSelector.SelectedItem).Content}", true);
+                LogMessage(LF("msg_showing_track", ((ComboBoxItem)cmbTrackSelector.SelectedItem).Content), true);
             }
         }
 
@@ -3412,7 +3425,7 @@ namespace UltraVideoEditor
                               Math.Round(item.AudioFx?.BassBoost ?? 0), Math.Round(item.AudioFx?.TrebleBoost ?? 0), Math.Round(item.AudioFx?.ReverbAmount ?? 0)), true);
                 PlayBeep();
             }
-            else LogMessage("Select a clip first", true);
+            else LogMessage(L("msg_select_a_clip_first"), true);
         }
 
         private void UpdateAudioEffects()
@@ -3446,7 +3459,7 @@ namespace UltraVideoEditor
             }
             if (!File.Exists(item.Path))
             {
-                LogMessage("Audio file does not exist", true);
+                LogMessage(L("msg_audio_file_does_not_exist"), true);
                 return;
             }
             try
@@ -3563,7 +3576,7 @@ namespace UltraVideoEditor
         private void sldTransitionDuration_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             transitionDuration = sldTransitionDuration.Value;
-            if (accessibilityMode) LogMessage($"Transition duration: {transitionDuration:F1} seconds", true);
+            if (accessibilityMode) LogMessage(LF("msg_transition_duration_seconds", transitionDuration), true);
         }
 
         private void Transition_Selected(object sender, SelectionChangedEventArgs e)
@@ -3583,13 +3596,13 @@ namespace UltraVideoEditor
                     ClearClipTransition(t.ClipIndex1);
                 item.TransitionOut = null; item.TransitionOutDuration = 0;
                 transitions.RemoveAll(t => t.ClipIndex1 == idx || t.ClipIndex2 == idx);
-                LogMessage("Tranzicija uklonjena", true);
+                LogMessage(L("msg_transition_removed"), true);
                 PlayBeep();
                 UpdateTransitionIndicators();
             }
             else
             {
-                LogMessage("Select the first clip of the pair to remove the transition", true);
+                LogMessage(L("msg_select_the_first_clip_of_the_2"), true);
             }
         }
 
@@ -3623,7 +3636,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
             double time = PositionInClip(item);   // v1.4: was "player time − clip start"
@@ -3640,7 +3653,7 @@ namespace UltraVideoEditor
             };
             item.AddKeyframe(kf);
             UpdateKeyframeList(item);
-            LogMessage($"Keyframe added at {FormatTime(time)}", true);
+            LogMessage(LF("msg_keyframe_added_at", FormatTime(time)), true);
             PlayBeep();
         }
         private void AddKenBurnsKeyframes(TimelineItem item, double duration)
@@ -3656,7 +3669,7 @@ namespace UltraVideoEditor
             {
                 item.RemoveKeyframeAt(kf.Time);
                 UpdateKeyframeList(item);
-                LogMessage("Keyframe uklonjen", true);
+                LogMessage(L("msg_keyframe_removed"), true);
                 PlayBeep();
             }
         }
@@ -3685,7 +3698,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select a clip to preview the animation", true);
+                LogMessage(L("msg_select_a_clip_to_preview_the"), true);
                 return;
             }
             LogMessage(L("animation_preview_note"), true);
@@ -3744,11 +3757,11 @@ namespace UltraVideoEditor
         private async void GenerateVoice_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) { WpfMessageBox.Show(L("save_project_first2")); return; }
-            if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage("Enter text first", true); return; }
+            if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage(L("msg_enter_text_first"), true); return; }
             btnGenerateVoice.IsEnabled = false;
             prgVoice.Visibility = Visibility.Visible;
             txtVoiceStatus.Text = "Generating...";
-            LogMessage("Generating AI voice...", true);
+            LogMessage(L("msg_generating_ai_voice"), true);
             string lang = rbSrb.IsChecked == true ? "sr" : "en";
             string voiceoverPath = Path.Combine(currentProjectFolder, "AI_Voiceover.mp3");
             try
@@ -3775,7 +3788,7 @@ namespace UltraVideoEditor
                 SaveState();
                 timelineItems.Add(new TimelineItem { Path = voiceoverPath, Duration = voiceDuration, Name = "AI Voice", Type = "Audio", Volume = 100, TrackIndex = 3, VideoEffect = new VideoEffectData() });
                 UpdateTimelineDisplay();
-                LogMessage("AI voice generated", true);
+                LogMessage(L("msg_ai_voice_generated"), true);
                 txtVoiceStatus.Text = L("voice_done");
                 PlayBeep();
             }
@@ -3785,7 +3798,7 @@ namespace UltraVideoEditor
         private async void GenerateAI_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentProjectFolder)) { WpfMessageBox.Show(L("save_project_first2")); return; }
-            if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text)) { LogMessage("Enter an image description", true); return; }
+            if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text)) { LogMessage(L("msg_enter_an_image_description"), true); return; }
             string apiToken = GetCloudflareApiKey();
             if (string.IsNullOrEmpty(apiToken))
             {
@@ -3803,7 +3816,7 @@ namespace UltraVideoEditor
                 }
             }
             string accountId = GetCloudflareAccountId();
-            if (string.IsNullOrEmpty(accountId)) { LogMessage("Cloudflare Account ID is required for image generation.", true); return; }
+            if (string.IsNullOrEmpty(accountId)) { LogMessage(L("msg_cloudflare_account_id_is_required_for"), true); return; }
             btnGenerate.IsEnabled = false;
             prgAI.Visibility = Visibility.Visible;
             txtAIStatus.Text = "Generating via Cloudflare...";
@@ -3836,7 +3849,7 @@ namespace UltraVideoEditor
                                 SaveState();
                                 var dialog = new DurationDialog(5.0);
                                 double duration = dialog.ShowDialog() == true ? dialog.Duration : 5.0;
-                                LogMessage("Generating description for: " + cleanP + "...", false);
+                                LogMessage(LF("msg_generating_description_for", cleanP), false);
                                 string imgDesc = await GenerateImageDescriptionAsync(img, cleanP);
                                 if (string.IsNullOrEmpty(imgDesc)) imgDesc = LanguageManager.F("loc_ai_image_desc", cleanP);
 
@@ -3852,7 +3865,7 @@ namespace UltraVideoEditor
                                     VideoEffect = new VideoEffectData()
                                 });
                                 generated++;
-                                LogMessage("Image " + (idx + 1) + " ready. Description: " + imgDesc, true);
+                                LogMessage(LF("msg_image_ready_description", idx + 1, imgDesc), true);
                             }
                             else
                             {
@@ -3874,7 +3887,7 @@ namespace UltraVideoEditor
             btnGenerate.IsEnabled = true;
             prgAI.Visibility = Visibility.Collapsed;
             txtAIStatus.Text = string.Format(L("frames_done"), generated, prompts.Length);
-            LogMessage($"AI frames generated: {generated}/{prompts.Length}", true);
+            LogMessage(LF("msg_ai_frames_generated", generated, prompts.Length), true);
             PlayBeep();
         }
 
@@ -3883,7 +3896,7 @@ namespace UltraVideoEditor
             if (cmbAudioClips.SelectedItem is TimelineItem item && item.IsAudio)
             {
                 selectedAudioPath = item.Path;
-                LogMessage($"Selected audio clip: {item.Name}", true);
+                LogMessage(LF("msg_selected_audio_clip", item.Name), true);
             }
         }
 
@@ -3892,7 +3905,7 @@ namespace UltraVideoEditor
             if (cmbTranscribeAudio.SelectedItem is TimelineItem item && item.IsAudio)
             {
                 selectedTranscribeAudioPath = item.Path;
-                LogMessage($"Selected audio for transcription: {item.Name}", true);
+                LogMessage(LF("msg_selected_audio_for_transcription", item.Name), true);
             }
         }
 
@@ -3900,13 +3913,13 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(selectedTranscribeAudioPath))
             {
-                LogMessage("Select an audio file to transcribe", true);
+                LogMessage(L("msg_select_an_audio_file_to_transcribe"), true);
                 return;
             }
 
             if (!AITranscription.IsWhisperAvailable())
             {
-                LogMessage("faster-whisper-xxl not found. Place faster-whisper-xxl.exe next to UltraVideoEditor.exe.", true);
+                LogMessage(L("msg_faster_whisper_xxl_not_found_place"), true);
                 WpfMessageBox.Show(
                     "faster-whisper-xxl not found.\n\n" +
                     "Preuzmi faster-whisper-xxl.exe i postavi ga pored UltraVideoEditor.exe.\n\n" +
@@ -3973,7 +3986,7 @@ namespace UltraVideoEditor
                         lstSubtitles.Items.Add($"{FormatTime(s)} -> {FormatTime(en)}: {line.Text.Trim()}");
                         added++;
                     }
-                    LogMessage($"Added {added} subtitles from the transcript", true);
+                    LogMessage(LF("msg_added_subtitles_from_the_transcript", added), true);
                 }
             }
             catch (Exception ex)
@@ -3986,17 +3999,17 @@ namespace UltraVideoEditor
 
         private async void SyncLyrics_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(selectedAudioPath)) { LogMessage("Select an audio clip first", true); return; }
-            if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage("Enter the song lyrics", true); return; }
+            if (string.IsNullOrEmpty(selectedAudioPath)) { LogMessage(L("msg_select_an_audio_clip_first"), true); return; }
+            if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage(L("msg_enter_the_song_lyrics"), true); return; }
             btnSyncLyrics.IsEnabled = false;
             prgSync.Visibility = Visibility.Visible;
             txtSyncStatus.Text = "Synchronizing...";
-            LogMessage("Synchronizing lyrics...", true);
+            LogMessage(L("msg_synchronizing_lyrics"), true);
             try
             {
                 string[] lines = txtLyrics.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 var lyrics = lines.Where(l => !string.IsNullOrWhiteSpace(l.Trim())).ToList();
-                if (lyrics.Count == 0) { LogMessage("No valid lyric lines", true); return; }
+                if (lyrics.Count == 0) { LogMessage(L("msg_no_valid_lyric_lines"), true); return; }
                 double duration = await GetMediaDurationWithTimeoutAsync(selectedAudioPath, TimeSpan.FromSeconds(15));
                 syncedSubtitles.Clear();
 
@@ -4013,7 +4026,7 @@ namespace UltraVideoEditor
                         // where each line is in the audio. No transcription, no guessing.
                         // Result: millisecond-accurate timestamps that follow the real voice.
                         txtSyncStatus.Text = "Whisper is listening and aligning text...";
-                        LogMessage("🎵 Forced alignment: Whisper detecting where each line begins...", true);
+                        LogMessage(L("msg_alignment_whisper_is_finding_where_each"), true);
                         string ffmpegPath = AppPaths.FFmpeg;
 
                         var alignResult = await AITranscription.ForcedAlignAsync(
@@ -4038,7 +4051,7 @@ namespace UltraVideoEditor
                                     End   = line.EndSeconds
                                 });
                             usedAlignment = true;
-                            LogMessage($"✅ Forced alignment: {alignResult.Lines.Count} lines aligned with the voice", true);
+                            LogMessage(LF("msg_alignment_lines_aligned_with_the_voice", alignResult.Lines.Count), true);
 
                             // Proslijedi word-level timestamps AIVideoCreatoru
                             if (alignResult.WordTimings?.Count > 0)
@@ -4047,18 +4060,18 @@ namespace UltraVideoEditor
                                 if (creator != null)
                                 {
                                     creator.SetWordTimings(alignResult.WordTimings);
-                                    LogMessage($"🔤 Word-level sync: {alignResult.WordTimings.Count} words", true);
+                                    LogMessage(LF("msg_word_level_sync_words", alignResult.WordTimings.Count), true);
                                 }
                             }
                         }
                         else
                         {
-                            LogMessage($"⚠ Alignment failed ({alignResult.ErrorMessage}) — using even distribution", true);
+                            LogMessage(LF("msg_alignment_failed_using_even_distribution", alignResult.ErrorMessage), true);
                         }
                     }
                     catch (Exception alignEx)
                     {
-                        LogMessage($"⚠ Alignment error: {alignEx.Message} — falling back to even distribution", true);
+                        LogMessage(LF("msg_alignment_error_falling_back_to_even", alignEx.Message), true);
                     }
                 }
 
@@ -4068,7 +4081,7 @@ namespace UltraVideoEditor
                     double timePerLine = duration / Math.Max(1, lyrics.Count);
                     for (int i = 0; i < lyrics.Count; i++)
                         syncedSubtitles.Add(new AISubtitle { Text = lyrics[i], Start = i * timePerLine, End = (i + 1) * timePerLine });
-                    LogMessage("Sync: uniform distribution (install Whisper for audio-precise sync)", true);
+                    LogMessage(L("msg_sync_uniform_distribution_install_whisper_for"), true);
                 }
 
                 lstAutoSubtitles.Items.Clear();
@@ -4085,14 +4098,14 @@ namespace UltraVideoEditor
 
         private void AddSyncedSubtitles_Click(object sender, RoutedEventArgs e)
         {
-            if (syncedSubtitles.Count == 0) { LogMessage("No subtitles to add", true); return; }
+            if (syncedSubtitles.Count == 0) { LogMessage(L("msg_no_subtitles_to_add"), true); return; }
             SaveState();
             foreach (var sub in syncedSubtitles)
             {
                 subtitles.Add(new SubtitleItem { Text = sub.Text, Start = sub.Start, End = sub.End });
                 lstSubtitles.Items.Add($"{FormatTime(sub.Start)} -> {FormatTime(sub.End)}: {sub.Text}");
             }
-            LogMessage($"Added {syncedSubtitles.Count} subtitles", true);
+            LogMessage(LF("msg_added_subtitles", syncedSubtitles.Count), true);
             PlayBeep();
         }
 
@@ -4158,7 +4171,7 @@ namespace UltraVideoEditor
                 }
             }
             UpdateTimelineDisplay();
-            LogMessage($"Template \"{t.Name}\" primenjen.", true);
+            LogMessage(LF("msg_template_applied", t.Name), true);
         }
 
         // ── Faza 4C: Color Grading Engine ───────────────────────────
@@ -4178,7 +4191,7 @@ namespace UltraVideoEditor
             if (dlg.ShowDialog() != true) { DiscardLastUndo(); return; }
             {
                 UpdateTimelineDisplay();
-                LogMessage("Color Grading: grade applied to the timeline clips.", true);
+                LogMessage(L("msg_color_grading_grade_applied_to_the"), true);
             }
         }
 
@@ -4194,7 +4207,7 @@ namespace UltraVideoEditor
                 if (added?.Count > 0)
                 {
                     UpdateTimelineDisplay();
-                    LogMessage($"Smart Scene Detection: added {added.Count} scenes to the timeline.", true);
+                    LogMessage(LF("msg_smart_scene_detection_added_scenes_to", added.Count), true);
                 }
             }
         }
@@ -4221,7 +4234,7 @@ namespace UltraVideoEditor
                 foreach (var item in dlg.ResultItems)
                     timelineItems.Add(item);
                 UpdateTimelineDisplay();
-                LogMessage($"Timeline AI Assistant: changes applied. Clips: {timelineItems.Count}", true);
+                LogMessage(LF("msg_timeline_ai_assistant_changes_applied_clips", timelineItems.Count), true);
             }
         }
 
@@ -4258,7 +4271,7 @@ namespace UltraVideoEditor
                         cursor += seg.Duration;
                     }
                     UpdateTimelineDisplay();
-                    LogMessage($"Added {segments.Count} highlight segments to the timeline.", true);
+                    LogMessage(LF("msg_added_highlight_segments_to_the_timeline", segments.Count), true);
                     PlayBeep();
                     // Save for Phase 3
                     _lastHighlightResult      = dlg.PublicResult;
@@ -4270,14 +4283,14 @@ namespace UltraVideoEditor
 
         private void AddSubtitle_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage("Enter subtitle text", true); return; }
+            if (string.IsNullOrWhiteSpace(txtSubtitleText?.Text)) { LogMessage(L("msg_enter_subtitle_text"), true); return; }
             bool startOk = double.TryParse(txtSubStart?.Text?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double start);
             bool endOk = double.TryParse(txtSubEnd?.Text?.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double end);
             if (!startOk || !endOk) { LogMessage(L("time_format_error"), true); return; }
             subtitles.Add(new SubtitleItem { Text = txtSubtitleText.Text, Start = start, End = end });
             lstSubtitles.Items.Add($"{FormatTime(start)} -> {FormatTime(end)}: {txtSubtitleText.Text}");
             txtSubtitleText.Clear();
-            LogMessage("Subtitle added", true);
+            LogMessage(L("msg_subtitle_added"), true);
             PlayBeep();
         }
 
@@ -4285,7 +4298,7 @@ namespace UltraVideoEditor
         {
             subtitles.Clear();
             lstSubtitles.Items.Clear();
-            LogMessage("Subtitles deleted", true);
+            LogMessage(L("msg_subtitles_deleted"), true);
             PlayBeep();
         }
 
@@ -4295,7 +4308,7 @@ namespace UltraVideoEditor
             if (dialog.ShowDialog() == true)
             {
                 currentExportSettings = dialog.Settings;
-                LogMessage($"Export options: {currentExportSettings.Format}, {currentExportSettings.Quality}", true);
+                LogMessage(LF("msg_export_options", currentExportSettings.Format, currentExportSettings.Quality), true);
             }
         }
 
@@ -4319,7 +4332,7 @@ namespace UltraVideoEditor
                         string autoDesc = "";
                         if (type == "Image")
                         {
-                            LogMessage("Generating description for " + Path.GetFileName(f) + "...", false);
+                            LogMessage(LF("msg_generating_description_for", Path.GetFileName(f)), false);
                             autoDesc = await GenerateImageDescriptionAsync(f);
                             if (string.IsNullOrEmpty(autoDesc))
                                 autoDesc = "Slika: " + Path.GetFileNameWithoutExtension(f);
@@ -4336,12 +4349,12 @@ namespace UltraVideoEditor
                             VideoEffect = new VideoEffectData()
                         });
                         if (!string.IsNullOrEmpty(autoDesc))
-                            LogMessage("Added: " + Path.GetFileName(f) + ". Description: " + autoDesc, true);
+                            LogMessage(LF("msg_added_with_description", Path.GetFileName(f), autoDesc), true);
                     }
                     catch (Exception ex) { LogMessage(string.Format(L("generic_error"), ex.Message), true); }
                 }
                 UpdateTimelineDisplay();
-                LogMessage($"Items added: {d.FileNames.Length}", true);
+                LogMessage(LF("msg_items_added", d.FileNames.Length), true);
                 PlayBeep();
             }
         }
@@ -4364,7 +4377,7 @@ namespace UltraVideoEditor
                     catch (Exception ex) { LogMessage(string.Format(L("generic_error"), ex.Message), true); }
                 }
                 UpdateTimelineDisplay();
-                LogMessage($"Items added: {d.FileNames.Length}", true);
+                LogMessage(LF("msg_items_added", d.FileNames.Length), true);
                 PlayBeep();
             }
         }
@@ -4383,7 +4396,7 @@ namespace UltraVideoEditor
             {
                 if (!File.Exists(filePath))
                 {
-                    LogMessage($"File not found: {Path.GetFileName(filePath)}", true);
+                    LogMessage(LF("msg_file_not_found", Path.GetFileName(filePath)), true);
                     continue;
                 }
 
@@ -4410,19 +4423,19 @@ namespace UltraVideoEditor
                         VideoEffect = new VideoEffectData()
                     });
 
-                    LogMessage($"YouTube → Timeline: {Path.GetFileName(filePath)}", true);
+                    LogMessage(LF("msg_youtube_timeline", Path.GetFileName(filePath)), true);
                     added++;
                 }
                 catch (Exception ex)
                 {
-                    LogMessage($"Error adding {Path.GetFileName(filePath)}: {ex.Message}", true);
+                    LogMessage(LF("msg_error_adding", Path.GetFileName(filePath), ex.Message), true);
                 }
             }
 
             if (added > 0)
             {
                 UpdateTimelineDisplay();
-                LogMessage($"Added {added} file(s) from YouTube to the timeline.", true);
+                LogMessage(LF("msg_added_file_s_from_youtube_to", added), true);
                 PlayBeep();
             }
         }
@@ -4435,7 +4448,7 @@ namespace UltraVideoEditor
         {
             if (timelineItems.Count == 0)
             {
-                LogMessage("Auto-Render: No clips to render", true);
+                LogMessage(L("msg_auto_render_no_clips_to_render"), true);
                 return;
             }
 
@@ -4455,7 +4468,7 @@ namespace UltraVideoEditor
             btnRenderTool.IsEnabled = false;
             txtRenderStatus.Text = "Auto-Render in progress...";
 
-            LogMessage($"🚀 Auto-Render: {timelineItems.Count} clips → {outputPath}", true);
+            LogMessage(LF("msg_auto_render_clips", timelineItems.Count, outputPath), true);
 
             try
             {
@@ -4539,13 +4552,13 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"Auto-Render: file was not created: {outputPath}", true);
+                    LogMessage(LF("msg_auto_render_file_was_not_created", outputPath), true);
                     txtRenderStatus.Text = "Auto-Render failed";
                 }
             }
             catch (Exception ex)
             {
-                LogMessage($"Auto-Render error: {ex.Message}", true);
+                LogMessage(LF("msg_auto_render_error", ex.Message), true);
                 txtRenderStatus.Text = "Auto-Render error";
             }
             finally
@@ -4559,7 +4572,7 @@ namespace UltraVideoEditor
         {
             if (timelineItems.Count == 0)
             {
-                LogMessage("No clips to render", true);
+                LogMessage(L("msg_no_clips_to_render"), true);
                 return;
             }
 
@@ -4579,7 +4592,7 @@ namespace UltraVideoEditor
             {
                 var audioDialog = new WpfSaveFileDialog { Filter = "MP3 audio|*.mp3|WAV audio|*.wav", DefaultExt = "mp3", FileName = "audio.mp3" };
                 if (audioDialog.ShowDialog() != true) return;
-                LogMessage("Exporting audio only...", true);
+                LogMessage(L("msg_exporting_audio_only"), true);
                 bool audioOk = await ExportHelpers.ExportAudioOnlyAsync(timelineItems, audioDialog.FileName, CancellationToken.None);
                 LogMessage(audioOk ? $"Audio exported: {audioDialog.FileName}" : "Audio export failed — no audio clip on the timeline?", true);
                 if (audioOk) PlayBeep();
@@ -4615,7 +4628,7 @@ namespace UltraVideoEditor
             var resolutionDialog = new ResolutionDialog { Owner = this };
             if (resolutionDialog.ShowDialog() != true)
             {
-                LogMessage("Rendering cancelled", true);
+                LogMessage(L("msg_rendering_cancelled"), true);
                 return;
             }
             if (!string.IsNullOrEmpty(resolutionDialog.SelectedResolution))
@@ -4631,7 +4644,7 @@ namespace UltraVideoEditor
             btnRenderTool.IsEnabled = false;
             txtRenderStatus.Text = "Rendering...";
 
-            LogMessage("Rendering started...", true);
+            LogMessage(L("msg_rendering_started"), true);
 
             try
             {
@@ -4654,7 +4667,7 @@ namespace UltraVideoEditor
                         prgRender.Value = percent;
                         if (accessibilityMode && percent % 10 == 0)
                         {
-                            LogMessage($"Render progress: {percent}%", true);
+                            LogMessage(LF("msg_render_progress", percent), true);
                         }
                     });
                 });
@@ -4688,7 +4701,7 @@ namespace UltraVideoEditor
 
                 if (needsConversion && File.Exists(outputPath))
                 {
-                    LogMessage($"Converting to {requestedExt.TrimStart('.').ToUpperInvariant()}...", true);
+                    LogMessage(LF("msg_converting_to", requestedExt.TrimStart('.').ToUpperInvariant()), true);
                     bool converted = await ExportHelpers.ConvertContainerAsync(outputPath, requestedPath, _renderCancellation?.Token ?? CancellationToken.None);
                     if (converted)
                     {
@@ -4697,7 +4710,7 @@ namespace UltraVideoEditor
                     }
                     else
                     {
-                        LogMessage($"Conversion failed — the MP4 is kept: {outputPath}", true);
+                        LogMessage(LF("msg_conversion_failed_the_mp4_is_kept", outputPath), true);
                     }
                 }
 
@@ -4725,7 +4738,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                LogMessage("Rendering cancelled", true);
+                LogMessage(L("msg_rendering_cancelled"), true);
                 txtRenderStatus.Text = "Cancelled";
                 PlayBeep();
             }
@@ -4734,7 +4747,7 @@ namespace UltraVideoEditor
                 // v1.4: details go to the log files; the message tells where they are instead of
                 // reading a stack trace aloud.
                 AppLog.Error("Render", ex);
-                LogMessage($"RENDER ERROR: {ex.Message}", true);
+                LogMessage(LF("msg_render_error", ex.Message), true);
                 txtRenderStatus.Text = L("render_failed_status");
                 string where = File.Exists(RenderEngine.LastErrorLogPath) ? RenderEngine.LastErrorLogPath : AppLog.TodayFile;
                 WpfMessageBox.Show(string.Format(L("render_failed_msg"), ex.Message, where), L("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
@@ -4792,7 +4805,7 @@ namespace UltraVideoEditor
                     UiScaling.SetScale(_lowVisionScale);
                     ApplyNativeListViewScale(_lowVisionScale);
                     // v1.4: this message is said even though Low vision mode itself does not speak
-                    if (announce) { LogMessage("Low vision mode on", false); AnnounceModeChange("Low vision mode on"); }
+                    if (announce) { LogMessage(L("msg_low_vision_mode_on"), false); AnnounceModeChange("Low vision mode on"); }
                     break;
 
                 case UIMode.Sighted:
@@ -4959,7 +4972,7 @@ namespace UltraVideoEditor
                 else if (e.Key == Key.F3) { e.Handled = false; }
                 else if (e.Key == Key.L && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
-                    if (_logWindow != null) { _logWindow.Show(); _logWindow.Activate(); LogMessage("Log window opened", true); }
+                    if (_logWindow != null) { _logWindow.Show(); _logWindow.Activate(); LogMessage(L("msg_log_window_opened"), true); }
                     e.Handled = true;
                 }
                 else if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control)
@@ -4967,7 +4980,7 @@ namespace UltraVideoEditor
                     nativeListView?.Focus();
                     if (nativeListView?.Items.Count > 0 && nativeListView.SelectedItems.Count == 0)
                         nativeListView.Items[0].Selected = true;
-                    LogMessage("Focus on the clip list. Use the up/down arrows to navigate.", true);
+                    LogMessage(L("msg_focus_on_the_clip_list_use"), true);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -5090,6 +5103,11 @@ namespace UltraVideoEditor
                     if (!DuplicateKey("descframe")) DescribeFrameHere_Click(null, null);   // v1.4 (R4)
                     e.Handled = true;
                 }
+                else if (e.Key == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt))
+                {
+                    OpenAudioDescription_Click(null, null);   // v1.4.5: audio description for viewers
+                    e.Handled = true;
+                }
                 else if (e.Key == Key.D && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt))
                 {
                     if (!DuplicateKey("descparts")) DescribeClipParts_Click(null, null);   // v1.4 (R4)
@@ -5194,11 +5212,11 @@ namespace UltraVideoEditor
                 {
                     subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = item.Start, End = item.End });
                     lstSubtitles.Items.Add($"{FormatTime(item.Start)} -> {FormatTime(item.End)}: {dialog.Text}");
-                    LogMessage($"Subtitle added to clip: {item.Name}", true);
+                    LogMessage(LF("msg_subtitle_added_to_clip", item.Name), true);
                     PlayBeep();
                 }
             }
-            else LogMessage("Select a clip first", true);
+            else LogMessage(L("msg_select_a_clip_first"), true);
         }
 
         private void AddIntroText_Click(object sender, RoutedEventArgs e)
@@ -5208,7 +5226,7 @@ namespace UltraVideoEditor
             {
                 subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = 0, End = 5 });
                 lstSubtitles.Items.Add($"0:00 -> 0:05: {dialog.Text}");
-                LogMessage($"Intro text added: {dialog.Text}", true);
+                LogMessage(LF("msg_intro_text_added", dialog.Text), true);
                 PlayBeep();
             }
         }
@@ -5221,7 +5239,7 @@ namespace UltraVideoEditor
                 double totalDuration = GetTotalDuration();
                 subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = totalDuration - 5 > 0 ? totalDuration - 5 : 0, End = totalDuration });
                 lstSubtitles.Items.Add($"{FormatTime(totalDuration - 5)} -> {FormatTime(totalDuration)}: {dialog.Text}");
-                LogMessage($"Outro text added: {dialog.Text}", true);
+                LogMessage(LF("msg_outro_text_added", dialog.Text), true);
                 PlayBeep();
             }
         }
@@ -5244,16 +5262,16 @@ namespace UltraVideoEditor
                         LogMessage(string.Format(L("transition_added"), transition.Name, idx + 1, idx + 2), true);
                         PlayBeep();
                     }
-                    else LogMessage("Select a transition first", true);
+                    else LogMessage(L("msg_select_a_transition_first"), true);
                 }
-                else LogMessage("Select the first clip of the pair (not the last)", true);
+                else LogMessage(L("msg_select_the_first_clip_of_the"), true);
             }
         }
 
         private void AddTransitionBetweenSpecific_Click(object sender, RoutedEventArgs e)
         {
-            if (timelineItems.Count < 2) { LogMessage("Not enough clips to add a transition", true); return; }
-            if (lstTransitions.SelectedItem is not TransitionEffect transition) { LogMessage("Select a transition first", true); return; }
+            if (timelineItems.Count < 2) { LogMessage(L("msg_not_enough_clips_to_add_a"), true); return; }
+            if (lstTransitions.SelectedItem is not TransitionEffect transition) { LogMessage(L("msg_select_a_transition_first"), true); return; }
             var dialog = new TransitionDialog(timelineItems.Count);
             if (dialog.ShowDialog() == true)
             {
@@ -5267,14 +5285,14 @@ namespace UltraVideoEditor
                     LogMessage(string.Format(L("transition_added"), transition.Name, clipIndex + 1, clipIndex + 2), true);
                     PlayBeep();
                 }
-                else LogMessage("Invalid clip number", true);
+                else LogMessage(L("msg_invalid_clip_number"), true);
             }
         }
 
         private void ClearPrompt_Click(object sender, RoutedEventArgs e)
         {
             txtAIPrompt.Clear();
-            LogMessage("Prompt obrisan", true);
+            LogMessage(L("msg_prompt_cleared"), true);
             PlayBeep();
         }
 
@@ -5316,14 +5334,14 @@ namespace UltraVideoEditor
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     item.AudioDescription = dialog.Text;
-                    LogMessage($"Audio description added for image {item.Index}: {dialog.Text}", true);
+                    LogMessage(LF("msg_description_added_to_clip", item.Index, dialog.Text), true);
                     UpdateTimelineDisplay();
                     PlayBeep();
                 }
             }
             else
             {
-                LogMessage("Select an image first", true);
+                LogMessage(L("msg_select_an_image_first"), true);
             }
         }
 
@@ -5369,7 +5387,7 @@ namespace UltraVideoEditor
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
             {
                 item.AudioDescription = dialog.Text;
-                LogMessage($"Audio description added for image {item.Index}: {dialog.Text}", true);
+                LogMessage(LF("msg_description_added_to_clip", item.Index, dialog.Text), true);
                 UpdateTimelineDisplay();
                 PlayBeep();
             }
@@ -5485,7 +5503,7 @@ namespace UltraVideoEditor
 
         private async void GenerateScenario_Click(object sender, RoutedEventArgs e)
         {
-            LogMessage("GenerateScenario_Click pozvan", true);
+            LogMessage("GenerateScenario_Click called", true);
 
             if (string.IsNullOrWhiteSpace(txtAnimationPrompt.Text))
             {
@@ -5513,7 +5531,7 @@ namespace UltraVideoEditor
             var availableImages = timelineItems.Where(i => i.IsImage).Select(i => i.Name).ToList();
             if (availableImages.Count == 0)
             {
-                LogMessage("No images on the timeline to create an animation", true);
+                LogMessage(L("msg_no_images_on_the_timeline_to"), true);
                 return;
             }
 
@@ -5536,7 +5554,7 @@ namespace UltraVideoEditor
 
                 if (string.IsNullOrEmpty(result))
                 {
-                    LogMessage("AI did not return a response", true);
+                    LogMessage(L("msg_ai_did_not_return_a_response"), true);
                     return;
                 }
 
@@ -5552,7 +5570,7 @@ namespace UltraVideoEditor
 
                 if (jsonStart < 0 || jsonEnd <= jsonStart)
                 {
-                    LogMessage("AI did not return a valid JSON array", true);
+                    LogMessage(L("msg_ai_did_not_return_a_valid_2"), true);
                     return;
                 }
 
@@ -5592,12 +5610,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage("Scenario generation cancelled", true);
+                    LogMessage(L("msg_scenario_generation_cancelled"), true);
                 }
                 lstAnimationScenes.ItemsSource = null;
                 lstAnimationScenes.ItemsSource = _animationScenes;
 
-                LogMessage($"Scenario generated: {_animationScenes.Count} scenes", true);
+                LogMessage(LF("msg_scenario_generated_scenes", _animationScenes.Count), true);
                 PlayBeep();
             }
             catch (Exception ex)
@@ -5649,7 +5667,7 @@ namespace UltraVideoEditor
 
                 if (layout?.raspored == null || layout.raspored.Count == 0)
                 {
-                    LogMessage("AI did not return a valid layout", true);
+                    LogMessage(L("msg_ai_did_not_return_a_valid"), true);
                     return;
                 }
 
@@ -5770,19 +5788,19 @@ namespace UltraVideoEditor
             {
                 if (!double.TryParse(txtAnimationStartTime.Text.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double startTime))
                 {
-                    LogMessage("Enter a valid number of seconds", true);
+                    LogMessage(L("msg_enter_a_valid_number_of_seconds"), true);
                     return;
                 }
                 SaveState();
                 animacija.UseFixedPosition = true;      // v1.4: Start alone was overwritten on the next refresh
                 animacija.FixedPosition = Math.Max(0, startTime);
                 UpdateTimelineDisplay();
-                LogMessage($"Animacija '{animacija.Name}' postavljena na {FormatTime(startTime)}", true);
+                LogMessage(LF("msg_animation_placed_at", animacija.Name, FormatTime(startTime)), true);
                 PlayBeep();
             }
             else
             {
-                LogMessage("Select an animation on the timeline first", true);
+                LogMessage(L("msg_select_an_animation_on_the_timeline"), true);
             }
         }
 
@@ -5790,11 +5808,11 @@ namespace UltraVideoEditor
         {
             if (_animationScenes.Count == 0)
             {
-                LogMessage("No scenes to create an animation", true);
+                LogMessage(L("msg_no_scenes_to_create_an_animation"), true);
                 return;
             }
 
-            LogMessage("Creating animation from scenes...", true);
+            LogMessage(L("msg_creating_animation_from_scenes"), true);
             SaveState();
 
             foreach (var scene in _animationScenes)
@@ -5811,7 +5829,7 @@ namespace UltraVideoEditor
                 }
             }
             UpdateTimelineDisplay();
-            LogMessage($"Kreirano {_animationScenes.Count} animacija", true);
+            LogMessage(LF("msg_created_animations", _animationScenes.Count), true);
             PlayBeep();
         }
 
@@ -5840,7 +5858,7 @@ namespace UltraVideoEditor
                 string accountId = GetCloudflareAccountId();
                 if (string.IsNullOrEmpty(accountId)) return "";
                 string url = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct";
-                LogMessage($"CallCloudflareAI: Pozivam URL: {url}", true);
+                LogMessage($"CallCloudflareAI: Calling URL: {url}", true);
 
                 try
                 {
@@ -5848,7 +5866,7 @@ namespace UltraVideoEditor
                     string responseBody = await response.Content.ReadAsStringAsync();
 
                     LogMessage($"CallCloudflareAI: Status code: {response.StatusCode}", true);
-                    LogMessage($"CallCloudflareAI: Response (prvih 500): {responseBody.Substring(0, Math.Min(500, responseBody.Length))}", true);
+                    LogMessage($"CallCloudflareAI: Response (first 500): {responseBody.Substring(0, Math.Min(500, responseBody.Length))}", true);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -5865,7 +5883,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogMessage($"CallCloudflareAI: Izuzetak: {ex.Message}", true);
+                    LogMessage($"CallCloudflareAI: Exception: {ex.Message}", true);
                     return "";
                 }
             }
@@ -5885,7 +5903,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                LogMessage("Select a transition first", true);
+                LogMessage(L("msg_select_a_transition_first"), true);
             }
         }
 
@@ -5907,12 +5925,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
+                    LogMessage(LF("msg_no_keyframe_at_add_a_keyframe", FormatTime(time)), true);
                 }
             }
             else
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
             }
         }
 
@@ -5934,12 +5952,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
+                    LogMessage(LF("msg_no_keyframe_at_add_a_keyframe", FormatTime(time)), true);
                 }
             }
             else
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
             }
         }
 
@@ -5962,12 +5980,12 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogMessage($"No keyframe at {FormatTime(time)}. Add a keyframe first (Ctrl+K)", true);
+                    LogMessage(LF("msg_no_keyframe_at_add_a_keyframe", FormatTime(time)), true);
                 }
             }
             else
             {
-                LogMessage("Select a clip first", true);
+                LogMessage(L("msg_select_a_clip_first"), true);
             }
         }
 
@@ -6069,7 +6087,7 @@ namespace UltraVideoEditor
         {
             if (!(nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item) || (!item.IsImage && !item.IsVideo))
             {
-                LogMessage("Select an image or video clip on the timeline.", true);
+                LogMessage(L("msg_select_an_image_or_video_clip"), true);
                 return;
             }
 
@@ -6091,7 +6109,7 @@ namespace UltraVideoEditor
                 if (dlg.AutoPlaceAll)
                 {
                     // The dialog already distributed the clips of this track evenly.
-                    LogMessage("Even distribution applied.", true);
+                    LogMessage(L("msg_even_distribution_applied"), true);
                 }
                 else if (dlg.SelectedPosition >= 0)
                 {
@@ -6177,12 +6195,12 @@ namespace UltraVideoEditor
         private void ApplyTransitionToSelectedClip()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect tpl))
-            { LogMessage("Select a transition in the transitions list.", true); return; }
+            { LogMessage(L("msg_select_a_transition_in_the_transitions"), true); return; }
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("Select a clip that is not the first — the transition goes between the previous clip and the selected one.", true); return; }
+            { LogMessage(L("msg_select_a_clip_that_is_not_2"), true); return; }
             int idx = timelineItems.IndexOf(item);
             var prevItem = PreviousOnTrack(item);
-            if (prevItem == null) { LogMessage("Select a clip that is not the first", true); return; }
+            if (prevItem == null) { LogMessage(L("msg_select_a_clip_that_is_not"), true); return; }
             int prevIdx = timelineItems.IndexOf(prevItem);
             SaveState();
             var t = new TransitionEffect
@@ -6198,7 +6216,7 @@ namespace UltraVideoEditor
             SetClipTransition(prevItem, t);
             string c1 = prevItem.Name;
             string c2 = item.Name;
-            LogMessage("Tranzicija '" + t.Name + "' (" + transitionDuration.ToString("F1") + "s) izmedju '" + c1 + "' i '" + c2 + "'.", true);
+            LogMessage(LF("msg_transition_between", t.Name, transitionDuration.ToString("F1"), c1, c2), true);
             PlayBeep();
             UpdateTransitionIndicators();
         }
@@ -6206,9 +6224,9 @@ namespace UltraVideoEditor
         private void ApplyTransitionToAll()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect tpl))
-            { LogMessage("Select a transition in the list.", true); return; }
+            { LogMessage(L("msg_select_a_transition_in_the_list"), true); return; }
             var vids = timelineItems.Where(i => i.IsVideo || i.IsImage).ToList();
-            if (vids.Count < 2) { LogMessage("At least 2 video/image clips are required.", true); return; }
+            if (vids.Count < 2) { LogMessage(L("msg_at_least_2_video_image_clips"), true); return; }
             SaveState();
             transitions.Clear();
             RecalculatePositions();
@@ -6221,7 +6239,7 @@ namespace UltraVideoEditor
                 transitions.Add(t);
                 SetClipTransition(vids[i - 1], t);
             }
-            LogMessage("Tranzicija '" + tpl.Name + "' primenjena na " + transitions.Count + " prelaza.", true);
+            LogMessage(LF("msg_transition_applied_to", tpl.Name, transitions.Count), true);
             PlayBeep();
             UpdateTransitionIndicators();
         }
@@ -6229,7 +6247,7 @@ namespace UltraVideoEditor
         private void DescribeSelectedTransition()
         {
             if (!(lstTransitions.SelectedItem is TransitionEffect t))
-            { LogMessage("No transition selected.", true); return; }
+            { LogMessage(L("msg_no_transition_selected"), true); return; }
             string desc;
             if (t.Type == TransitionType.Fade) desc = LanguageManager.T("loc_fade_desc");
             else if (t.Type == TransitionType.Crossfade) desc = "Crossfade: the two clips gradually blend into each other.";
@@ -6242,13 +6260,13 @@ namespace UltraVideoEditor
             else if (t.Type == TransitionType.ZoomIn) desc = "Zoom In: the next clip zooms in from the center and covers the previous one.";
             else if (t.Type == TransitionType.ZoomOut) desc = "Zoom Out: the previous clip shrinks and reveals the next one.";
             else desc = t.Name;
-            LogMessage("Effect: " + t.Name + ". " + desc, true);
+            LogMessage(LF("msg_effect_desc", t.Name, desc), true);
         }
 
         private void ShowTransitionOnSelectedClip()
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("No clip selected.", true); return; }
+            { LogMessage(L("msg_no_clip_selected"), true); return; }
             int idx = timelineItems.IndexOf(item);
             var before = transitions.FirstOrDefault(t => t.ClipIndex2 == idx);
             var after = transitions.FirstOrDefault(t => t.ClipIndex1 == idx);
@@ -6262,13 +6280,13 @@ namespace UltraVideoEditor
         private void RemoveTransitionFromSelectedClip()
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
-            { LogMessage("No clip selected.", true); return; }
+            { LogMessage(L("msg_no_clip_selected"), true); return; }
             int idx = timelineItems.IndexOf(item);
             foreach (var t in transitions.Where(x => x.ClipIndex1 == idx || x.ClipIndex2 == idx).ToList())
                 ClearClipTransition(t.ClipIndex1);
             int removed = transitions.RemoveAll(t => t.ClipIndex1 == idx || t.ClipIndex2 == idx);
-            if (removed > 0) { SaveState(); LogMessage("Removed " + removed + " transition(s) from clip " + (idx + 1) + ".", true); PlayBeep(); UpdateTransitionIndicators(); }
-            else LogMessage("No transitions on this clip.", true);
+            if (removed > 0) { SaveState(); LogMessage(LF("msg_removed_transitions", removed, idx + 1), true); PlayBeep(); UpdateTransitionIndicators(); }
+            else LogMessage(L("msg_no_transitions_on_this_clip"), true);
         }
 
         private void UpdateTransitionIndicators()
@@ -6334,7 +6352,7 @@ namespace UltraVideoEditor
         {
             _lowVisionScale = Math.Min(LowVisionScaleMax, _lowVisionScale + LowVisionScaleStep);
             if (_uiMode == UIMode.LowVision) SetUIMode(UIMode.LowVision, announce: false);
-            LogMessage($"Low vision text size: {_lowVisionScale:0.##}x", true);
+            LogMessage(LF("msg_low_vision_text_size_x", _lowVisionScale), true);
         }
 
         /// <summary>
@@ -6346,7 +6364,7 @@ namespace UltraVideoEditor
         {
             _lowVisionScale = Math.Max(LowVisionScaleMin, _lowVisionScale - LowVisionScaleStep);
             if (_uiMode == UIMode.LowVision) SetUIMode(UIMode.LowVision, announce: false);
-            LogMessage($"Low vision text size: {_lowVisionScale:0.##}x", true);
+            LogMessage(LF("msg_low_vision_text_size_x", _lowVisionScale), true);
         }
 
         private void InitNativeListView()
@@ -6410,9 +6428,9 @@ namespace UltraVideoEditor
                     contextMenu.Items.Add(new WinForms.ToolStripSeparator());
                     contextMenu.Items.Add("🎨 " + L("ctx_add_text_to_image"), null, (s, e) => AddTextToImage_Click(null, null));
                     nativeListView.ContextMenuStrip = contextMenu;
-                    nativeListView.AccessibleName = "List of clips on the timeline. Use the arrow keys to navigate. Ctrl+Space for play/pause. Page Up/Down for quick scrolling.";
+                    nativeListView.AccessibleName = L("acc_clip_list");
 
-                    LogMessage("Win32 ListView inicijalizovan - kolone postavljene", true);
+                    LogMessage("Win32 ListView initialised - columns set", true);
                     UpdateTimelineDisplay();
                 }
                 else
@@ -6737,12 +6755,12 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                System.Windows.MessageBox.Show("Save the project first!");
+                System.Windows.MessageBox.Show(L("msg_save_the_project_first"));
                 return;
             }
             if (string.IsNullOrWhiteSpace(txtAIPrompt?.Text))
             {
-                LogMessage("Enter an image description in the prompt field.", true);
+                LogMessage(L("msg_enter_an_image_description_in_the"), true);
                 return;
             }
 
@@ -6759,7 +6777,7 @@ namespace UltraVideoEditor
                 {
                     string cleanP = prompts[i].Trim();
                     if (string.IsNullOrEmpty(cleanP)) continue;
-                    LogMessage("Pollinations.ai generise: " + cleanP + "...", true);
+                    LogMessage(LF("msg_pollinations_generating", cleanP), true);
                     try
                     {
                         // Pollinations.ai — samo URL sa promptom, nula konfiguracije
@@ -6787,11 +6805,11 @@ namespace UltraVideoEditor
                             VideoEffect = new VideoEffectData()
                         });
                         generated++;
-                        LogMessage("Image " + (i + 1) + " ready. Description: " + desc, true);
+                        LogMessage(LF("msg_image_ready_description", i + 1, desc), true);
                         if (prgAI != null)
                             Dispatcher.Invoke(() => prgAI.Value = (i + 1) * 100 / prompts.Length);
                     }
-                    catch (Exception ex) { LogMessage("Pollinations error: " + ex.Message, true); }
+                    catch (Exception ex) { LogMessage(LF("msg_pollinations_error", ex.Message), true); }
                     await Task.Delay(300);
                 }
             }
@@ -6799,7 +6817,7 @@ namespace UltraVideoEditor
             UpdateTimelineDisplay();
             if (btnGenerate != null) btnGenerate.IsEnabled = true;
             if (prgAI != null) prgAI.Visibility = System.Windows.Visibility.Collapsed;
-            LogMessage("Pollinations.ai: generisano " + generated + "/" + prompts.Length + " slika.", true);
+            LogMessage(LF("msg_pollinations_generated", generated, prompts.Length), true);
             PlayBeep();
         }
 
@@ -6811,13 +6829,13 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrEmpty(currentProjectFolder))
             {
-                System.Windows.MessageBox.Show("Save the project first!");
+                System.Windows.MessageBox.Show(L("msg_save_the_project_first"));
                 return;
             }
             var dlg = new SkiaAnimationDialog();
             if (dlg.ShowDialog() != true) return;
 
-            LogMessage("Generating SkiaSharp animation: " + dlg.AnimationText + "...", true);
+            LogMessage(LF("msg_skia_generating", dlg.AnimationText), true);
             try
             {
                 string outPath = System.IO.Path.Combine(currentProjectFolder,
@@ -6846,12 +6864,12 @@ namespace UltraVideoEditor
                     VideoEffect = new VideoEffectData()
                 });
                 UpdateTimelineDisplay();
-                LogMessage("Skia animacija kreirana: " + System.IO.Path.GetFileName(outPath), true);
+                LogMessage(LF("msg_skia_created", System.IO.Path.GetFileName(outPath)), true);
                 PlayBeep();
             }
             catch (Exception ex)
             {
-                LogMessage("Error generating animation: " + ex.Message, true);
+                LogMessage(LF("msg_animation_error", ex.Message), true);
             }
         }
 
@@ -6880,7 +6898,7 @@ namespace UltraVideoEditor
                 var audioItem = timelineItems.FirstOrDefault(i => i.IsAudio);
                 if (audioItem == null)
                 {
-                    LogMessage("No audio file on the timeline. Add a song first.", true);
+                    LogMessage(L("msg_no_audio_file_on_the_timeline"), true);
                     return;
                 }
 
@@ -6890,7 +6908,7 @@ namespace UltraVideoEditor
                     !i.Name.Contains("Outro")).ToList();
                 if (images.Count == 0)
                 {
-                    LogMessage("No images on the timeline. Add images first.", true);
+                    LogMessage(L("msg_no_images_on_the_timeline_add"), true);
                     return;
                 }
 
@@ -6914,7 +6932,7 @@ namespace UltraVideoEditor
 
                 if (timePerImage <= 0)
                 {
-                    LogMessage("Not enough time for images. Reduce the text duration.", true);
+                    LogMessage(L("msg_not_enough_time_for_images_reduce"), true);
                     return;
                 }
 
@@ -6924,7 +6942,7 @@ namespace UltraVideoEditor
                 bool soundsEnabled = dialog.EnableTransitionSounds || dialog.EnableAmbientSounds;
                 if (soundsEnabled)
                 {
-                    LogMessage("🔊 Local sound library active for slideshow", true);
+                    LogMessage(L("msg_local_sound_library_active_for_slideshow"), true);
                 }
                 // Lista za tranzicione zvukove
                 var transitionSounds = new List<TimelineItem>();
@@ -7012,13 +7030,13 @@ namespace UltraVideoEditor
                 }
                 if (transitionSounds.Count > 0)
                 {
-                    LogMessage($"Added {transitionSounds.Count} transition sounds", true);
+                    LogMessage(LF("msg_added_transition_sounds", transitionSounds.Count), true);
                 }
 
                 // Ambijentalni zvukovi — lokalna biblioteka
                 if (dialog.EnableAmbientSounds)
                 {
-                    LogMessage("Adding ambient sounds from the local library...", true);
+                    LogMessage(L("msg_adding_ambient_sounds_from_the_local"), true);
                     var ambientSounds = new List<TimelineItem>();
 
                     string[] ambientTypes = { "birds", "children laughing", "wind" };
@@ -7057,7 +7075,7 @@ namespace UltraVideoEditor
                     }
                     if (ambientSounds.Count > 0)
                     {
-                        LogMessage($"Added {ambientSounds.Count} ambient sounds", true);
+                        LogMessage(LF("msg_added_ambient_sounds", ambientSounds.Count), true);
                     }
                 }
                 // v1.4: logo and intro text both used to sit at 0 s on top of each other.
@@ -7068,7 +7086,7 @@ namespace UltraVideoEditor
                     logoDur = Math.Max(0, dialog.IntroDuration - 1.0);
                 if (hasLogo && logoDur < 0.5)
                 {
-                    LogMessage("Not enough intro time for the logo — set a longer intro duration to show it.", true);
+                    LogMessage(L("msg_not_enough_intro_time_for_the"), true);
                     hasLogo = false;
                     logoDur = 0;
                 }
@@ -7093,7 +7111,7 @@ namespace UltraVideoEditor
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(introTextItem);
-                    LogMessage($"Added intro text: {dialog.IntroText}", true);
+                    LogMessage(LF("msg_added_intro_text", dialog.IntroText), true);
                 }
 
                 // DODAJ ODJAVNI TEKST (na kraju)
@@ -7118,7 +7136,7 @@ namespace UltraVideoEditor
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(outroTextItem);
-                    LogMessage($"Added outro text: {dialog.OutroText}", true);
+                    LogMessage(LF("msg_added_outro_text", dialog.OutroText), true);
                 }
 
                 // Logo
@@ -7139,7 +7157,7 @@ namespace UltraVideoEditor
                         VideoEffect = new VideoEffectData()
                     };
                     timelineItems.Add(logoItem);
-                    LogMessage($"Added logo: {Path.GetFileName(dialog.LogoPath)}", true);
+                    LogMessage(LF("msg_added_logo", Path.GetFileName(dialog.LogoPath)), true);
                 }
 
                 // Crossfade between images (if enabled)
@@ -7334,13 +7352,13 @@ namespace UltraVideoEditor
             subtitles.Add(subtitle);
             lstSubtitles.Items.Add($"{FormatTime(startTime)} -> {FormatTime(startTime + duration)}: {text}");
 
-            LogMessage($"Added text: '{text}' from {FormatTime(startTime)} to {FormatTime(startTime + duration)}", true);
+            LogMessage(LF("msg_added_text_from_to", text, FormatTime(startTime), FormatTime(startTime + duration)), true);
         }
         private void AddTextToImage_Click(object sender, RoutedEventArgs e)
         {
             if (nativeListView?.SelectedItems.Count == 0 || !(nativeListView.SelectedItems[0].Tag is TimelineItem item))
             {
-                LogMessage("Select an image first", true);
+                LogMessage(L("msg_select_an_image_first"), true);
                 return;
             }
 
@@ -7363,7 +7381,7 @@ namespace UltraVideoEditor
                     Enabled = true
                 };
 
-                LogMessage($"Text '{dialog.Text}' added to image {item.Index}", true);
+                LogMessage(LF("msg_text_added_to_image", dialog.Text, item.Index), true);
                 PlayBeep();
 
                 // Refresh display in ListView
@@ -7378,12 +7396,12 @@ namespace UltraVideoEditor
             {
                 nativeListView.Items[number - 1].Selected = true;
                 nativeListView.Items[number - 1].EnsureVisible();
-                LogMessage($"Navigated to clip {number}", true);
+                LogMessage(LF("msg_navigated_to_clip", number), true);
                 PlayBeep();
             }
             else
             {
-                LogMessage($"Number {number} does not exist (1-{nativeListView.Items.Count})", true);
+                LogMessage(LF("msg_number_does_not_exist_1", number, nativeListView.Items.Count), true);
             }
         }
         private void MoveToFirst_Click(object sender, RoutedEventArgs e)
@@ -7404,7 +7422,7 @@ namespace UltraVideoEditor
                     }
                 }), System.Windows.Threading.DispatcherPriority.Background);
 
-                LogMessage($"Clip '{item.Name}' moved to the first position", true);
+                LogMessage(LF("msg_clip_moved_to_the_first_position", item.Name), true);
                 PlayBeep();
             }
         }
@@ -7428,7 +7446,7 @@ namespace UltraVideoEditor
                     }
                 }), System.Windows.Threading.DispatcherPriority.Background);
 
-                LogMessage($"Clip '{item.Name}' moved to the last position", true);
+                LogMessage(LF("msg_clip_moved_to_the_last_position", item.Name), true);
                 PlayBeep();
             }
         }
@@ -7459,7 +7477,7 @@ namespace UltraVideoEditor
                             }
                         }), System.Windows.Threading.DispatcherPriority.Background);
 
-                        LogMessage($"Clip '{item.Name}' moved to position {newPosition}", true);
+                        LogMessage(LF("msg_clip_moved_to_position", item.Name, newPosition), true);
                         PlayBeep();
                     }
                 }
@@ -7499,7 +7517,7 @@ namespace UltraVideoEditor
                 }
 
                 UpdateTimelineDisplay();
-                LogMessage($"✅ Added {dialog.DownloadedMediaPaths.Count} media items from Pixabay", true);
+                LogMessage(LF("msg_added_media_items_from_pixabay", dialog.DownloadedMediaPaths.Count), true);
                 PlayBeep();
             }
         }
@@ -7545,12 +7563,12 @@ namespace UltraVideoEditor
                         _mediaPlayer.Time = ms;
                         if (!_mediaPlayer.IsPlaying) _mediaPlayer.Play();
                     });
-                    LogMessage($"▶ Seek na {TimeSpan.FromSeconds(seconds):mm\\:ss}", false);
+                    LogMessage(LF("msg_seek_to", TimeSpan.FromSeconds(seconds)), false);
                 }
             }
             catch (Exception ex)
             {
-                LogMessage($"Seek error: {ex.Message}", false);
+                LogMessage(LF("msg_seek_error", ex.Message), false);
             }
         }
 

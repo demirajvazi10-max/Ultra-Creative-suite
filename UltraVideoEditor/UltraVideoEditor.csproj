@@ -39,6 +39,14 @@
 		<Page Remove="Tests\**" />
 	</ItemGroup>
 
+	<!-- v1.4.5: backup folders are never built (a .cs or .xaml copy there would be a second definition) -->
+	<ItemGroup>
+		<Compile Remove="Backup_*\**" />
+		<EmbeddedResource Remove="Backup_*\**" />
+		<None Remove="Backup_*\**" />
+		<Page Remove="Backup_*\**" />
+	</ItemGroup>
+
 	<ItemGroup>
 	  <Compile Update="Properties\Resources.Designer.cs">
 	    <DesignTime>True</DesignTime>

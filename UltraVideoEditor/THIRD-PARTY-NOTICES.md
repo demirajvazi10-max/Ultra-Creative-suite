@@ -53,6 +53,16 @@ If you use the program commercially, check the licence of the model your compute
 
 Clips downloaded from these services keep their own licence; check it before publishing a video commercially.
 
+## Voices for the audio description (only when you choose them)
+
+| Service | Notes |
+|---|---|
+| Microsoft neural voices (Edge "Read aloud" service) | Free, no key. Not an official developer service, so it may change. The access token is computed by `EdgeTtsToken.cs`, a C# port of [edge-tts](https://github.com/rany2/edge-tts) (`drm.py`), licensed under the LGPLv3. |
+| [Google Cloud Text-to-Speech](https://cloud.google.com/text-to-speech) (Chirp 3 HD) | Your own Google Cloud API key; the first million characters a month are free, see Google's pricing and terms. |
+| Google Translate voice | Free, no key; used as the fallback. |
+| [Google Gemini API](https://ai.google.dev/gemini-api/terms) | Optional, your own key from Google AI Studio; describes the pictures and translates. See Google's terms and pricing (free tier for the Flash models). |
+| Google Translate (text) | Free, no key; translates the English picture descriptions when no Gemini key is saved. |
+
 ## Ambient sound library
 
 The ambient sound library the AI music video creator uses is **Adobe Audition's free sound effects**. It is not shipped with Ultra Video Editor: Adobe's licence allows using the sounds in your own productions, but not sharing the sound files as a standalone package. The installer (optional task) and *Help → Download the sound library from Adobe* download the categories Weather, Animals, Human Elements, Liquid and Water, Ambience 1 and Ambience 2 directly from Adobe's server, under Adobe's terms, and convert them to OGG on your computer: https://www.adobe.com/products/audition/offers/AdobeAuditionDLCSFX.html

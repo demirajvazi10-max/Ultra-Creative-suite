@@ -122,7 +122,7 @@
                 <MenuItem x:Name="mnuDescParts" Tag="mnu_desc_parts" InputGestureText="Ctrl+Alt+D" Click="DescribeClipParts_Click"/>
                 <MenuItem x:Name="mnuDescAllMine" Tag="mnu_desc_all_mine" Click="DescribeAllMyClips_Click"/>
                 <MenuItem x:Name="mnuDescStop" Tag="mnu_desc_stop" Click="StopDescribing_Click"/>
-                <MenuItem x:Name="mnuAudioDescription" Tag="🔈|mnu_audio_description" Click="OpenAudioDescription_Click"/>
+                <MenuItem x:Name="mnuAudioDescription" Tag="🔈|mnu_audio_description" InputGestureText="Ctrl+Alt+A" Click="OpenAudioDescription_Click"/>
                 <MenuItem x:Name="mnuDescFollow" Tag="mnu_desc_follow" IsCheckable="True" IsChecked="True" Click="ToggleAnnounceDescriptions_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuGenerateVoice" Tag="mw_generate_voice" Click="GenerateVoice_Click"/>

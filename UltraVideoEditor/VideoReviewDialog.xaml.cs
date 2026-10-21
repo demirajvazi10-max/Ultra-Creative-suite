@@ -104,7 +104,9 @@ namespace UltraVideoEditor
 
             AddFinding(FindingItem.Info("—", "✅ Ollama radi"));
 
-            string detectedModel = null;
+            // v1.4.5: the installed Qwen3-VL (exact name) is preferred
+            string best = await FrameDescriber.FindModelAsync();
+            string detectedModel = best != null && best.StartsWith("qwen", StringComparison.OrdinalIgnoreCase) ? best : null;
             foreach (string name in new[] { "qwen2.5vl", "qwen2-vl", "qwen2.5-vl", "qwen2.5vl:latest", "qwen2-vl:latest" })
             {
                 try
@@ -998,6 +1000,8 @@ namespace UltraVideoEditor
 
         private async Task<string> DetectQwenModelAsync()
         {
+            string best = await FrameDescriber.FindModelAsync();
+            if (best != null && best.StartsWith("qwen", StringComparison.OrdinalIgnoreCase)) return best;
             foreach (string name in new[] { "qwen2.5vl", "qwen2-vl", "qwen2.5-vl" })
                 if (await _ollama.IsModelAvailable(name)) return name;
             return null;

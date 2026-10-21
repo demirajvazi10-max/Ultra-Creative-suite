@@ -267,7 +267,11 @@ namespace UltraVideoEditor
                 }
 
                 // Detect and cache the exact model name — once per entire video
-                if (await _ollamaClient.IsModelAvailable(QWEN_MODEL))
+                // v1.4.5: the installed Qwen3-VL (exact name with its tag) comes first
+                string best = await FrameDescriber.FindModelAsync();
+                if (best != null && best.StartsWith("qwen", StringComparison.OrdinalIgnoreCase))
+                    _resolvedQwenModel = best;
+                else if (await _ollamaClient.IsModelAvailable(QWEN_MODEL))
                     _resolvedQwenModel = QWEN_MODEL;
                 else if (await _ollamaClient.IsModelAvailable(QWEN_MODEL_ALT))
                     _resolvedQwenModel = QWEN_MODEL_ALT;

@@ -24,6 +24,15 @@ namespace UltraVideoEditor
 
             base.OnStartup(e);
 
+            // v1.4.5: every window opens in the interface language — the texts written in
+            // its XAML (labels, buttons, tooltips, screen-reader names) are translated when it loads
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                new RoutedEventHandler((s, args) =>
+                {
+                    if (s is Window w && ReferenceEquals(args.OriginalSource, w))
+                        XamlTranslator.Translate(w, LanguageManager.CurrentLanguage);
+                }));
+
             // v1.4: text in FFmpeg (titles, outro, subtitles) needs a font configuration
             AppPaths.EnsureFontconfig();
 

@@ -82,6 +82,7 @@
                         <TextBlock Text="Ctrl+Shift+V   Volume point at the playhead (volume over time)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Ctrl+Shift+F   Describe the frame under the playhead (AI)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Ctrl+Alt+D     Describe the selected clip by parts (AI, background)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
+                        <TextBlock Text="Ctrl+Alt+A     Audio description for viewers (opens the window)" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="Home           Go to start" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                         <TextBlock Text="End            Go to end" Foreground="{DynamicResource TextPrimary}" FontFamily="Consolas" Margin="5,2"/>
                     </StackPanel>

@@ -141,7 +141,7 @@ namespace UltraVideoEditor
             }
         }
 
-        private static string StripSymbols(string text)
+        internal static string StripSymbols(string text)
         {
             var sb = new System.Text.StringBuilder();
             foreach (var rune in text.EnumerateRunes())

@@ -29,7 +29,8 @@ namespace UltraVideoEditor
         private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(180) };
         private static readonly Dictionary<string, string> _cache = new Dictionary<string, string>();
         private static string _model;
-        private static readonly string[] ModelPreference = { "qwen2.5vl", "qwen2.5-vl", "qwen2-vl", "llava", "moondream" };
+        // v1.4.5: Qwen3-VL first (much better descriptions); the instruct variant before "thinking"
+        private static readonly string[] ModelPreference = { "qwen3-vl", "qwen2.5vl", "qwen2.5-vl", "qwen2-vl", "llava", "moondream" };
 
         /// <summary>Shortest part a clip is divided into, and the longest before it is split.</summary>
         private const double MinPart = 2.0, MaxPart = 8.0;
@@ -47,7 +48,8 @@ namespace UltraVideoEditor
                             .Select(m => m["name"]?.ToString() ?? "").ToList() ?? new List<string>();
                 foreach (string pref in ModelPreference)
                 {
-                    string hit = names.FirstOrDefault(n => n.StartsWith(pref, StringComparison.OrdinalIgnoreCase));
+                    var hits = names.Where(n => n.StartsWith(pref, StringComparison.OrdinalIgnoreCase)).ToList();
+                    string hit = hits.FirstOrDefault(n => !n.Contains("thinking", StringComparison.OrdinalIgnoreCase)) ?? hits.FirstOrDefault();
                     if (hit != null) return _model = hit;
                 }
             }
@@ -116,7 +118,14 @@ namespace UltraVideoEditor
         }
 
         /// <summary>Describes the frame at <paramref name="fileTime"/> seconds of the file.</summary>
-        public static async Task<FrameResult> DescribeFrameAsync(string path, double fileTime, CancellationToken ct)
+        public static Task<FrameResult> DescribeFrameAsync(string path, double fileTime, CancellationToken ct) =>
+            DescribeFrameAsync(path, fileTime, false, ct);
+
+        /// <summary>
+        /// <paramref name="forViewers"/>: a short sentence for blind VIEWERS (audio description) instead of the
+        /// editor's description (no shot sizes, no "the image shows").
+        /// </summary>
+        public static async Task<FrameResult> DescribeFrameAsync(string path, double fileTime, bool forViewers, CancellationToken ct)
         {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) return new FrameResult { Error = "no_picture" };
 
@@ -125,15 +134,29 @@ namespace UltraVideoEditor
             bool still = kind != PictureKind.Video;   // a picture or a cover: one frame, no seeking
             if (still) fileTime = 0;
 
-            string key = $"{path}|{Math.Round(Math.Max(0, fileTime), 1).ToString(CultureInfo.InvariantCulture)}";
+            // v1.4.5: the language is part of the key — before, a description made in English was
+            // given back from the cache after switching the program to Serbian. The English
+            // description (what the model writes) is kept too, so another language only translates.
+            string lang = LanguageManager.CurrentLanguage ?? "en";
+            string where = $"{path}|{Math.Round(Math.Max(0, fileTime), 1).ToString(CultureInfo.InvariantCulture)}";
+            string key = $"{(forViewers ? "V|" : "")}{lang}|{where}";
+            string enKey = $"{(forViewers ? "V|" : "")}en|{where}";
+            string english;
             lock (_cache)
             {
                 if (_cache.TryGetValue(key, out var cached))
                     return new FrameResult { Text = cached, CoverOnly = kind == PictureKind.Cover };
+                _cache.TryGetValue(enKey, out english);
             }
 
             string model = await FindModelAsync();
-            if (model == null) return new FrameResult { Error = "no_model" };
+            if (model == null && !GeminiClient.HasKey) return new FrameResult { Error = "no_model" };
+            if (english != null)
+            {
+                string again = await TranslateAsync(model, english, lang, ct);
+                lock (_cache) { _cache[key] = again; }
+                return new FrameResult { Text = again, CoverOnly = kind == PictureKind.Cover };
+            }
 
             string frame = Path.Combine(Path.GetTempPath(), $"uve_frame_{Guid.NewGuid():N}.jpg");
             try
@@ -158,9 +181,34 @@ namespace UltraVideoEditor
                 }
 
                 string base64 = Convert.ToBase64String(await File.ReadAllBytesAsync(frame, ct));
-                string text = await AskModelAsync(model, base64, ct);
+
+                // v1.4.5: with a Gemini key, Gemini looks at the picture and writes directly in the
+                // program language (natural Serbian); the local model is the fallback
+                if (GeminiClient.HasKey)
+                {
+                    try
+                    {
+                        string g = await GeminiClient.AskAsync(Prompt(forViewers, GeminiClient.LanguageName(lang)), base64, ct);
+                        if (!string.IsNullOrWhiteSpace(g))
+                        {
+                            g = Clean(g);
+                            if (lang == "en" && forViewers) g = StripCameraWords(g);
+                            if (lang == "sr") g = CyrillicToLatin(g);
+                            lock (_cache) { _cache[key] = g; }
+                            return new FrameResult { Text = g, CoverOnly = kind == PictureKind.Cover };
+                        }
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception ex) { LogTranslateOnce("Gemini (describing)", ex); }
+                    if (model == null) return new FrameResult { Error = "failed", Detail = "Gemini gave no answer." };
+                }
+
+                string text = await AskModelAsync(model, base64, forViewers, ct);
                 if (string.IsNullOrWhiteSpace(text)) return new FrameResult { Error = "failed", Detail = "The vision model gave no answer." };
                 text = Clean(text);
+                if (forViewers) text = StripCameraWords(text);
+                lock (_cache) { _cache[enKey] = text; }
+                text = await TranslateAsync(model, text, lang, ct);
                 lock (_cache) { _cache[key] = text; }
                 return new FrameResult { Text = text, CoverOnly = kind == PictureKind.Cover };
             }
@@ -188,7 +236,7 @@ namespace UltraVideoEditor
         {
             var result = new List<FrameDescription>();
             if (item == null || string.IsNullOrEmpty(item.Path) || !File.Exists(item.Path)) { problem?.Invoke("no_picture"); return result; }
-            if (await FindModelAsync() == null) return null;
+            if (!await CanDescribeAsync()) return null;
 
             double dur = Math.Max(0.1, item.Duration);
             var kind = await ProbePictureAsync(item.Path, ct);
@@ -263,7 +311,7 @@ namespace UltraVideoEditor
         }
 
         /// <summary>Shot changes (seconds from <paramref name="offset"/>) found with FFmpeg's scene score.</summary>
-        private static async Task<List<double>> FindShotChangesAsync(string path, double offset, double length, CancellationToken ct)
+        public static async Task<List<double>> FindShotChangesAsync(string path, double offset, double length, CancellationToken ct)
         {
             var times = new List<double>();
             var inv = CultureInfo.InvariantCulture;
@@ -276,25 +324,31 @@ namespace UltraVideoEditor
             return times;
         }
 
-        private static async Task<string> AskModelAsync(string model, string base64, CancellationToken ct)
+        private static string Prompt(bool forViewers, string lang) => forViewers
+            // v1.4: audio description, like on Netflix — what a blind viewer needs, briefly
+            ? "You write audio description for blind viewers of a music video. Write ONE short, complete " +
+              "sentence (6 to 12 words, present tense) that says who is there and what happens. Always finish " +
+              "the sentence. If the frame is mostly text (a title or credits), just read the text. Do not " +
+              $"mention the camera, the shot, the image or the frame. No introduction. Answer only in {lang}."
+            : "You describe video frames for a blind video editor. In one or two short sentences say " +
+              "who or what is in the picture, what is happening, where, and the shot size " +
+              "(close-up, medium shot or wide shot). Mention readable text if there is any. " +
+              $"No introduction, do not start with 'The image'. Answer in {lang}.";
+
+        /// <summary>Something can describe pictures: Gemini (with a key) or a local vision model.</summary>
+        public static async Task<bool> CanDescribeAsync() => GeminiClient.HasKey || await FindModelAsync() != null;
+
+        private static async Task<string> AskModelAsync(string model, string base64, bool forViewers, CancellationToken ct)
         {
-            string lang = (LanguageManager.CurrentLanguage ?? "en") switch
-            {
-                "sr" => "Serbian, written in the Latin alphabet",
-                "de" => "German",
-                _ => "English"
-            };
+            // v1.4.5: always English — the description is translated afterwards (TranslateAsync)
             var request = new
             {
                 model,
-                prompt = "You describe video frames for a blind video editor. In one or two short sentences say " +
-                         "who or what is in the picture, what is happening, where, and the shot size " +
-                         "(close-up, medium shot or wide shot). Mention readable text if there is any. " +
-                         $"No introduction, do not start with 'The image'. Answer in {lang}.",
+                prompt = Prompt(forViewers, "English"),
                 images = new[] { base64 },
                 stream = false,
                 keep_alive = "30m",
-                options = new { temperature = 0.1, num_predict = 120, num_ctx = 4096 }
+                options = new { temperature = 0.1, num_predict = 200, num_ctx = 4096 }
             };
             var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
             using var resp = await _http.PostAsync("http://localhost:11434/api/generate", content, ct);
@@ -302,8 +356,152 @@ namespace UltraVideoEditor
             return JObject.Parse(await resp.Content.ReadAsStringAsync(ct))["response"]?.ToString()?.Trim();
         }
 
+        /// <summary>
+        /// v1.4.5: the vision model always describes in ENGLISH (the small models describe well in
+        /// English, but their Serbian was poor: Croatian forms, invented words, "Detaljno…"). The
+        /// English sentence is then translated: with Google Cloud Translation when a Google Cloud
+        /// key is saved, otherwise with the free Google Translate service, and only when both fail
+        /// by the local model. Serbian comes back in Latin letters.
+        /// </summary>
+        private static async Task<string> TranslateAsync(string model, string english, string lang, CancellationToken ct)
+        {
+            if (lang == "en" || string.IsNullOrWhiteSpace(english)) return english;
+            string result = null;
+            if (GeminiClient.HasKey)
+            {
+                try { result = await GeminiClient.TranslateAsync(english, lang, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { LogTranslateOnce("Gemini", ex); }
+            }
+            string key = string.IsNullOrWhiteSpace(result) ? NeuralTts.GoogleKey : null;
+            if (!string.IsNullOrEmpty(key))
+            {
+                try { result = await CloudTranslateAsync(english, lang, key, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { LogTranslateOnce("Google Cloud Translation", ex); }
+            }
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                try { result = await FreeTranslateAsync(english, lang, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { LogTranslateOnce("Google Translate", ex); }
+            }
+            if (string.IsNullOrWhiteSpace(result) && model != null)
+            {
+                try { result = await ModelTranslateAsync(model, english, lang, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { LogTranslateOnce("local model", ex); }
+            }
+            if (string.IsNullOrWhiteSpace(result)) return english;
+            result = Clean(System.Net.WebUtility.HtmlDecode(result));
+            return lang == "sr" ? CyrillicToLatin(result) : result;
+        }
+
+        private static readonly HashSet<string> _translateLogged = new HashSet<string>();
+        private static void LogTranslateOnce(string service, Exception ex)
+        {
+            lock (_translateLogged) { if (!_translateLogged.Add(service)) return; }
+            AppLog.Error($"Translating a picture description with {service}", ex);
+        }
+
+        private static async Task<string> CloudTranslateAsync(string text, string lang, string key, CancellationToken ct)
+        {
+            var body = new { q = text, source = "en", target = lang, format = "text" };
+            var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+            using var resp = await _http.PostAsync("https://translation.googleapis.com/language/translate/v2?key=" + Uri.EscapeDataString(key), content, ct);
+            string json = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                throw new InvalidOperationException(JObject.Parse(json)["error"]?["message"]?.ToString() ?? resp.StatusCode.ToString());
+            return JObject.Parse(json)["data"]?["translations"]?[0]?["translatedText"]?.ToString();
+        }
+
+        private static async Task<string> FreeTranslateAsync(string text, string lang, CancellationToken ct)
+        {
+            string url = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl={lang}&dt=t&q={Uri.EscapeDataString(text)}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+            using var resp = await _http.SendAsync(req, ct);
+            resp.EnsureSuccessStatusCode();
+            var parts = JArray.Parse(await resp.Content.ReadAsStringAsync(ct))[0] as JArray;
+            if (parts == null) return null;
+            var sb = new StringBuilder();
+            foreach (var p in parts) sb.Append(p?[0]?.ToString());
+            return sb.ToString();
+        }
+
+        private static async Task<string> ModelTranslateAsync(string model, string text, string lang, CancellationToken ct)
+        {
+            string target = lang == "sr" ? "Serbian (ekavian, as spoken in Serbia), written in the Latin alphabet" : "German";
+            var request = new
+            {
+                model,
+                prompt = $"Translate this sentence into {target}. Keep it short and natural. " +
+                         $"Reply with the translation only, nothing else.\n\n{text}",
+                stream = false,
+                keep_alive = "30m",
+                options = new { temperature = 0.1, num_predict = 200 }
+            };
+            var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
+            using var resp = await _http.PostAsync("http://localhost:11434/api/generate", content, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return JObject.Parse(await resp.Content.ReadAsStringAsync(ct))["response"]?.ToString()?.Trim();
+        }
+
+        /// <summary>
+        /// Camera words at the start of a viewer description ("Close-up of a girl…" → "A girl…"):
+        /// the viewer prompt forbids them, but small models still write them.
+        /// </summary>
+        private static string StripCameraWords(string text)
+        {
+            string t = System.Text.RegularExpressions.Regex.Replace(text,
+                @"^(an?\s+)?(extreme\s+)?(close[- ]?up|detailed|detail|wide|medium|long|aerial|overhead)(\s+(shot|view|image|scene|picture))?\s+(of|shows|showing|with)\s+",
+                "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+            t = System.Text.RegularExpressions.Regex.Replace(t, @"^(in\s+)?(this|the)\s+(shot|frame|scene|picture),?\s+", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+            if (t.Length < 3) return text;
+            return char.ToUpperInvariant(t[0]) + t.Substring(1);
+        }
+
+        private static readonly HashSet<string> EnglishWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "a", "an", "is", "are", "with", "and", "in", "on", "of", "her", "his", "their", "at", "to",
+            "while", "through", "girl", "boy", "man", "woman", "child", "children", "people", "walks", "stands",
+            "sits", "holding", "wearing", "standing", "sitting", "walking", "playing", "smiling", "looks", "text", "reads"
+        };
+
+        private static bool LooksEnglish(string text)
+        {
+            var words = System.Text.RegularExpressions.Regex.Split(text.ToLowerInvariant(), @"[^\p{L}']+").Where(w => w.Length > 0).ToList();
+            if (words.Count == 0) return false;
+            int hits = words.Count(w => EnglishWords.Contains(w));
+            return hits >= 2 && hits * 4 >= words.Count;   // a quarter of the words are common English words
+        }
+
+        private static string CyrillicToLatin(string s)
+        {
+            if (string.IsNullOrEmpty(s) || !s.Any(c => c >= '\u0400' && c <= '\u04FF')) return s;
+            var map = new Dictionary<char, string>
+            {
+                ['а']="a",['б']="b",['в']="v",['г']="g",['д']="d",['ђ']="đ",['е']="e",['ж']="ž",['з']="z",['и']="i",
+                ['ј']="j",['к']="k",['л']="l",['љ']="lj",['м']="m",['н']="n",['њ']="nj",['о']="o",['п']="p",['р']="r",
+                ['с']="s",['т']="t",['ћ']="ć",['у']="u",['ф']="f",['х']="h",['ц']="c",['ч']="č",['џ']="dž",['ш']="š"
+            };
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                char lower = char.ToLowerInvariant(c);
+                if (map.TryGetValue(lower, out string lat))
+                    sb.Append(c == lower ? lat : char.ToUpperInvariant(lat[0]) + lat.Substring(1));
+                else sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
         private static string Clean(string text)
         {
+            // a "thinking" model writes its reasoning first: only the answer after it is kept
+            int think = text.LastIndexOf("</think>", StringComparison.OrdinalIgnoreCase);
+            if (think >= 0) text = text.Substring(think + 8);
             text = Regex.Replace(text, @"\s+", " ").Trim().Trim('"');
             foreach (string p in new[] { "The image shows ", "This image shows ", "The image depicts ", "The video frames show ", "The video frame shows ", "The frame shows ", "In this image, ", "Na slici je ", "Na slici se vidi " })
                 if (text.Length > p.Length + 1 && text.StartsWith(p, StringComparison.OrdinalIgnoreCase))
