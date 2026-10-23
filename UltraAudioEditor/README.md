@@ -1,9 +1,9 @@
 # 🎵 Ultra Audio Editor
 
-**Professional Windows audio editor with full screen reader accessibility.**  
+**A Windows audio editor with full screen reader accessibility.**  
 Built from the ground up so blind and sighted users have equal access to every feature.
 
-> Part of the **Ultra** platform — an open accessible engine for professional creative tools.  
+> Part of the **Ultra** platform — an open accessible engine for creative tools.  
 > This tool lives in the `UltraAudioEditor` folder of the [Ultra Creative Suite](../README.md) repository and shares its [GPL-3.0 license](../LICENSE).
 
 ---

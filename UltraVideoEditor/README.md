@@ -2,7 +2,7 @@
 
 > An accessible video editor for Windows, with a built-in AI music video creator. Fully usable with JAWS and NVDA, and equally usable for sighted and low-vision users.
 
-Part of [Ultra Creative Suite](../README.md). Built by a blind developer and tested daily with JAWS for Windows.
+Part of [Ultra Creative Suite](../README.md). Made by Demir Ajvazi and used daily with JAWS for Windows.
 
 ---
 

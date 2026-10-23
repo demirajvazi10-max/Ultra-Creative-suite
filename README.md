@@ -1,18 +1,18 @@
 # Ultra Creative Suite
 
-**A family of professional creative apps for Windows that are fully accessible to blind, low-vision, and sighted users — without compromise.**
+**Creative tools that start with the keyboard, not the mouse.**
 
-Built by a blind developer. Tested daily with JAWS for Windows.
+A family of creative apps for Windows — video, audio, photo, captions and more — designed from the first line for keyboard and screen reader use, and equally comfortable with a mouse. Made by Demir Ajvazi, who uses them every day with JAWS for Windows.
 
 ---
 
 ## Demo
 
-This video was created entirely by the author — who is blind — using Ultra Creative Suite with JAWS for Windows. No sighted assistance.
+This video was made entirely by the author, with Ultra Creative Suite and JAWS for Windows.
 
 [![Ultra Creative Suite Demo](https://img.youtube.com/vi/K1mXPN4hEFs/maxresdefault.jpg)](https://www.youtube.com/watch?v=K1mXPN4hEFs)
 
-> A children's song video: lyrics analyzed by AI, stock footage automatically selected and downloaded, mood-based color grading applied, ambient sounds mixed, rendered to 4K. Created independently by a blind user.
+> A children's song video: lyrics analyzed by AI, stock footage automatically selected and downloaded, mood-based color grading applied, ambient sounds mixed, rendered to 4K.
 
 ---
 
@@ -20,10 +20,10 @@ This video was created entirely by the author — who is blind — using Ultra C
 
 Ultra Creative Suite is a family of creative and productivity apps for Windows, built from the ground up with full accessibility as a core requirement — not an afterthought. It started with an AI-assisted video editor and has grown into a full suite: video editing, audio editing, photo editing, captioning, screen recording, multi-track audio recording, podcast/audiobook playback, and an accessible DAW, with more apps added over time.
 
-Every app works for blind, low-vision, and sighted users equally. Blind users can independently edit timelines, apply AI effects, transcribe audio, compose music, and produce finished, professional-quality output — without sighted assistance, and without a stripped-down "accessible mode" that hides features.
+Every app works for blind, low-vision, and sighted users equally: edit timelines, apply AI effects, transcribe audio, compose music and produce finished work, with the same features for everyone — no stripped-down "accessible mode" that hides things.
 
-> "I am blind and I use JAWS for Windows. I built this because no professional creative software on the market is actually usable with a screen reader."
-> — Author
+> "I use JAWS every day, and I wanted creative tools where the keyboard and the screen reader come first, not as an afterthought."
+> — Demir Ajvazi
 
 ---
 
@@ -32,7 +32,7 @@ Every app works for blind, low-vision, and sighted users equally. Blind users ca
 This repository hosts the full Ultra Creative Suite as a monorepo. Every app lives in its own sibling subfolder — none of them is "the root project":
 
 - **`/UltraVideoEditor`** — Ultra Video Editor, the flagship AI-assisted video editor
-- **`/UltraAudioEditor`** — Ultra Audio Editor, a companion professional audio editor with the same accessibility standard
+- **`/UltraAudioEditor`** — Ultra Audio Editor, a companion audio editor with the same accessibility standard
 - **`/UltraStudio`** — Ultra Studio, an AI-assisted photo editor with the same accessibility standard: a dual JAWS Mode / Visual Mode interface, local AI image description and editing suggestions, and AI-guided precise object extraction (Segment Anything)
 - **`/UltraCaptions`** — Ultra Captions, an accessible subtitle/caption editor combining Whisper auto-transcription with manual keyboard-driven timing
 - **`/UltraCast`** — Ultra Cast, an accessible screen recorder for tutorials, demos, and walkthroughs
@@ -89,9 +89,9 @@ All apps target Windows 10/11 (64-bit) and .NET 8, and most either bundle or aut
 
 ## Why This Matters
 
-There is no professional creative software that blind users can actually use independently. Adobe Premiere, DaVinci Resolve, Final Cut, and their equivalents in photo editing and audio production — none of them work meaningfully with screen readers.
+Blind creators already do great work with tools like Reaper (with OSARA), Pro Tools, Logic and others, and some video editors can be used with a screen reader too. But most creative software was designed for the mouse first and made accessible later, so getting good with it often takes many workarounds, scripts and a lot of patience — and in video and photo editing the choice is still small.
 
-Ultra Creative Suite exists to change that: a growing family of apps where a blind person can independently edit video, mix audio, retouch photos, transcribe and caption, record a screen or a podcast, and compose music — without sighted assistance.
+Ultra Creative Suite takes the other road: keyboard and screen reader first, from the very first design decision, with the same features for sighted users. On top of that it adds things that help everyone, like AI audio description written and mixed into a video automatically.
 
 This project is being developed as part of an [NLnet Foundation](https://nlnet.nl) grant application under the NGI0 Commons Fund.
 

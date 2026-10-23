@@ -6,7 +6,7 @@
     "role": "maintainer",
     "name": "Demir Ajvazi",
     "email": "demir.ajvazi10@gmail.com",
-    "description": "Blind software developer from Serbia. I use JAWS screen reader as my primary interface with a computer. I built Ultra Creative Suite because no professional video editor in the world works properly with a screen reader.",
+    "description": "Software developer from Serbia. I use the JAWS screen reader every day, and I build creative tools — video, audio and photo editing — that start with the keyboard and the screen reader, and work equally well with a mouse.",
     "webpageUrl": {
       "url": "https://github.com/demirajvazi10-max/Ultra-Creative-suite"
     }
@@ -15,14 +15,16 @@
     {
       "guid": "ultra-creative-suite",
       "name": "Ultra Creative Suite",
-      "description": "The world's first professional video editor built from the ground up for blind, low-vision, and sighted users. Every feature — timeline editing, AI video creation, 4K GPU rendering — is fully accessible via JAWS and NVDA screen readers. The AI Video Creator transcribes song lyrics using Whisper AI, automatically downloads matching stock footage, and renders a complete music video in 4K, entirely controllable through a screen reader. Built in C# / WPF / .NET 8. Over 300 million people are blind or severely visually impaired worldwide. Before this project, none of them had a professional creative tool built for them.",
+      "description": "A family of creative apps for Windows (video, audio and photo editing, captions, recording) designed keyboard- and screen-reader-first, and fully usable by sighted users. The video editor offers timeline editing, video layers, colour LUTs, export at the source frame rate, AI audio description that Gemini writes and a natural voice mixes into the video, and an AI music video creator — all reachable with JAWS and NVDA. Built in C# / WPF / .NET 8. Most creative software is made for the mouse first and made accessible later; this project starts from the other side.",
       "webpageUrl": {
         "url": "https://github.com/demirajvazi10-max/Ultra-Creative-suite"
       },
       "repositoryUrl": {
         "url": "https://github.com/demirajvazi10-max/Ultra-Creative-suite"
       },
-      "licenses": ["spdx:GPL-3.0"],
+      "licenses": [
+        "spdx:GPL-3.0"
+      ],
       "tags": [
         "accessibility",
         "blind",
@@ -61,7 +63,10 @@
         "amount": 10000,
         "currency": "USD",
         "frequency": "yearly",
-        "channels": ["github-sponsors", "ko-fi"]
+        "channels": [
+          "github-sponsors",
+          "ko-fi"
+        ]
       }
     ],
     "history": []

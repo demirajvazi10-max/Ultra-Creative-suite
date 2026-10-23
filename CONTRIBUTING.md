@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Ultra Creative Suite.
 
-This project exists to make video editing accessible to blind and visually impaired users. Every contribution — code, documentation, testing, or feedback — directly helps people who currently have no professional video editing tools available to them.
+This project builds creative tools that start with the keyboard and the screen reader, and work just as well for sighted users. Every contribution — code, documentation, testing, or feedback — helps blind, low-vision and sighted creators work with the same tools.
 
 This repository contains two tools: the **Video Editor** (this root folder) and the **Audio Editor** (`UltraAudioEditor/`). The guidelines below apply to both unless noted otherwise; the Audio Editor's own setup steps are documented in [UltraAudioEditor/README.md](UltraAudioEditor/README.md).
 
