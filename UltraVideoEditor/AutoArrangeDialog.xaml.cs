@@ -67,21 +67,24 @@ namespace UltraVideoEditor
             _imageCount = imageCount;
 
             string dur = TimeSpan.FromSeconds(_audioDuration).ToString(@"mm\:ss");
-            txtAudioInfo.Text = $"Audio duration: {dur} ({_audioDuration:F1} seconds) | Images: {_imageCount}";
+            txtAudioInfo.Text = LanguageManager.F("lx_audio_length_f_seconds_pictures_aaa81", dur, _audioDuration, _imageCount);
 
             EffectSequence = new List<string> { "ZoomIn", "SlideLeft", "FadeIn", "ZoomOut", "SlideRight" };
 
             cmbEffectMode.SelectedIndex = 0;
             cmbResolution.SelectedIndex = 1;
+            // v2.0: the default opening and closing texts in the program's language
+            txtIntroText.Text = LanguageManager.T("default_intro_text");
+            txtOutroText.Text = LanguageManager.T("lx_aa_outro_default");
 
             _isInitializing = false;
 
-            AutomationProperties.SetName(this, "Auto arrange images");
+            AutomationProperties.SetName(this, LanguageManager.T("lx_arrange_pictures_automatically_1254c"));
         }
 
         private void btnBrowseLogo_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new WpfOpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp" };
+            var dialog = new WpfOpenFileDialog { Filter = LanguageManager.T("lx_filter_images") + "|*.png;*.jpg;*.jpeg;*.bmp" };
             if (dialog.ShowDialog() == true)
             {
                 txtLogoPath.Text = dialog.FileName;
@@ -95,10 +98,8 @@ namespace UltraVideoEditor
                 ? System.IO.Directory.GetFiles(soundsDir, "*.*", System.IO.SearchOption.AllDirectories).Length
                 : 0;
             WpfMessageBox.Show(
-                $"Local sound library: {soundsDir}\n\nNumber of files: {count}\n\n" +
-                "Place MP3/WAV files in Assets/Sounds/ and its subfolders.\n" +
-                "AI automatically analyzes file names and selects the appropriate sound.",
-                "Local sound library", MessageBoxButton.OK, MessageBoxImage.Information);
+                LanguageManager.F("lx_sound_lib_info", soundsDir, count),
+                LanguageManager.T("lx_sound_lib_title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void EffectMode_Changed(object sender, SelectionChangedEventArgs e)
@@ -106,25 +107,12 @@ namespace UltraVideoEditor
             if (_isInitializing) return;
             if (cmbEffectMode.SelectedItem == null) return;
 
-            var selected = cmbEffectMode.SelectedItem as ComboBoxItem;
-            if (selected != null && selected.Content != null)
+            // v2.0: by position, so it works in every language (0 automatic, 1 manual, 2 random)
+            switch (cmbEffectMode.SelectedIndex)
             {
-                string mode = selected.Content.ToString();
-                if (mode.Contains("Automatic"))
-                {
-                    EffectMode = "auto";
-                    txtEffectSequence.IsEnabled = false;
-                }
-                else if (mode.Contains(L("aa_effect_manual").Replace("🎲 ", "")))
-                {
-                    EffectMode = "manual";
-                    txtEffectSequence.IsEnabled = true;
-                }
-                else if (mode.Contains(L("aa_effect_random").Replace("🎲 ", "")))
-                {
-                    EffectMode = "random";
-                    txtEffectSequence.IsEnabled = false;
-                }
+                case 0: EffectMode = "auto"; txtEffectSequence.IsEnabled = false; break;
+                case 1: EffectMode = "manual"; txtEffectSequence.IsEnabled = true; break;
+                case 2: EffectMode = "random"; txtEffectSequence.IsEnabled = false; break;
             }
         }
 

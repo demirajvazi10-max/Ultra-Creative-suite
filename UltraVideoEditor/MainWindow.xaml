@@ -30,6 +30,10 @@
                 <MenuItem x:Name="mnuExport" Tag="mw_export" InputGestureText="Ctrl+E" Click="FinalRender_Click"/>
                 <MenuItem x:Name="mnuExportOptions" Tag="mnu_export_options" Click="ShowExportOptions_Click"/>
                 <MenuItem x:Name="mnuExportMulti" Tag="📱|mnu_export_multi" Click="ExportMultiFormat_Click"/>
+                <MenuItem x:Name="mnuExportOtio" Tag="mnu_export_otio" Click="ExportOtio_Click"/>
+                <MenuItem x:Name="mnuExportEdl" Tag="mnu_export_edl" Click="ExportEdl_Click"/>
+                <MenuItem Tag="mnu_export_xml" Click="ExportXml_Click"/>
+                <MenuItem Tag="imp_mnu" InputGestureText="Ctrl+Alt+Shift+I" Click="ImportTimeline_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuExit" Tag="mnu_exit" InputGestureText="Alt+F4" Click="Exit_Click"/>
             </MenuItem>
@@ -44,6 +48,34 @@
                 <MenuItem x:Name="mnuCutAllMarkers" Tag="mw_cut_all_markers2" InputGestureText="Ctrl+Shift+X" Click="CutAtAllMarkers_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuDeleteSelected" Tag="menu_delete_selected" InputGestureText="Del" Click="RemoveFromTimeline_Click"/>
+                <MenuItem x:Name="mnuRippleDelete" Tag="mnu_ripple_delete" InputGestureText="Shift+Del" Click="RippleDelete_Click"/>
+                <Separator/>
+                <MenuItem x:Name="mnuLayerSettings" Tag="🧩|mnu_layer_settings" InputGestureText="Ctrl+Alt+L" Click="OpenLayerSettings_Click"/>
+                <MenuItem x:Name="mnuDetachAudio" Tag="mnu_detach_audio" InputGestureText="Ctrl+Alt+U" Click="DetachAudio_Click"/>
+                <MenuItem x:Name="mnuEdgeStartEarlier" Tag="mnu_edge_start_earlier" InputGestureText="Ctrl+[" Click="EdgeStartEarlier_Click"/>
+                <MenuItem x:Name="mnuEdgeStartLater" Tag="mnu_edge_start_later" InputGestureText="Ctrl+Shift+[" Click="EdgeStartLater_Click"/>
+                <MenuItem x:Name="mnuEdgeEndLater" Tag="mnu_edge_end_later" InputGestureText="Ctrl+]" Click="EdgeEndLater_Click"/>
+                <MenuItem x:Name="mnuEdgeEndEarlier" Tag="mnu_edge_end_earlier" InputGestureText="Ctrl+Shift+]" Click="EdgeEndEarlier_Click"/>
+                <MenuItem x:Name="mnuWhereAmI" Tag="mnu_where_am_i" InputGestureText="F4" Click="WhereAmI_Click"/>
+                <MenuItem x:Name="mnuClipEffects" Tag="🎨|mnu_clip_effects" InputGestureText="Ctrl+Alt+E" Click="OpenClipEffects_Click"/>
+                <MenuItem x:Name="mnuTitle" Tag="🔤|mnu_title" InputGestureText="Ctrl+Alt+T" Click="OpenTitle_Click"/>
+                <MenuItem x:Name="mnuSlipEarlier" Tag="mnu_slip_earlier" InputGestureText="Alt+[" Click="SlipEarlier_Click"/>
+                <MenuItem x:Name="mnuSlipLater" Tag="mnu_slip_later" InputGestureText="Alt+]" Click="SlipLater_Click"/>
+                <MenuItem x:Name="mnuRollEarlier" Tag="mnu_roll_earlier" InputGestureText="Ctrl+Alt+[" Click="RollEarlier_Click"/>
+                <MenuItem x:Name="mnuRollLater" Tag="mnu_roll_later" InputGestureText="Ctrl+Alt+]" Click="RollLater_Click"/>
+                <MenuItem x:Name="mnuSlideEarlier" Tag="mnu_slide_earlier" InputGestureText="Shift+Alt+[" Click="SlideEarlier_Click"/>
+                <MenuItem x:Name="mnuSlideLater" Tag="mnu_slide_later" InputGestureText="Shift+Alt+]" Click="SlideLater_Click"/>
+                <MenuItem x:Name="mnuTrackMixer" Tag="🎚|mnu_track_mixer" InputGestureText="Ctrl+Alt+M" Click="OpenTrackMixer_Click"/>
+                <MenuItem Tag="🎯|obj_mnu" InputGestureText="Ctrl+Alt+O" Click="FollowObject_Click"/>
+                <MenuItem Tag="🎨|col_mnu" InputGestureText="Ctrl+Alt+C" Click="ColourHere_Click"/>
+                <!-- v2.0: multicam (MainWindow.Multicam.cs) -->
+                <MenuItem Tag="🎥|mc_mnu_make" InputGestureText="Ctrl+Alt+Shift+M" Click="MakeMulticam_Click"/>
+                <MenuItem Tag="mc_mnu_read" Click="ReadMulticamCuts_Click"/>
+                <!-- v2.0: mixer automation (MainWindow.Mixer.cs) -->
+                <MenuItem Tag="mixa_mnu_point" InputGestureText="Ctrl+Alt+Shift+V" Click="TrackVolumePoint_Click"/>
+                <MenuItem Tag="mixa_mnu_read" Click="ReadTrackVolume_Click"/>
+                <MenuItem Tag="mixa_mnu_remove" Click="RemoveTrackVolumePoint_Click"/>
+                <MenuItem Tag="mixa_mnu_clear" Click="ClearTrackVolume_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuSelectAll" Tag="mnu_select_all" InputGestureText="Ctrl+A" Click="SelectAll_Click"/>
             </MenuItem>
@@ -56,6 +88,10 @@
                 <MenuItem x:Name="mnuShowVideoOnly" Tag="menu_show_video_only" Click="ShowVideoTracksOnly_Click"/>
                 <MenuItem x:Name="mnuShowAudioOnly" Tag="menu_show_audio_only" Click="ShowAudioTracksOnly_Click"/>
                 <MenuItem x:Name="mnuShowGraphicTimeline" Tag="mnu_show_graphic_timeline" IsCheckable="True" IsChecked="True" Click="ToggleGraphicTimeline_Click"/>
+                <Separator/>
+                <MenuItem x:Name="mnuUseProxies" Tag="mnu_use_proxies" IsCheckable="True" Click="ToggleProxies_Click"/>
+                <MenuItem x:Name="mnuCreateProxies" Tag="mnu_create_proxies" Click="CreateProxies_Click"/>
+                <MenuItem x:Name="mnuDeleteProxies" Tag="mnu_delete_proxies" Click="DeleteProxies_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuDisplayMode" Tag="mnu_display_mode">
                     <MenuItem x:Name="mnuModeSighted" Tag="mode_sighted" IsCheckable="True" Click="SetModeSighted_Click"/>
@@ -84,12 +120,19 @@
                 <MenuItem x:Name="mnuAddAudio" Tag="mnu_add_audio" InputGestureText="Ctrl+Shift+I" Click="AddAudioOnly_Click"/>
                 <MenuItem x:Name="mnuImportYouTube"
                           Header="▶ Import from YouTube"
-                          InputGestureText="Ctrl+Y"
                           Click="ImportFromYouTube_Click"
                           AutomationProperties.Name="Import video or audio from YouTube directly to timeline"/>
                 <Separator/>
-                <MenuItem x:Name="mnuAddVideoTrack" Tag="add_video_track" Click="AddVideoTrack_Click"/>
-                <MenuItem x:Name="mnuAddAudioTrack" Tag="add_audio_track" Click="AddAudioTrack_Click"/>
+                <MenuItem x:Name="mnuAddVideoTrack" Tag="add_video_track" InputGestureText="Ctrl+Alt+N" Click="AddVideoTrack_Click"/>
+                <MenuItem x:Name="mnuAddAudioTrack" Tag="add_audio_track" InputGestureText="Ctrl+Alt+Shift+N" Click="AddAudioTrack_Click"/>
+                <!-- v2.0: unlimited, named, lockable tracks (MainWindow.Tracks.cs) -->
+                <MenuItem Tag="trk_mnu_prev" InputGestureText="Ctrl+Alt+PgUp" Click="PrevTrack_Click"/>
+                <MenuItem Tag="trk_mnu_next" InputGestureText="Ctrl+Alt+PgDn" Click="NextTrack_Click"/>
+                <MenuItem Tag="trk_mnu_rename" InputGestureText="Ctrl+Alt+R" Click="RenameTrack_Click"/>
+                <MenuItem Tag="trk_mnu_lock" InputGestureText="Ctrl+Alt+K" Click="ToggleTrackLock_Click"/>
+                <MenuItem Tag="trk_mnu_hide" InputGestureText="Ctrl+Alt+H" Click="ToggleTrackHidden_Click"/>
+                <MenuItem Tag="trk_mnu_list" InputGestureText="Ctrl+Alt+I" Click="ListTracks_Click"/>
+                <MenuItem Tag="trk_mnu_remove" Click="RemoveTrack_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuMoveLeft" Tag="move_left" InputGestureText="Ctrl+Left" Click="MoveLeft_Click"/>
                 <MenuItem x:Name="mnuMoveRight" Tag="move_right" InputGestureText="Ctrl+Right" Click="MoveRight_Click"/>
@@ -104,7 +147,12 @@
                 <MenuItem x:Name="mnuDuck" Tag="mnu_duck" Click="DuckMusic_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuSetSpeed" Tag="mnu_set_speed" InputGestureText="Ctrl+Alt+S" Click="SetClipSpeed_Click"/>
+                <MenuItem Tag="sr_mnu" InputGestureText="Ctrl+Alt+Shift+S" Click="SpeedRamp_Click"/>
+                <MenuItem Tag="cmp_mnu_make" InputGestureText="Ctrl+Alt+G" Click="MakeCompound_Click"/>
+                <MenuItem Tag="cmp_mnu_break" InputGestureText="Ctrl+Alt+Shift+G" Click="BreakCompound_Click"/>
                 <MenuItem x:Name="mnuPlayMix" Tag="🎧|mnu_play_mix" InputGestureText="Ctrl+Shift+Space" Click="PlayMix_Click"/>
+                <MenuItem x:Name="mnuPreviewVideo" Tag="🎬|mnu_preview_video" InputGestureText="Ctrl+Alt+Space" Click="PreviewVideo_Click"/>
+                <MenuItem Tag="live_mnu_size" InputGestureText="Ctrl+Alt+Shift+Space" Click="CycleLiveSize_Click"/>
                 <MenuItem x:Name="mnuMixShots" Tag="mnu_mix_shots" IsCheckable="True" IsChecked="True" Click="ToggleMixShotAnnouncements_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuAddMarker" Tag="marker" InputGestureText="Ctrl+M" Click="AddMarker_Click"/>
@@ -193,14 +241,13 @@
                 <MenuItem x:Name="mnuMediaProviders"
                           Header="🌐 Media Providers (API keys)"
                           Click="MnuMediaProviders_Click"
-                          InputGestureText="Ctrl+M"
                           AutomationProperties.Name="Media provider settings — Pixabay, Pexels, Coverr"/>
                 <Separator/>
                 <MenuItem x:Name="mnuSettings" Tag="mw_settings" Click="ShowPreferences_Click"/>
             </MenuItem>
             <MenuItem x:Name="mnuHelp" Tag="mw_help_menu">
                 <MenuItem x:Name="mnuShortcuts" Tag="mnu_shortcuts" InputGestureText="F1" Click="ShowHelp_Click"/>
-                <MenuItem x:Name="mnuManual" Tag="mw_manual" Click="ShowUserManual_Click"/>
+                <MenuItem x:Name="mnuManual" Tag="mw_manual" InputGestureText="Ctrl+F1" Click="ShowUserManual_Click"/>
                 <Separator/>
                 <MenuItem x:Name="mnuUpdates" Tag="mw_updates" Click="CheckForUpdates_Click"/>
                 <MenuItem x:Name="mnuOpenLogs" Tag="mw_open_logs" Click="OpenLogFolder_Click"/>
@@ -285,13 +332,8 @@
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock x:Name="txtTrackSelector" Tag="mnu_show_track" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <ComboBox x:Name="cmbTrackSelector" Width="120" Height="25" SelectionChanged="TrackSelector_Changed" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" AutomationProperties.Name="Show track">
-                            <ComboBoxItem Content="🎬 Video 1" Tag="0" IsSelected="True"/>
-                            <ComboBoxItem Content="🎬 Video 2" Tag="1"/>
-                            <ComboBoxItem Content="🎵 Audio 1" Tag="2"/>
-                            <ComboBoxItem Content="🎵 Audio 2" Tag="3"/>
-                            <ComboBoxItem Content="📋 All tracks" Tag="-1"/>
-                        </ComboBox>
+                        <!-- v2.0: the items are made in code (MainWindow.Tracks.cs), one per track -->
+                        <ComboBox x:Name="cmbTrackSelector" Width="220" Height="25" SelectionChanged="TrackSelector_Changed" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}" AutomationProperties.Name="Show track"/>
                     </StackPanel>
 
                     <!-- v1.4 (R7): the accessible clip list on top, the graphical timeline for the mouse
@@ -330,7 +372,7 @@
                                   ResizeDirection="Rows" AutomationProperties.Name="Splitter between the clip list and the graphic timeline"/>
                     <DockPanel x:Name="pnlGraphicTimeline" Grid.Row="2">
                         <TextBlock x:Name="txtGraphicInfo" DockPanel.Dock="Bottom" Foreground="{DynamicResource TextPrimary}" FontSize="11" Margin="4,2" Text=" "/>
-                        <ScrollViewer x:Name="svGraphicTimeline" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Disabled"
+                        <ScrollViewer x:Name="svGraphicTimeline" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Auto"
                                       Focusable="False" Background="#161616">
                             <local:GraphicTimeline x:Name="graphicTimeline" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         </ScrollViewer>
@@ -611,6 +653,9 @@
                             <TextBlock x:Name="txtAnimOpacity" Text="Opacity (0-1):" Foreground="{DynamicResource TextPrimary}" Margin="0,10,0,0"/>
                             <Slider x:Name="sldOpacity" Minimum="0" Maximum="1" Value="1" Width="200" TickFrequency="0.05" TickPlacement="BottomRight" ValueChanged="AnimValue_Changed" AutomationProperties.Name="Opacity from 0 to 1"/>
                             <TextBlock x:Name="txtOpacityValue" Text="1.00" Foreground="Yellow" Margin="10,0"/>
+                            <!-- v2.0: keyframe curves -->
+                            <TextBlock Tag="kf_lbl_easing" Foreground="{DynamicResource TextPrimary}" Margin="0,10,0,0"/>
+                            <ComboBox x:Name="cmbKeyEasing" Width="260" HorizontalAlignment="Left" AutomationProperties.Name="Way to the next keyframe" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextPrimary}"/>
                         </StackPanel>
                     </Border>
 

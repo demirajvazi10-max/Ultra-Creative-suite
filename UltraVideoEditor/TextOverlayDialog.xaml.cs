@@ -23,7 +23,9 @@ namespace UltraVideoEditor
                 return selected?.Tag?.ToString() ?? "#FFFFFF";
             }
         }
-        public string Position => (cmbPosition.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content.ToString() ?? "Centar";
+        // v2.0: the position items are translated; the value is the original (English) text
+        public string Position => XamlTranslator.Original(cmbPosition.SelectedItem as System.Windows.Controls.ComboBoxItem,
+                                                          System.Windows.Controls.ContentControl.ContentProperty) ?? "📐 Center";
 
         public TextOverlayDialog(string title = "Add text to image", string initialText = null, bool styleOptions = false)
         {
@@ -46,7 +48,7 @@ namespace UltraVideoEditor
                         child.Visibility = Visibility.Collapsed;
                 }
                 btnApply.Content = "✅ OK";
-                AutomationProperties.SetName(btnApply, "OK");
+                AutomationProperties.SetName(btnApply, LanguageManager.T("dlg_ok"));
                 SizeToContent = SizeToContent.Height;
             }
             if (!string.IsNullOrEmpty(initialText))

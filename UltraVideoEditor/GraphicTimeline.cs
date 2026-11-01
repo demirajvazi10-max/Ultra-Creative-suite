@@ -34,7 +34,8 @@ namespace UltraVideoEditor
     {
         // ── layout ────────────────────────────────────────────────────────────
         public const double LabelWidth = 86, RulerHeight = 24, LaneHeight = 46, LaneGap = 4;
-        private static readonly int[] LaneOrder = { 1, 0, 2, 3 };   // top to bottom: Video 2, Video 1, Audio 1, Audio 2
+        // v2.0: top to bottom — the highest video track down to Video 1, then Audio 1, 2, 3…
+        private static int[] LaneOrder => TrackSet.DisplayOrder().ToArray();
         private const double EdgeGrip = 7, SnapPixels = 8;
 
         // ── data, supplied by the main window ─────────────────────────────────
@@ -76,7 +77,7 @@ namespace UltraVideoEditor
             Focusable = false;
             ClipToBounds = true;
             System.Windows.Automation.AutomationProperties.SetName(this,
-                "Graphic timeline for the mouse. With the keyboard, use the clip list above.");
+                LanguageManager.T("lx_graphic_timeline_for_the_mouse_e2166"));
             WaveformCache.Ready += () => Dispatcher.BeginInvoke(new Action(InvalidateVisual));
             ThumbnailCache.Ready += () => Dispatcher.BeginInvoke(new Action(InvalidateVisual));
         }
@@ -96,6 +97,8 @@ namespace UltraVideoEditor
         private double X(double t) => LabelWidth + t * PixelsPerSecond;
         private double T(double x) => Math.Max(0, (x - LabelWidth) / PixelsPerSecond);
         private static int LaneOf(int track) { int i = Array.IndexOf(LaneOrder, track); return i < 0 ? 0 : i; }
+        /// <summary>Top of a track's lane (for scrolling it into view).</summary>
+        public double TopOfTrack(int track) => LaneTop(LaneOf(track));
         private double LaneTop(int lane) => RulerHeight + lane * (LaneHeight + LaneGap) + 3;
         private int TrackAtY(double y)
         {
@@ -113,7 +116,7 @@ namespace UltraVideoEditor
         private static readonly Media.Brush BgBrush = B("#161616"), LaneBrush = B("#222226"), RulerBrush = B("#101010"),
             VideoBrush = B("#2D5F9A"), ImageBrush = B("#3E7D4F"), AudioBrush = B("#7A4E9C"), TextBrush = B("#E8E8E8"),
             DimText = B("#9A9A9A"), PlayheadBrush = B("#FF3B30"), MarkerBrush = B("#FFC107"), WaveBrush = B("#D9C6F0"),
-            SelBrush = B("#FFFFFF"), GhostBrush = B("#66FFFFFF"), LabelBg = B("#1C1C1C");
+            SelBrush = B("#FFFFFF"), GhostBrush = B("#66FFFFFF"), LabelBg = B("#1C1C1C"), HiddenLaneBrush = B("#151518");
         private static readonly Media.Pen TickPen = Frozen(new Media.Pen(B("#555555"), 1));
         private static readonly Media.Pen SelPen = Frozen(new Media.Pen(SelBrush, 2));
         private static readonly Media.Pen ClipPen = Frozen(new Media.Pen(B("#0D0D0D"), 1));
@@ -133,8 +136,10 @@ namespace UltraVideoEditor
             var items = Items?.Invoke() ?? new List<TimelineItem>();
 
             // lanes
-            for (int lane = 0; lane < LaneOrder.Length; lane++)
-                dc.DrawRectangle(LaneBrush, null, new System.Windows.Rect(LabelWidth, LaneTop(lane), Math.Max(0, w - LabelWidth), LaneHeight));
+            var order = LaneOrder;
+            for (int lane = 0; lane < order.Length; lane++)
+                dc.DrawRectangle(TrackSet.IsHidden(order[lane]) ? HiddenLaneBrush : LaneBrush, null,
+                                 new System.Windows.Rect(LabelWidth, LaneTop(lane), Math.Max(0, w - LabelWidth), LaneHeight));
 
             DrawRuler(dc, w);
 
@@ -175,9 +180,17 @@ namespace UltraVideoEditor
             // track names, pinned to the left edge of the visible area
             double lx = ScrollOffset;
             dc.DrawRectangle(LabelBg, null, new System.Windows.Rect(lx, 0, LabelWidth, h));
-            string[] names = { "Video 2", "Video 1", "Audio 1", "Audio 2" };
-            for (int lane = 0; lane < names.Length; lane++)
-                dc.DrawText(Text(names[lane], 12, TextBrush), new WPoint(lx + 8, LaneTop(lane) + LaneHeight / 2 - 8));
+            for (int lane = 0; lane < order.Length; lane++)
+            {
+                int t = order[lane];
+                string own = TrackSet.OwnName(t);
+                string flags = (TrackSet.IsLocked(t) ? "🔒" : "") + (TrackSet.IsHidden(t) ? "🚫" : "");
+                double top = LaneTop(lane);
+                dc.PushClip(new Media.RectangleGeometry(new System.Windows.Rect(lx, top, LabelWidth - 2, LaneHeight)));
+                dc.DrawText(Text(TrackSet.BaseName(t) + (flags.Length > 0 ? " " + flags : ""), 12, TextBrush), new WPoint(lx + 6, top + (own.Length > 0 ? 5 : LaneHeight / 2 - 8)));
+                if (own.Length > 0) dc.DrawText(Text(own, 10, DimText), new WPoint(lx + 6, top + 24));
+                dc.Pop();
+            }
         }
 
         private System.Windows.Rect ClipRect(double start, double dur, int track) =>
@@ -302,6 +315,14 @@ namespace UltraVideoEditor
                 e.Handled = true;
                 return;
             }
+            if (TrackSet.IsLocked(item.TrackIndex))
+            {
+                // v2.0: a locked track — the clip is selected, but it cannot be dragged or trimmed
+                ClipClicked?.Invoke(item, Math.Clamp(T(p.X) - item.Start, 0, item.Duration), false);
+                InfoChanged?.Invoke("🔒 " + TrackSet.Name(item.TrackIndex));
+                e.Handled = true;
+                return;
+            }
             _drag = kind;
             _dragItem = item;
             _dragFrom = p;
@@ -345,7 +366,7 @@ namespace UltraVideoEditor
                     int tr = TrackAtY(p.Y);
                     // video stays on video tracks, sound on audio tracks
                     bool audio = _dragItem.IsAudio;
-                    _pvTrack = tr >= 0 && (audio ? tr >= 2 : tr <= 1) ? tr : _origTrack;
+                    _pvTrack = tr >= 0 && (audio ? TrackSet.IsAudio(tr) : TrackSet.IsVideo(tr)) && !TrackSet.IsLocked(tr) ? tr : _origTrack;
                     InfoChanged?.Invoke($"{_dragItem.Name}  →  {Fmt(_pvStart)}  ({TrackName(_pvTrack)})");
                     break;
                 }
@@ -448,7 +469,7 @@ namespace UltraVideoEditor
         }
 
         private static string Fmt(double s) => TimeSpan.FromSeconds(Math.Max(0, s)).ToString(@"m\:ss\.f");
-        private static string TrackName(int t) => t switch { 0 => "Video 1", 1 => "Video 2", 2 => "Audio 1", 3 => "Audio 2", _ => "?" };
+        private static string TrackName(int t) => TrackSet.Name(t);
     }
 
     /// <summary>v1.4 (R7) — sound peaks of a file (20 per second), read once with FFmpeg in the background.</summary>

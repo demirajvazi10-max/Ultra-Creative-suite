@@ -1,48 +1,8 @@
-﻿<Window x:Class="UltraVideoEditor.ExportOptions"
+<Window x:Class="UltraVideoEditor.ExportOptions"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Export options" Height="350" Width="450"
+        Title="Export options" Width="560" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource ControlBg}">
-
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <TextBlock Text="🎬 Export options" FontSize="20" FontWeight="Bold" 
-                   Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="Format:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cmbFormat" Width="200" SelectedIndex="0" AutomationProperties.Name="Export format">
-                <ComboBoxItem Content="MP4"/>
-                <ComboBoxItem Content="WebM"/>
-                <ComboBoxItem Content="AVI"/>
-            </ComboBox>
-        </StackPanel>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10">
-            <TextBlock Text="Quality:" Foreground="{DynamicResource TextPrimary}" Width="100" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cmbQuality" Width="200" SelectedIndex="1" AutomationProperties.Name="Export quality">
-                <ComboBoxItem Content="Low"/>
-                <ComboBoxItem Content="Medium"/>
-                <ComboBoxItem Content="High"/>
-            </ComboBox>
-        </StackPanel>
-
-        <CheckBox x:Name="chkAudioOnly" Grid.Row="3" Content="Export audio only" 
-                  Foreground="{DynamicResource TextPrimary}" Margin="0,15"/>
-
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20">
-            <Button x:Name="btnExport" Content="✅ EXPORT" Click="Export_Click" Width="100" Height="35" IsDefault="True"
-                    Background="{DynamicResource ApplyBrush}" Foreground="{DynamicResource ButtonTextBrush}" Margin="0,0,10,0" AutomationProperties.Name="Export"/>
-            <Button x:Name="btnCancel" Content="❌ CANCEL" Click="Cancel_Click" Width="100" Height="35" IsCancel="True"
-                    Background="{DynamicResource CancelBrush}" Foreground="{DynamicResource ButtonTextBrush}" AutomationProperties.Name="Cancel"/>
-        </StackPanel>
-    </Grid>
+    <!-- v2.0: the content is built in ExportOptions.xaml.cs (format, codec, quality, frame rate, finishing) -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" x:Name="host"/>
 </Window>

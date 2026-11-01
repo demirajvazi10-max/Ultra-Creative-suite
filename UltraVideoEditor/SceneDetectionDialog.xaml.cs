@@ -45,7 +45,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Select a video file",
+                Title  = LanguageManager.T("lx_choose_a_video_file_01c42"),
                 Filter = "Video files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
@@ -65,7 +65,7 @@ namespace UltraVideoEditor
             string videoPath = TxtVideoPath.Text;
             if (!File.Exists(videoPath))
             {
-                MessageBox.Show("Please select a video file.", "Error",
+                MessageBox.Show(LanguageManager.T("lx_please_choose_a_video_file_5c960"), LanguageManager.T("lx_error_7f2f6"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -75,7 +75,7 @@ namespace UltraVideoEditor
             _result  = null;
             _selected.Clear();
             ScenesPanel.Children.Clear();
-            TxtSceneCount.Text          = "Detektujem…";
+            TxtSceneCount.Text          = LanguageManager.T("lx_detecting_3611a");
             TxtReport.Text              = "";
             BtnAddToTimeline.IsEnabled  = false;
             BtnSelectAll.IsEnabled      = false;
@@ -83,7 +83,7 @@ namespace UltraVideoEditor
             BtnCopyReport.Visibility    = Visibility.Collapsed;
             ProgressPanel.Visibility    = Visibility.Visible;
             ProgressBar.Value           = 0;
-            BtnDetect.Content           = "⏹ Cancel";
+            BtnDetect.Content           = LanguageManager.T("lx_cancel_3bdb2");
 
             var progress = new Progress<(int Percent, string Message)>(p =>
             {
@@ -106,19 +106,19 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    TxtSceneCount.Text = "Error.";
-                    MessageBox.Show(_result.Error, "Detection Error",
+                    TxtSceneCount.Text = LanguageManager.T("lx_error_b1c55");
+                    MessageBox.Show(_result.Error, LanguageManager.T("lx_detection_error_68f3f"),
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (OperationCanceledException)
             {
-                TxtSceneCount.Text = "Cancelled.";
+                TxtSceneCount.Text = LanguageManager.T("lx_cancelled_d3e41");
                 SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Error",
+                MessageBox.Show(LanguageManager.F("lx_error_f93e6", ex.Message), LanguageManager.T("lx_error_7f2f6"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -145,7 +145,7 @@ namespace UltraVideoEditor
                 _selected.Add(scene); // all included by default
             }
 
-            TxtSceneCount.Text = $"{scenes.Count} scenes  ·  {AIHighlightEngine.FormatTime(_result.TotalDuration)}";
+            TxtSceneCount.Text = LanguageManager.F("lx_scenes_5ed9d", scenes.Count, AIHighlightEngine.FormatTime(_result.TotalDuration));
             BtnAddToTimeline.IsEnabled = _selected.Count > 0;
         }
 
@@ -206,7 +206,7 @@ namespace UltraVideoEditor
                 Content    = $"#{scene.Index:D3}  {AIHighlightEngine.FormatTime(scene.Start)} → {AIHighlightEngine.FormatTime(scene.End)}  ({scene.Duration:F1}s)",
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            AutomationProperties.SetName(chk, $"Scene {scene.Index}, {scene.Duration:F1} seconds");
+            AutomationProperties.SetName(chk, LanguageManager.F("lx_scene_f_seconds_0503c", scene.Index, scene.Duration));
             chk.Checked   += (_, _) => { if (!_selected.Contains(scene)) { _selected.Add(scene); UpdateAddButton(); } };
             chk.Unchecked += (_, _) => { _selected.Remove(scene); UpdateAddButton(); };
             DockPanel.SetDock(chk, Dock.Left);
@@ -303,8 +303,8 @@ namespace UltraVideoEditor
                     cursor += scene.Duration;
                 }
                 MessageBox.Show(
-                    $"Added {_selected.Count} scenes to the timeline.",
-                    "Timeline", MessageBoxButton.OK, MessageBoxImage.Information);
+                    LanguageManager.F("lx_added_scenes_to_the_timeline_6978a", _selected.Count),
+                    LanguageManager.T("lx_timeline_01851"), MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
                 Close();
                 return;

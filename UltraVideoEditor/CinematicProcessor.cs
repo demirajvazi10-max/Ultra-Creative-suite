@@ -627,8 +627,7 @@ namespace UltraVideoEditor
             // Provjeri da li Ollama radi
             if (!await IsVisionModelAvailable(ollamaModel))
             {
-                onProgress(-1, $"Ollama vision model '{ollamaModel}' is not available. " +
-                    $"Run: ollama pull {ollamaModel}");
+                onProgress(-1, LanguageManager.F("lx_the_ollama_vision_model_is_409c1", ollamaModel, ollamaModel));
                 return;
             }
 
@@ -649,7 +648,7 @@ namespace UltraVideoEditor
                 item.AudioDescription = desc;
 
                 count++;
-                onProgress(count, $"Clip {count}: {item.Name} — {desc}");
+                onProgress(count, LanguageManager.F("lx_clip_7e6d5", count, item.Name, desc));
 
                 // Small delay between requests
                 await Task.Delay(200, ct);

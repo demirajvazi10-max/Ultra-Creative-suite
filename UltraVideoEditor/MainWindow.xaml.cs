@@ -133,7 +133,7 @@ namespace UltraVideoEditor
         private List<AISubtitle> syncedSubtitles = new List<AISubtitle>();
         private string selectedAudioPath = "";
         private WinForms.ListView nativeListView;
-        private ExportSettingsData currentExportSettings = new ExportSettingsData();
+        private ExportSettingsData currentExportSettings = ExportOptions.LoadSaved();   // v2.0: remembered
 
         private Stack<List<TimelineItem>> undoStack = new Stack<List<TimelineItem>>();
         private Stack<List<TimelineItem>> redoStack = new Stack<List<TimelineItem>>();
@@ -230,6 +230,7 @@ namespace UltraVideoEditor
                 SetupKeyboardCommands();
                 SetAccessibilityNames();
                 InitPositionAnnouncer();
+                InitV2Menus();   // v2.0
                 LoadTransitions();
                 SetupDragDrop();
                 SetupDragDropFromExplorer();
@@ -288,6 +289,9 @@ namespace UltraVideoEditor
             if (txtJawsLog != null) txtJawsLog.Text = L("system_ready");
             if (txtStatus != null) txtStatus.Text = L("status_idle");
 
+            // v2.0: the menu names lose their shortcut for a moment, so they can be translated
+            HelpPages.RestoreMenuNames(FindLogicalChildren<MenuItem>(this));
+
             // ── AUTO-SCAN: prevodi sve elemente koji imaju Tag="key" ili Tag="emoji|key" ──
             ApplyLanguageToTree(this);
 
@@ -313,20 +317,28 @@ namespace UltraVideoEditor
             _outroText = L("default_outro_text");
 
             // ── LISTVIEW KOLONE (WinForms, ne reaguju na Tag sistem) ──────────
-            if (nativeListView != null && nativeListView.Columns.Count >= 7)
+            if (nativeListView != null && nativeListView.Columns.Count >= 8)
             {
                 nativeListView.Columns[0].Text = L("listview_col_num");
                 nativeListView.Columns[1].Text = L("listview_col_name");
                 nativeListView.Columns[2].Text = L("listview_col_type");
-                nativeListView.Columns[3].Text = L("listview_col_duration");
-                nativeListView.Columns[4].Text = L("listview_col_start");
-                nativeListView.Columns[5].Text = L("listview_col_end");
-                nativeListView.Columns[6].Text = L("listview_col_audio_desc");
+                nativeListView.Columns[3].Text = L("listview_col_track");   // v2.0
+                nativeListView.Columns[4].Text = L("listview_col_duration");
+                nativeListView.Columns[5].Text = L("listview_col_start");
+                nativeListView.Columns[6].Text = L("listview_col_end");
+                nativeListView.Columns[7].Text = L("listview_col_audio_desc");
             }
             if (nativeListView != null) nativeListView.AccessibleName = L("acc_clip_list");
 
             // v1.4.5: the texts written in the XAML of every open window (dialogs included)
             XamlTranslator.TranslateAllWindows(_currentLanguage);
+
+            // v2.0: the screen-reader names of the main window's controls follow the language too
+            try { SetAccessibilityNames(); } catch (Exception ex) { AppLog.Error("Accessible names", ex); }
+
+            // v2.0: every menu command's name carries its shortcut, with key names in this
+            // language ("Open Ctrl+O"), read by JAWS and NVDA
+            HelpPages.AddShortcutsToMenuNames(FindLogicalChildren<MenuItem>(this));
 
             UpdateTimelineDisplay();
         }
@@ -522,7 +534,7 @@ namespace UltraVideoEditor
         {
             string id = GetApiKey("cloudflare_account");
             if (!string.IsNullOrWhiteSpace(id) || !askIfMissing) return id?.Trim();
-            var dlg = new TextOverlayDialog("Cloudflare Account ID (Cloudflare dashboard → Workers AI → Account ID)") { Owner = this };
+            var dlg = new TextOverlayDialog(L("lx_cf_account")) { Owner = this };
             if (dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.Text))
             {
                 id = dlg.Text.Trim();
@@ -659,67 +671,67 @@ namespace UltraVideoEditor
             {
                 nativeListView.AccessibleName = L("acc_clip_list");
             }
-            AutomationProperties.SetName(btnPlay, "Play or pause, Ctrl Space");
-            AutomationProperties.SetName(btnRenderTool, "Render project, Ctrl R");
-            AutomationProperties.SetName(btnCut, "Cut clip, Ctrl X");
-            AutomationProperties.SetName(btnCutAllMarkers, "Cut at all markers, Ctrl Shift X");
-            AutomationProperties.SetName(btnMoveLeft, "Move left, Ctrl Left");
-            AutomationProperties.SetName(btnMoveRight, "Move right, Ctrl Right");
-            AutomationProperties.SetName(btnDuration, "Set duration, Ctrl D");
+            AutomationProperties.SetName(btnPlay, LanguageManager.T("lx_play_or_pause_ctrl_space_0de4e"));
+            AutomationProperties.SetName(btnRenderTool, LanguageManager.T("lx_render_the_project_ctrl_r_c1618"));
+            AutomationProperties.SetName(btnCut, LanguageManager.T("lx_cut_the_clip_ctrl_x_856c3"));
+            AutomationProperties.SetName(btnCutAllMarkers, LanguageManager.T("lx_cut_at_all_markers_ctrl_92c13"));
+            AutomationProperties.SetName(btnMoveLeft, LanguageManager.T("lx_move_left_ctrl_left_0f903"));
+            AutomationProperties.SetName(btnMoveRight, LanguageManager.T("lx_move_right_ctrl_right_db35c"));
+            AutomationProperties.SetName(btnDuration, LanguageManager.T("lx_set_the_length_ctrl_d_47d90"));
             AutomationProperties.SetName(btnVolume, L("acc_set_volume"));
             AutomationProperties.SetName(btnZoomIn, L("acc_zoom_in"));
-            AutomationProperties.SetName(btnZoomOut, "Zoom out, Ctrl minus");
-            AutomationProperties.SetName(btnAddMarker, "Add marker, Ctrl M");
+            AutomationProperties.SetName(btnZoomOut, LanguageManager.T("lx_zoom_out_ctrl_minus_331e9"));
+            AutomationProperties.SetName(btnAddMarker, LanguageManager.T("lx_add_a_marker_ctrl_m_e714d"));
             AutomationProperties.SetName(btnNextMarker, L("acc_next_marker"));
-            AutomationProperties.SetName(btnPrevMarker, "Previous marker, Ctrl Shift comma");
-            AutomationProperties.SetName(btnSeekBack, "Seek back 5 seconds");
-            AutomationProperties.SetName(btnSeekForward, "Seek forward 5 seconds");
-            AutomationProperties.SetName(tabTimeline, "Timeline tab, clip list");
-            AutomationProperties.SetName(tabAI, "AI functions tab");
-            AutomationProperties.SetName(tabEffects, "Effects tab");
-            AutomationProperties.SetName(tabSubtitles, "Subtitles tab");
-            AutomationProperties.SetName(tabTransitions, "Transitions tab");
-            AutomationProperties.SetName(tabAnimation, "Animation tab");
-            AutomationProperties.SetName(sldBrightness, "Brightness control");
-            AutomationProperties.SetName(sldContrast, "Contrast control");
-            AutomationProperties.SetName(sldBlur, "Blur control");
+            AutomationProperties.SetName(btnPrevMarker, LanguageManager.T("lx_previous_marker_ctrl_shift_comma_ecf9d"));
+            AutomationProperties.SetName(btnSeekBack, LanguageManager.T("lx_back_seconds_21efc"));
+            AutomationProperties.SetName(btnSeekForward, LanguageManager.T("lx_forward_seconds_b550c"));
+            AutomationProperties.SetName(tabTimeline, LanguageManager.T("lx_timeline_tab_clip_list_3106b"));
+            AutomationProperties.SetName(tabAI, LanguageManager.T("lx_ai_tab_2a350"));
+            AutomationProperties.SetName(tabEffects, LanguageManager.T("lx_effects_tab_f946c"));
+            AutomationProperties.SetName(tabSubtitles, LanguageManager.T("lx_subtitles_tab_7416d"));
+            AutomationProperties.SetName(tabTransitions, LanguageManager.T("lx_transitions_tab_ab5e6"));
+            AutomationProperties.SetName(tabAnimation, LanguageManager.T("lx_animation_tab_3d76f"));
+            AutomationProperties.SetName(sldBrightness, LanguageManager.T("lx_brightness_1bac3"));
+            AutomationProperties.SetName(sldContrast, LanguageManager.T("lx_contrast_81e36"));
+            AutomationProperties.SetName(sldBlur, LanguageManager.T("lx_blur_10ecd"));
             AutomationProperties.SetName(sldBass, L("acc_bass"));
             AutomationProperties.SetName(sldTreble, L("acc_treble"));
-            AutomationProperties.SetName(sldReverb, "Reverb effect");
-            AutomationProperties.SetName(txtVoiceText, "Text for AI voice");
-            AutomationProperties.SetName(txtAIPrompt, "Prompt for AI images");
-            AutomationProperties.SetName(txtLyrics, "Song lyrics for synchronization");
+            AutomationProperties.SetName(sldReverb, LanguageManager.T("lx_echo_f20c6"));
+            AutomationProperties.SetName(txtVoiceText, LanguageManager.T("lx_text_for_the_ai_voice_d7f76"));
+            AutomationProperties.SetName(txtAIPrompt, LanguageManager.T("lx_description_for_the_ai_pictures_382ce"));
+            AutomationProperties.SetName(txtLyrics, LanguageManager.T("lx_song_lyrics_to_synchronize_558bd"));
             AutomationProperties.SetName(btnGenerateVoice, L("acc_generate_voice"));
             AutomationProperties.SetName(btnGenerate, L("acc_generate_frames"));
-            AutomationProperties.SetName(btnSyncLyrics, "Synchronize lyrics");
-            AutomationProperties.SetName(txtSubtitleText, "Subtitle text");
+            AutomationProperties.SetName(btnSyncLyrics, LanguageManager.T("lx_synchronize_the_lyrics_fedd3"));
+            AutomationProperties.SetName(txtSubtitleText, LanguageManager.T("lx_subtitle_text_4d0f4"));
             AutomationProperties.SetName(txtSubStart, L("acc_subtitle_start"));
-            AutomationProperties.SetName(txtSubEnd, "End in seconds");
-            AutomationProperties.SetName(btnAddSubtitle, "Add subtitle");
+            AutomationProperties.SetName(txtSubEnd, LanguageManager.T("lx_end_in_seconds_66ef8"));
+            AutomationProperties.SetName(btnAddSubtitle, LanguageManager.T("lx_add_the_subtitle_bbd33"));
             AutomationProperties.SetName(btnClearSubtitles, L("acc_clear_subtitles"));
             AutomationProperties.SetName(sldPreviewDuration, L("acc_preview_duration"));
-            AutomationProperties.SetName(cmbTranscribeAudio, "Select audio file for transcription");
-            AutomationProperties.SetName(btnTranscribe, "Start AI transcription");
-            AutomationProperties.SetName(txtTranscriptionResult, "Transcription result");
-            AutomationProperties.SetName(cmbTrackSelector, "Track display selector");
-            AutomationProperties.SetName(lstKeyframes, "Keyframe list");
-            AutomationProperties.SetName(btnAddKeyframe, "Add keyframe");
-            AutomationProperties.SetName(btnRemoveKeyframe, "Remove keyframe");
-            AutomationProperties.SetName(btnApplyKeyframe, "Apply keyframe");
-            AutomationProperties.SetName(btnPreviewAnimation, "Preview animation");
-            AutomationProperties.SetName(sldZoom, "Zoom control");
-            AutomationProperties.SetName(sldRotation, "Rotation control");
-            AutomationProperties.SetName(sldX, "Horizontal position control");
-            AutomationProperties.SetName(sldY, "Vertical position control");
-            AutomationProperties.SetName(sldOpacity, "Opacity control");
-            AutomationProperties.SetName(sldTransitionDuration, "Transition duration");
-            AutomationProperties.SetName(lstTransitions, "Transition list");
-            AutomationProperties.SetName(btnRemoveTransition, "Remove transition");
-            AutomationProperties.SetName(chkGPUAcceleration, "GPU acceleration");
+            AutomationProperties.SetName(cmbTranscribeAudio, LanguageManager.T("lx_audio_file_to_transcribe_63d31"));
+            AutomationProperties.SetName(btnTranscribe, LanguageManager.T("lx_start_the_transcription_c1eba"));
+            AutomationProperties.SetName(txtTranscriptionResult, LanguageManager.T("lx_transcription_result_2daf0"));
+            AutomationProperties.SetName(cmbTrackSelector, LanguageManager.T("lx_which_tracks_to_show_913e1"));
+            AutomationProperties.SetName(lstKeyframes, LanguageManager.T("lx_keyframe_list_c18a7"));
+            AutomationProperties.SetName(btnAddKeyframe, LanguageManager.T("lx_add_a_keyframe_fe125"));
+            AutomationProperties.SetName(btnRemoveKeyframe, LanguageManager.T("lx_remove_the_keyframe_3d509"));
+            AutomationProperties.SetName(btnApplyKeyframe, LanguageManager.T("lx_apply_the_keyframe_72dda"));
+            AutomationProperties.SetName(btnPreviewAnimation, LanguageManager.T("lx_preview_the_animation_7149c"));
+            AutomationProperties.SetName(sldZoom, LanguageManager.T("lx_zoom_25192"));
+            AutomationProperties.SetName(sldRotation, LanguageManager.T("lx_rotation_05465"));
+            AutomationProperties.SetName(sldX, LanguageManager.T("lx_horizontal_position_39862"));
+            AutomationProperties.SetName(sldY, LanguageManager.T("lx_vertical_position_1b583"));
+            AutomationProperties.SetName(sldOpacity, LanguageManager.T("lx_opacity_87274"));
+            AutomationProperties.SetName(sldTransitionDuration, LanguageManager.T("lx_transition_length_b24ff"));
+            AutomationProperties.SetName(lstTransitions, LanguageManager.T("lx_transition_list_7c2b9"));
+            AutomationProperties.SetName(btnRemoveTransition, LanguageManager.T("lx_remove_the_transition_895d0"));
+            AutomationProperties.SetName(chkGPUAcceleration, LanguageManager.T("lx_graphics_card_acceleration_9433c"));
             // txtJawsLog must be a live region
             if (txtJawsLog != null)
             {
-                AutomationProperties.SetName(txtJawsLog, "Status message");
+                AutomationProperties.SetName(txtJawsLog, LanguageManager.T("lx_status_message_e2547"));
                 AutomationProperties.SetLiveSetting(txtJawsLog, AutomationLiveSetting.Assertive);
             }
         }
@@ -893,7 +905,7 @@ namespace UltraVideoEditor
 
         private void UpdateZoomDisplay()
         {
-            if (txtZoomStatus != null) txtZoomStatus.Text = $"Zoom: {zoomLevel:F1}x";
+            if (txtZoomStatus != null) txtZoomStatus.Text = LanguageManager.F("lx_zoom_f_x_ea364", zoomLevel);
             UpdateTimelineDisplay();
         }
 
@@ -907,7 +919,10 @@ namespace UltraVideoEditor
             TimelineItems = timelineItems,
             Subtitles = subtitles,
             Markers = markers,
-            Transitions = transitions
+            Transitions = transitions,
+            Tracks = TrackMixer.Current,   // v2.0
+            TrackLayout = TrackSet.Save(),
+            Multicams = _multicams
         });
 
         private void MarkProjectSaved()
@@ -968,6 +983,9 @@ namespace UltraVideoEditor
                     Subtitles = subtitles,
                     Markers = markers,
                     Transitions = transitions,
+                    Tracks = TrackMixer.Current,   // v2.0: the track mixer
+                    TrackLayout = TrackSet.Save(),   // v2.0: unlimited tracks
+                    Multicams = _multicams,   // v2.0: multicam
                     CurrentTrackFilter = currentTrackFilter,
                     ZoomLevel = zoomLevel,
                     ProjectVersion = "5.1"
@@ -1097,6 +1115,7 @@ namespace UltraVideoEditor
 
         protected override void OnClosed(EventArgs e)
         {
+            try { StopLive(announce: false); } catch { }   // v2.0
             base.OnClosed(e);
             // v1.4: the log window only hides itself when closed, so it could keep the
             // program running in the background after the main window was closed.
@@ -1110,6 +1129,9 @@ namespace UltraVideoEditor
             subtitles.Clear();
             markers.Clear();
             transitions.Clear();
+            TrackMixer.Current = new List<TrackMix>();   // v2.0
+            TrackSet.Reset();   // v2.0
+            _multicams = new List<MulticamData>();   // v2.0
             undoStack.Clear();
             redoStack.Clear();
             _currentProjectPath = null;
@@ -1134,6 +1156,9 @@ namespace UltraVideoEditor
                     Subtitles = subtitles,
                     Markers = markers,
                     Transitions = transitions,
+                    Tracks = TrackMixer.Current,   // v2.0: the track mixer
+                    TrackLayout = TrackSet.Save(),   // v2.0: unlimited tracks
+                    Multicams = _multicams,   // v2.0: multicam
                     CurrentTrackFilter = currentTrackFilter,
                     ZoomLevel = zoomLevel,
                     ProjectVersion = "5.1"
@@ -1248,6 +1273,9 @@ namespace UltraVideoEditor
                     subtitles = projectData.Subtitles ?? new List<SubtitleItem>();
                     markers = projectData.Markers ?? new List<double>();
                     transitions = projectData.Transitions ?? new List<TransitionEffect>();
+                    TrackMixer.Current = projectData.Tracks ?? new List<TrackMix>();   // v2.0
+                    TrackSet.Load(projectData.TrackLayout, timelineItems);   // v2.0: unlimited tracks
+                    _multicams = projectData.Multicams ?? new List<MulticamData>();   // v2.0: multicam
                     currentTrackFilter = projectData.CurrentTrackFilter;
                     zoomLevel = projectData.ZoomLevel;
                     currentProjectFolder = projectPath != null ? Path.GetDirectoryName(projectPath) ?? string.Empty : string.Empty;
@@ -1306,33 +1334,20 @@ namespace UltraVideoEditor
                 ContentTag = source.ContentTag,
                 AmbientSoundPath = source.AmbientSoundPath,
                 RelativePath = source.RelativePath,
-                TextOverlay = source.TextOverlay == null ? new TextOverlayData() : new TextOverlayData
-                {
-                    Text = source.TextOverlay.Text,
-                    Font = source.TextOverlay.Font,
-                    SelectedFontSize = source.TextOverlay.SelectedFontSize,
-                    Color = source.TextOverlay.Color,
-                    Position = source.TextOverlay.Position,
-                    Enabled = source.TextOverlay.Enabled
-                },
-                VideoEffect = source.VideoEffect != null ? new VideoEffectData
-                {
-                    Brightness = source.VideoEffect.Brightness,
-                    Contrast = source.VideoEffect.Contrast,
-                    Blur = source.VideoEffect.Blur,
-                    Speed = source.VideoEffect.Speed
-                } : null,
+                // v2.0: full copies (titles, colour, stabilisation and the new sound settings included)
+                TextOverlay = source.TextOverlay == null ? new TextOverlayData() : source.TextOverlay.Clone(),
+                VideoEffect = source.VideoEffect?.Clone(),
                 // v1.4 (R4/R5): without these, Ctrl+Z after trimming, a speed change or "lower the
                 // music under speech" also threw away the volume points, audio effects and descriptions
                 VolumePoints = source.VolumePoints?.Select(p => new VolumePoint { Time = p.Time, Volume = p.Volume }).ToList(),
-                AudioFx = source.AudioFx == null ? null : new AudioSettingsData
-                {
-                    BassBoost = source.AudioFx.BassBoost,
-                    TrebleBoost = source.AudioFx.TrebleBoost,
-                    ReverbAmount = source.AudioFx.ReverbAmount,
-                    CompressorEnabled = source.AudioFx.CompressorEnabled
-                },
-                FrameDescriptions = source.FrameDescriptions?.Select(d => new FrameDescription { Start = d.Start, End = d.End, Text = d.Text }).ToList()
+                AudioFx = source.AudioFx?.Clone(),
+                FrameDescriptions = source.FrameDescriptions?.Select(d => new FrameDescription { Start = d.Start, End = d.End, Text = d.Text }).ToList(),
+                // v2.0: layer settings and the colour LUT
+                Layer = source.Layer?.Clone(),
+                LutPath = source.LutPath,
+                Tracking = source.Tracking?.Clone(),   // v2.0: a followed object
+                MulticamId = source.MulticamId, MulticamAngle = source.MulticamAngle,   // v2.0: multicam
+                CompoundItems = source.CompoundItems?.Select(DeepCloneTimelineItem).ToList()   // v2.0: compound clip
             };
             foreach (var kf in source.Keyframes)
             {
@@ -1343,7 +1358,8 @@ namespace UltraVideoEditor
                     Rotation = kf.Rotation,
                     X = kf.X,
                     Y = kf.Y,
-                    Opacity = kf.Opacity
+                    Opacity = kf.Opacity,
+                    Easing = kf.Easing   // v2.0
                 });
             }
             return clone;
@@ -1357,6 +1373,7 @@ namespace UltraVideoEditor
                 copy.Add(DeepCloneTimelineItem(item));
             }
             undoStack.Push(copy);
+            RememberMix(copy);   // v2.0: the track mixer (automation included) is undone with the clips
             redoStack.Clear();
         }
 
@@ -1371,6 +1388,7 @@ namespace UltraVideoEditor
         {
             if (undoStack.Count == 0) return;
             timelineItems = undoStack.Pop();
+            RestoreMix(timelineItems);   // v2.0
             UpdateTimelineDisplay();
         }
 
@@ -1382,7 +1400,9 @@ namespace UltraVideoEditor
                 var currentCopy = new List<TimelineItem>();
                 foreach (var item in timelineItems) currentCopy.Add(DeepCloneTimelineItem(item));
                 redoStack.Push(currentCopy);
+                RememberMix(currentCopy);   // v2.0
                 timelineItems = previous;
+                RestoreMix(previous);
                 UpdateTimelineDisplay();
                 LogMessage(L("undo_done"), true);
                 PlayBeep();
@@ -1398,7 +1418,9 @@ namespace UltraVideoEditor
                 var currentCopy = new List<TimelineItem>();
                 foreach (var item in timelineItems) currentCopy.Add(DeepCloneTimelineItem(item));
                 undoStack.Push(currentCopy);
+                RememberMix(currentCopy);   // v2.0
                 timelineItems = next;
+                RestoreMix(next);
                 UpdateTimelineDisplay();
                 LogMessage(L("msg_redone"), true);
                 PlayBeep();
@@ -1427,6 +1449,7 @@ namespace UltraVideoEditor
                 LogMessage(L("msg_no_copied_clip_to_paste"), true);
                 return;
             }
+            if (TrackSet.IsLocked(_copiedClip.TrackIndex)) { LogMessage(LF("trk_locked_refuse", TrackSet.Name(_copiedClip.TrackIndex)), true); PlayBeep(); return; }   // v2.0
             SaveState();
             var newClip = DeepCloneTimelineItem(_copiedClip);
             newClip.Name = _copiedClip.Name + " (kopija)";
@@ -1489,8 +1512,7 @@ namespace UltraVideoEditor
         {
             currentTrackFilter = -1;
             UpdateTimelineDisplay();
-            if (cmbTrackSelector != null)
-                cmbTrackSelector.SelectedIndex = 4;
+            SelectTrackInCombo(-1);
             LogMessage(L("msg_showing_all_tracks"), true);
         }
 
@@ -1498,8 +1520,7 @@ namespace UltraVideoEditor
         {
             currentTrackFilter = 0;
             UpdateTimelineDisplay();
-            if (cmbTrackSelector != null)
-                cmbTrackSelector.SelectedIndex = 0;
+            SelectTrackInCombo(0);
             LogMessage(L("msg_showing_video_tracks_only"), true);
         }
 
@@ -1507,36 +1528,12 @@ namespace UltraVideoEditor
         {
             currentTrackFilter = 2;
             UpdateTimelineDisplay();
-            if (cmbTrackSelector != null)
-                cmbTrackSelector.SelectedIndex = 2;
+            SelectTrackInCombo(2);
             LogMessage(L("msg_showing_audio_tracks_only"), true);
         }
 
-        private void MoveClipUp_Click(object sender, RoutedEventArgs e)
-        {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && item.TrackIndex > 0)
-            {
-                SaveState();
-                item.TrackIndex--;
-                UpdateTimelineDisplay();
-                LogMessage(LF("msg_clip_moved_to_track", item.TrackIndex + 1), true);
-                PlayBeep();
-            }
-            else LogMessage(L("cant_move_higher"), true);
-        }
-
-        private void MoveClipDown_Click(object sender, RoutedEventArgs e)
-        {
-            if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
-            {
-                SaveState();
-                item.TrackIndex++;
-                UpdateTimelineDisplay();
-                LogMessage(LF("msg_clip_moved_to_track", item.TrackIndex + 1), true);
-                PlayBeep();
-            }
-            else LogMessage(L("cant_move_lower"), true);
-        }
+        private void MoveClipUp_Click(object sender, RoutedEventArgs e) => MoveClipToNeighbourTrack(-1);   // v2.0: MainWindow.Tracks.cs
+        private void MoveClipDown_Click(object sender, RoutedEventArgs e) => MoveClipToNeighbourTrack(+1);
 
         private void ResetEffects_Click(object sender, RoutedEventArgs e)
         {
@@ -1613,10 +1610,11 @@ namespace UltraVideoEditor
             }
         }
 
+        /// <summary>v2.0 — the manual as a web page in the browser (fully readable with JAWS and NVDA).</summary>
         private void ShowUserManual_Click(object sender, RoutedEventArgs e)
         {
-            // v1.4: the manual used to be a "coming soon" message — open the built-in help instead.
-            ShowHelp_Click(sender, e);
+            var menu = FindLogicalChildren<System.Windows.Controls.Menu>(this).FirstOrDefault();
+            LogMessage(HelpPages.OpenManual(menu) ? L("help_manual_opened") : L("help_failed"), true);
         }
 
         private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
@@ -2148,6 +2146,7 @@ namespace UltraVideoEditor
                 LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
+            if (RefuseLocked(item)) return;   // v2.0
 
             // v1.4: position INSIDE the selected clip (see PositionInClip) — the old
             // "player time minus clip start" was negative for every clip except the first.
@@ -2173,7 +2172,8 @@ namespace UltraVideoEditor
                         Rotation = kf.Rotation,
                         X = kf.X,
                         Y = kf.Y,
-                        Opacity = kf.Opacity
+                        Opacity = kf.Opacity,
+                    Easing = kf.Easing   // v2.0
                     });
                 }
                 item.Keyframes.RemoveAll(k => k.Time > cutPosition);
@@ -2236,7 +2236,8 @@ namespace UltraVideoEditor
                                 Rotation = kf.Rotation,
                                 X = kf.X,
                                 Y = kf.Y,
-                                Opacity = kf.Opacity
+                                Opacity = kf.Opacity,
+                    Easing = kf.Easing   // v2.0
                             });
                         }
                         newItems.Add(part);
@@ -2259,7 +2260,8 @@ namespace UltraVideoEditor
                         Rotation = kf.Rotation,
                         X = kf.X,
                         Y = kf.Y,
-                        Opacity = kf.Opacity
+                        Opacity = kf.Opacity,
+                    Easing = kf.Easing   // v2.0
                     });
                 }
                 newItems.Add(lastPart);
@@ -2283,13 +2285,14 @@ namespace UltraVideoEditor
                 LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
+            if (RefuseLocked(item)) return;   // v2.0
             RecalculatePositions();
             var sameTrack = timelineItems.Where(i => i.TrackIndex == item.TrackIndex).OrderBy(i => i.Start).ToList();
             int pos = sameTrack.IndexOf(item);
             int otherPos = pos + direction;
             if (otherPos < 0 || otherPos >= sameTrack.Count)
             {
-                LogMessage(direction < 0 ? "No clip to the left" : "No clip to the right", true);
+                LogMessage(L(direction < 0 ? "lx_no_clip_left" : "lx_no_clip_right"), true);
                 return;
             }
             var other = sameTrack[otherPos];
@@ -2312,7 +2315,7 @@ namespace UltraVideoEditor
             timelineItems[iOther] = item;
             UpdateTimelineDisplay();
             SelectItemInList(item);
-            LogMessage(direction < 0 ? "Clip moved left" : "Clip moved right", true);
+            LogMessage(L(direction < 0 ? "lx_clip_moved_left" : "lx_clip_moved_right"), true);
             PlayBeep();
         }
 
@@ -2320,6 +2323,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
+                if (RefuseLocked(item)) return;   // v2.0
                 var dialog = new DurationDialog(item.Duration);
                 if (dialog.ShowDialog() == true)
                 {
@@ -2355,6 +2359,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
+                if (RefuseLocked(item)) return;   // v2.0
                 SaveState();
                 timelineItems.Remove(item);
                 UpdateTimelineDisplay();
@@ -2365,6 +2370,7 @@ namespace UltraVideoEditor
 
         private void TogglePlay_Click(object sender, RoutedEventArgs e)
         {
+            if (LiveHandlesTogglePlay()) return;   // v2.0: live timeline playback
             if (_currentMedia == null && timelineItems.Count > 0)
             {
                 var firstItem = (nativeListView?.SelectedItems.Count > 0 ? nativeListView.SelectedItems[0].Tag as TimelineItem : null)
@@ -2419,6 +2425,7 @@ namespace UltraVideoEditor
         /// </summary>
         private void SeekBy(long ms)
         {
+            if (LiveHandlesSeekBy(ms)) return;   // v2.0
             if (_mediaPlayer == null || _currentMedia == null)
             {
                 LogMessage(L("select_clip_first_play"), true);
@@ -2554,8 +2561,7 @@ namespace UltraVideoEditor
             if (currentTrackFilter != -1 && item.TrackIndex != currentTrackFilter)
             {
                 currentTrackFilter = -1;
-                if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 4;
-                UpdateTimelineDisplay();
+                UpdateTimelineDisplay();   // v2.0: the track list follows currentTrackFilter
             }
             foreach (WinForms.ListViewItem li in nativeListView.Items)
             {
@@ -2574,6 +2580,7 @@ namespace UltraVideoEditor
         /// <summary>Puts the playhead at a timeline time: in the montage mix, or in the clip under it.</summary>
         private void SeekTimelineTo(double t, TimelineItem clip, bool play)
         {
+            if (LiveHandlesSeekTo(t, play)) return;   // v2.0
             if (_mixPreviewActive && _currentMedia != null)
             {
                 if (PlayerEnded) RestartAt(t, play);
@@ -2692,6 +2699,7 @@ namespace UltraVideoEditor
         /// </summary>
         private void RestartAt(double pos, bool play)
         {
+            if (LiveHandlesSeekTo(pos, play)) return;   // v2.0
             if (_mixPreviewActive && _mixPath != null && File.Exists(_mixPath))
             {
                 LoadMix(_mixPath, pos, play);
@@ -2740,6 +2748,7 @@ namespace UltraVideoEditor
         /// <summary>Handles J, K, L, Q, W, comma and period. Returns false for any other key.</summary>
         private bool HandleEditingKey(Key key)
         {
+            if (DigitOf(key) is int digit && digit > 0) return !DuplicateKey("mc" + digit) ? HandleMulticamDigit(digit) : MulticamAt(_mixPreviewActive ? currentPlaybackPosition : TimelinePosition) != null;   // v2.0: multicam
             if (key != Key.J && key != Key.K && key != Key.L && key != Key.Q && key != Key.W &&
                 key != Key.OemComma && key != Key.OemPeriod) return false;
             if (DuplicateKey("ed" + key)) return true;
@@ -2772,6 +2781,7 @@ namespace UltraVideoEditor
         /// <summary>L plays forward (again: 2×, 4×); J runs backward (again: 2×, 4×, 8×).</summary>
         private void Shuttle(int direction)
         {
+            if (LiveHandlesShuttle(direction)) return;   // v2.0
             if (!PlayerReady()) return;
             if (PlayerEnded)
             {
@@ -2823,6 +2833,7 @@ namespace UltraVideoEditor
         /// <summary>K: stop the shuttle, pause, and say where the playhead is.</summary>
         private void ShuttleStop()
         {
+            if (LiveHandlesShuttleStop()) return;   // v2.0
             if (!PlayerReady()) return;
             _rewindTimer?.Stop();
             _shuttle = 0;
@@ -2850,6 +2861,7 @@ namespace UltraVideoEditor
         /// <summary>Comma / period: one frame back / forward, paused, with the exact time announced.</summary>
         private void StepFrame(int direction)
         {
+            if (LiveHandlesStep(direction)) return;   // v2.0
             if (!PlayerReady()) return;
             if (PlayerEnded)
             {
@@ -2914,6 +2926,7 @@ namespace UltraVideoEditor
                 LogMessage(L("msg_select_a_clip_first"), true);
                 return;
             }
+            if (RefuseLocked(item)) return;   // v2.0
             if (item.IsAudio || item.IsImage) { LogMessage(L("speed_video_only"), true); return; }
 
             double[] speeds = { 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0 };
@@ -2988,6 +3001,19 @@ namespace UltraVideoEditor
 
         private async void PlayMix_Click(object sender, RoutedEventArgs e)
         {
+            // v2.0: the whole timeline plays live, picture included; the same key pauses and continues.
+            // If the live picture cannot start (or there is no picture), the sound-only mix plays as before.
+            if (LiveActive) { LivePauseResume(); return; }
+            if (!_mixBuilding && timelineItems.Any(i => !(i.Type == "Audio" || i.IsAudio)))
+            {
+                double total0 = TimelineMixPreview.TotalLength(timelineItems);
+                double from0 = 0;
+                if (_mixPreviewActive) from0 = currentPlaybackPosition;
+                else if (_playingItem != null) from0 = TimelinePosition;
+                else if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem sel0) from0 = sel0.Start;
+                if (from0 >= total0 - 0.5) from0 = 0;
+                if (await StartLiveAsync(from0, play: true)) return;
+            }
             // The mix is already loaded: the same key pauses and continues it.
             if (_mixPreviewActive && _currentMedia != null &&
                 _mediaPlayer.State != LibVLCSharp.Shared.VLCState.Ended &&
@@ -3056,6 +3082,7 @@ namespace UltraVideoEditor
         /// <summary>Loads the montage mix into the player at a timeline position.</summary>
         private void LoadMix(string path, double from, bool play)
         {
+            StopLive(announce: false);   // v2.0: a mix or a preview file replaces the live picture
             if (_mediaPlayer.IsPlaying) _mediaPlayer.Stop();
             _rewindTimer?.Stop();   // a J (backward) still running must not move the mix
             _shuttle = 0;
@@ -3108,7 +3135,7 @@ namespace UltraVideoEditor
 
         private void FollowTick()
         {
-            if (_currentMedia == null) return;
+            if (_currentMedia == null && !LiveActive) return;   // v2.0: the live player has no VLC media
             TimelineItem item;
             double pos;
             if (_mixPreviewActive)
@@ -3370,27 +3397,13 @@ namespace UltraVideoEditor
             }
         }
 
-        private void AddVideoTrack_Click(object sender, RoutedEventArgs e)
-        {
-            // v1.4: honest message — the four tracks always exist; nothing was ever "added".
-            currentTrackFilter = 1;
-            if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 1;
-            UpdateTimelineDisplay();
-            LogMessage(L("msg_video_2_track_selected_new_videos"), true);
-            PlayBeep();
-        }
-
-        private void AddAudioTrack_Click(object sender, RoutedEventArgs e)
-        {
-            currentTrackFilter = 3;
-            if (cmbTrackSelector != null) cmbTrackSelector.SelectedIndex = 3;
-            UpdateTimelineDisplay();
-            LogMessage(L("msg_audio_2_track_selected_new_audio"), true);
-            PlayBeep();
-        }
+        // v2.0: real new tracks — MainWindow.Tracks.cs
+        private void AddVideoTrack_Click(object sender, RoutedEventArgs e) => AddTrack(audio: false);
+        private void AddAudioTrack_Click(object sender, RoutedEventArgs e) => AddTrack(audio: true);
 
         private void TrackSelector_Changed(object sender, SelectionChangedEventArgs e)
         {
+            if (_rebuildingTrackCombo) return;   // v2.0: the list is being refilled
             if (cmbTrackSelector.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
                 currentTrackFilter = int.Parse(item.Tag.ToString());
@@ -3412,13 +3425,12 @@ namespace UltraVideoEditor
                 // reach the render and the montage mix (before, they only coloured the preview)
                 if (item.IsAudio || item.IsVideo)
                 {
-                    item.AudioFx = new AudioSettingsData
-                    {
-                        BassBoost = sldBass?.Value ?? 0,
-                        TrebleBoost = sldTreble?.Value ?? 0,
-                        ReverbAmount = sldReverb?.Value ?? 0,
-                        CompressorEnabled = chkCompressor?.IsChecked == true
-                    };
+                    // v2.0: the settings of Clip effects (Ctrl+Alt+E) are kept
+                    item.AudioFx ??= new AudioSettingsData();
+                    item.AudioFx.BassBoost = sldBass?.Value ?? 0;
+                    item.AudioFx.TrebleBoost = sldTreble?.Value ?? 0;
+                    item.AudioFx.ReverbAmount = sldReverb?.Value ?? 0;
+                    item.AudioFx.CompressorEnabled = chkCompressor?.IsChecked == true;
                 }
                 LogMessage(LF("fx_applied_summary", item.Name,
                               Math.Round(item.VideoEffect.Brightness), Math.Round(item.VideoEffect.Contrast), Math.Round(item.VideoEffect.Blur),
@@ -3616,6 +3628,7 @@ namespace UltraVideoEditor
                 sldX.Value = kf.X;
                 sldY.Value = kf.Y;
                 sldOpacity.Value = kf.Opacity;
+                SelectEasing(kf.Easing);   // v2.0
                 UpdateAnimValueDisplays();
                 LogMessage(LanguageManager.F("loc_keyframe_at", FormatTime(kf.Time)), true);
             }
@@ -3625,6 +3638,7 @@ namespace UltraVideoEditor
 
         private void UpdateAnimValueDisplays()
         {
+            EnsureEasingItems();   // v2.0: keyframe curves
             if (txtZoomValue != null) txtZoomValue.Text = $"{sldZoom.Value:F2}";
             if (txtRotationValue != null) txtRotationValue.Text = $"{sldRotation.Value:F0}°";
             if (txtXValue != null) txtXValue.Text = $"{sldX.Value:F0}";
@@ -3649,7 +3663,8 @@ namespace UltraVideoEditor
                 Rotation = sldRotation.Value,
                 X = sldX.Value,
                 Y = sldY.Value,
-                Opacity = sldOpacity.Value
+                Opacity = sldOpacity.Value,
+                Easing = ChosenEasing   // v2.0
             };
             item.AddKeyframe(kf);
             UpdateKeyframeList(item);
@@ -3684,6 +3699,7 @@ namespace UltraVideoEditor
                 currentEditingKeyframe.X = sldX.Value;
                 currentEditingKeyframe.Y = sldY.Value;
                 currentEditingKeyframe.Opacity = sldOpacity.Value;
+                currentEditingKeyframe.Easing = ChosenEasing;   // v2.0
                 UpdateKeyframeList(item);
                 LogMessage(L("keyframe_updated"), true);
             }
@@ -3713,7 +3729,7 @@ namespace UltraVideoEditor
                 lstKeyframes.Items.Add(kf);
             }
             if (txtSelectedClip != null)
-                txtSelectedClip.Text = $"Selected clip: {item.Name} (Keyframes: {item.Keyframes.Count})";
+                txtSelectedClip.Text = LanguageManager.F("lx_selected_clip_keyframes_bced6", item.Name, item.Keyframes.Count);
         }
 
         private double GetAudioDuration(string filePath)
@@ -3760,7 +3776,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(txtVoiceText.Text)) { LogMessage(L("msg_enter_text_first"), true); return; }
             btnGenerateVoice.IsEnabled = false;
             prgVoice.Visibility = Visibility.Visible;
-            txtVoiceStatus.Text = "Generating...";
+            txtVoiceStatus.Text = LanguageManager.T("lx_generating_81362");
             LogMessage(L("msg_generating_ai_voice"), true);
             string lang = rbSrb.IsChecked == true ? "sr" : "en";
             string voiceoverPath = Path.Combine(currentProjectFolder, "AI_Voiceover.mp3");
@@ -3819,7 +3835,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(accountId)) { LogMessage(L("msg_cloudflare_account_id_is_required_for"), true); return; }
             btnGenerate.IsEnabled = false;
             prgAI.Visibility = Visibility.Visible;
-            txtAIStatus.Text = "Generating via Cloudflare...";
+            txtAIStatus.Text = LanguageManager.T("lx_generating_with_cloudflare_6eeef");
             LogMessage(LanguageManager.T("loc_cf_generating"), true);
             string[] prompts = txtAIPrompt.Text.Split(',');
             int generated = 0;
@@ -3830,7 +3846,7 @@ namespace UltraVideoEditor
                 {
                     string cleanP = prompts[idx].Trim();
                     if (string.IsNullOrEmpty(cleanP)) continue;
-                    txtAIStatus.Text = $"{idx + 1}/{prompts.Length}: {cleanP} (Cloudflare)";
+                    txtAIStatus.Text = LanguageManager.F("lx_cloudflare_73e50", idx + 1, prompts.Length, cleanP);
                     string img = Path.Combine(currentProjectFolder, $"AI_{Guid.NewGuid().ToString().Substring(0, 8)}.jpg");
                     try
                     {
@@ -3929,7 +3945,7 @@ namespace UltraVideoEditor
             }
 
             btnTranscribe.IsEnabled = false;
-            txtTranscriptionResult.Text = "Transcription in progress (large-v3)...";
+            txtTranscriptionResult.Text = LanguageManager.T("lx_transcribing_large_v_8fcec");
             LogMessage(L("transcription_running"), true);
             try
             {
@@ -4003,7 +4019,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrWhiteSpace(txtLyrics.Text)) { LogMessage(L("msg_enter_the_song_lyrics"), true); return; }
             btnSyncLyrics.IsEnabled = false;
             prgSync.Visibility = Visibility.Visible;
-            txtSyncStatus.Text = "Synchronizing...";
+            txtSyncStatus.Text = LanguageManager.T("lx_synchronizing_857a3");
             LogMessage(L("msg_synchronizing_lyrics"), true);
             try
             {
@@ -4025,7 +4041,7 @@ namespace UltraVideoEditor
                         // FORCED ALIGNMENT: user has already provided text, Whisper only measures
                         // where each line is in the audio. No transcription, no guessing.
                         // Result: millisecond-accurate timestamps that follow the real voice.
-                        txtSyncStatus.Text = "Whisper is listening and aligning text...";
+                        txtSyncStatus.Text = LanguageManager.T("lx_whisper_is_listening_and_aligning_cdb10");
                         LogMessage(L("msg_alignment_whisper_is_finding_where_each"), true);
                         string ffmpegPath = AppPaths.FFmpeg;
 
@@ -4116,8 +4132,8 @@ namespace UltraVideoEditor
             if (_lastHighlightResult == null || !_lastHighlightResult.Success)
             {
                 System.Windows.MessageBox.Show(
-                    "Run AI Highlight Engine (Ctrl+Shift+H) and complete the analysis before Phase 3.",
-                    "Phase 3", System.Windows.MessageBoxButton.OK,
+                    LanguageManager.T("lx_run_the_ai_highlight_engine_3695b"),
+                    LanguageManager.T("lx_phase_68103"), System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
                 return;
             }
@@ -4181,8 +4197,8 @@ namespace UltraVideoEditor
             if (videoItems.Count == 0)
             {
                 System.Windows.MessageBox.Show(
-                    "No video clips on the timeline.",
-                    "Color Grading", System.Windows.MessageBoxButton.OK,
+                    LanguageManager.T("lx_there_are_no_video_clips_29051"),
+                    LanguageManager.T("lx_colour_grading_ecc23"), System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
                 return;
             }
@@ -4218,8 +4234,8 @@ namespace UltraVideoEditor
             if (timelineItems.Count == 0)
             {
                 System.Windows.MessageBox.Show(
-                    "Timeline is empty. Add clips before using the AI Assistant.",
-                    "Timeline AI Asistent",
+                    LanguageManager.T("lx_the_timeline_is_empty_add_dec61"),
+                    LanguageManager.T("lx_timeline_ai_assistant_8662b"),
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
                 return;
@@ -4314,11 +4330,11 @@ namespace UltraVideoEditor
 
         private async void AddVideoImage_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfOpenFileDialog { Multiselect = true, Filter = "Video and images|*.mp4;*.avi;*.mov;*.mkv;*.jpg;*.png;*.jpeg;*.bmp" };
+            var d = new WpfOpenFileDialog { Multiselect = true, Filter = L("lx_filter_video_images") + "|*.mp4;*.avi;*.mov;*.mkv;*.jpg;*.png;*.jpeg;*.bmp" };
             if (d.ShowDialog() == true)
             {
                 SaveState();
-                int targetTrack = currentTrackFilter >= 0 && currentTrackFilter <= 1 ? currentTrackFilter : 0;
+                int targetTrack = TargetTrackFor(audio: false);   // v2.0: the chosen video track
                 foreach (var f in d.FileNames)
                 {
                     if (!MediaLoader.IsValidMediaFile(f)) { LogMessage(string.Format(L("not_valid_media"), Path.GetFileName(f)), true); continue; }
@@ -4361,11 +4377,11 @@ namespace UltraVideoEditor
 
         private async void AddAudioOnly_Click(object sender, RoutedEventArgs e)
         {
-            var d = new WpfOpenFileDialog { Multiselect = true, Filter = "Audio|*.mp3;*.wav;*.m4a;*.flac;*.ogg" };
+            var d = new WpfOpenFileDialog { Multiselect = true, Filter = L("lx_filter_audio") + "|*.mp3;*.wav;*.m4a;*.flac;*.ogg" };
             if (d.ShowDialog() == true)
             {
                 SaveState();
-                int targetTrack = (currentTrackFilter == 2 || currentTrackFilter == 3) ? currentTrackFilter : 2;
+                int targetTrack = TargetTrackFor(audio: true);   // v2.0: the chosen audio track
                 foreach (var f in d.FileNames)
                 {
                     if (!MediaLoader.IsValidMediaFile(f)) { LogMessage(string.Format(L("not_valid_audio"), Path.GetFileName(f)), true); continue; }
@@ -4406,9 +4422,7 @@ namespace UltraVideoEditor
                     bool   isAudio = ext == ".mp3" || ext == ".wav" || ext == ".m4a"
                                   || ext == ".flac" || ext == ".ogg";
 
-                    int track = isAudio
-                        ? (currentTrackFilter == 2 || currentTrackFilter == 3 ? currentTrackFilter : 2)
-                        : (currentTrackFilter >= 0 && currentTrackFilter <= 1 ? currentTrackFilter : 0);
+                    int track = TargetTrackFor(isAudio);   // v2.0
 
                     double duration = await GetMediaDurationWithTimeoutAsync(filePath, TimeSpan.FromSeconds(30));
 
@@ -4466,7 +4480,7 @@ namespace UltraVideoEditor
             prgRender.Visibility = Visibility.Visible;
             prgRender.Value = 0;
             btnRenderTool.IsEnabled = false;
-            txtRenderStatus.Text = "Auto-Render in progress...";
+            txtRenderStatus.Text = LanguageManager.T("lx_automatic_render_in_progress_e8991");
 
             LogMessage(LF("msg_auto_render_clips", timelineItems.Count, outputPath), true);
 
@@ -4505,7 +4519,7 @@ namespace UltraVideoEditor
                     long fileSize = new FileInfo(outputPath).Length;
                     _lastRenderPath = outputPath;   // v1.4 (4.2): the audio description starts from this video
                     LogMessage(string.Format(L("render_done_log"), outputPath, fileSize / 1024 / 1024), true);
-                    txtRenderStatus.Text = "Auto-Render complete!";
+                    txtRenderStatus.Text = LanguageManager.T("lx_automatic_render_finished_a7c50");
                     PlayBeep();
 
                     // Auto-close prozor posle 8 sekundi — ne treba klik
@@ -4516,7 +4530,7 @@ namespace UltraVideoEditor
                         {
                             var toast = new System.Windows.Window
                             {
-                                Title = "Auto-Render complete",
+                                Title = LanguageManager.T("lx_automatic_render_finished_ff83e"),
                                 Width = 420, Height = 130,
                                 WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
                                 Left = SystemParameters.WorkArea.Right - 440,
@@ -4529,10 +4543,7 @@ namespace UltraVideoEditor
                             };
                             var txt = new System.Windows.Controls.TextBlock
                             {
-                                Text = "Video sacuvan!" + Environment.NewLine +
-                                       System.IO.Path.GetFileName(outputPath) + Environment.NewLine +
-                                       "(" + (fileSize / 1024 / 1024) + " MB)" + Environment.NewLine +
-                                       "The window will close in 8 seconds...",
+                                Text = LanguageManager.F("lx_video_saved_mb_this_window_bf958", Environment.NewLine, System.IO.Path.GetFileName(outputPath), Environment.NewLine, (fileSize / 1024 / 1024), Environment.NewLine),
                                 Foreground = System.Windows.Media.Brushes.LightGreen,
                                 FontSize = 13, TextAlignment = System.Windows.TextAlignment.Center,
                                 VerticalAlignment = System.Windows.VerticalAlignment.Center,
@@ -4553,13 +4564,13 @@ namespace UltraVideoEditor
                 else
                 {
                     LogMessage(LF("msg_auto_render_file_was_not_created", outputPath), true);
-                    txtRenderStatus.Text = "Auto-Render failed";
+                    txtRenderStatus.Text = LanguageManager.T("lx_automatic_render_failed_fb8fe");
                 }
             }
             catch (Exception ex)
             {
                 LogMessage(LF("msg_auto_render_error", ex.Message), true);
-                txtRenderStatus.Text = "Auto-Render error";
+                txtRenderStatus.Text = LanguageManager.T("lx_automatic_render_error_4df11");
             }
             finally
             {
@@ -4590,29 +4601,35 @@ namespace UltraVideoEditor
             // v1.4: "Export audio only" (Export options) now really exports just the audio
             if (currentExportSettings?.ExportAudioOnly == true)
             {
-                var audioDialog = new WpfSaveFileDialog { Filter = "MP3 audio|*.mp3|WAV audio|*.wav", DefaultExt = "mp3", FileName = "audio.mp3" };
+                var audioDialog = new WpfSaveFileDialog { Filter = L("lx_filter_mp3") + "|*.mp3|" + L("lx_filter_wav") + "|*.wav", DefaultExt = "mp3", FileName = "audio.mp3" };
                 if (audioDialog.ShowDialog() != true) return;
                 LogMessage(L("msg_exporting_audio_only"), true);
                 bool audioOk = await ExportHelpers.ExportAudioOnlyAsync(timelineItems, audioDialog.FileName, CancellationToken.None);
-                LogMessage(audioOk ? $"Audio exported: {audioDialog.FileName}" : "Audio export failed — no audio clip on the timeline?", true);
+                LogMessage(audioOk ? LF("lx_audio_exported", audioDialog.FileName) : L("lx_audio_export_failed"), true);
                 if (audioOk) PlayBeep();
                 return;
             }
 
+            // v2.0: the file type follows Export options (ProRes is a .mov file)
+            string codecChoice = currentExportSettings?.VideoCodec ?? "H264";
+            string defExt = (currentExportSettings?.Format ?? "MP4") switch { "WebM" => "webm", "AVI" => "avi", "MOV" => "mov", "MKV" => "mkv", _ => "mp4" };
             var saveDialog = new WpfSaveFileDialog
             {
-                Filter = "MP4 video|*.mp4|WebM video|*.webm|AVI video|*.avi",
-                DefaultExt = "mp4",
-                FileName = "izlazni_video.mp4"
+                Filter = "MP4 video|*.mp4|MOV video (ProRes, DNxHR)|*.mov|WebM video|*.webm|AVI video|*.avi|MKV video (FFV1 lossless)|*.mkv",
+                FilterIndex = defExt switch { "mov" => 2, "webm" => 3, "avi" => 4, "mkv" => 5, _ => 1 },
+                DefaultExt = defExt,
+                FileName = "video." + defExt
             };
 
             if (saveDialog.ShowDialog() != true) return;
 
             // v1.4: the renderer always produces H.264/AAC in MP4. For WebM/AVI it renders to
             // a temporary MP4 next to the target and converts at the end (WebM used to fail).
+            // v2.0: the same for ProRes (.mov) and H.265 (HEVC) in MP4.
             string requestedPath = saveDialog.FileName;
             string requestedExt = Path.GetExtension(requestedPath).ToLowerInvariant();
-            bool needsConversion = requestedExt == ".webm" || requestedExt == ".avi";
+            bool needsConversion = requestedExt == ".webm" || requestedExt == ".avi" || requestedExt == ".mov" || requestedExt == ".mkv" ||
+                                   (requestedExt == ".mp4" && (codecChoice == "H265" || codecChoice == "H265_10"));
             string outputPath = needsConversion
                 ? Path.Combine(Path.GetDirectoryName(requestedPath) ?? "", Path.GetFileNameWithoutExtension(requestedPath) + "_tmp_render.mp4")
                 : requestedPath;
@@ -4642,14 +4659,14 @@ namespace UltraVideoEditor
             prgRender.Visibility = Visibility.Visible;
             prgRender.Value = 0;
             btnRenderTool.IsEnabled = false;
-            txtRenderStatus.Text = "Rendering...";
+            txtRenderStatus.Text = LanguageManager.T("lx_rendering_fe365");
 
             LogMessage(L("msg_rendering_started"), true);
 
             try
             {
                 string ffmpegExePath = AppPaths.FFmpeg;
-                LogMessage($"Checking FFmpeg at: {ffmpegExePath}", true);
+                AppLog.Info($"Checking FFmpeg at: {ffmpegExePath}");
 
                 if (!File.Exists(ffmpegExePath))
                 {
@@ -4702,7 +4719,8 @@ namespace UltraVideoEditor
                 if (needsConversion && File.Exists(outputPath))
                 {
                     LogMessage(LF("msg_converting_to", requestedExt.TrimStart('.').ToUpperInvariant()), true);
-                    bool converted = await ExportHelpers.ConvertContainerAsync(outputPath, requestedPath, _renderCancellation?.Token ?? CancellationToken.None);
+                    bool converted = await ExportHelpers.ConvertContainerAsync(outputPath, requestedPath, _renderCancellation?.Token ?? CancellationToken.None,
+                                                                               codecChoice, currentExportSettings?.Quality ?? "Medium", useGPUAcceleration);
                     if (converted)
                     {
                         try { File.Delete(outputPath); } catch { }
@@ -4739,7 +4757,7 @@ namespace UltraVideoEditor
             catch (OperationCanceledException)
             {
                 LogMessage(L("msg_rendering_cancelled"), true);
-                txtRenderStatus.Text = "Cancelled";
+                txtRenderStatus.Text = LanguageManager.T("lx_cancelled_a1bf9");
                 PlayBeep();
             }
             catch (Exception ex)
@@ -4789,14 +4807,14 @@ namespace UltraVideoEditor
             {
                 case UIMode.Accessibility:
                     borderAccessibilityStatus.Visibility = Visibility.Visible;
-                    txtAccessibilityStatus.Text = "♿ ACCESSIBILITY MODE ON";
+                    txtAccessibilityStatus.Text = LanguageManager.T("lx_accessibility_mode_on_10455");
                     try { if (_positionAnnounceOn) positionAnnounceTimer?.Start(); } catch { }
                     if (announce) LogMessage(L("accessibility_on"), true);
                     break;
 
                 case UIMode.LowVision:
                     borderAccessibilityStatus.Visibility = Visibility.Visible;
-                    txtAccessibilityStatus.Text = $"🔍 LOW VISION MODE ON ({_lowVisionScale:0.##}x)";
+                    txtAccessibilityStatus.Text = LanguageManager.F("lx_low_vision_mode_on_x_4a246", _lowVisionScale);
                     try { positionAnnounceTimer?.Stop(); } catch { }
                     // Low vision needs strong contrast as a baseline, plus
                     // enlarged text/controls across every window.
@@ -4805,7 +4823,7 @@ namespace UltraVideoEditor
                     UiScaling.SetScale(_lowVisionScale);
                     ApplyNativeListViewScale(_lowVisionScale);
                     // v1.4: this message is said even though Low vision mode itself does not speak
-                    if (announce) { LogMessage(L("msg_low_vision_mode_on"), false); AnnounceModeChange("Low vision mode on"); }
+                    if (announce) { LogMessage(L("msg_low_vision_mode_on"), false); AnnounceModeChange(LanguageManager.T("lx_low_vision_mode_on_488f1")); }
                     break;
 
                 case UIMode.Sighted:
@@ -4852,9 +4870,7 @@ namespace UltraVideoEditor
             catch { }
 
             SetUIMode(screenReaderDetected ? UIMode.Accessibility : UIMode.Sighted, announce: false, byUser: false);
-            LogMessage(screenReaderDetected
-                ? "Screen reader detected — starting in Accessibility mode."
-                : "No screen reader detected — starting in Sighted mode.", true);
+            LogMessage(L(screenReaderDetected ? "lx_sr_detected" : "lx_sr_not_detected"), true);
         }
 
         private void SetModeSighted_Click(object sender, RoutedEventArgs e) => SetUIMode(UIMode.Sighted);
@@ -4892,8 +4908,16 @@ namespace UltraVideoEditor
 
                 // v1.4 (R5): Premiere-style editing keys without modifiers — J/K/L shuttle,
                 // comma/period one frame, Q/W trim the clip to the playhead. Never inside a text field.
-                if (Keyboard.Modifiers == ModifierKeys.None && !IsTextInput(e.OriginalSource) && HandleEditingKey(e.Key))
+                if (Keyboard.Modifiers == ModifierKeys.None && !IsTextInput(e.OriginalSource) && HandleEditingKey(realKey))
                 {
+                    e.Handled = true;
+                    return;
+                }
+
+                // v2.0: Layer and colour, ripple delete, detach sound, J/L edges, where am I
+                if (!IsTextInput(e.OriginalSource) && IsV2Key(realKey, Keyboard.Modifiers))
+                {
+                    if (!DuplicateKey("v2" + realKey + Keyboard.Modifiers)) HandleV2Key(realKey, Keyboard.Modifiers);
                     e.Handled = true;
                     return;
                 }
@@ -4966,7 +4990,13 @@ namespace UltraVideoEditor
                 else if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
                 {
                     // the transition list uses F1 to read the selected effect's description
-                    if (!lstTransitions.IsKeyboardFocusWithin) { ShowHelp_Click(null, null); e.Handled = true; }
+                    if (!lstTransitions.IsKeyboardFocusWithin) { if (!DuplicateKey("help")) ShowHelp_Click(null, null); e.Handled = true; }
+                }
+                else if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    // v2.0: Ctrl+F1 opens the manual
+                    if (!DuplicateKey("manual")) ShowUserManual_Click(null, null);
+                    e.Handled = true;
                 }
                 else if (e.Key == Key.F2) { e.Handled = false; }
                 else if (e.Key == Key.F3) { e.Handled = false; }
@@ -5196,18 +5226,21 @@ namespace UltraVideoEditor
             };
         }
 
+        /// <summary>
+        /// v2.0 — F1: the keyboard shortcuts as a web page in the browser, made from the menus in
+        /// the language in use. The old help window could not be read by JAWS or NVDA.
+        /// </summary>
         private void ShowHelp_Click(object sender, RoutedEventArgs e)
         {
-            var helpWindow = new HelpWindow();
-            helpWindow.Owner = this;
-            helpWindow.ShowDialog();
+            var menu = FindLogicalChildren<System.Windows.Controls.Menu>(this).FirstOrDefault();
+            LogMessage(HelpPages.OpenShortcuts(menu) ? L("help_shortcuts_opened") : L("help_failed"), true);
         }
 
         private void AddSubtitleToClip_Click(object sender, RoutedEventArgs e)
         {
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item)
             {
-                var dialog = new TextOverlayDialog($"Add subtitle to: {item.Name}");
+                var dialog = new TextOverlayDialog(LF("lx_add_subtitle_to", item.Name));
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = item.Start, End = item.End });
@@ -5221,7 +5254,7 @@ namespace UltraVideoEditor
 
         private void AddIntroText_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new TextOverlayDialog("Intro text (song title)");
+            var dialog = new TextOverlayDialog(L("lx_intro_text"));
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
             {
                 subtitles.Add(new SubtitleItem { Text = dialog.Text, Start = 0, End = 5 });
@@ -5233,7 +5266,7 @@ namespace UltraVideoEditor
 
         private void AddOutroText_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new TextOverlayDialog("Outro text (author, channel)");
+            var dialog = new TextOverlayDialog(L("lx_outro_text"));
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
             {
                 double totalDuration = GetTotalDuration();
@@ -5330,7 +5363,7 @@ namespace UltraVideoEditor
             // v1.4: any clip with a picture can get a description, not only pictures
             if (nativeListView?.SelectedItems.Count > 0 && nativeListView.SelectedItems[0].Tag is TimelineItem item && !item.IsAudio)
             {
-                var dialog = new TextOverlayDialog($"Audio description: {item.Name}");
+                var dialog = new TextOverlayDialog(LF("lx_ad_for", item.Name));
                 if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Text))
                 {
                     item.AudioDescription = dialog.Text;
@@ -5503,7 +5536,7 @@ namespace UltraVideoEditor
 
         private async void GenerateScenario_Click(object sender, RoutedEventArgs e)
         {
-            LogMessage("GenerateScenario_Click called", true);
+            AppLog.Info("GenerateScenario_Click called");
 
             if (string.IsNullOrWhiteSpace(txtAnimationPrompt.Text))
             {
@@ -5550,7 +5583,7 @@ namespace UltraVideoEditor
             try
             {
                 string result = await CallCloudflareAI(prompt, apiToken);
-                LogMessage($"AI response (first 300 characters): {result?.Substring(0, Math.Min(300, result?.Length ?? 0))}", true);
+                AppLog.Info($"AI response (first 300 characters): {result?.Substring(0, Math.Min(300, result?.Length ?? 0))}");
 
                 if (string.IsNullOrEmpty(result))
                 {
@@ -5577,7 +5610,7 @@ namespace UltraVideoEditor
                 string jsonArray = cleanedResult.Substring(jsonStart, jsonEnd - jsonStart + 1);
                 string wrappedJson = $"{{\"scenes\": {jsonArray}}}";
 
-                LogMessage($"JSON to parse: {wrappedJson.Substring(0, Math.Min(200, wrappedJson.Length))}", true);
+                AppLog.Info($"JSON to parse: {wrappedJson.Substring(0, Math.Min(200, wrappedJson.Length))}");
 
                 var scenes = JsonConvert.DeserializeObject<dynamic>(wrappedJson);
 
@@ -5626,7 +5659,7 @@ namespace UltraVideoEditor
 
         private async void AISuggestLayout_Click(object sender, RoutedEventArgs e)
         {
-            LogMessage("AISuggestLayout_Click called", true);
+            AppLog.Info("AISuggestLayout_Click called");
 
             var animacije = timelineItems.Where(i => i.Type == "Animation" || i.Name.Contains("animacija")).ToList();
             if (animacije.Count == 0)
@@ -5677,11 +5710,11 @@ namespace UltraVideoEditor
                 {
                     if (item.animacija_index < 1 || item.animacija_index > animacije.Count) continue;  // v1.4: AI may return a bad index
                     var anim = animacije[item.animacija_index - 1];
-                    message.AppendLine($"Animation {item.animacija_index}: '{anim.Name}' from {FormatTime(item.pocetak)} to {FormatTime(item.kraj)}. Reason: {item.razlog}");
+                    message.AppendLine(LF("lx_anim_layout_item", item.animacija_index, anim.Name, FormatTime(item.pocetak), FormatTime(item.kraj), item.razlog));
                 }
                 message.AppendLine(L("arrangement_accept"));
 
-                var resultDialog = WpfMessageBox.Show(message.ToString(), "AI Predlog rasporeda",
+                var resultDialog = WpfMessageBox.Show(message.ToString(), L("lx_anim_layout_title"),
                                                    MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (resultDialog == MessageBoxResult.Yes)
@@ -5850,7 +5883,7 @@ namespace UltraVideoEditor
                 };
 
                 string jsonBody = JsonConvert.SerializeObject(requestBody);
-                LogMessage($"CallCloudflareAI: Request body: {jsonBody.Substring(0, Math.Min(200, jsonBody.Length))}", true);
+                AppLog.Info($"CallCloudflareAI: Request body: {jsonBody.Substring(0, Math.Min(200, jsonBody.Length))}");
 
                 var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
@@ -5858,21 +5891,21 @@ namespace UltraVideoEditor
                 string accountId = GetCloudflareAccountId();
                 if (string.IsNullOrEmpty(accountId)) return "";
                 string url = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct";
-                LogMessage($"CallCloudflareAI: Calling URL: {url}", true);
+                AppLog.Info($"CallCloudflareAI: Calling URL: {url}");
 
                 try
                 {
                     var response = await client.PostAsync(url, content);
                     string responseBody = await response.Content.ReadAsStringAsync();
 
-                    LogMessage($"CallCloudflareAI: Status code: {response.StatusCode}", true);
-                    LogMessage($"CallCloudflareAI: Response (first 500): {responseBody.Substring(0, Math.Min(500, responseBody.Length))}", true);
+                    AppLog.Info($"CallCloudflareAI: Status code: {response.StatusCode}");
+                    AppLog.Info($"CallCloudflareAI: Response (first 500): {responseBody.Substring(0, Math.Min(500, responseBody.Length))}");
 
                     if (response.IsSuccessStatusCode)
                     {
                         var result = JsonConvert.DeserializeObject<dynamic>(responseBody);
                         string aiResponse = result?.result?.response?.ToString();
-                        LogMessage($"CallCloudflareAI: AI response: {aiResponse?.Substring(0, Math.Min(300, aiResponse?.Length ?? 0))}", true);
+                        AppLog.Info($"CallCloudflareAI: AI response: {aiResponse?.Substring(0, Math.Min(300, aiResponse?.Length ?? 0))}");
                         return aiResponse ?? "";
                     }
                     else
@@ -5883,7 +5916,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogMessage($"CallCloudflareAI: Exception: {ex.Message}", true);
+                    AppLog.Info($"CallCloudflareAI: Exception: {ex.Message}");
                     return "";
                 }
             }
@@ -6039,7 +6072,7 @@ namespace UltraVideoEditor
                     return obj?.choices?[0]?.message?.content?.ToString()?.Trim() ?? "";
                 }
             }
-            catch (Exception ex) { LogMessage("GPT-4 Vision error: " + ex.Message, false); }
+            catch (Exception ex) { AppLog.Info("GPT-4 Vision error: " + ex.Message); }
             return "";
         }
 
@@ -6080,7 +6113,7 @@ namespace UltraVideoEditor
                     return obj?.result?.response?.Trim() ?? "";
                 }
             }
-            catch (Exception ex) { LogMessage("Cloudflare llava error: " + ex.Message, false); }
+            catch (Exception ex) { AppLog.Info("Cloudflare llava error: " + ex.Message); }
             return "";
         }
         private void SetImagePosition_Click(object sender, RoutedEventArgs e)
@@ -6113,7 +6146,7 @@ namespace UltraVideoEditor
                 }
                 else if (dlg.SelectedPosition >= 0)
                 {
-                    LogMessage($"DEBUG: Setting '{item.Name}' to position {dlg.SelectedPosition:F2}s, duration {dlg.SelectedDuration:F2}s", true);
+                    AppLog.Info($"DEBUG: Setting '{item.Name}' to position {dlg.SelectedPosition:F2}s, duration {dlg.SelectedDuration:F2}s");
 
                     item.FixedPosition = dlg.SelectedPosition;
                     item.Duration = dlg.SelectedDuration;
@@ -6339,7 +6372,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogMessage("Failed to scale timeline list view: " + ex.Message, false);
+                AppLog.Info("Failed to scale timeline list view: " + ex.Message);
             }
         }
 
@@ -6387,6 +6420,7 @@ namespace UltraVideoEditor
                     nativeListView.Columns.Add(L("listview_col_num"), 50, WinForms.HorizontalAlignment.Center);
                     nativeListView.Columns.Add(L("listview_col_name"), 350, WinForms.HorizontalAlignment.Left);
                     nativeListView.Columns.Add(L("listview_col_type"), 60, WinForms.HorizontalAlignment.Center);
+                    nativeListView.Columns.Add(L("listview_col_track"), 120, WinForms.HorizontalAlignment.Left);   // v2.0: which track
                     nativeListView.Columns.Add(L("listview_col_duration"), 80, WinForms.HorizontalAlignment.Center);
                     nativeListView.Columns.Add(L("listview_col_start"), 80, WinForms.HorizontalAlignment.Center);
                     nativeListView.Columns.Add(L("listview_col_end"), 80, WinForms.HorizontalAlignment.Center);
@@ -6430,7 +6464,7 @@ namespace UltraVideoEditor
                     nativeListView.ContextMenuStrip = contextMenu;
                     nativeListView.AccessibleName = L("acc_clip_list");
 
-                    LogMessage("Win32 ListView initialised - columns set", true);
+                    AppLog.Info("Win32 ListView initialised - columns set");
                     UpdateTimelineDisplay();
                 }
                 else
@@ -6551,6 +6585,14 @@ namespace UltraVideoEditor
                 e.Handled = true; e.SuppressKeyPress = true;
                 return;
             }
+            // v2.0: F1 keyboard shortcuts, Ctrl+F1 the manual, from the clip list too
+            if (e.KeyCode == WinForms.Keys.F1 && !e.Alt && !e.Shift)
+            {
+                if (e.Control) { if (!DuplicateKey("manual")) ShowUserManual_Click(null, null); }
+                else if (!DuplicateKey("help")) ShowHelp_Click(null, null);
+                e.Handled = true; e.SuppressKeyPress = true;
+                return;
+            }
             if (e.KeyCode == WinForms.Keys.F && e.Control && e.Shift && !e.Alt)
             {
                 if (!DuplicateKey("descframe")) DescribeFrameHere_Click(null, null);
@@ -6563,6 +6605,31 @@ namespace UltraVideoEditor
                 e.Handled = true; e.SuppressKeyPress = true;
                 return;
             }
+            // v2.0: the same new keys when the clip list has the focus
+            {
+                Key v2k = e.KeyCode switch
+                {
+                    WinForms.Keys.L => Key.L, WinForms.Keys.U => Key.U, WinForms.Keys.Delete => Key.Delete,
+                    WinForms.Keys.F4 => Key.F4, WinForms.Keys.OemOpenBrackets => Key.OemOpenBrackets,
+                    WinForms.Keys.OemCloseBrackets => Key.OemCloseBrackets,
+                    WinForms.Keys.E => Key.E, WinForms.Keys.T => Key.T, WinForms.Keys.Space => Key.Space, WinForms.Keys.M => Key.M,   // v2.0 second part
+                    WinForms.Keys.PageUp => Key.PageUp, WinForms.Keys.PageDown => Key.PageDown, WinForms.Keys.N => Key.N,   // v2.0 tracks
+                    WinForms.Keys.R => Key.R, WinForms.Keys.K => Key.K, WinForms.Keys.H => Key.H, WinForms.Keys.I => Key.I,
+                    WinForms.Keys.O => Key.O,   // v2.0 follow an object
+                    WinForms.Keys.V => Key.V,   // v2.0 track volume point (Ctrl+Alt+Shift+V)
+                    WinForms.Keys.C => Key.C,   // v2.0 colour here (Ctrl+Alt+C)
+                    WinForms.Keys.S => Key.S,   // v2.0 speed ramp (Ctrl+Alt+Shift+S)
+                    WinForms.Keys.G => Key.G,   // v2.0 compound clip (Ctrl+Alt+G, Ctrl+Alt+Shift+G)
+                    _ => Key.None
+                };
+                var v2m = (e.Control ? ModifierKeys.Control : 0) | (e.Alt ? ModifierKeys.Alt : 0) | (e.Shift ? ModifierKeys.Shift : 0);
+                if (v2k != Key.None && IsV2Key(v2k, v2m))
+                {
+                    if (!DuplicateKey("v2" + v2k + v2m)) HandleV2Key(v2k, v2m);
+                    e.Handled = true; e.SuppressKeyPress = true;
+                    return;
+                }
+            }
             if (noMods)
             {
                 Key wk = e.KeyCode switch
@@ -6574,6 +6641,8 @@ namespace UltraVideoEditor
                     WinForms.Keys.W => Key.W,
                     WinForms.Keys.Oemcomma => Key.OemComma,
                     WinForms.Keys.OemPeriod => Key.OemPeriod,
+                    >= WinForms.Keys.D1 and <= WinForms.Keys.D9 => Key.D1 + (e.KeyCode - WinForms.Keys.D1),   // v2.0: multicam
+                    >= WinForms.Keys.NumPad1 and <= WinForms.Keys.NumPad9 => Key.D1 + (e.KeyCode - WinForms.Keys.NumPad1),
                     _ => Key.None
                 };
                 if (wk != Key.None && HandleEditingKey(wk))
@@ -6626,7 +6695,7 @@ namespace UltraVideoEditor
         {
             if (nativeListView == null)
             {
-                LogMessage("UpdateNativeListView: nativeListView is null", true);
+                AppLog.Info("UpdateNativeListView: nativeListView is null");
                 return;
             }
 
@@ -6643,6 +6712,8 @@ namespace UltraVideoEditor
                 // v1.4: positions are computed for ALL tracks first (independently of the
                 // track filter), so Start/End no longer change just because a filter is on.
                 RecalculatePositions();
+                TrackSet.Sync(timelineItems);   // v2.0: a track that holds a clip always exists
+                RebuildTrackCombo();
 
                 var filteredItems = currentTrackFilter == -1
                     ? timelineItems
@@ -6656,6 +6727,7 @@ namespace UltraVideoEditor
                     var listItem = new WinForms.ListViewItem(item.Index.ToString());
                     listItem.SubItems.Add(item.Name);
                     listItem.SubItems.Add(item.TypeIcon);
+                    listItem.SubItems.Add(TrackSet.Name(item.TrackIndex) + (TrackSet.IsLocked(item.TrackIndex) ? " 🔒" : ""));   // v2.0
                     listItem.SubItems.Add(TimeSpan.FromSeconds(item.Duration).ToString(@"mm\:ss"));
                     listItem.SubItems.Add(TimeSpan.FromSeconds(item.Start).ToString(@"mm\:ss"));
                     listItem.SubItems.Add(TimeSpan.FromSeconds(item.End).ToString(@"mm\:ss"));
@@ -6690,8 +6762,8 @@ namespace UltraVideoEditor
                 if (txtTimelineInfo != null)
                 {
                     string infoText = filteredItems.Count > 0
-                        ? $"Total clips: {filteredItems.Count} | Total duration: {FormatTime(GetTotalDuration())} | Zoom: {zoomLevel:F1}x"
-                        : "No clips on the timeline.";
+                        ? LF("lx_timeline_info", filteredItems.Count, FormatTime(GetTotalDuration()), zoomLevel)
+                        : L("lx_timeline_empty");
                     txtTimelineInfo.Text = infoText;
                     // Help screen readers to read the updated status
                     AutomationProperties.SetName(txtTimelineInfo, infoText);
@@ -6708,6 +6780,7 @@ namespace UltraVideoEditor
 
         private void PlaySelectedItem(TimelineItem item, double startInClip = 0, bool startPaused = false)
         {
+            StopLive(announce: false);   // v2.0: a single clip replaces the live timeline
             if (item == null || !File.Exists(item.Path)) return;
 
             try
@@ -6715,7 +6788,8 @@ namespace UltraVideoEditor
                 if (_mediaPlayer.IsPlaying) _mediaPlayer.Stop();
                 StopMixPreviewMode();   // v1.4 (R3): a single clip replaces the montage mix
                 var oldMedia = _currentMedia;
-                _currentMedia = new Media(_libVLC, item.Path);
+                // v2.0: a small preview copy of a 4K clip when "Use preview copies" is on
+                _currentMedia = new Media(_libVLC, ProxyManager.PathFor(item.Path));
                 // v1.4: start where this clip really begins in its file (cut parts, highlights)
                 // and stop where it ends, so the preview matches the render.
                 double from = Math.Max(0, item.SourceOffset + Math.Max(0, startInClip));
@@ -7368,7 +7442,7 @@ namespace UltraVideoEditor
                 return;
             }
 
-            var dialog = new TextOverlayDialog($"Add text to: {item.Name}", null, styleOptions: true);
+            var dialog = new TextOverlayDialog(LF("lx_add_text_to", item.Name), null, styleOptions: true);
             if (dialog.ShowDialog() == true)
             {
                 item.TextOverlay = new TextOverlayData
@@ -7580,7 +7654,7 @@ namespace UltraVideoEditor
             {
                 System.Windows.MessageBox.Show(
                     L("no_render_for_export"),
-                    "Export", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    LanguageManager.T("lx_export_f3e4f"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -7597,14 +7671,14 @@ namespace UltraVideoEditor
                     new System.Threading.CancellationToken());
 
                 string nl = Environment.NewLine;
-                string msg = "Export complete!" + nl + nl;
-                msg += "Original (16:9): " + System.IO.Path.GetFileName(finalVideo) + nl;
-                if (results.HasShorts) msg += "Shorts/TikTok (9:16): " + System.IO.Path.GetFileName(results.Shorts) + nl;
-                if (results.HasSquare) msg += "Instagram (1:1): " + System.IO.Path.GetFileName(results.Square) + nl;
-                msg += nl + "All files are in: " + dir;
+                string msg = L("lx_multi_done") + nl + nl;
+                msg += LF("lx_multi_original", System.IO.Path.GetFileName(finalVideo)) + nl;
+                if (results.HasShorts) msg += LF("lx_multi_shorts", System.IO.Path.GetFileName(results.Shorts)) + nl;
+                if (results.HasSquare) msg += LF("lx_multi_square", System.IO.Path.GetFileName(results.Square)) + nl;
+                msg += nl + LF("lx_multi_folder", dir);
 
                 LogMessage(L("export_done"), true);
-                System.Windows.MessageBox.Show(msg, "Export", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(msg, LanguageManager.T("lx_export_f3e4f"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {

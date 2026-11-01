@@ -77,17 +77,48 @@ namespace UltraVideoEditor
             // DODATO ZA WINDOWS MEDIA PLAYER: -pix_fmt yuv420p -profile:v high -level 4.1
             // v1.4: the quality chosen in Export options is used (it was ignored)
             string quality = exportSettings?.Quality ?? "Medium";
-            int crf = quality == "High" ? 18 : quality == "Low" ? 28 : 23;
-            string x264Preset = quality == "High" ? "medium" : "veryfast";
+            // v2.0: "Maximum" — near-lossless intermediates for archive / ProRes / further editing
+            int crf = quality == "Maximum" ? 14 : quality == "High" ? 18 : quality == "Low" ? 28 : 23;
+            string x264Preset = quality == "Maximum" ? "slow" : quality == "High" ? "medium" : "veryfast";
+            string nvPreset = quality == "Maximum" ? "p6" : quality == "High" ? "p4" : "p2";
             string vEncArgs = nvencAvailable
-                ? $"-c:v h264_nvenc -preset p2 -rc vbr -cq {crf} -b:v 0 -profile:v high -level 4.1"
-                : $"-c:v libx264 -preset {x264Preset} -crf {crf} -profile:v high -level 4.1";
+                ? $"-c:v h264_nvenc -preset {nvPreset} -rc vbr -cq {crf} -b:v 0 -profile:v high -level 5.1"
+                : $"-c:v libx264 -preset {x264Preset} -crf {crf} -profile:v high -level 5.1";
             string pixFmt = "-pix_fmt yuv420p";
+            _xfEnc = $"-c:v libx264 -preset {(quality == "Maximum" ? "medium" : "veryfast")} -crf {Math.Min(22, crf)} -profile:v high -level 5.1 -pix_fmt yuv420p";
 
-            const string TARGET_FPS = "30"; // ISKRA PATCH: uniformni 30fps (Pravilo 2)
+            // v2.0: clips on the layer tracks (Video 2 …) are not part of the main picture —
+            // they are drawn on top of it at the very end (LayerCompositor). Only when there is
+            // no main picture at all are they rendered as the main track, as before.
+            // v2.0: a hidden layer track is switched off — its picture and its clips' own sound
+            items = items.Where(i => !TrackSet.IsHidden(i.TrackIndex)).ToList();
+            var layerItems = items.Where(IsLayerClip).ToList();
+            if (layerItems.Count > 0 && items.Any(i => !layerItems.Contains(i) && !(i.Type == "Audio" || i.IsAudio)))
+                items = items.Where(i => !layerItems.Contains(i)).ToList();
+            else
+                layerItems.Clear();
+
+            // v2.0: the frame rate follows the source video (or the one chosen in Export options);
+            // it was always 30 fps. AI music videos keep 30.
+            string TARGET_FPS = await ResolveFrameRateAsync(exportSettings, items, cancellationToken);
+            _fps = TARGET_FPS;
+            RenderEngineBeatLock.TargetFps = TARGET_FPS;
+            // v2.0: H.264 level 5.1 allows 4K only up to 30 fps; NVENC refuses to start above it.
+            // 5.2 covers 4K at 60 fps; above 60 fps the encoder chooses the level itself.
+            double fpsValue = LayerCompositor.ParseRate(TARGET_FPS);
+            if (fpsValue > 60.5)
+            {
+                vEncArgs = vEncArgs.Replace(" -level 5.1", "");
+                _xfEnc = _xfEnc.Replace(" -level 5.1", "");
+            }
+            else if (fpsValue > 30.5)
+            {
+                vEncArgs = vEncArgs.Replace("-level 5.1", "-level 5.2");
+                _xfEnc = _xfEnc.Replace("-level 5.1", "-level 5.2");
+            }
             const string VSYNC_CFR = "-fps_mode cfr";
             string fpsSuffix = $",fps={TARGET_FPS}";
-            LogToMainWindow($"RenderEngine: Enkoder: {(nvencAvailable ? "h264_nvenc (GPU)" : "libx264 (CPU)")} | FastRender={fastRender} | FPS={TARGET_FPS} CFR");
+            LogToMainWindow(LanguageManager.F("lx_render_encoder_fast_render_fps_98c8e", (nvencAvailable ? "h264_nvenc (GPU)" : "libx264 (CPU)"), fastRender, TARGET_FPS));
             vEncArgs_cached = vEncArgs;
 
             if (!File.Exists(_ffmpegPath))
@@ -98,15 +129,15 @@ namespace UltraVideoEditor
 
             var sortedItems = items.OrderBy(i => i.Start).ToList();
 
-            LogToMainWindow($"RenderEngine: Total clips before filtering: {sortedItems.Count}");
+            LogToMainWindow(LanguageManager.F("lx_render_clips_before_sorting_out_352b7", sortedItems.Count));
 
             foreach (var item in sortedItems)
             {
-                LogToMainWindow($"  Clip: Type={item.Type}, Name={item.Name}, Path={(string.IsNullOrEmpty(item.Path) ? "EMPTY" : item.Path)}");
+                LogToMainWindow(LanguageManager.F("lx_clip_type_name_file_441d6", item.Type, item.Name, (string.IsNullOrEmpty(item.Path) ? LanguageManager.T("lx_no_file") : item.Path)));
             }
 
             var allImageItems = sortedItems.Where(i => i.Type == "Image" || (i.IsImage && !i.IsAudio)).ToList();
-            LogToMainWindow($"RenderEngine: Total Image clips: {allImageItems.Count}");
+            LogToMainWindow(LanguageManager.F("lx_render_picture_clips_in_total_db36e", allImageItems.Count));
 
             var images = allImageItems.Where(i =>
                 !string.IsNullOrEmpty(i.Path) &&
@@ -128,15 +159,15 @@ namespace UltraVideoEditor
             var videos = sortedItems.Where(i => i.Type == "Video" || i.IsVideo).ToList();
 
             LogToMainWindow(LF("re_found_media", images.Count, textImages.Count, videos.Count));
-            LogToMainWindow($"RenderEngine: Selected resolution: {resolution}");
-            LogToMainWindow($"RenderEngine: Sorted {sortedItems.Count} clips along the timeline");
+            LogToMainWindow(LanguageManager.F("lx_render_resolution_4510b", resolution));
+            LogToMainWindow(LanguageManager.F("lx_render_clips_put_in_timeline_da7fd", sortedItems.Count));
 
             if (images.Count == 0 && videos.Count == 0 && textImages.Count == 0)
                 throw new Exception("No images, text or video to render");
 
             string tempDir = Path.Combine(Path.GetTempPath(), "UVE_Render_") + Guid.NewGuid().ToString().Substring(0, 8);
             Directory.CreateDirectory(tempDir);
-            LogToMainWindow($"RenderEngine: Temp folder: {tempDir}");
+            LogToMainWindow(LanguageManager.F("lx_render_temporary_folder_8fbe1", tempDir));
 
             string[] res = resolution.Split('x');
             int targetWidth = int.Parse(res[0]);
@@ -196,7 +227,7 @@ namespace UltraVideoEditor
                     // everything after it later in time.
                     if (skipOverlapping.Contains(item))
                     {
-                        LogToMainWindow($"⚠️ '{item.Name}' starts at the same time as another clip — skipped in render");
+                        LogToMainWindow(LanguageManager.F("lx_starts_at_the_same_time_88a28", item.Name));
                         continue;
                     }
 
@@ -213,7 +244,7 @@ namespace UltraVideoEditor
                         ? slotDur : item.Duration;
                     effectiveDuration = Math.Max(0.2, effectiveDuration);
                     if (Math.Abs(effectiveDuration - item.Duration) > 0.05)
-                        LogToMainWindow($"⏱ '{(item.Name ?? "").Substring(0, Math.Min(30, (item.Name ?? "").Length))}': {item.Duration:F2}s → {effectiveDuration:F2}s (until next clip on the timeline)");
+                        LogToMainWindow(LanguageManager.F("lx_f_s_f_s_until_4fcef", (item.Name ?? "").Substring(0, Math.Min(30, (item.Name ?? "").Length)), item.Duration, effectiveDuration));
                     // Where in the source file the clip begins (cut parts, highlights)
                     string sourceSeekArg = item.SourceOffset > 0.01
                         ? $"-ss {item.SourceOffset.ToString("F3", CultureInfo.InvariantCulture)} "
@@ -223,7 +254,7 @@ namespace UltraVideoEditor
 
                     if (isTextItem)
                     {
-                        LogToMainWindow($"RenderEngine: Text layer '{item.Name}' (Start={item.Start:F1}s, duration: {item.Duration:F2}s)");
+                        LogToMainWindow(LanguageManager.F("lx_render_text_layer_start_f_5af36", item.Name, item.Start, item.Duration));
 
                         bool isOdjavniTekst = item.Name.StartsWith("Outro text");
 
@@ -470,7 +501,7 @@ namespace UltraVideoEditor
 
                         bool needsSlowMoFix = audioDesc2.Contains("slowmo=1");
                         string fpsNormalize = needsSlowMoFix
-                            ? ",minterpolate=fps=25:mi_mode=mci:mc_mode=aobmc:me=hexbs:vsbmc=1"
+                            ? $",minterpolate=fps={TARGET_FPS}:mi_mode=mci:mc_mode=aobmc:me=hexbs:vsbmc=1"
                             : "";
 
                         // ── GLOBALNA COLOR NORMALIZACIJA ─────────────────────────────────────
@@ -631,6 +662,33 @@ namespace UltraVideoEditor
                             : "";
                         // at 2x speed, twice as much of the source fills the same slot
                         string inputDurStr = (effectiveDuration * clipSpeed).ToString("0.###", CultureInfo.InvariantCulture);
+                        if (SpeedRamp.Has(item))
+                        {
+                            // v2.0: a speed ramp — the exact inverse of the speed curve for every frame
+                            var sp = item.VideoEffect.SpeedPoints;
+                            clipSpeed = SpeedRamp.Average(item);
+                            speedVf = $"setpts='({SpeedRamp.InverseExpr(sp, effectiveDuration, 0, 0)})/TB',";
+                            inputDurStr = (SpeedRamp.SourceAt(sp, effectiveDuration, effectiveDuration) + 0.1).ToString("0.###", CultureInfo.InvariantCulture);
+                        }
+
+                        // v2.0: smooth slow motion — new frames are calculated between the real ones
+                        if (clipSpeed < 0.999 && item.VideoEffect?.SmoothSlowMotion == true && !PreviewMode)
+                            speedVf += $"minterpolate=fps={TARGET_FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,";
+
+                        // v2.0: stabilisation — pass 1 measures the shake, pass 2 (in the clip's
+                        // filter below) steadies the picture. If pass 1 fails the clip is used as it is.
+                        if (item.VideoEffect?.Stabilize == true)
+                        {
+                            string trf = Path.ChangeExtension(tempVideo, ".trf");
+                            int shaky = (int)Math.Clamp(Math.Round(item.VideoEffect.StabilizeStrength), 1, 10);
+                            LogToMainWindow(LF("re_stabilizing", item.Name ?? Path.GetFileName(item.Path)));
+                            string detectArgs = $"-nostdin {sourceSeekArg}-t {inputDurStr} -i \"{item.Path}\" " +
+                                                $"-vf \"vidstabdetect=shakiness={shaky}:accuracy=15:result='{EscapeFilterPath(trf)}'\" -an -f null -";
+                            if (await RunFFmpegAsync(detectArgs, cancellationToken) && File.Exists(trf))
+                                speedVf = $"vidstabtransform=input='{EscapeFilterPath(trf)}':smoothing={8 + shaky * 3}:zoom=0:optzoom=1:interpol=bicubic," + speedVf;
+                            else
+                                LogToMainWindow(LF("re_stabilize_failed", item.Name ?? Path.GetFileName(item.Path)));
+                        }
 
                         bool isZoompan = videoVf.Contains("zoompan");
                         string argsVid;
@@ -661,6 +719,16 @@ namespace UltraVideoEditor
                             argsVid = $"-nostdin -stream_loop -1 {sourceSeekArg}-t {inputDurStr} -i \"{item.Path}\" -vf \"{speedVf}{normVf},{videoVf}{loopFadeIn}{loopFadeOut}\" -t {durationStr} {vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{tempVideo}\"";
                         }
 
+                        // v2.0: an .mp4/.mov that holds only sound (no picture) used to stop the
+                        // whole render ("Output file does not contain any stream"). Its slot is now
+                        // a black picture; its sound is used as usual.
+                        if (!await HasPictureAsync(item.Path, cancellationToken))
+                        {
+                            LogToMainWindow(LF("re_no_picture", item.Name ?? Path.GetFileName(item.Path)));
+                            argsVid = $"-nostdin -f lavfi -i color=c=black:s={targetWidth}x{targetHeight}:r={TARGET_FPS}:d={durationStr} " +
+                                      $"-t {durationStr} {vEncArgs} {VSYNC_CFR} {pixFmt} -an -y \"{tempVideo}\"";
+                        }
+
                         success = await RunFFmpegAsync(argsVid, cancellationToken);
                     }
                     else
@@ -675,62 +743,13 @@ namespace UltraVideoEditor
                         // ── Pacing-aware fade: fast→0.25s, slow→0.70s, standard→0.50s ──
                         // FIX-FADE: increased to 0.50s for standard (Gemini: min 0.5s for fluidity)
                         // fast ostaje kratak da ne ubije energiju refrena
-                        string pacingTag = ExtractTag(item.AudioDescription ?? "", "pacing");
-                        double clipFade = pacingTag switch
-                        {
-                            "fast" => 0.25,
-                            "slow" => 0.70,
-                            _      => 0.50
-                        };
-                        // v1.4: a transition the user picked for this clip wins (Transitions tab)
-                        if (item.TransitionOutDuration > 0.05)
-                            clipFade = Math.Min(item.TransitionOutDuration, Math.Max(0.1, effectiveDuration - 0.1));
+                        // v2.0: the same rules as live playback (TransitionAfter)
+                        int prevIdx = videoFiles.Count - 2;   // the clip rendered before this one
+                        var prevItem = prevIdx >= 0
+                            ? sortedItems.Where(si => itemToFile.ContainsKey(si)).Skip(prevIdx).Take(1).FirstOrDefault()
+                            : null;
+                        var (xfadeType, clipFade) = TransitionAfter(item, prevItem, effectiveDuration);
                         fadeDurations.Add(clipFade);
-
-                        // Izvuci xfade tip iz AudioDescription (setovan od AIVideoCreator.AddCrossfadeWithEnergy)
-                        string xfadeType = !string.IsNullOrEmpty(item.TransitionOut)
-                            ? item.TransitionOut
-                            : ExtractTag(item.AudioDescription ?? "", "xfade");
-
-                        // FIX-BRIGHTNESS-TRANSITION: odaberi tip tranzicije na osnovu razlike u svjetlini
-                        // Gemini preporuka: svjetlo→tamno = crossfade (blagi), tamno→tamno = hard cut (brzi fade)
-                        // Dobivamo brightness iz anchor_brightness taga
-                        if (string.IsNullOrEmpty(xfadeType) || xfadeType == "fade")
-                        {
-                            double clipBrightness   = 0;
-                            double prevBrightness   = 0;
-                            var bMatch = System.Text.RegularExpressions.Regex.Match(
-                                item.AudioDescription ?? "", @"anchor_brightness=([\d.]+)");
-                            if (bMatch.Success && double.TryParse(bMatch.Groups[1].Value,
-                                System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out double bv))
-                                clipBrightness = bv;
-
-                            int prevIdx = videoFiles.Count - 1; // index of previous added clip
-                            if (prevIdx >= 0 && prevIdx < sortedItems.Count)
-                            {
-                                var prevItemDesc = sortedItems
-                                    .Where(si => itemToFile.ContainsKey(si))
-                                    .Skip(prevIdx).Take(1).FirstOrDefault()?.AudioDescription ?? "";
-                                var pbMatch = System.Text.RegularExpressions.Regex.Match(
-                                    prevItemDesc, @"anchor_brightness=([\d.]+)");
-                                if (pbMatch.Success && double.TryParse(pbMatch.Groups[1].Value,
-                                    System.Globalization.NumberStyles.Float,
-                                    System.Globalization.CultureInfo.InvariantCulture, out double pb))
-                                    prevBrightness = pb;
-                            }
-
-                            double brightnessDelta = Math.Abs(clipBrightness - prevBrightness);
-                            // FIX-DISSOLVE: dissolve causes "bleeding" (ghosting) of previous scene elements.
-                            // Gemini @ 01:06: beach silhouettes visible over grass = dissolve at similar brightness.
-                            // Threshold lowered to 0.03 — practically only identical frames (e.g. same ambient).
-                            // Everything else goes as a clean fade without ghosting.
-                            xfadeType = brightnessDelta < 0.03 ? "dissolve" : "fade";
-                        }
-
-                        // v1.4: an unknown name (e.g. the old "zoom") made the whole one-pass
-                        // crossfade fail and fall back to hard cuts — only pass valid xfade names.
-                        if (!ValidXfadeNames.Contains(xfadeType ?? "")) xfadeType = "fade";
                         transitionTypes.Add(xfadeType);
                     }
 
@@ -781,14 +800,14 @@ namespace UltraVideoEditor
                 var ownSoundClips = new List<TimelineItem>();
                 foreach (var v in sortedItems.Where(i => (i.Type == "Video" || i.IsVideo) && !i.IsImage &&
                                                          !IsAiCreatorClip(i) && i.Volume > 0 &&
-                                                         Math.Abs((i.VideoEffect?.Speed ?? 1.0) - 1.0) < 0.001 &&
+                                                         Math.Abs((i.VideoEffect?.Speed ?? 1.0) - 1.0) < 0.001 && !SpeedRamp.Has(i) &&
                                                          !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path)))
                 {
                     if (await ExportHelpers.HasAudioAsync(v.Path, cancellationToken))
                         ownSoundClips.Add(v);
                 }
                 if (ownSoundClips.Count > 0)
-                    LogToMainWindow($"🔈 Keeping the original sound of {ownSoundClips.Count} video clip(s)");
+                    LogToMainWindow(LanguageManager.F("lx_keeping_the_original_sound_of_049a8", ownSoundClips.Count));
 
                 // No music track, but the clips have their own sound: a silent base track the
                 // length of the timeline carries them.
@@ -857,11 +876,11 @@ namespace UltraVideoEditor
                         }
 
                         double deficit = audioDurForSync - effectiveVideoDur;
-                        LogToMainWindow($"[IskraSync] Audio={audioDurForSync:F3}s (ss={audioSsOffset:F2}s) | VideoSum={totalVidDur:F3}s | TimelineSpan={timelineSpan:F2}s | XfadeOverlap={crossfadeOverlap:F2}s | EffectiveVideo={effectiveVideoDur:F3}s | Deficit={deficit:F3}s");
+                        LogToMainWindow(LanguageManager.F("lx_length_check_sound_f_s_81c44", audioDurForSync, audioSsOffset, totalVidDur, timelineSpan, crossfadeOverlap, effectiveVideoDur, deficit));
 
                         // FIX 6: Upozorenje kad timeline prelazi audio trajanje
                         if (timelineSpan > audioDurForSync + 2.0)
-                            LogToMainWindow($"[IskraSync] ⚠ Timeline ({timelineSpan:F1}s) exceeds audio ({audioDurForSync:F1}s) by {timelineSpan - audioDurForSync:F1}s — outro segments will be trimmed by -shortest");
+                            LogToMainWindow(LanguageManager.F("lx_length_check_the_timeline_f_6b405", timelineSpan, audioDurForSync, timelineSpan - audioDurForSync));
 
                         if (deficit > 0.15 && videoFiles.Count > 0)
                         {
@@ -881,7 +900,7 @@ namespace UltraVideoEditor
 
                             // FIX 3: Ukupni kapacitet poola bez ponavljanja
                             double poolTotalCapacity = outroPoolDurs.Sum();
-                            LogToMainWindow($"[IskraSync] SmartOutroPool: {outroPool.Count} clips, capacity={poolTotalCapacity:F1}s, deficit={deficit:F2}s");
+                            LogToMainWindow(LanguageManager.F("lx_length_check_clips_to_fill_bdf49", outroPool.Count, poolTotalCapacity, deficit));
 
                             // FIX 5: Buffer +0.5s (umjesto +1.0s) — preciznije poklapanje s xfade-om
                             double remaining    = deficit + 0.5;
@@ -923,7 +942,7 @@ namespace UltraVideoEditor
                                     double actualSeg = await GetVideoDuration(outroSegPath, cancellationToken);
                                     remaining -= actualSeg;
                                     anySegOk = true;
-                                    LogToMainWindow($"[IskraSync] ✅ Outro seg {outroSegIdx}: {actualSeg:F2}s (pool[{poolIdx - 1}]), ostalo={remaining:F2}s");
+                                    LogToMainWindow(LanguageManager.F("lx_length_check_ending_part_f_6d722", outroSegIdx, actualSeg, poolIdx - 1, remaining));
                                 }
                                 else
                                 {
@@ -945,16 +964,16 @@ namespace UltraVideoEditor
                             }
 
                             if (anySegOk)
-                                LogToMainWindow($"[IskraSync] ✅ SmartOutroPool complete: {videoFiles.Count} clips total, remaining={remaining:F2}s");
+                                LogToMainWindow(LanguageManager.F("lx_length_check_the_end_is_c8acb", videoFiles.Count, remaining));
                             else
-                                LogToMainWindow($"[IskraSync] ⚠ SmartOutroPool failed — video may be shorter than audio");
+                                LogToMainWindow(LanguageManager.T("lx_length_check_filling_the_end_a10db"));
 
                             if (remaining > 1.0)
-                                LogToMainWindow($"[IskraSync] ℹ Pool exhausted ({outroPool.Count} clips), {remaining:F1}s deficit remains — -shortest will cover it");
+                                LogToMainWindow(LanguageManager.F("lx_length_check_all_clips_used_06fcd", outroPool.Count, remaining));
                         }
                         else if (deficit <= 0)
                         {
-                            LogToMainWindow($"[IskraSync] ✅ Duration OK (video longer than audio by {-deficit:F2}s — -shortest will trim)");
+                            LogToMainWindow(LanguageManager.F("lx_length_check_the_length_is_8fcc1", -deficit));
                         }
                     }
                 }
@@ -979,10 +998,10 @@ namespace UltraVideoEditor
                     crossfadedVideo = await ApplyCrossfadeSinglePass(
                         videoFiles, tempDir, fadeDurations, CROSSFADE_DURATION, cancellationToken, transitionTypes);
                     if (crossfadedVideo != null)
-                        LogToMainWindow($"✨ Cross-dissolve: {videoFiles.Count} clips, avg fade {avgFade}s (pacing-aware)");
+                        LogToMainWindow(LanguageManager.F("lx_crossfades_clips_s_on_average_3f7f7", videoFiles.Count, avgFade));
                     else
                     {
-                        LogToMainWindow("⚠️ Cross-dissolve failed — using pairwise");
+                        LogToMainWindow(LanguageManager.T("lx_the_crossfades_failed_they_are_3ab89"));
                         if (videoFiles.Count <= 24)
                             crossfadedVideo = await ApplyCrossfadePairwise(
                                 videoFiles, tempDir, fadeDurations, CROSSFADE_DURATION, cancellationToken);
@@ -1010,20 +1029,24 @@ namespace UltraVideoEditor
                     // speech") and the clip's audio effects (bass, treble, reverb, compressor)
                     bool mainCurve = AudioAutomation.HasCurve(audio);
                     bool mainVolChanged = Math.Abs(mainVol - 1.0) > 0.005 || mainCurve;
-                    string mainFx = AudioEffects.GetFFmpegFilter(audio.AudioFx);
-                    if (mainAudioDelay > 0.01 || mainAudioIn > 0.01 || mainVolChanged || mainFx.Length > 0)
+                    string mainFx = AudioEffects.GetFFmpegFilter(audio.AudioFx, audio.Duration);
+                    string mainTrack = TrackMixer.Filter(audio.TrackIndex);   // v2.0: the track mixer
+                    if (mainAudioDelay > 0.01 || mainAudioIn > 0.01 || mainVolChanged || mainFx.Length > 0 || mainTrack.Length > 0)
                     {
                         string placedAudio = Path.Combine(tempDir, "audio_placed.wav");
                         long delayMsMain = (long)Math.Round(mainAudioDelay * 1000);
                         string inArg = mainAudioIn > 0.01 ? $"-ss {mainAudioIn.ToString("F3", CultureInfo.InvariantCulture)} " : "";
-                        string mainChain = $"adelay={delayMsMain}:all=1" +
-                                           (mainFx.Length > 0 ? "," + mainFx : "") +
-                                           (mainVolChanged ? "," + AudioAutomation.VolumeFilter(audio, mainAudioDelay) : "");
+                        // v2.0: the effects (fades included) work on the clip itself, before it is
+                        // moved to its place on the timeline
+                        string mainChain = (mainFx.Length > 0 ? mainFx + "," : "") +
+                                           $"adelay={delayMsMain}:all=1" +
+                                           (mainVolChanged ? "," + AudioAutomation.VolumeFilter(audio, mainAudioDelay) : "") +
+                                           (mainTrack.Length > 0 ? "," + mainTrack : "");
                         string placeArgs = $"-nostdin {inArg}-i \"{tempAudioPath}\" -af \"{mainChain}\" -c:a pcm_f32le -y \"{placedAudio}\"";
                         if (await RunFFmpegAsync(placeArgs, cancellationToken) && File.Exists(placedAudio) && new FileInfo(placedAudio).Length > 1000)
                         {
                             tempAudioPath = placedAudio;
-                            LogToMainWindow($"🎵 Music placed at {mainAudioDelay:F2}s on the timeline" + (mainAudioIn > 0.01 ? $" (from {mainAudioIn:F2}s in the file)" : ""));
+                            LogToMainWindow(LanguageManager.F("lx_music_placed_at_f_s_49ff8", mainAudioDelay, (mainAudioIn > 0.01 ? LanguageManager.F("lx_music_from_in_file", mainAudioIn) : "")));
                         }
                     }
 
@@ -1108,13 +1131,13 @@ namespace UltraVideoEditor
                             if (await RunFFmpegAsync(padArgs, cancellationToken) && File.Exists(padded))
                             {
                                 crossfadedVideo = padded;
-                                LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → last picture held for {missing:F1}s so the whole song is kept");
+                                LogToMainWindow(LanguageManager.F("lx_length_the_video_f_s_9c446", crossfadedDur, audioDurForSync, missing));
                             }
                             else
                             {
                                 string tVal = crossfadedDur.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
                                 shortestArg = $"-t {tVal} ";
-                                LogToMainWindow($"[DurationFix] Video={crossfadedDur:F1}s < Audio={audioDurForSync:F1}s → -t {tVal}");
+                                LogToMainWindow(LanguageManager.F("lx_length_the_video_f_s_255d0", crossfadedDur, audioDurForSync, tVal));
                             }
                             AnnounceShortVideo(crossfadedDur, audioDurForSync);
                         }
@@ -1231,15 +1254,26 @@ namespace UltraVideoEditor
                             string postInputs = useMaster
                                 ? "-nostdin -i \"" + finalOutput + "\" -i \"" + masterAudio + "\" -map 0:v -map 1:a -t " + finalDurStr + " "
                                 : "-nostdin -i \"" + finalOutput + "\" ";
-                            string BuildPostArgs(string subtitleFilters) =>
-                                postInputs +
-                                "-vf \"" + fadeInFilter + "," +
-                                "fade=t=out:st=" + fadeStartStr + ":d=" + fadeOutDurStr + "," +
-                                "colorchannelmixer=rr=1:rb=-0.02:gr=0:gg=1:gb=-0.02:br=-0.03:bg=-0.03:bb=1.06" +
-                                subtitleFilters + "\" " +
-                                "-af \"afade=t=in:st=0:d=0.8,afade=t=out:st=" + fadeStartStr + ":d=" + fadeOutDurStr +
-                                ",alimiter=limit=0.98:attack=5:release=60:level=disabled\" " +
-                                $"{encArgsPost} -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -y \"{postOutput}\"";
+                            // v2.0: the fade at the start and end and the warm colour are options now
+                            // (Export options). They were forced on every video — right for the AI
+                            // children's songs, wrong for someone's own footage.
+                            bool doFades = exportSettings?.FadeInOut ?? true;
+                            bool doWarm = exportSettings?.WarmLook ?? sortedItems.Any(IsAiCreatorClip);
+                            string BuildPostArgs(string subtitleFilters)
+                            {
+                                var vf = new List<string>();
+                                if (doFades) { vf.Add(fadeInFilter); vf.Add("fade=t=out:st=" + fadeStartStr + ":d=" + fadeOutDurStr); }
+                                if (doWarm) vf.Add("colorchannelmixer=rr=1:rb=-0.02:gr=0:gg=1:gb=-0.02:br=-0.03:bg=-0.03:bb=1.06");
+                                string vfStr = string.Join(",", vf) + (vf.Count == 0 ? (subtitleFilters ?? "").TrimStart(',') : subtitleFilters);
+                                string videoPart = vfStr.Length > 0
+                                    ? "-vf \"" + vfStr + "\" " + encArgsPost + " -pix_fmt yuv420p "
+                                    : "-c:v copy ";
+                                string af = (doFades
+                                    ? "afade=t=in:st=0:d=0.8,afade=t=out:st=" + fadeStartStr + ":d=" + fadeOutDurStr + ","
+                                    : "") + "alimiter=limit=0.98:attack=5:release=60:level=disabled";
+                                return postInputs + videoPart + "-af \"" + af + "\" " +
+                                       $"-c:a aac -b:a 256k -ar 48000 -y \"{postOutput}\"";
+                            }
 
                             bool postOk = false;
                             if (karaokeAssPath != null)
@@ -1248,10 +1282,10 @@ namespace UltraVideoEditor
                                 postOk = await RunFFmpegAsync(BuildPostArgs(BuildDrawtext(skipKaraokeLines: true) + assFilter), cancellationToken)
                                          && File.Exists(postOutput) && new FileInfo(postOutput).Length > 100_000;
                                 if (postOk)
-                                    LogToMainWindow("🎤 Karaoke subtitles rendered (each word lights up as it is sung)");
+                                    LogToMainWindow(LanguageManager.T("lx_karaoke_subtitles_drawn_every_word_2a6bf"));
                                 else
                                 {
-                                    LogToMainWindow("⚠️ Karaoke subtitles failed — rendering plain subtitles instead");
+                                    LogToMainWindow(LanguageManager.T("lx_karaoke_subtitles_failed_plain_subtitles_9fc50"));
                                     try { if (File.Exists(postOutput)) File.Delete(postOutput); } catch { }
                                 }
                             }
@@ -1265,6 +1299,25 @@ namespace UltraVideoEditor
                         }
                     }
                     catch (Exception exPost) { LogSwallowedError("Post-processing file swap", exPost); }
+
+                    // v2.0: layers (Video 2 …), keyframe animation and colour LUTs, drawn over the
+                    // finished picture in one last pass
+                    try
+                    {
+                        var layerClips = layerItems.Select(ToComposite).ToList();
+                        var mainComposite = sortedItems.Where(i => !(i.Type == "Audio" || i.IsAudio)).Select(ToComposite).ToList();
+                        if (LayerCompositor.IsNeeded(layerClips, mainComposite))
+                        {
+                            progress?.Report(97);
+                            var compositor = new LayerCompositor(AppPaths.FFprobe, RunFFmpegAsync, LogToMainWindow);
+                            LayerCompositor.FontSpec = DtFont;
+                            if (await compositor.ApplyAsync(finalOutput, layerClips, mainComposite, _xfW, _xfH, TARGET_FPS,
+                                                            vEncArgs_cached ?? vEncArgs, cancellationToken))
+                                LogToMainWindow(LanguageManager.F("lx_layers_drawn_layer_clip_s_12517", layerClips.Count));
+                        }
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception exLayers) { LogSwallowedError("Drawing the layers", exLayers); }
                 }
 
                 progress?.Report(100);
@@ -1530,7 +1583,7 @@ namespace UltraVideoEditor
 
                         double trimEnd = clip.Start + clipDur;
                         // v1.4 (R5): the clip's audio effects and its volume curve (t = timeline time here)
-                        string clipFx = AudioEffects.GetFFmpegFilter(clip.AudioFx);
+                        string clipFx = AudioEffects.GetFFmpegFilter(clip.AudioFx, clip.Duration);
                         string clipVol = AudioAutomation.HasCurve(clip)
                             ? AudioAutomation.VolumeFilter(clip, clip.Start)
                             : $"volume={vol.ToString("F2", CultureInfo.InvariantCulture)}";
@@ -1540,6 +1593,7 @@ namespace UltraVideoEditor
                             $"adelay={delayMs}|{delayMs}," +
                             $"atrim=end={trimEnd.ToString("F3", CultureInfo.InvariantCulture)}," +
                             clipVol +
+                            (TrackMixer.Filter(clip.TrackIndex) is string tf && tf.Length > 0 ? "," + tf : "") +   // v2.0: track mixer
                             $"[sa{idx}]");
                         idx++;
                     }
@@ -1755,7 +1809,7 @@ namespace UltraVideoEditor
                 if (cpuArgs != arguments && await RunFFmpegOnceAsync(cpuArgs, ct))
                 {
                     if (!_useCpuEncoder)
-                        LogToMainWindow("RenderEngine: the GPU encoder (NVENC) failed — continuing with the CPU encoder (libx264).");
+                        LogToMainWindow(LanguageManager.T("lx_render_the_graphics_card_encoder_a04ca"));
                     _useCpuEncoder = true;
                     return true;
                 }
@@ -1836,6 +1890,33 @@ namespace UltraVideoEditor
             catch { /* the window may be closing */ }
         }
 
+        /// <summary>v2.0 — does the file have a real picture (not only sound, not only cover art)?</summary>
+        private async Task<bool> HasPictureAsync(string path, CancellationToken ct)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path) || string.IsNullOrEmpty(AppPaths.FFprobe) || !File.Exists(AppPaths.FFprobe))
+                    return true;   // can't tell: try as before
+                using var p = new Process
+                {
+                    StartInfo = new ProcessStartInfo(AppPaths.FFprobe,
+                        $"-v error -select_streams v -show_entries stream=codec_name:stream_disposition=attached_pic -of csv=p=0 \"{path}\"")
+                    { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true }
+                };
+                p.Start();
+                var outTask = p.StandardOutput.ReadToEndAsync();
+                var errTask = p.StandardError.ReadToEndAsync();
+                await p.WaitForExitAsync(ct);
+                await errTask;
+                string o = (await outTask).Trim();
+                if (p.ExitCode != 0) return true;
+                // one line per video stream: "h264,0" — the last field is 1 for cover art
+                return o.Split('\n').Select(l => l.Trim()).Any(l => l.Length > 0 && !l.EndsWith(",1"));
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { return true; }
+        }
+
         public static string LastErrorLogPath => Path.Combine(AppPaths.LogsDir, "render_last_error.log");
 
         private static void WriteFfmpegFailure(string arguments, int exitCode, string stderr)
@@ -1886,6 +1967,34 @@ namespace UltraVideoEditor
             string stdout = _re3so.Result;
 
             return stderr + stdout;
+        }
+
+        /// <summary>
+        /// v2.0 — the transition from <paramref name="item"/> into the next picture clip, as the
+        /// export makes it (and live playback shows it): the type and length chosen in the
+        /// Transitions tab, or the AI creator's choice, or otherwise a soft dissolve / fade of
+        /// 0.25 s (fast pacing), 0.7 s (slow) or 0.5 s. <paramref name="previous"/> is the clip
+        /// before it (for the brightness rule); <paramref name="slot"/> its time on the timeline.
+        /// </summary>
+        public static (string Type, double Duration) TransitionAfter(TimelineItem item, TimelineItem previous, double slot)
+        {
+            string desc = item.AudioDescription ?? "";
+            double fade = ExtractTag(desc, "pacing") switch { "fast" => 0.25, "slow" => 0.70, _ => 0.50 };
+            if (item.TransitionOutDuration > 0.05)
+                fade = Math.Min(item.TransitionOutDuration, Math.Max(0.1, slot - 0.1));
+            string type = !string.IsNullOrEmpty(item.TransitionOut) ? item.TransitionOut : ExtractTag(desc, "xfade");
+            if (string.IsNullOrEmpty(type) || type == "fade")
+            {
+                // similar brightness → dissolve, different → fade (anchor_brightness from the AI creator; 0 otherwise)
+                static double Bright(string d)
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(d ?? "", @"anchor_brightness=([\d.]+)");
+                    return m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : 0;
+                }
+                type = Math.Abs(Bright(desc) - Bright(previous?.AudioDescription)) < 0.03 ? "dissolve" : "fade";
+            }
+            if (!ValidXfadeNames.Contains(type ?? "")) type = "fade";
+            return (type, fade);
         }
 
         private static string ExtractTag(string text, string key)
@@ -1963,11 +2072,11 @@ namespace UltraVideoEditor
             if (videoFiles == null || videoFiles.Count < 2)
                 return null;
 
-            const string TARGET_FPS = "30";
+            string TARGET_FPS = _fps;   // v2.0: the render's frame rate (was always 30)
             // v1.4: the resolution the user chose (was hard-coded 1920:1080, so 9:16 / 720p
             // renders were letterboxed back into 16:9 whenever crossfades were used)
             string TARGET_RES = $"{_xfW}:{_xfH}";
-            const string ENC = "-c:v libx264 -preset veryfast -crf 22 -profile:v high -level 4.1 -pix_fmt yuv420p";
+            string ENC = _xfEnc;   // v2.0: follows the export quality
 
             // fadeStr is now computed per-pair inside the loop using FadeFor(i)
 
@@ -2056,7 +2165,7 @@ namespace UltraVideoEditor
 
                 if (durations.Any(d => d <= 0.05))
                 {
-                    LogToMainWindow("   ⚠️ CrossfadeSinglePass: invalid duration on one of the clips");
+                    LogToMainWindow(LanguageManager.T("lx_crossfades_one_of_the_clips_f1335"));
                     return null;
                 }
 
@@ -2074,7 +2183,7 @@ namespace UltraVideoEditor
 
                     if (prevDur <= thisFade + 0.05)
                     {
-                        LogToMainWindow($"   ⚠️ CrossfadeSinglePass: clip {i - 1} too short for fade ({prevDur:F2}s ≤ {thisFade:F2}s)");
+                        LogToMainWindow(LanguageManager.F("lx_crossfades_clip_is_too_short_d0d36", i - 1, prevDur, thisFade));
                         return null;
                     }
 
@@ -2112,7 +2221,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"   ⚠️ CrossfadeSinglePass error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_crossfade_error_b0002", ex.Message));
                 return null;
             }
         }
@@ -2130,7 +2239,7 @@ namespace UltraVideoEditor
             if (videoFiles == null || videoFiles.Count < 2)
                 return null;
 
-            const string TARGET_FPS = "30";
+            string TARGET_FPS = _fps;   // v2.0
             int TARGET_W = _xfW;   // v1.4: chosen resolution (was hard-coded 1920x1080)
             int TARGET_H = _xfH;
 
@@ -2165,7 +2274,7 @@ namespace UltraVideoEditor
 
                 if (!ok || !File.Exists(normPath) || new FileInfo(normPath).Length < 500)
                 {
-                    LogToMainWindow($"   ⚠️ Crossfade norm fail for clip {i} — using original");
+                    LogToMainWindow(LanguageManager.F("lx_preparing_clip_for_the_crossfade_9737b", i));
                     normalized.Add(input);
                 }
                 else
@@ -2235,7 +2344,7 @@ namespace UltraVideoEditor
                 }
                 else
                 {
-                    LogToMainWindow($"   ⚠️ xfade pair {i - 1}→{i} failed — hard cut");
+                    LogToMainWindow(LanguageManager.F("lx_the_crossfade_failed_a_hard_997ac", i - 1, i));
 
                     string concatPath = Path.Combine(tempDir, $"xf_hc_{i:D4}.mp4");
                     string concatList = Path.Combine(tempDir, $"xf_hcl_{i:D4}.txt");
@@ -2291,7 +2400,7 @@ namespace UltraVideoEditor
             for (int i = 0; i < videoFiles.Count; i++)
                 inputs.Append($"-i \"{videoFiles[i]}\" ");
 
-            const string FPS_NORM = "fps=fps=30:round=near";
+            string FPS_NORM = $"fps=fps={_fps}:round=near";   // v2.0
 
             for (int i = 0; i < videoFiles.Count; i++)
                 filterParts.Append($"[{i}:v]{FPS_NORM}[f{i}];");
@@ -2338,6 +2447,71 @@ namespace UltraVideoEditor
 
         private string vEncArgs_cached = null;
 
+        // v2.0: frame rate and intermediate encoder of the current render
+        private string _fps = "30";
+        private string _xfEnc = "-c:v libx264 -preset veryfast -crf 22 -profile:v high -level 4.1 -pix_fmt yuv420p";
+
+        /// <summary>v2.0 — a picture clip on a layer track (Video 2 and up) that is not hidden.</summary>
+        internal static bool IsLayerClip(TimelineItem i) =>
+            i != null && TrackSet.IsLayer(i.TrackIndex) && !TrackSet.IsHidden(i.TrackIndex) &&
+            !(i.Type == "Audio" || i.IsAudio) && (i.IsVideo || i.IsImage) &&
+            !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path);
+
+        /// <summary>
+        /// v2.0 — the output frame rate: the one chosen in Export options, or (Auto) the frame
+        /// rate of the first video clip. Projects of the AI music video creator stay at 30.
+        /// </summary>
+        private async Task<string> ResolveFrameRateAsync(ExportSettingsData settings, List<TimelineItem> items, CancellationToken ct)
+        {
+            string chosen = settings?.FrameRate;
+            if (!string.IsNullOrWhiteSpace(chosen) && chosen != "Auto" && LayerCompositor.ParseRate(chosen) >= 10)
+                return chosen;
+            if (items.Any(IsAiCreatorClip)) return "30";
+            var firstVideo = items.Where(i => (i.Type == "Video" || i.IsVideo) && !i.IsImage && !string.IsNullOrEmpty(i.Path) && File.Exists(i.Path))
+                                  .OrderBy(i => i.TrackIndex).ThenBy(i => i.Start).FirstOrDefault();
+            if (firstVideo == null) return "30";
+            try
+            {
+                var probe = new LayerCompositor(AppPaths.FFprobe, RunFFmpegAsync, LogToMainWindow);
+                string r = await probe.ProbeFrameRateAsync(firstVideo.Path, ct);
+                if (!string.IsNullOrEmpty(r))
+                {
+                    LogToMainWindow(LanguageManager.F("lx_frame_rate_taken_from_fps_9eeed", Path.GetFileName(firstVideo.Path), r));
+                    return r;
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { LogSwallowedError("Reading the frame rate", ex); }
+            return "30";
+        }
+
+        /// <summary>v2.0 — a timeline clip as the compositor sees it.</summary>
+        /// <summary>v2.0 — a quick preview of the whole video: the slow smooth slow motion is left out.</summary>
+        public bool PreviewMode { get; set; }
+
+        internal static CompositeClip ToComposite(TimelineItem i) => new CompositeClip
+        {
+            Name = i.Name ?? "",
+            Path = i.Path,
+            Start = i.Start,
+            Duration = i.Duration,
+            SourceOffset = i.SourceOffset,
+            IsImage = i.IsImage || i.Type == "Image",
+            Volume = i.Volume,
+            TrackFx = TrackMixer.Filter(i.TrackIndex),   // v2.0: the track mixer (volume, automation, mute, solo, EQ, effects)
+            Track = i.TrackIndex,
+            Layer = i.Layer,
+            LutPath = i.LutPath,
+            Title = i.TextOverlay,   // v2.0: text on a clip is drawn (it was stored but never rendered)
+            Tracking = i.Tracking,   // v2.0: a followed object (blur, pixelate, black box, spotlight; a mask that follows it)
+            // v2.0: main-track clips play at their speed; layers always at normal speed
+            Speed = TrackSet.IsLayer(i.TrackIndex) ? 1.0 : Math.Clamp(SpeedRamp.Has(i) ? SpeedRamp.Average(i) : i.VideoEffect?.Speed is double sp && sp > 0.01 ? sp : 1.0, 0.1, 10),
+            Keyframes = (i.Keyframes ?? new List<AnimationKeyframe>()).Select(k => new CompositeKeyframe
+            {
+                Time = k.Time, Zoom = k.Zoom, Rotation = k.Rotation, X = k.X, Y = k.Y, Opacity = k.Opacity, Easing = k.Easing ?? "Linear"
+            }).ToList()
+        };
+
         // v1.4: output size for the crossfade passes (set per render from the chosen resolution)
         private int _xfW = 1920, _xfH = 1080;
 
@@ -2375,7 +2549,9 @@ namespace UltraVideoEditor
 
     public static class RenderEngineBeatLock
     {
-        private const string TARGET_FPS = "30";
+        /// <summary>v2.0: the render's frame rate (was a fixed 30).</summary>
+        internal static string TargetFps = "30";
+        private static string TARGET_FPS => TargetFps;
         private const double CUT_ADVANCE_S = 0.080;
 
         public static double BeatSpeedFactor(

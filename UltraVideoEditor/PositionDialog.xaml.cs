@@ -38,13 +38,13 @@ namespace UltraVideoEditor
         {
             string dur = TimeSpan.FromSeconds(_audioDuration).ToString(@"mm\:ss");
             txtAudioInfo.Text = _audioDuration > 0
-                ? string.Format("Audio duration: {0} ({1:F0} seconds)", dur, _audioDuration)
-                : "No audio file loaded.";
+                ? LanguageManager.F("lx_pos_audio_len", dur, _audioDuration)
+                : LanguageManager.T("lx_pos_no_audio");
 
-            txtImageName.Text = "Image: " + _currentItem.Name;
+            txtImageName.Text = LanguageManager.F("lx_picture_9e4b8", _currentItem.Name);
             txtImageDesc.Text = string.IsNullOrWhiteSpace(_currentItem.AudioDescription)
-                ? "(No audio description)"
-                : "Description: " + _currentItem.AudioDescription;
+                ? LanguageManager.T("lx_pos_no_desc")
+                : LanguageManager.F("lx_pos_desc", _currentItem.AudioDescription);
 
             double pos = _currentItem.UseFixedPosition && _currentItem.FixedPosition > 0
                 ? _currentItem.FixedPosition : _currentItem.Start;
@@ -65,7 +65,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                txtAutoInfo.Text = images.Count == 0 ? "No images on the timeline." : "No audio file loaded.";
+                txtAutoInfo.Text = LanguageManager.T(images.Count == 0 ? "lx_pos_no_images" : "lx_pos_no_audio");
             }
 
             RefreshScheduleList();

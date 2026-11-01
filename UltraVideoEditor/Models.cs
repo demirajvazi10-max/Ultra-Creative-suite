@@ -28,6 +28,22 @@ namespace UltraVideoEditor
         public double X { get; set; } = 0;
         public double Y { get; set; } = 0;
         public double Opacity { get; set; } = 1.0;
+        /// <summary>
+        /// v2.0 — how the movement from this keyframe to the next one goes: Linear (even),
+        /// EaseIn (starts slowly), EaseOut (ends slowly), EaseInOut (both), Hold (stays, then jumps).
+        /// </summary>
+        public string Easing { get; set; } = "Linear";
+
+        public static readonly string[] Easings = { "Linear", "EaseIn", "EaseOut", "EaseInOut", "Hold" };
+
+        /// <summary>v2.0 — what a screen reader says for a keyframe in the list.</summary>
+        public override string ToString()
+        {
+            string T(string k) => LanguageManager.GetText(k, LanguageManager.CurrentLanguage ?? "en");
+            var inv = System.Globalization.CultureInfo.CurrentCulture;
+            return string.Format(T("kf_item"), Time.ToString("0.0", inv), Zoom.ToString("0.00", inv), Math.Round(Rotation),
+                                 Math.Round(X), Math.Round(Y), Opacity.ToString("0.00", inv), T("kf_ease_" + (Easing ?? "Linear")));
+        }
     }
 
     // Scene za AI animaciju
@@ -55,6 +71,20 @@ namespace UltraVideoEditor
         public string Color { get; set; } = "#FFFFFF";
         public string Position { get; set; } = "Centar";
         public bool Enabled { get; set; } = false;
+
+        // v2.0 — titles: drawn in the render (before, text on a clip was stored but never drawn)
+        /// <summary>A second, smaller line under the text (a name's role, a place…).</summary>
+        public string Subtitle { get; set; } = "";
+        /// <summary>None, Fade, SlideUp, SlideLeft, Zoom, Typewriter.</summary>
+        public string Animation { get; set; } = "Fade";
+        /// <summary>A dark band behind the text so it reads on any picture.</summary>
+        public bool Box { get; set; } = false;
+        /// <summary>Seconds after the clip begins when the text appears.</summary>
+        public double StartIn { get; set; } = 0;
+        /// <summary>How long it stays, in seconds; 0 = until the clip ends.</summary>
+        public double Length { get; set; } = 0;
+
+        public TextOverlayData Clone() => (TextOverlayData)MemberwiseClone();
     }
 
     /// <summary>v1.4 (R4) — one described part of a clip.</summary>
@@ -143,19 +173,35 @@ namespace UltraVideoEditor
         /// <summary>v1.4 (R5) — bass, treble, reverb and compressor of this clip (Effects tab).</summary>
         public AudioSettingsData AudioFx { get; set; }
 
+        /// <summary>
+        /// v2.0 — how this clip sits over the picture below when it is on a layer track (Video 2):
+        /// position, size, opacity, green/blue screen, own sound. Null = full frame, solid.
+        /// </summary>
+        public LayerSettings Layer { get; set; }
+
+        /// <summary>v2.0 — a colour look-up table (.cube) applied to this clip in the render; null = none.</summary>
+        public string LutPath { get; set; }
+
+        /// <summary>v2.0 — an object followed through this clip, and what is done with it (blur, pixelate…); null = none.</summary>
+        public TrackingData Tracking { get; set; }
+
+        /// <summary>v2.0 — this clip is part of a multicam clip (its id); null = no.</summary>
+        public string MulticamId { get; set; }
+        /// <summary>v2.0 — which camera (1 … 9) this multicam part shows; 0 = the multicam sound.</summary>
+        public int MulticamAngle { get; set; }
+
+        /// <summary>
+        /// v2.0 — a compound clip: the clips it was made of (their FixedPosition is relative to
+        /// the compound's start). Break it apart to get them back; null = an ordinary clip.
+        /// </summary>
+        public List<TimelineItem> CompoundItems { get; set; }
+
         /// <summary>The saved picture description at a position inside the clip, or null.</summary>
         public FrameDescription DescriptionAt(double positionInClip) =>
             FrameDescriptions?.FirstOrDefault(d => positionInClip >= d.Start - 0.001 && positionInClip < d.End);
 
         [JsonIgnore]
-        public string TrackName => TrackIndex switch
-        {
-            0 => "🎬 Video 1",
-            1 => "🎬 Video 2",
-            2 => "🎵 Audio 1",
-            3 => "🎵 Audio 2",
-            _ => $"Track {TrackIndex + 1}"
-        };
+        public string TrackName => (TrackSet.IsAudio(TrackIndex) ? "🎵 " : "🎬 ") + TrackSet.Name(TrackIndex);   // v2.0: unlimited, named tracks
 
         // v1.4: extensions compared case-insensitively — phones and cameras write ".MP4",
         // ".JPG", ".MOV"; those clips were treated as "unknown" (not video, not image)
@@ -175,30 +221,23 @@ namespace UltraVideoEditor
         }
 
         [JsonIgnore]
-        public bool IsAudio => Ext is ".mp3" or ".wav" or ".m4a" or ".flac" or ".ogg" or ".aac" or ".wma";
+        public bool IsAudio => Type == "Audio" || Ext is ".mp3" or ".wav" or ".m4a" or ".flac" or ".ogg" or ".aac" or ".wma";   // v2.0: also the detached sound of a video
 
         [JsonIgnore]
         public bool IsImage => Ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
 
         [JsonIgnore]
-        public bool IsVideo => Ext is ".mp4" or ".avi" or ".mov" or ".mkv" or ".webm" or ".m4v" or ".wmv";
+        public bool IsVideo => Type != "Audio" && Ext is ".mp4" or ".avi" or ".mov" or ".mkv" or ".webm" or ".m4v" or ".wmv";
 
         [JsonIgnore]
-        public bool IsVideoTrack => TrackIndex == 0 || TrackIndex == 1;
+        public bool IsVideoTrack => TrackSet.IsVideo(TrackIndex);
 
         [JsonIgnore]
-        public bool IsAudioTrack => TrackIndex == 2 || TrackIndex == 3;
+        public bool IsAudioTrack => TrackSet.IsAudio(TrackIndex);
 
         public override string ToString()
         {
-            string trackInfo = TrackIndex switch
-            {
-                0 => "🎬 Video 1 ",
-                1 => "🎬 Video 2 ",
-                2 => "🎵 Audio 1 ",
-                3 => "🎵 Audio 2 ",
-                _ => $"Track {TrackIndex + 1} "
-            };
+            string trackInfo = TrackName + " ";
 
             string typeInfo = IsAudio ? "Audio" : (IsVideo ? "Video" : "Image");
             string volumeInfo = IsAudio ? string.Format(L("models_volume_sfx"), Volume) : "";
@@ -268,6 +307,94 @@ namespace UltraVideoEditor
         public double Contrast { get; set; } = 0;
         public double Blur { get; set; } = 0;
         public double Speed { get; set; } = 1.0;
+
+        // v2.0 — colour correction (all 0 = unchanged; -100 … 100 unless noted)
+        public double Saturation { get; set; } = 0;
+        /// <summary>Positive = warmer (orange), negative = cooler (blue).</summary>
+        public double Temperature { get; set; } = 0;
+        /// <summary>Positive = towards magenta, negative = towards green.</summary>
+        public double Tint { get; set; } = 0;
+        /// <summary>Mid-tones: positive = lighter, negative = darker.</summary>
+        public double Gamma { get; set; } = 0;
+        public double Shadows { get; set; } = 0;
+        public double Highlights { get; set; } = 0;
+        /// <summary>0 … 100, darker corners.</summary>
+        public double Vignette { get; set; } = 0;
+        /// <summary>0 … 100.</summary>
+        public double Sharpen { get; set; } = 0;
+
+        // v2.0 — picture
+        /// <summary>Steadies a shaky clip (two passes in the render).</summary>
+        public bool Stabilize { get; set; } = false;
+        /// <summary>1 … 10, how shaky the clip is (more = stronger smoothing).</summary>
+        public double StabilizeStrength { get; set; } = 5;
+        /// <summary>Slow motion with new frames calculated between the real ones (optical flow).</summary>
+        public bool SmoothSlowMotion { get; set; } = false;
+
+        // v2.0 — colour balance per tonal range (like colour wheels), -100 … 100:
+        // R = red (+) ↔ cyan (−), G = green (+) ↔ magenta (−), B = blue (+) ↔ yellow (−)
+        public double ShadowR { get; set; }
+        public double ShadowG { get; set; }
+        public double ShadowB { get; set; }
+        public double MidR { get; set; }
+        public double MidG { get; set; }
+        public double MidB { get; set; }
+        public double HighR { get; set; }
+        public double HighG { get; set; }
+        public double HighB { get; set; }
+
+        // v2.0 — one colour only (a qualifier): "" = off, or r, y, g, c, b, m
+        public string SelColor { get; set; } = "";
+        /// <summary>Hue shift of that colour in degrees (-180 … 180).</summary>
+        public double SelHue { get; set; }
+        public double SelSaturation { get; set; }
+        public double SelBrightness { get; set; }
+        /// <summary>Keep only that colour; everything else becomes black and white.</summary>
+        public bool SelKeepOnly { get; set; }
+        /// <summary>v2.0 — a colour picked from the picture ("#RRGGBB"); with "keep only", exactly that colour stays.</summary>
+        public string SelPicked { get; set; } = "";
+        /// <summary>v2.0 — how close to the picked colour a pixel must be, 5 … 60.</summary>
+        public double SelSimilarity { get; set; } = 25;
+
+        // v2.0 — power window: the colour correction only inside (or outside) one area.
+        /// <summary>"" = off, Oval, Rectangle, Top, Bottom, Left, Right (the last four are soft graduated areas).</summary>
+        public string PwShape { get; set; } = "";
+        /// <summary>Centre and size in percent of the picture; Feather = the soft edge in percent of the size.</summary>
+        public double PwX { get; set; } = 50;
+        public double PwY { get; set; } = 50;
+        public double PwW { get; set; } = 50;
+        public double PwH { get; set; } = 50;
+        public double PwFeather { get; set; } = 20;
+        /// <summary>true = correct everything except the area.</summary>
+        public bool PwInvert { get; set; }
+        public bool HasWindow => !string.IsNullOrEmpty(PwShape) && PowerWindow.Shapes.Contains(PwShape);
+
+        // v2.0 — curves: the output at 0, 25, 50, 75 and 100 % input, as "0 25 50 75 100"
+        // (empty = straight). All = every channel together; R, G, B = one colour channel.
+        public string CurveAll { get; set; } = "";
+        public string CurveR { get; set; } = "";
+        public string CurveG { get; set; } = "";
+        public string CurveB { get; set; } = "";
+
+        /// <summary>v2.0 — a speed ramp: the speed changes inside the clip (null / empty = the steady Speed).</summary>
+        public List<SpeedPoint> SpeedPoints { get; set; }
+
+        public bool HasCurves => !Curves.IsStraight(CurveAll) || !Curves.IsStraight(CurveR) || !Curves.IsStraight(CurveG) || !Curves.IsStraight(CurveB);
+
+        public VideoEffectData Clone()
+        {
+            var c = (VideoEffectData)MemberwiseClone();
+            c.SpeedPoints = SpeedPoints?.Select(p => new SpeedPoint { Time = p.Time, Speed = p.Speed }).ToList();   // v2.0
+            return c;
+        }
+
+        public bool HasBalance => ShadowR != 0 || ShadowG != 0 || ShadowB != 0 || MidR != 0 || MidG != 0 || MidB != 0 ||
+                                  HighR != 0 || HighG != 0 || HighB != 0;
+
+        /// <summary>True when any colour setting differs from the original.</summary>
+        public bool HasColor => Saturation != 0 || Temperature != 0 || Tint != 0 || Gamma != 0 ||
+                                Shadows != 0 || Highlights != 0 || Vignette != 0 || Sharpen != 0 ||
+                                HasBalance || !string.IsNullOrEmpty(SelColor) || HasCurves;
     }
 
     public class AudioSettingsData
@@ -276,13 +403,40 @@ namespace UltraVideoEditor
         public double TrebleBoost { get; set; } = 0;
         public double ReverbAmount { get; set; } = 0;
         public bool CompressorEnabled { get; set; } = false;
+
+        // v2.0 — three-band equaliser in dB (-12 … 12)
+        public double LowGain { get; set; } = 0;
+        public double MidGain { get; set; } = 0;
+        public double HighGain { get; set; } = 0;
+        /// <summary>0 = off, 1 = light, 2 = strong.</summary>
+        public int NoiseReduction { get; set; } = 0;
+        /// <summary>Clearer speech: low rumble removed, presence raised, levels evened.</summary>
+        public bool VoiceEnhance { get; set; } = false;
+        /// <summary>Seconds of fade at the start and the end of the clip's sound.</summary>
+        public double FadeIn { get; set; } = 0;
+        public double FadeOut { get; set; } = 0;
+
+        public AudioSettingsData Clone() => (AudioSettingsData)MemberwiseClone();
     }
 
     public class ExportSettingsData
     {
         public string Format { get; set; } = "MP4";
+        /// <summary>Low, Medium, High or Maximum (v2.0).</summary>
         public string Quality { get; set; } = "Medium";
         public bool ExportAudioOnly { get; set; } = false;
+
+        /// <summary>v2.0 — H264, H265, H265_10 (Main10), ProRes, DNxHR, DNxHR10 (HQX) or FFV1. ProRes and DNxHR are written as .mov, FFV1 as .mkv.</summary>
+        public string VideoCodec { get; set; } = "H264";
+
+        /// <summary>v2.0 — "Auto" (the frame rate of the first video clip) or 24, 25, 30, 50, 60…</summary>
+        public string FrameRate { get; set; } = "Auto";
+
+        /// <summary>v2.0 — a soft fade from and to black at the start and the end.</summary>
+        public bool FadeInOut { get; set; } = true;
+
+        /// <summary>v2.0 — the warm colour look of the AI music videos; null = only for AI creator projects.</summary>
+        public bool? WarmLook { get; set; } = null;
     }
 
     public class AISubtitle

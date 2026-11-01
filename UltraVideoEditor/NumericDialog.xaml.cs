@@ -19,7 +19,7 @@ namespace UltraVideoEditor
             InitializeComponent();
             UiScaling.Register(this);
             _maxValue = maxValue;
-            lblInstruction.Text = $"Pozicija (1 - {maxValue}):";
+            lblInstruction.Text = LanguageManager.F("lx_position_cebc0", maxValue);
             txtNumber.Focus();
         }
 

@@ -49,7 +49,7 @@ namespace UltraVideoEditor
             string key        = MediaProviderSettings.LoadKey(providerName);
             bool   configured = !string.IsNullOrWhiteSpace(key);
 
-            statusLabel.Text       = configured ? "● Active" : "● Not configured";
+            statusLabel.Text       = LanguageManager.T(configured ? "lx_prov_active" : "lx_prov_not_set");
             statusLabel.Foreground = configured
                 ? new WpfBrush(WpfColor.FromRgb(0x00, 0xE6, 0x76))
                 : new WpfBrush(WpfColor.FromRgb(0xEF, 0x53, 0x50));
@@ -94,7 +94,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrWhiteSpace(input))
             {
-                WpfMessageBox.Show("Enter an API key.", "Warning",
+                WpfMessageBox.Show(LanguageManager.T("lx_enter_api_key"), LanguageManager.T("lx_warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 keyBox.Focus();
                 return;
@@ -108,16 +108,16 @@ namespace UltraVideoEditor
                 {
                     _creator?.SaveMediaProviderKey(providerName, input);
                     RefreshStatus(providerName, statusLabel, keyBox);
-                    txtInfo.Text = "OK [" + providerName + "] Key saved, provider active.";
+                    txtInfo.Text = LanguageManager.F("lx_ok_the_key_is_saved_6a51d", providerName);
                 }
                 else
                 {
-                    txtInfo.Text = "ERROR [" + providerName + "] Error while saving.";
+                    txtInfo.Text = LanguageManager.F("lx_error_saving_failed_8f8d5", providerName);
                 }
             }
             else
             {
-                txtInfo.Text = "[" + providerName + "] Key was not changed.";
+                txtInfo.Text = LanguageManager.F("lx_the_key_was_not_changed_f8b21", providerName);
             }
         }
 
@@ -134,7 +134,7 @@ namespace UltraVideoEditor
             MediaProviderSettings.DeleteKey(providerName);
             _creator?.DeleteMediaProviderKey(providerName);
             RefreshStatus(providerName, statusLabel, keyBox);
-            txtInfo.Text = "[" + providerName + "] Key deleted, provider deactivated.";
+            txtInfo.Text = LanguageManager.F("lx_the_key_is_deleted_the_a0bdf", providerName);
         }
 
         // ── Hyperlink ──────────────────────────────────────────────────────────
@@ -160,8 +160,8 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                WpfMessageBox.Show("Error while opening folder: " + ex.Message,
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                WpfMessageBox.Show(LanguageManager.F("lx_open_folder_error", ex.Message),
+                    LanguageManager.T("generic_error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -169,7 +169,7 @@ namespace UltraVideoEditor
         {
             MediaProviderRegistry.Instance.ReloadJsonProviders();
             RefreshJsonProvidersList();
-            txtInfo.Text = "Providers refreshed.";
+            txtInfo.Text = LanguageManager.T("lx_providers_refreshed_0e951");
         }
 
         private void RefreshJsonProvidersList()
@@ -178,9 +178,9 @@ namespace UltraVideoEditor
                 .OfType<JsonMediaProvider>().ToList();
 
             txtJsonProviders.Text = jsonProviders.Count == 0
-                ? "No external providers loaded."
-                : "Loaded: " + string.Join(", ", jsonProviders.Select(p =>
-                    p.Name + (p.IsConfigured ? " (active)" : " (no key)")));
+                ? LanguageManager.T("lx_prov_none_loaded")
+                : LanguageManager.F("lx_prov_loaded", string.Join(", ", jsonProviders.Select(p =>
+                    p.Name + LanguageManager.T(p.IsConfigured ? "lx_prov_on_mark" : "lx_prov_nokey_mark"))));
         }
 
         // ── Close ────────────────────────────────────────────────────────────

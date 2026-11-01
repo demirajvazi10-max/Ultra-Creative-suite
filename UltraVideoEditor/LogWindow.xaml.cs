@@ -23,7 +23,7 @@ namespace UltraVideoEditor
             UiScaling.Register(this);
             lstLog.ItemsSource = _logEntries;
             lstLog.KeyDown += LstLog_KeyDown;
-            AutomationProperties.SetName(this, "Log window");
+            AutomationProperties.SetName(this, LanguageManager.T("lx_log_window_87e82"));
             // Non-modal window (opened with Show), so IsCancel can't be used —
             // handle Escape directly instead so JAWS/NVDA users can close it easily.
             this.PreviewKeyDown += (s, e) =>
@@ -58,7 +58,7 @@ namespace UltraVideoEditor
                 if (lstLog.SelectedItem is LogEntry entry)
                 {
                     WpfClipboard.SetText($"[{entry.Time}] {entry.Message}");
-                    AnnounceToJaws("Selected message copied");
+                    AnnounceToJaws(LanguageManager.T("lx_the_selected_message_is_copied_c2068"));
                 }
                 e.Handled = true;
             }

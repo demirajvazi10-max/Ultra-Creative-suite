@@ -201,14 +201,7 @@ namespace UltraVideoEditor
             if (whisperExe == null)
             {
                 result.ErrorMessage =
-                    "Whisper not found on this computer.\n\n" +
-                    "Install it in one of these ways:\n\n" +
-                    "OPTION A — Python (recommended):\n" +
-                    "  pip install openai-whisper\n\n" +
-                    "OPTION B — Standalone (no Python):\n" +
-                    "  Download faster-whisper-xxl.exe from GitHub\n" +
-                    "  and place it next to UltraVideoEditor.exe\n\n" +
-                    "After installation, restart the application.";
+                    LanguageManager.T("lx_whisper_is_not_installed_on_dba68");
                 return result;
             }
 
@@ -226,7 +219,7 @@ namespace UltraVideoEditor
 
             try
             {
-                progress?.Report("Ekstrahujem audio...");
+                progress?.Report(LanguageManager.T("lx_extracting_the_sound_f27ed"));
                 string audioPath = mediaPath;
 
                 string ext = Path.GetExtension(mediaPath).ToLower();
@@ -240,7 +233,7 @@ namespace UltraVideoEditor
                     }
                 }
 
-                progress?.Report($"Whisper is analyzing audio (model: {modelSize})...");
+                progress?.Report(LanguageManager.F("lx_whisper_is_listening_to_the_f1266", modelSize));
 
                 bool isFasterWhisper = whisperExe.ToLower().Contains("faster-whisper");
                 string whisperArgs = isFasterWhisper
@@ -306,7 +299,7 @@ namespace UltraVideoEditor
                         {
                             stdErr.AppendLine(e.Data);
                             if (e.Data.Contains("%") || e.Data.Contains("Detecting"))
-                                progress?.Report($"Whisper: {e.Data.Trim()}");
+                                progress?.Report(LanguageManager.F("lx_whisper_39782", e.Data.Trim()));
                         }
                     };
 
@@ -345,7 +338,7 @@ namespace UltraVideoEditor
                         // v1.4: vocal separation failed (no internet for the first model download,
                         // not enough memory...) — transcribe the full mix instead.
                         AppLog.Warn("Whisper: vocal separation failed, transcribing without it. " + LastLine(stdErrText));
-                        progress?.Report("Whisper: retrying without vocal separation...");
+                        progress?.Report(LanguageManager.T("lx_whisper_trying_again_without_separating_88e0e"));
                         whisperArgs = whisperArgs.Replace(VocalExtractArg, "");
                     }
                     foreach (string variant in formatVariants)
@@ -357,13 +350,13 @@ namespace UltraVideoEditor
                                              stdErrText.IndexOf("unrecognized arguments", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                              stdErrText.IndexOf("invalid choice", StringComparison.OrdinalIgnoreCase) >= 0;
                         if (WroteSomething() || !argumentError) break;
-                        progress?.Report("Whisper: retrying with simpler output options...");
+                        progress?.Report(LanguageManager.T("lx_whisper_trying_again_with_simpler_5100c"));
                     }
                 }
 
                 ct.ThrowIfCancellationRequested();
 
-                progress?.Report("Parsiranje rezultata...");
+                progress?.Report(LanguageManager.T("lx_reading_the_results_3041d"));
 
                 string audioName = Path.GetFileNameWithoutExtension(audioPath);
                 string srtPath = Path.Combine(tempDir, audioName + ".srt");
@@ -384,7 +377,7 @@ namespace UltraVideoEditor
 
                 if (timedLines.Count == 0)
                 {
-                    result.ErrorMessage = "Whisper did not recognize any text in the audio file.";
+                    result.ErrorMessage = LanguageManager.T("lx_whisper_did_not_hear_any_d495a");
                     return result;
                 }
 
@@ -424,7 +417,7 @@ namespace UltraVideoEditor
                         // Pomijeri prvi segment tik ispred drugog
                         double correctedStart = Math.Max(0, secondStart - avgDur - 0.1);
                         double correctedEnd   = secondStart - 0.05;
-                        progress?.Report($"VAD korekcija: prvi titl pomjeren {firstStart:F2}s → {correctedStart:F2}s (halucinacija na instrumentalu)");
+                        progress?.Report(LanguageManager.F("lx_voice_check_the_first_subtitle_8fd3d", firstStart, correctedStart));
                         timedLines[0] = new TimedLine
                         {
                             Text         = timedLines[0].Text,
@@ -450,7 +443,7 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                result.ErrorMessage = "Transcription cancelled.";
+                result.ErrorMessage = LanguageManager.T("lx_transcription_cancelled_dc727");
             }
             catch (Exception ex)
             {
@@ -499,14 +492,14 @@ namespace UltraVideoEditor
 
             if (userLines == null || userLines.Count == 0)
             {
-                result.ErrorMessage = "No text to align.";
+                result.ErrorMessage = LanguageManager.T("lx_there_is_no_text_to_9a057");
                 return result;
             }
 
             string whisperExe = FindWhisperExecutable();
             if (whisperExe == null)
             {
-                result.ErrorMessage = "Whisper not found.";
+                result.ErrorMessage = LanguageManager.T("lx_whisper_was_not_found_a8870");
                 return result;
             }
 
@@ -525,7 +518,7 @@ namespace UltraVideoEditor
                 if (ext != ".wav")
                 {
                     wavPath = await ExtractAudioAsync(audioPath, tempDir, ffmpegPath);
-                    if (wavPath == null) { result.ErrorMessage = "Error during audio extraction."; return result; }
+                    if (wavPath == null) { result.ErrorMessage = LanguageManager.T("lx_extracting_the_sound_failed_895d4"); return result; }
                 }
 
                 // initial_prompt = cijeli tekst pjesme (max 224 tokena = ~900 znakova)
@@ -564,7 +557,7 @@ namespace UltraVideoEditor
                                   $"--word_timestamps True --condition_on_previous_text False --verbose False";
                 }
 
-                progress?.Report($"Whisper alignment ({modelSize} model, listening to voice...)");
+                progress?.Report(LanguageManager.F("lx_whisper_alignment_model_listening_to_c90ea", modelSize));
 
                 using var proc = new Process
                 {
@@ -583,7 +576,7 @@ namespace UltraVideoEditor
                 proc.ErrorDataReceived += (s, e) => {
                     if (!string.IsNullOrEmpty(e.Data)) {
                         stderr.AppendLine(e.Data);
-                        if (e.Data.Contains("%")) progress?.Report($"Alignment: {e.Data.Trim()}");
+                        if (e.Data.Contains("%")) progress?.Report(LanguageManager.F("lx_alignment_6f338", e.Data.Trim()));
                     }
                 };
 
@@ -593,7 +586,7 @@ namespace UltraVideoEditor
                 await proc.WaitForExitOrKillAsync(ct);
 
                 ct.ThrowIfCancellationRequested();
-                progress?.Report("Mapping text to timestamps...");
+                progress?.Report(LanguageManager.T("lx_matching_the_text_to_the_952ab"));
 
                 // Try JSON (word-level) first, SRT as fallback
                 string jsonPath = Directory.GetFiles(tempDir, "*.json").FirstOrDefault();
@@ -630,7 +623,7 @@ namespace UltraVideoEditor
                     {
                         result.WordTimings = wordTimings;
                         result.HeardWords = wordTimings;
-                        progress?.Report($"Word-level sync: {wordTimings.Count} words with timestamps.");
+                        progress?.Report(LanguageManager.F("lx_word_timing_words_with_times_bfb0b", wordTimings.Count));
                     }
 
                     // Izvuci segmente iz JSON-a za liniju-po-liniju mapiranje
@@ -640,7 +633,7 @@ namespace UltraVideoEditor
 
                     if (whisperSegments.Count == 0)
                     {
-                        result.ErrorMessage = "Whisper JSON/SRT contains no segments.";
+                        result.ErrorMessage = LanguageManager.T("lx_whisper_s_json_or_srt_2ecc9");
                         return result;
                     }
 
@@ -657,23 +650,23 @@ namespace UltraVideoEditor
                     var whisperSegments = ParseWhisperSrt(srtPath);
                     if (whisperSegments.Count == 0)
                     {
-                        result.ErrorMessage = "Whisper found no time alignment in the audio file.";
+                        result.ErrorMessage = LanguageManager.T("lx_whisper_found_no_times_in_7dec3");
                         return result;
                     }
                     BuildAlignedLines(userLines, whisperSegments, result);
                 }
                 else
                 {
-                    result.ErrorMessage = "Whisper alignment did not generate a JSON or SRT file. " + stderr;
+                    result.ErrorMessage = LanguageManager.F("lx_whisper_alignment_made_no_json_72ec2", stderr);
                     return result;
                 }
 
                 result.FullText = string.Join("\n", userLines);
                 result.Success  = true;
-                progress?.Report($"Alignment gotov — {result.Lines.Count} linija, {result.WordTimings.Count} word timestamps.");
+                progress?.Report(LanguageManager.F("lx_alignment_done_lines_word_times_d01ca", result.Lines.Count, result.WordTimings.Count));
             }
-            catch (OperationCanceledException) { result.ErrorMessage = "Alignment cancelled."; }
-            catch (Exception ex) { result.ErrorMessage = $"Alignment error: {ex.Message}"; }
+            catch (OperationCanceledException) { result.ErrorMessage = LanguageManager.T("lx_alignment_cancelled_bacda"); }
+            catch (Exception ex) { result.ErrorMessage = LanguageManager.F("lx_alignment_error_c4e33", ex.Message); }
             finally { try { Directory.Delete(tempDir, true); } catch { } }
 
             return result;
@@ -694,7 +687,7 @@ namespace UltraVideoEditor
             result.AlignmentConfidence = aligned.Confidence;
             if (!aligned.IsUsable)
             {
-                progress?.Report($"Word alignment too uncertain ({aligned.Confidence:P0} of words matched).");
+                progress?.Report(LanguageManager.F("lx_the_word_alignment_is_too_f194a", aligned.Confidence));
                 return false;
             }
 
@@ -706,7 +699,7 @@ namespace UltraVideoEditor
             }).ToList();
             result.LineWords = aligned.Lines.Select(l => l.Words).ToList();
             result.WordTimings = aligned.Lines.SelectMany(l => l.Words).ToList();
-            progress?.Report($"Lyrics aligned word by word: {aligned.Confidence:P0} of words matched.");
+            progress?.Report(LanguageManager.F("lx_lyrics_aligned_word_by_word_e1162", aligned.Confidence));
             return true;
         }
 
@@ -730,7 +723,7 @@ namespace UltraVideoEditor
             result.WordTimings = sung.SelectMany(l => l.Words).ToList();
             int words = sung.Sum(l => l.Words.Count), matched = sung.Sum(l => l.MatchedWords);
             result.AlignmentConfidence = words > 0 ? (double)matched / words : 0;
-            progress?.Report($"Lyrics aligned as sung: {sung.Count} sung lines from {distinct} of {typed} typed lines.");
+            progress?.Report(LanguageManager.F("lx_lyrics_aligned_as_sung_sung_b845a", sung.Count, distinct, typed));
             return true;
         }
 

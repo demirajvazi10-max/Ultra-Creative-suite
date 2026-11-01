@@ -39,7 +39,7 @@ namespace UltraVideoEditor
             UiScaling.Register(this);
             _items = timelineItems.Where(i => i.IsVideoTrack && File.Exists(i.Path)).ToList();
             BuildPresetButtons();
-            TxtClipCount.Text = $"{_items.Count} video clips on the timeline";
+            TxtClipCount.Text = LanguageManager.F("lx_video_clips_on_the_timeline_16505", _items.Count);
         }
 
         // ── Preset buttons ────────────────────────────────────────────
@@ -70,7 +70,7 @@ namespace UltraVideoEditor
                     Style     = (Style)FindResource("PresetBtn"),
                 };
                 AutomationProperties.SetName(btn,
-                    $"Preset {label}: {ColorGradingEngine.PresetDescriptions[preset]}");
+                    LanguageManager.F("lx_preset_a0e2a", label, ColorGradingEngine.PresetDescriptions[preset]));
 
                 var p = preset; // closure capture
                 btn.Checked += (_, _) =>
@@ -104,8 +104,8 @@ namespace UltraVideoEditor
             if (_running) { _cts?.Cancel(); return; }
             if (_items.Count == 0)
             {
-                MessageBox.Show("No video clips on the timeline.",
-                    "Color Grading", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(LanguageManager.T("lx_there_are_no_video_clips_29051"),
+                    LanguageManager.T("lx_colour_grading_ecc23"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -117,7 +117,7 @@ namespace UltraVideoEditor
             BtnDeselectAll.IsEnabled = false;
             ProgressPanel.Visibility = Visibility.Visible;
             ProgressBar.Value        = 0;
-            BtnAnalyze.Content       = "⏹ Cancel";
+            BtnAnalyze.Content       = LanguageManager.T("lx_cancel_3bdb2");
             _cts = new CancellationTokenSource();
 
             var progress = new Progress<(int Percent, string Message)>(p =>
@@ -136,23 +136,23 @@ namespace UltraVideoEditor
                 BtnApply.IsEnabled       = true;
                 BtnSelectAll.IsEnabled   = true;
                 BtnDeselectAll.IsEnabled = true;
-                TxtClipCount.Text = $"{_gradeResults.Count} clips  ·  preset: {_selected}";
+                TxtClipCount.Text = LanguageManager.F("lx_clips_preset_7bdc8", _gradeResults.Count, _selected);
             }
             catch (OperationCanceledException)
             {
                 SetProgress(0, "Cancelled.");
-                TxtClipCount.Text = "Cancelled.";
+                TxtClipCount.Text = LanguageManager.T("lx_cancelled_d3e41");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Color Grading",
+                MessageBox.Show(LanguageManager.F("lx_error_f93e6", ex.Message), LanguageManager.T("lx_colour_grading_ecc23"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
                 _running = false;
                 _cts?.Dispose(); _cts = null;
-                BtnAnalyze.Content       = "🎨 Analyze and grade";
+                BtnAnalyze.Content       = LanguageManager.T("lx_analyse_and_grade_31890");
                 BtnAnalyze.IsEnabled     = true;
                 ProgressPanel.Visibility = Visibility.Collapsed;
             }
@@ -245,7 +245,7 @@ namespace UltraVideoEditor
                 Margin    = new Thickness(0, 0, 0, 3),
             };
             AutomationProperties.SetName(chk,
-                $"{r.Item.Name}, preset {r.Grade.AppliedPreset}");
+                LanguageManager.F("lx_preset_49515", r.Item.Name, r.Grade.AppliedPreset));
             chk.Checked   += (_, _) => { r.Selected = true;  UpdateApplyButton(); };
             chk.Unchecked += (_, _) => { r.Selected = false; UpdateApplyButton(); };
             sp.Children.Add(chk);
@@ -261,7 +261,7 @@ namespace UltraVideoEditor
 
             card.Child = sp;
             AutomationProperties.SetName(card,
-                $"Clip {r.Item.Name}, grade preset {r.Grade.AppliedPreset}");
+                LanguageManager.F("lx_clip_grade_preset_fa440", r.Item.Name, r.Grade.AppliedPreset));
             return card;
         }
 
@@ -297,18 +297,15 @@ namespace UltraVideoEditor
             if (count == 0) return;
 
             var confirm = MessageBox.Show(
-                $"Apply color grade to {count} clips?\n\n" +
-                "The grade filter is written into each clip's ContentTag\n" +
-                "and is applied at the next render.",
-                "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                LanguageManager.F("lx_apply_the_colour_grade_to_2388d", count),
+                LanguageManager.T("lx_confirm_04a21"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
 
             ColorGradingEngine.ApplyGradesToItems(_gradeResults);
 
             MessageBox.Show(
-                $"Color grade applied to {count} clips.\n" +
-                "Run the render to see the result.",
-                "Color Grading", MessageBoxButton.OK, MessageBoxImage.Information);
+                LanguageManager.F("lx_colour_grade_applied_to_clips_8bb88", count),
+                LanguageManager.T("lx_colour_grading_ecc23"), MessageBoxButton.OK, MessageBoxImage.Information);
 
             DialogResult = true;
             Close();

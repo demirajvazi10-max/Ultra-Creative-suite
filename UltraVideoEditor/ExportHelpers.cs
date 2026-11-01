@@ -177,15 +177,34 @@ namespace UltraVideoEditor
         /// Converts a finished MP4 render into WebM (VP9 + Opus) or AVI (MPEG-4 + MP3).
         /// Returns true when <paramref name="outPath"/> was written.
         /// </summary>
-        public static async Task<bool> ConvertContainerAsync(string mp4Path, string outPath, CancellationToken ct)
+        public static async Task<bool> ConvertContainerAsync(string mp4Path, string outPath, CancellationToken ct,
+                                                             string codec = "H264", string quality = "Medium", bool useGpu = false)
         {
             string ext = Path.GetExtension(outPath).ToLowerInvariant();
+            // v2.0: H.265 (HEVC) and ProRes 422 HQ. The quality follows Export options.
+            int hevcCrf = quality switch { "Maximum" => 16, "High" => 20, "Low" => 30, _ => 25 };
             string codecs = ext switch
             {
-                ".webm" => "-c:v libvpx-vp9 -crf 32 -b:v 0 -row-mt 1 -c:a libopus -b:a 160k",
+                ".webm" => $"-c:v libvpx-vp9 -crf {(quality == "Maximum" ? 20 : quality == "High" ? 26 : 32)} -b:v 0 -row-mt 1 -c:a libopus -b:a 160k",
                 ".avi" => "-c:v mpeg4 -q:v 3 -c:a libmp3lame -b:a 192k",
+                // v2.0: DNxHR (Avid / Resolve intermediate), HQ 8-bit or HQX 10-bit
+                ".mov" when codec == "DNxHR" => "-c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -c:a pcm_s16le -ar 48000",
+                ".mov" when codec == "DNxHR10" => "-c:v dnxhd -profile:v dnxhr_hqx -pix_fmt yuv422p10le -c:a pcm_s24le -ar 48000",
+                ".mov" => "-c:v prores_ks -profile:v 3 -vendor apl0 -pix_fmt yuv422p10le -c:a pcm_s16le -ar 48000",
+                // v2.0: lossless archive (FFV1, 10-bit) in Matroska
+                ".mkv" => "-c:v ffv1 -level 3 -g 1 -slices 16 -slicecrc 1 -pix_fmt yuv422p10le -c:a flac",
+                ".mp4" when codec == "H265" => $"-c:v libx265 -preset medium -crf {hevcCrf} -tag:v hvc1 -pix_fmt yuv420p -c:a copy -movflags +faststart",
+                // v2.0: H.265 Main 10 (10-bit)
+                ".mp4" when codec == "H265_10" => $"-c:v libx265 -preset medium -crf {hevcCrf} -profile:v main10 -tag:v hvc1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart",
                 _ => "-c copy"
             };
+            if (ext == ".mp4" && (codec == "H265" || codec == "H265_10") && useGpu)
+            {
+                // the NVIDIA encoder first (much faster); the CPU encoder if it is not there
+                string tenBit = codec == "H265_10" ? "-profile:v main10 -pix_fmt p010le" : "-pix_fmt yuv420p";
+                string gpu = $"-nostdin -y -i \"{mp4Path}\" -c:v hevc_nvenc -preset p5 -rc vbr -cq {hevcCrf} -b:v 0 -tag:v hvc1 {tenBit} -c:a copy -movflags +faststart \"{outPath}\"";
+                if (await RunFfmpegAsync(gpu, ct) && File.Exists(outPath) && new FileInfo(outPath).Length > 1000) return true;
+            }
             string args = $"-nostdin -y -i \"{mp4Path}\" {codecs} \"{outPath}\"";
             return await RunFfmpegAsync(args, ct) && File.Exists(outPath) && new FileInfo(outPath).Length > 1000;
         }

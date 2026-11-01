@@ -17,7 +17,7 @@ namespace UltraVideoEditor
         {
             InitializeComponent();
             UiScaling.Register(this);
-            this.Title = $"Add subtitle to: {clip.Name}";
+            this.Title = LanguageManager.F("lx_add_a_subtitle_to_c0360", clip.Name);
         }
 
         private void Ok_Click(object sender, RoutedEventArgs e)

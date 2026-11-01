@@ -17,7 +17,8 @@ namespace UltraVideoEditor
     ///
     /// Each element remembers which row it was translated from, so switching languages back
     /// and forth always starts from the right row, even where two rows share one word.
-    /// Combo box and list box items are left alone: the code reads their text as values.
+    /// List box items are left alone: the code reads their text as values. Combo box items are
+    /// translated (v2.0); their value is their Tag, or the original text from Original().
     /// Bound texts are left alone too, so a binding is never broken.
     /// </summary>
     internal static class XamlTranslator
@@ -95,7 +96,9 @@ namespace UltraVideoEditor
                 Apply(obj, obj is WControls.HeaderedContentControl ? WControls.HeaderedContentControl.HeaderProperty
                                                                    : WControls.HeaderedItemsControl.HeaderProperty, col);
 
-            if (obj is WControls.ContentControl && obj is not WControls.ComboBoxItem && obj is not WControls.ListBoxItem
+            // v2.0: combo box items are translated too; code that needs the item's value reads its
+            // Tag, or the original text through Original()
+            if (obj is WControls.ContentControl && (obj is WControls.ComboBoxItem || obj is not WControls.ListBoxItem)
                 && obj is not Window)
                 Apply(obj, WControls.ContentControl.ContentProperty, col);
 
@@ -117,6 +120,15 @@ namespace UltraVideoEditor
 
             foreach (object child in LogicalTreeHelper.GetChildren(obj))
                 if (child is DependencyObject d) Walk(d, col, depth + 1);
+        }
+
+        /// <summary>v2.0 — the English text an element had in the XAML, whatever language it shows now.</summary>
+        public static string Original(DependencyObject obj, DependencyProperty prop)
+        {
+            if (obj == null) return null;
+            if (_memo.TryGetValue(obj, out var memos) && memos.TryGetValue(prop, out var m) && obj.GetValue(prop) as string == m.Written)
+                return UiTranslations.Rows[m.Row][0];
+            return obj.GetValue(prop) as string;
         }
 
         private static void Apply(DependencyObject obj, DependencyProperty prop, int col)

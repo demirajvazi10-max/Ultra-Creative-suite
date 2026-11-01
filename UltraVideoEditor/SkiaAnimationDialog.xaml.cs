@@ -46,7 +46,7 @@ namespace UltraVideoEditor
         {
             if (string.IsNullOrWhiteSpace(txtText.Text))
             {
-                WpfMessageBox.Show("Enter animation text.", "Error",
+                WpfMessageBox.Show(LanguageManager.T("lx_enter_anim_text"), LanguageManager.T("generic_error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 txtText.Focus();
                 return;

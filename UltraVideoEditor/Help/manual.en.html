@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultra Video Editor manual</title>
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #1b1b1b; --muted: #555; --accent: #0b5cad; --line: #d0d7de; --code: #f3f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16181b; --fg: #e8e8e8; --muted: #b0b0b0; --accent: #7cb7ff; --line: #3a3f45; --code: #23272c; } }
+  body { background: var(--bg); color: var(--fg); font: 17px/1.6 "Segoe UI", system-ui, sans-serif; max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  h1 { font-size: 1.9rem; margin-top: 0; }
+  h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.15rem; margin-top: 1.6rem; }
+  a { color: var(--accent); }
+  kbd { font-family: Consolas, monospace; background: var(--code); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; white-space: nowrap; }
+  nav ul { columns: 2; }
+  @media (max-width: 40rem) { nav ul { columns: 1; } }
+  .note { color: var(--muted); }
+  :focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+<h1>Ultra Video Editor manual</h1>
+<p>Version 2.0. Made by Demir Ajvazi.</p>
+<p>Every heading on this page is a section. With a screen reader, press <kbd>H</kbd> to go from heading to heading, <kbd>2</kbd> for the main sections, or <kbd>Insert+F6</kbd> (JAWS) or <kbd>NVDA+F7</kbd> (NVDA) for the list of headings. The <a href="shortcuts.html">list of all keyboard shortcuts</a> opens with <kbd>F1</kbd> in the program, and this manual with <kbd>Ctrl+F1</kbd>.</p>
+</header>
+
+<nav aria-label="Contents">
+<h2>Contents</h2>
+<ul>
+<li><a href="#start">Getting started</a></li>
+<li><a href="#basics">Basic editing</a></li>
+<li><a href="#playback">Playing and listening</a></li>
+<li><a href="#tracks">Tracks and layers</a></li>
+<li><a href="#editing">Advanced editing</a></li>
+<li><a href="#colour">Colour</a></li>
+<li><a href="#sound">Sound and the track mixer</a></li>
+<li><a href="#titles">Titles, subtitles and animation</a></li>
+<li><a href="#masks">Masks and following objects</a></li>
+<li><a href="#ai">Descriptions and AI tools</a></li>
+<li><a href="#ad">Audio description for viewers, step by step</a></li>
+<li><a href="#export">Export and exchange</a></li>
+<li><a href="#settings">Settings, display and help</a></li>
+</ul>
+</nav>
+
+<main>
+<section aria-labelledby="start">
+<h2 id="start">Getting started</h2>
+<h3>The main window</h3>
+<p>The window has a menu bar (press <kbd>Alt</kbd> to reach it), the clip list, the player and tabs for effects, subtitles, transitions and animation. Every menu command shows its shortcut, and screen readers read it with the command, for example "Open Ctrl+O".</p>
+<p>The clip list is the timeline in text form: one line per clip with its number, name, type, track, length, start, end and description. <kbd>Ctrl+L</kbd> brings the focus to it from anywhere. <kbd>Ctrl+Tab</kbd> and <kbd>Ctrl+Shift+Tab</kbd> move between the tabs.</p>
+<h3>What the program says</h3>
+<p>Everything that happens is spoken through the screen reader: what a command did, progress of long work in quarters, and errors with what to do about them. You never need to open the log to know what happened, but <kbd>Ctrl+Shift+L</kbd> shows it when you want to read things again.</p>
+<h3>Undo</h3>
+<p><kbd>Ctrl+Z</kbd> undoes and <kbd>Ctrl+Y</kbd> redoes almost every change: editing, tracks, effects, the mixer, imports. Closing a window with Cancel leaves no change and no empty undo step.</p>
+</section>
+
+<section aria-labelledby="basics">
+<h2 id="basics">Basic editing</h2>
+<h3>Projects</h3>
+<p><kbd>Ctrl+N</kbd> starts a new project, <kbd>Ctrl+O</kbd> opens one, <kbd>Ctrl+S</kbd> saves and <kbd>F12</kbd> saves under another name. Every two minutes a changed project is copied aside; if the program did not close normally, it offers to restore that copy the next time.</p>
+<h3>Adding media</h3>
+<p><kbd>Ctrl+I</kbd> adds videos and pictures, <kbd>Ctrl+Shift+I</kbd> adds sound files. Timeline, Import from YouTube brings in a video or an MP3, one video or a whole playlist.</p>
+<h3>Moving through the clips</h3>
+<p>In the clip list, the arrows go from clip to clip, <kbd>Page Up</kbd> and <kbd>Page Down</kbd> jump five clips, <kbd>Home</kbd> and <kbd>End</kbd> go to the first and last clip, and <kbd>Ctrl+G</kbd> goes to a clip by its number. <kbd>F4</kbd>, Where am I, speaks the position and what is under the playhead on every track, how long until the next cut, and the description of the picture when one exists.</p>
+<h3>Changing clips</h3>
+<p><kbd>Ctrl+Left</kbd> and <kbd>Ctrl+Right</kbd> move a clip, <kbd>Ctrl+D</kbd> sets its length, <kbd>Ctrl+Alt+V</kbd> its volume and <kbd>Ctrl+Alt+S</kbd> its speed. <kbd>Ctrl+X</kbd> cuts the clip at the playhead; <kbd>Q</kbd> and <kbd>W</kbd> trim its start or end to the playhead. <kbd>Delete</kbd> deletes the selected clip; <kbd>Shift+Delete</kbd> deletes it and closes the gap (ripple delete), so later clips and the layers above move back. <kbd>Ctrl+C</kbd> and <kbd>Ctrl+V</kbd> copy and paste clips.</p>
+<h3>Markers</h3>
+<p><kbd>Ctrl+M</kbd> adds a marker at the playhead, <kbd>Ctrl+Shift+N</kbd> and <kbd>Ctrl+Shift+Comma</kbd> go to the next and previous marker, and <kbd>Ctrl+Shift+X</kbd> cuts the clips at all markers.</p>
+</section>
+
+<section aria-labelledby="playback">
+<h2 id="playback">Playing and listening</h2>
+<h3>One clip</h3>
+<p><kbd>Ctrl+Space</kbd> plays or pauses the selected clip. <kbd>Alt+Left</kbd> and <kbd>Alt+Right</kbd> move five seconds, with <kbd>Shift</kbd> a tenth of a second; <kbd>Comma</kbd> and <kbd>Period</kbd> move one frame.</p>
+<h3>The whole timeline, live</h3>
+<p><kbd>Ctrl+Shift+Space</kbd> plays the whole timeline live, without rendering first: the main track with its transitions, the layers, colour, titles and subtitles, with the full sound mix. <kbd>Space</kbd> pauses and continues, and the arrows and comma or period move as usual.</p>
+<ul>
+<li><kbd>L</kbd> plays; pressed again while playing it goes 2 and then 4 times faster, without sound. At the end, <kbd>L</kbd> starts again from the beginning.</li>
+<li><kbd>J</kbd> plays backwards; pressed again 2 and then 4 times faster (picture only).</li>
+<li><kbd>K</kbd> stops. <kbd>Space</kbd> or <kbd>L</kbd> return to normal playing with sound.</li>
+<li><kbd>Ctrl+Alt+Shift+Space</kbd> changes the size of the live picture: automatic, 640, 960, 1280 or 1920 wide. Automatic starts at 960 and goes one size down when the computer cannot keep up, and says so.</li>
+</ul>
+<p>Ken Burns motion and stabilisation are seen only in the export and in the whole-video preview.</p>
+<h3>Whole-video preview</h3>
+<p><kbd>Ctrl+Alt+Space</kbd> renders the whole video small and fast, with picture, layers, titles, colour and sound, and plays it. Pressed again while it is being made, it stops. If nothing changed, the same preview plays at once.</p>
+<h3>Proxies</h3>
+<p>View, Make preview copies of large clips: clips taller than 1080 lines get smaller copies that play smoothly on a slower computer. The export always uses the originals.</p>
+</section>
+
+<section aria-labelledby="tracks">
+<h2 id="tracks">Tracks and layers</h2>
+<h3>Tracks</h3>
+<p><kbd>Ctrl+Alt+N</kbd> adds a video track and <kbd>Ctrl+Alt+Shift+N</kbd> an audio track, up to 60 of each. <kbd>Ctrl+Alt+Page Up</kbd> and <kbd>Ctrl+Alt+Page Down</kbd> go to the previous or next track and say what is on it; the clip list then shows that track. <kbd>Ctrl+Up</kbd> and <kbd>Ctrl+Down</kbd> move the selected clip to the track above or below (past the last track, a new one is made).</p>
+<p><kbd>Ctrl+Alt+R</kbd> names the track (Music, Narration, Titles), <kbd>Ctrl+Alt+K</kbd> locks it so its clips cannot be changed, <kbd>Ctrl+Alt+H</kbd> switches a layer track off and on, and <kbd>Ctrl+Alt+I</kbd> reads all tracks. Timeline, Remove an empty track removes the track you are on when it holds no clips. Higher video tracks are drawn over lower ones.</p>
+<h3>Layers</h3>
+<p>Select a picture clip and press <kbd>Ctrl+Alt+L</kbd>, Layer and colour. Tick Move this clip to the layer track: it is then drawn over the main picture while it lasts. Choose the position (full frame, centre, a corner or your own), the size, the opacity, a green or blue screen, and whether its own sound is mixed in.</p>
+<p>A layer also gets a blend mode (screen, multiply, overlay, soft light, lighten, darken, add, difference) and a mask (see <a href="#masks">Masks</a>). In the same window a colour LUT (.cube file) colours the clip, on the main picture as well as on a layer.</p>
+</section>
+
+<section aria-labelledby="editing">
+<h2 id="editing">Advanced editing</h2>
+<h3>J and L cuts</h3>
+<p><kbd>Ctrl+Alt+U</kbd> detaches the sound of a video clip into its own clip. Then <kbd>Ctrl+[</kbd> starts the selected clip half a second earlier and <kbd>Ctrl+]</kbd> lets it end half a second later; with <kbd>Shift</kbd> they work the other way. That is how the sound begins before the picture, or goes on after it.</p>
+<h3>Slip, roll and slide</h3>
+<p><kbd>Alt+[</kbd> and <kbd>Alt+]</kbd> slip a clip: it stays in place and keeps its length but shows an earlier or later part of its file. <kbd>Ctrl+Alt+[</kbd> and <kbd>Ctrl+Alt+]</kbd> roll the cut to the next clip half a second earlier or later. <kbd>Shift+Alt+[</kbd> and <kbd>Shift+Alt+]</kbd> slide the clip between its neighbours: it keeps its content and length, and the clips around it get shorter or longer.</p>
+<h3>Speed and speed ramps</h3>
+<p><kbd>Ctrl+Alt+S</kbd> sets the speed of a clip; Clip effects adds smooth slow motion. <kbd>Ctrl+Alt+Shift+S</kbd>, Speed ramp, changes the speed smoothly inside a video clip: choose a ready shape (speeds up, slows down, slow motion in the middle, fast in the middle), or put the playhead on a place, set the speed in percent and add a point. The clip keeps its length on the timeline, and the window says how much of the recording it now uses.</p>
+<h3>Multicam</h3>
+<p><kbd>Ctrl+Alt+Shift+M</kbd>: tick 2 to 9 video clips of the same event and choose the main sound. The cameras are lined up by their sound (or by their places on the timeline), and the offset of every camera is spoken. Play the timeline and press <kbd>1</kbd> to <kbd>9</kbd> to cut to a camera; when stopped, a number changes the camera of the part under the playhead. Timeline, Read the multicam cuts lists every cut.</p>
+<h3>Compound clips</h3>
+<p>Select two or more clips (<kbd>Shift</kbd> or <kbd>Ctrl</kbd> with the arrows) and press <kbd>Ctrl+Alt+G</kbd>: they become one clip, rendered once with their layers, titles, colour and sound. <kbd>Ctrl+Alt+Shift+G</kbd> breaks it apart and puts the clips back at their places, ready for changes.</p>
+<h3>Transitions</h3>
+<p>In the Transitions tab, choose a transition and press <kbd>Enter</kbd> or <kbd>Space</kbd> to put it on the selected clip; <kbd>F1</kbd> there reads its description. Without a chosen transition, cuts get a short soft dissolve. Transitions are seen in live playback and in the export.</p>
+</section>
+
+<section aria-labelledby="colour">
+<h2 id="colour">Colour</h2>
+<h3>Clip effects</h3>
+<p><kbd>Ctrl+Alt+E</kbd> opens Clip effects: brightness, contrast, saturation, temperature, tint, mid-tones, shadows, highlights, vignette and sharpness, optionally for the whole track; stabilisation, speed and smooth slow motion; and the clip's own sound (three-band equaliser, noise reduction, clearer voice, compressor, fades).</p>
+<h3>Colour balance, curves and one colour</h3>
+<p>Clip effects also has colour balance for shadows, mid-tones and highlights separately, and curves for all colours and for red, green and blue, five points each, with ready shapes. One colour only shifts the hue, saturation or brightness of reds, yellows, greens, cyans, blues or magentas, or keeps only that colour and turns the rest black and white. Pick the colour takes a colour from a part of the picture and says what it is.</p>
+<h3>Power window</h3>
+<p>In Clip effects, Power window applies the whole correction only inside an oval or rectangle (centre, width, height, soft edge), in a graduated top, bottom, left or right part (for example the sky), or everywhere except the window. Only the settings that matter for the chosen shape can be changed, and the program says which.</p>
+<h3>Colour described in words</h3>
+<p><kbd>Ctrl+Alt+C</kbd>, Colour here, measures the picture at the playhead and describes it in words: brightness, contrast, lost blacks and whites, warm or cool, a green or magenta cast, how strong the colours are and the main colours. Pressed again, it describes the whole clip. In Clip effects, Analyse the colour does the same for the settings in the window, and Match the colour makes the clip look like another clip.</p>
+</section>
+
+<section aria-labelledby="sound">
+<h2 id="sound">Sound and the track mixer</h2>
+<h3>Volume over time</h3>
+<p><kbd>Ctrl+Shift+V</kbd> sets a volume point at the playhead on the selected clip; the volume moves smoothly from point to point. Timeline, Lower the music under speech does it for you.</p>
+<h3>Track mixer</h3>
+<p><kbd>Ctrl+Alt+M</kbd> opens the track mixer: volume, mute, solo, a three-band equaliser, a compressor, pan, low cut, noise reduction, de-esser, room echo and a limiter for every track with sound, on top of each clip's own settings. It is saved with the project.</p>
+<h3>Track automation</h3>
+<p><kbd>Ctrl+Alt+Shift+V</kbd> sets a track volume point at the playhead: the whole track's volume moves smoothly from point to point, independent of its clips. The Edit menu reads the points and removes one or all.</p>
+</section>
+
+<section aria-labelledby="titles">
+<h2 id="titles">Titles, subtitles and animation</h2>
+<h3>Titles</h3>
+<p><kbd>Ctrl+Alt+T</kbd> puts a title over the selected clip, with an optional second line, its position (centre, lower third, top, bottom, corners), size, colour, a dark band behind it, how it comes in (fade, slide up, slide from the right, zoom), when it starts and how long it stays.</p>
+<h3>Subtitles</h3>
+<p>The Subtitles tab holds subtitles with their times. AI, Transcribe audio writes them from speech with Whisper, and Sync lyrics places song lyrics word by word.</p>
+<h3>Keyframe animation</h3>
+<p>In the Animation tab, <kbd>Ctrl+K</kbd> adds a keyframe with zoom, rotation, position and opacity, and <kbd>Ctrl+Shift+K</kbd> removes it. Every keyframe has a curve to the next one: linear, ease in (starts slowly), ease out (slows down at the end), ease in and out, or hold (the value jumps at the next keyframe). The keyframe list reads the curve with each keyframe.</p>
+</section>
+
+<section aria-labelledby="masks">
+<h2 id="masks">Masks and following objects</h2>
+<h3>Masks</h3>
+<p>In Layer and colour (<kbd>Ctrl+Alt+L</kbd>), a layer can have a mask: oval, rectangle, rounded rectangle, diamond, triangle, star, heart, or your own shape given as points (x y; x y; … in percent). The mask has its own place and size inside the layer and a soft edge; it can be turned inside out, move during the clip from one place and size to another, or follow an object.</p>
+<h3>Follow an object</h3>
+<p><kbd>Ctrl+Alt+O</kbd>: describe something in the selected clip in words (the man in the red jacket, the licence plate, the dog) and the picture AI finds it, or choose the part of the picture where it is. The editor follows it through the clip and says where it went and where it lost it. The object can be blurred, pixelated, covered with a black box or lit while the rest gets darker; on a layer clip, its mask can follow it; and a layer clip (a label, an arrow, a logo) can move along with an object in the picture below it.</p>
+</section>
+
+<section aria-labelledby="ai">
+<h2 id="ai">Descriptions and AI tools</h2>
+<h3>Descriptions of your clips</h3>
+<p><kbd>Ctrl+Shift+F</kbd> describes the frame under the playhead. <kbd>Ctrl+Alt+D</kbd> describes the selected clip part by part in the background, while you keep editing; AI, Describe all my clips does it for every clip. With a Gemini key the descriptions come from Gemini; without one, from the local model in Ollama.</p>
+<h3>AI music video creator</h3>
+<p>AI, Video Engine makes a finished music video from a song and its lyrics: footage is chosen for every line, cut to the music, with word-level lyric sync and karaoke subtitles, and every scene can be reviewed and changed.</p>
+<h3>Other AI tools</h3>
+<p>The AI menu also has video review, smart scene detection (<kbd>Ctrl+Shift+D</kbd>), the highlight engine (<kbd>Ctrl+Shift+H</kbd>), the timeline AI assistant (<kbd>Ctrl+Shift+T</kbd>), the colour grading engine (<kbd>Ctrl+Shift+G</kbd>), batch export (<kbd>Ctrl+Shift+B</kbd>), project templates (<kbd>Ctrl+Shift+P</kbd>), voice generation and transcription.</p>
+</section>
+
+<section aria-labelledby="ad">
+<h2 id="ad">Audio description for viewers, step by step</h2>
+<ol>
+<li><kbd>Ctrl+Alt+A</kbd> opens the window. A video clip selected in the clip list is filled in; otherwise choose a clip in Video from the timeline, or any file with Choose video.</li>
+<li>Once only, optional: paste a Gemini API key (free, from Google AI Studio) and press Test and save the key. With it, Gemini watches the whole video with its sound and writes the best descriptions.</li>
+<li>Choose how the descriptions are written and how often, then press Write the description script. Enter in the video field does the same.</li>
+<li>Read the script and correct it as you like: one line per description, time | text.</li>
+<li>Choose the voice (Microsoft natural voices are free; Google HD voices need a Google Cloud key) and how much the music goes down under it.</li>
+<li>Press Create the video with audio description. Next to the video you get the described video (.mp4), the text for YouTube (.txt) and a description track (.vtt).</li>
+</ol>
+<p>The window speaks its progress at every quarter; Stop cancels the work; a short sound plays when it finishes or fails.</p>
+</section>
+
+<section aria-labelledby="export">
+<h2 id="export">Export and exchange</h2>
+<h3>Export</h3>
+<p><kbd>Ctrl+E</kbd> exports the video. File, Export options chooses the format: MP4 with H.264, H.265 or H.265 10-bit; MOV with ProRes 422 HQ, DNxHR HQ or DNxHR HQX 10-bit; MKV with lossless FFV1 for archiving; WebM or AVI. Quality goes up to Maximum, the frame rate follows the video or is chosen (24 to 60), and the fades and the warm colour look can be switched off. File, Export for Shorts, TikTok and Instagram makes vertical and square versions.</p>
+<h3>Working with other editors</h3>
+<p>File, Export the timeline writes it as OpenTimelineIO (.otio), as an EDL, or as Final Cut 7 XML with all video and audio tracks, so another editor or a colourist can continue the work in their program.</p>
+<p><kbd>Ctrl+Alt+Shift+I</kbd>, Import a timeline, reads XML, OTIO and EDL files with their tracks, places and in-points. A video clip's sound is joined back to it, and files that moved are looked for next to the timeline file. You choose: Yes replaces the current timeline, No adds it after the end. Clips whose files are missing are named and left out.</p>
+</section>
+
+<section aria-labelledby="settings">
+<h2 id="settings">Settings, display and help</h2>
+<p>View, Language: English, Serbian or German. View, Display mode: sighted, accessibility (screen reader) or low vision; <kbd>Ctrl+Shift+A</kbd> switches the accessibility mode, and <kbd>Ctrl+Shift+Plus</kbd> and <kbd>Ctrl+Shift+Minus</kbd> make text and controls larger or smaller. View, Theme: dark, high contrast or light.</p>
+<p>Help, Keyboard shortcuts (<kbd>F1</kbd>) opens the <a href="shortcuts.html">list of all shortcuts</a>, built from the program's menus in the language you use. Help, Updates checks for a new version. Help, Download the sound library from Adobe adds ambient sounds for the AI music video creator.</p>
+</section>
+</main>
+<footer><p class="note">Ultra Video Editor 2.0 · Demir Ajvazi</p></footer>
+</body>
+</html>

@@ -229,7 +229,7 @@ namespace UltraVideoEditor
 
         private async void AIVideoCreator_Loaded(object sender, RoutedEventArgs e)
         {
-            AutomationProperties.SetName(this, "AI Video Creator dialog");
+            AutomationProperties.SetName(this, LanguageManager.T("lx_ai_music_video_creator_5a5e0"));
             txtOllamaStatus.Text = L("ol_checking");
             txtOllamaStatus.Foreground = System.Windows.Media.Brushes.Orange;
 
@@ -286,7 +286,7 @@ namespace UltraVideoEditor
                 }
             }
 
-            LogToMainWindow($"🎵 Auto-filled from audio file: '{fileName}'");
+            LogToMainWindow(LanguageManager.F("lx_filled_in_from_the_audio_0ea1f", fileName));
         }
 
         private void InitLocalSounds()
@@ -294,12 +294,12 @@ namespace UltraVideoEditor
             int count = LocalSoundLibrary.GetSoundCount();
             if (count > 0)
             {
-                LogToMainWindow($"🔊 Local sound library: {count} files — ambient sounds active.");
+                LogToMainWindow(LanguageManager.F("lx_local_sound_library_files_ambient_eea45", count));
             }
             else
             {
-                LogToMainWindow("⚠️ Assets/Sounds/ is empty or does not exist — ambient sounds will not be available.");
-                LogToMainWindow("   Place MP3/WAV files in Assets/Sounds/ to activate.");
+                LogToMainWindow(LanguageManager.T("lx_assets_sounds_is_empty_or_7137e"));
+                LogToMainWindow(LanguageManager.T("lx_put_mp_or_wav_files_e5e6e"));
                 _enableAmbientSounds = false;
                 if (chkAmbientSounds != null) chkAmbientSounds.IsChecked = false;
                 if (chkAmbientSounds != null) chkAmbientSounds.IsEnabled = false;
@@ -347,7 +347,7 @@ namespace UltraVideoEditor
             {
                 var dlg = new Microsoft.Win32.OpenFileDialog
                 {
-                    Title = "Select audio file for transcription",
+                    Title = LanguageManager.T("lx_choose_the_audio_file_to_63d31"),
                     Filter = L("filter_audio_video")
                 };
                 if (dlg.ShowDialog() != true) return;
@@ -369,9 +369,9 @@ namespace UltraVideoEditor
             }
 
             btnAutoTranscribe.IsEnabled = false;
-            btnAutoTranscribe.Content = "⏳ Transcribing...";
+            btnAutoTranscribe.Content = LanguageManager.T("lx_transcribing_baa42");
             if (txtTranscribeStatus != null)
-                txtTranscribeStatus.Text = "Starting Whisper...";
+                txtTranscribeStatus.Text = LanguageManager.T("lx_starting_whisper_38e2d");
 
             var progress = new Progress<string>(msg =>
             {
@@ -417,7 +417,7 @@ namespace UltraVideoEditor
                 _timedLyricsText = null; // forces a word-level alignment at generation (fast, cached words)
 
                 if (txtTranscribeStatus != null)
-                    txtTranscribeStatus.Text = $"✅ {result.Lines.Count} linija prepoznato";
+                    txtTranscribeStatus.Text = LanguageManager.F("lx_lines_recognized_d459f", result.Lines.Count);
 
                 AnnounceToUser(LF("transcription_done", result.Lines.Count), 0);
             }
@@ -428,7 +428,7 @@ namespace UltraVideoEditor
             finally
             {
                 btnAutoTranscribe.IsEnabled = true;
-                btnAutoTranscribe.Content = "🎤 Transcribe from audio";
+                btnAutoTranscribe.Content = LanguageManager.T("lx_transcribe_from_the_audio_dfcef");
             }
         }
 
@@ -462,7 +462,7 @@ namespace UltraVideoEditor
                     ApplyLyricTiming(cached, textKey);
                     return;
                 }
-                LogToMainWindow($"🔤 Cached words matched only {cached.AlignmentConfidence:P0} of the lyrics — running Whisper alignment");
+                LogToMainWindow(LanguageManager.F("lx_the_saved_word_timings_match_ff7fb", cached.AlignmentConfidence));
             }
 
             // 2. Whisper forced alignment
@@ -485,11 +485,11 @@ namespace UltraVideoEditor
                     ApplyLyricTiming(res, textKey);
                     return;
                 }
-                LogToMainWindow($"⚠️ Lyric alignment failed: {res.ErrorMessage}");
+                LogToMainWindow(LanguageManager.F("lx_aligning_the_lyrics_failed_f69fa", res.ErrorMessage));
             }
             else
             {
-                LogToMainWindow("ℹ️ Whisper is not installed — lyric lines cannot be aligned to the song");
+                LogToMainWindow(LanguageManager.T("lx_whisper_is_not_installed_so_c0963"));
             }
 
             // 3. Nothing worked: never keep timestamps that belong to a different text
@@ -513,7 +513,7 @@ namespace UltraVideoEditor
             _timedLyricsText = textKey;
 
             string confidence = res.AlignmentConfidence >= 0 ? $"{res.AlignmentConfidence:P0}" : "—";
-            LogToMainWindow($"🔤 Lyrics aligned: {res.Lines.Count} lines, {_wordTimings.Count} words, matched {confidence}");
+            LogToMainWindow(LanguageManager.F("lx_lyrics_aligned_lines_words_match_c36b3", res.Lines.Count, _wordTimings.Count, confidence));
             for (int i = 0; i < res.Lines.Count; i++)
                 LogToMainWindow($"   {FormatTime(res.Lines[i].StartSeconds)}  {res.Lines[i].Text}");
             AnnounceToUser(LF("lyrics_aligned", res.Lines.Count, confidence));
@@ -532,7 +532,7 @@ namespace UltraVideoEditor
             _enableVoiceNarration = chkVoiceNarration.IsChecked == true;
             _selectedTheme = (cmbVideoTheme.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "fun";
 
-            LogToMainWindow($"🎬 Postavke: TransitionSounds={_enableTransitionSounds}, AmbientSounds={_enableAmbientSounds}, VoiceNarration={_enableVoiceNarration}, Theme={_selectedTheme}");
+            LogToMainWindow(LanguageManager.F("lx_settings_transition_sounds_ambient_sound_3eeff", _enableTransitionSounds, _enableAmbientSounds, _enableVoiceNarration, _selectedTheme));
 
             var audioItem = mainWindow.timelineItems.FirstOrDefault(i => i.Type == "Audio");
 
@@ -579,7 +579,7 @@ namespace UltraVideoEditor
                     newAudioItem.Duration = totalDuration;
                     newAudioItem.End = totalDuration;
 
-                    LogToMainWindow($"🎵 AI-generated music added, duration: {FormatTime(totalDuration)}");
+                    LogToMainWindow(LanguageManager.F("lx_ai_music_added_length_7d5c6", FormatTime(totalDuration)));
                     audioItem = newAudioItem;
                     hasAudio = true;
                 }
@@ -670,14 +670,14 @@ namespace UltraVideoEditor
                         && !string.IsNullOrWhiteSpace(analysis.Mood);
                     if (validAnalysis)
                     {
-                        LogToMainWindow($"🎭 AI analysis: context='{analysis.Context}', mood='{analysis.Mood}', theme='{analysis.Theme}'");
+                        LogToMainWindow(LanguageManager.F("lx_ai_analysis_setting_mood_theme_0a757", analysis.Context, analysis.Mood, analysis.Theme));
                         return analysis;
                     }
                     LogToMainWindow(L("ai_empty_values"));
                 }
                 else
                 {
-                    LogToMainWindow($"⚠️ AI did not return JSON. Response: '{response?.Substring(0, Math.Min(100, response?.Length ?? 0))}'");
+                    LogToMainWindow(LanguageManager.F("lx_the_ai_did_not_answer_4f892", response?.Substring(0, Math.Min(100, response?.Length ?? 0))));
                 }
             }
             catch (Exception ex)
@@ -789,7 +789,7 @@ namespace UltraVideoEditor
             var results = new List<SceneKeywords>();
             int total = lyrics.Count;
 
-            LogToMainWindow($"🎬 Director pass: planning {total} lines with one visual identity...");
+            LogToMainWindow(LanguageManager.F("lx_director_pass_planning_lines_with_a6508", total));
 
             int batchSize = 16;
             string identityJson = null;                                     // fixed after the first batch
@@ -850,12 +850,12 @@ namespace UltraVideoEditor
                             if (identityJson == null && obj["identity"] is JObject idObj && idObj.HasValues)
                             {
                                 identityJson = idObj.ToString(Newtonsoft.Json.Formatting.None);
-                                LogToMainWindow($"🎭 Visual identity: {identityJson}");
+                                LogToMainWindow(LanguageManager.F("lx_visual_identity_d1553", identityJson));
                             }
                             if (obj["lines"] is JArray linesArr)
                                 batchResults = linesArr.ToObject<List<SceneKeywords>>();
                         }
-                        catch (Exception exParse) { LogToMainWindow($"⚠️ Director JSON parse: {exParse.Message}"); }
+                        catch (Exception exParse) { LogToMainWindow(LanguageManager.F("lx_the_director_s_json_could_784d9", exParse.Message)); }
                     }
                     if (batchResults == null)
                     {
@@ -920,7 +920,7 @@ namespace UltraVideoEditor
                                     if (hasAdultContent)
                                         LogToMainWindow(LF("ai_bad_keywords", r.Line, r.Keywords));
                                     if (hasContextForbidden)
-                                        LogToMainWindow($"🚫 Contextually forbidden keyword (ctx={analysis?.Context}): {r.Keywords}");
+                                        LogToMainWindow(LanguageManager.F("lx_keyword_not_allowed_in_this_28c3d", analysis?.Context, r.Keywords));
                                     int lyricIdx = r.Line - batchStart - 1;
                                     if (lyricIdx >= 0 && lyricIdx < batch.Count)
                                     {
@@ -948,7 +948,7 @@ namespace UltraVideoEditor
                                 .ToList();
                             results.AddRange(accepted);
                             foreach (var r in accepted)
-                                LogToMainWindow($"   Line {r.Line}: action='{r.Keywords}', sound='{r.Ambient}'{(r.FromAI ? "" : " (fallback)")}");
+                                LogToMainWindow(LanguageManager.F("lx_line_action_sound_de171", r.Line, r.Keywords, r.Ambient, (r.FromAI ? "" : " (fallback)")));
                             // Lines the model skipped get the rule-based fallback
                             for (int idx = 0; idx < batch.Count; idx++)
                             {
@@ -1183,7 +1183,7 @@ namespace UltraVideoEditor
             for (int i = 0; i < count; i++)
                 result.Add(templates[i % templates.Length]);
 
-            LogToMainWindow($"🎵 Instrumental scene ({count} frames) — context: '{context}', mood: '{mood}'");
+            LogToMainWindow(LanguageManager.F("lx_instrumental_scene_shots_setting_mood_0c6dd", count, context, mood));
             return result;
         }
 
@@ -2365,7 +2365,7 @@ namespace UltraVideoEditor
                 Theme = analysis.Theme ?? _detectedContext,
                 VisualStyle = analysis.VisualStyle ?? "bright colorful outdoor children"
             };
-            LogToMainWindow($"🎯 SongContext: age={_songContext.AgeGroup}, context={_songContext.Context}, season={_songContext.Season}");
+            LogToMainWindow(LanguageManager.F("lx_song_age_setting_season_f04e6", _songContext.AgeGroup, _songContext.Context, _songContext.Season));
 
             if (_contextKeywords.TryGetValue(_detectedContext, out var ctxList))
                 _universalKeywords = new List<string>(ctxList);
@@ -2414,7 +2414,7 @@ namespace UltraVideoEditor
                 _ => "Cheerful Children's Song"
             });
 
-            LogToMainWindow($"✅ Story board created: {scenes.Count} scenes for theme: '{overallTheme}'");
+            LogToMainWindow(LanguageManager.F("lx_storyboard_ready_scenes_for_the_d20b7", scenes.Count, overallTheme));
             return new StoryBoard { Scenes = scenes, MainCharacter = analysis.MainSubject ?? "Happy child", OverallTheme = overallTheme };
         }
 
@@ -2506,7 +2506,7 @@ namespace UltraVideoEditor
         {
             if (storyBoard?.Scenes == null || storyBoard.Scenes.Count < 3)
             {
-                LogToMainWindow("❌ Validation failed: Not enough scenes");
+                LogToMainWindow(LanguageManager.T("lx_check_failed_not_enough_scenes_f5423"));
                 return false;
             }
 
@@ -2520,7 +2520,7 @@ namespace UltraVideoEditor
                 bool hasPeak = scenes.Any(s => s.Energy >= 4);
                 if (!hasPeak)
                 {
-                    LogToMainWindow("⚠️ No scene with high energy (peak)");
+                    LogToMainWindow(LanguageManager.T("lx_no_scene_has_high_energy_57378"));
                     valid = false;
                 }
             }
@@ -2530,15 +2530,15 @@ namespace UltraVideoEditor
                 bool allCalm = scenes.All(s => s.Energy <= 2);
                 if (!allCalm)
                 {
-                    LogToMainWindow("⚠️ Lullaby has a scene with too much energy");
+                    LogToMainWindow(LanguageManager.T("lx_the_lullaby_has_a_scene_5f080"));
                     valid = false;
                 }
             }
 
             if (valid)
-                LogToMainWindow("✅ Story board validation successful!");
+                LogToMainWindow(LanguageManager.T("lx_storyboard_check_passed_25c49"));
             else
-                LogToMainWindow("❌ Story board validation failed");
+                LogToMainWindow(LanguageManager.T("lx_storyboard_check_failed_b0601"));
 
             return valid;
         }
@@ -2563,7 +2563,7 @@ namespace UltraVideoEditor
 
                     if (scenes != null && scenes.Count > 0)
                     {
-                        LogToMainWindow($"✅ Successfully parsed {scenes.Count} scenes");
+                        LogToMainWindow(LanguageManager.F("lx_read_scenes_01145", scenes.Count));
 
                         string overallTheme = _detectedContext switch
                         {
@@ -2593,7 +2593,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Parse error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_reading_error_9792c", ex.Message));
             }
 
             return CreateFallbackStoryBoard();
@@ -2601,7 +2601,7 @@ namespace UltraVideoEditor
 
         private StoryBoard CreateFallbackStoryBoard()
         {
-            LogToMainWindow("🔄 Using fallback story board");
+            LogToMainWindow(LanguageManager.T("lx_using_the_backup_storyboard_139ea"));
             var scenes = new List<StoryScene>();
 
             string mainCharacter = _detectedContext switch
@@ -2793,7 +2793,7 @@ namespace UltraVideoEditor
                                 string fileName = $"background_{Guid.NewGuid().ToString().Substring(0, 8)}.mp3";
                                 string outputPath = Path.Combine(tempDir, fileName);
 
-                                LogToMainWindow($"🎵 Downloading background music: {hit["title"]?.ToString() ?? searchQuery}");
+                                LogToMainWindow(LanguageManager.F("lx_downloading_background_music_7e7b1", hit["title"]?.ToString() ?? searchQuery));
 
                                 await DownloadToFileAsync(audioUrl, outputPath, ct);   // v1.4: the file is closed before anyone reads it
 
@@ -2814,7 +2814,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"❌ Error downloading music: {ex.Message}");
+                    LogToMainWindow(LanguageManager.F("lx_downloading_the_music_failed_d717e", ex.Message));
                 }
             }
 
@@ -2912,17 +2912,17 @@ namespace UltraVideoEditor
             string requested = soundType;
             soundType = MapToAmbientBed(soundType, _detectedContext);
             if (!string.IsNullOrEmpty(requested) && !string.Equals(requested, soundType, StringComparison.OrdinalIgnoreCase))
-                LogToMainWindow($"🔊 Ambient '{requested}' → '{soundType}' (a continuous background recording instead of a single sound effect)");
+                LogToMainWindow(LanguageManager.F("lx_ambient_sound_a_continuous_background_6488a", requested, soundType));
             if (!string.IsNullOrEmpty(soundType) &&
                 _ambientFileByType.TryGetValue(soundType, out string cachedPath) &&
                 File.Exists(cachedPath))
                 return cachedPath;
 
-            LogToMainWindow($"🔊 GetAmbientSoundPath: soundType='{soundType}', context='{_detectedContext}', AmbientSoundsEnabled={_enableAmbientSounds}");
+            LogToMainWindow(LanguageManager.F("lx_looking_for_an_ambient_sound_1a4b3", soundType, _detectedContext, _enableAmbientSounds));
 
             if (!_enableAmbientSounds || string.IsNullOrEmpty(soundType) || soundType == "none")
             {
-                LogToMainWindow($"🔊 Ambient sounds disabled or soundType empty");
+                LogToMainWindow(LanguageManager.T("lx_ambient_sounds_are_off_or_e5710"));
                 return null;
             }
 
@@ -2930,11 +2930,11 @@ namespace UltraVideoEditor
             if (localPath != null)
             {
                 _ambientFileByType[soundType] = localPath;
-                LogToMainWindow($"✅ Local ambient sound: {localPath}");
+                LogToMainWindow(LanguageManager.F("lx_local_ambient_sound_eb194", localPath));
                 return localPath;
             }
 
-            LogToMainWindow($"⚠️ No ambient sound found for '{soundType}' in the local library.");
+            LogToMainWindow(LanguageManager.F("lx_no_ambient_sound_for_in_4759f", soundType));
             return null;
         }
 
@@ -3182,13 +3182,13 @@ namespace UltraVideoEditor
                     _soundIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                     foreach (string dir in AppPaths.SoundDirs.DefaultIfEmpty(soundsDir))
                         foreach (var kv in BuildSoundIndex(dir)) _soundIndex[kv.Key] = kv.Value;
-                    LogToMainWindow($"🎵 Sound index: {_soundIndex.Count} files in Assets/Sounds/");
+                    LogToMainWindow(LanguageManager.F("lx_sound_index_files_in_assets_09e52", _soundIndex.Count));
                 }
             }
 
             if (_soundIndex.Count == 0)
             {
-                LogToMainWindow($"⚠️ Assets/Sounds/ is empty or missing");
+                LogToMainWindow(LanguageManager.T("lx_assets_sounds_is_empty_or_e6326"));
                 return null;
             }
 
@@ -3325,7 +3325,7 @@ namespace UltraVideoEditor
                     _bedIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                     foreach (var (file, tags) in _soundIndex)
                         if (EstimateSoundSeconds(file) >= 15) _bedIndex[file] = tags;
-                    LogToMainWindow($"🔊 Background recordings (15 s or longer): {_bedIndex.Count} of {_soundIndex.Count} sound files");
+                    LogToMainWindow(LanguageManager.F("lx_background_recordings_seconds_or_longer_4afdc", _bedIndex.Count, _soundIndex.Count));
                 }
             }
 
@@ -3341,7 +3341,7 @@ namespace UltraVideoEditor
                     if (!isBlacklisted)
                         filteredIndex[file] = tags;
                 }
-                LogToMainWindow($"🔊 Filter active: {filteredIndex.Count}/{_bedIndex.Count} background recordings in search");
+                LogToMainWindow(LanguageManager.F("lx_filter_on_searching_of_background_af70d", filteredIndex.Count, _bedIndex.Count));
             }
 
             // v1.4: a file whose name starts with the requested words wins outright
@@ -3361,11 +3361,11 @@ namespace UltraVideoEditor
                 string ext = Path.GetExtension(found);
                 string outputPath = Path.Combine(tempDir, $"ambient_{Guid.NewGuid().ToString().Substring(0, 8)}{ext}");
                 await Task.Run(() => File.Copy(found, outputPath, true));
-                LogToMainWindow($"🔊 Local sound: '{Path.GetFileName(found)}' for '{soundType}'");
+                LogToMainWindow(LanguageManager.F("lx_local_sound_for_4fc7f", Path.GetFileName(found), soundType));
                 return outputPath;
             }
 
-            LogToMainWindow($"🔊 No local sound found for '{soundType}' in Assets/Sounds/");
+            LogToMainWindow(LanguageManager.F("lx_no_local_sound_for_in_bd171", soundType));
             return null;
         }
 
@@ -3379,7 +3379,7 @@ namespace UltraVideoEditor
                 {
                     _sfxIndex = BuildSoundIndex(sfxDir);
                     if (_sfxIndex.Count > 0)
-                        LogToMainWindow($"🎵 SFX index: {_sfxIndex.Count} files in Assets/SFX/");
+                        LogToMainWindow(LanguageManager.F("lx_sound_effects_files_in_assets_4ff2b", _sfxIndex.Count));
                 }
             }
 
@@ -3396,7 +3396,7 @@ namespace UltraVideoEditor
             string ext = Path.GetExtension(found);
             string outputPath = Path.Combine(tempDir, $"sfx_{Guid.NewGuid().ToString().Substring(0, 8)}{ext}");
             await Task.Run(() => File.Copy(found, outputPath, true));
-            LogToMainWindow($"🎵 SFX: '{Path.GetFileName(found)}' for '{sfxType}'");
+            LogToMainWindow(LanguageManager.F("lx_sound_effect_for_83898", Path.GetFileName(found), sfxType));
             return outputPath;
         }
 
@@ -3482,7 +3482,7 @@ namespace UltraVideoEditor
         {
             if (!_enableAmbientSounds || scenes.All(s => string.IsNullOrEmpty(s.AmbientPath)))
             {
-                LogToMainWindow("🔊 Ambient sounds disabled or no sounds to mix");
+                LogToMainWindow(LanguageManager.T("lx_ambient_sounds_are_off_or_54ac3"));
                 return musicPath;
             }
 
@@ -3581,7 +3581,7 @@ namespace UltraVideoEditor
             if (regions.Count == 0) return musicPath;
 
             int sceneCount = scenes.Count(s => !string.IsNullOrEmpty(s.AmbientPath));
-            LogToMainWindow($"🔊 Mixing ambient sounds: {sceneCount} scenes → {regions.Count} continuous regions, {ambientBelowSongDb:F0} dB below the song (song average {musicMeanDb:F1} dB)");
+            LogToMainWindow(LanguageManager.F("lx_mixing_ambient_sounds_scenes_continuous_6ecfe", sceneCount, regions.Count, ambientBelowSongDb, musicMeanDb));
 
             // ── 2. Build the filter graph ────────────────────────────────────────
             var inv = CultureInfo.InvariantCulture;
@@ -3637,7 +3637,7 @@ namespace UltraVideoEditor
                     $"volume={RegionGain(reg.Path).ToString("F3", inv)}," +
                     $"adelay={delayMs}:all=1[amb{k}]");
 
-                LogToMainWindow($"🔊 Region {r + 1}: {Path.GetFileName(reg.Path)} {start:F1}s–{end:F1}s (from {seek:F1}s in file), gain ×{RegionGain(reg.Path):F2}");
+                LogToMainWindow(LanguageManager.F("lx_part_f_f_s_from_def04", r + 1, Path.GetFileName(reg.Path), start, end, seek, RegionGain(reg.Path)));
             }
 
             // All ambient regions → one bed, padded with silence to the full song length so the
@@ -3694,21 +3694,21 @@ namespace UltraVideoEditor
             catch (OperationCanceledException)
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
-                LogToMainWindow("⚠️ Audio mixing exceeded timeout (300s) - using original music");
+                LogToMainWindow(LanguageManager.T("lx_mixing_the_sound_took_longer_89a1b"));
                 AnnounceToUser(L("ambient_mix_failed"));
                 return musicPath;
             }
 
             if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
             {
-                LogToMainWindow($"✅ Ambient sounds mixed: {regions.Count} regions, ducking under the vocals, lossless WAV");
+                LogToMainWindow(LanguageManager.F("lx_ambient_sounds_mixed_parts_lowered_bf3d4", regions.Count));
                 return outputPath;
             }
 
             string tail;
             lock (stderr) tail = stderr.ToString();
             if (tail.Length > 600) tail = tail.Substring(tail.Length - 600);
-            LogToMainWindow($"⚠️ Ambient mixing failed (exit {process.ExitCode}) - using original music. FFmpeg: {tail}");
+            LogToMainWindow(LanguageManager.F("lx_mixing_the_ambient_sounds_failed_249cc", process.ExitCode, tail));
             AnnounceToUser(L("ambient_mix_failed"));
             return musicPath;
         }
@@ -3752,7 +3752,7 @@ namespace UltraVideoEditor
                 if (ok && File.Exists(genPath))
                 {
                     _transitionSoundCache[type] = genPath;
-                    LogToMainWindow($"🔊 Transition sound generated: {type}");
+                    LogToMainWindow(LanguageManager.F("lx_transition_sound_made_86671", type));
                     string copyPath = Path.Combine(tempDir, $"transition_{type}_{Guid.NewGuid().ToString().Substring(0, 8)}.wav");
                     File.Copy(genPath, copyPath, true);
                     return copyPath;
@@ -3760,7 +3760,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ Sound generation error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_making_the_sound_failed_2ecfb", ex.Message));
             }
 
             return null;
@@ -3852,7 +3852,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ WriteWav error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_writing_the_wav_file_failed_ad8bd", ex.Message));
                 return false;
             }
         }
@@ -3909,7 +3909,7 @@ namespace UltraVideoEditor
                     sc.Duration = Math.Round(2.8 + rng.NextDouble() * 0.4, 2); // 2.8–3.2s
                 }
 
-                LogToMainWindow($"🎬 Pacing [{sc.PacingCategory}] Scene {sc.SceneNumber} E={sc.Energy}: {prev:F1}s→{sc.Duration:F1}s");
+                LogToMainWindow(LanguageManager.F("lx_pace_scene_energy_f_s_95649", sc.PacingCategory, sc.SceneNumber, sc.Energy, prev, sc.Duration));
             }
         }
 
@@ -3922,33 +3922,31 @@ namespace UltraVideoEditor
             _audioPath = audioPath;
             _totalDuration = totalDuration;
 
-            btnGenerate.Content = "🎬 AI is creating story...";
+            btnGenerate.Content = LanguageManager.T("lx_the_ai_is_writing_the_6ec91");
             AnnounceToUser(L("ai_analyzing_song_story"), 5);
 
             var storyBoard = await GenerateStoryBoard(_lyricLines, _cts?.Token ?? CancellationToken.None);
 
             if (storyBoard?.Scenes == null || storyBoard.Scenes.Count == 0)
             {
-                LogToMainWindow("❌ Story board was not generated, using fallback");
+                LogToMainWindow(LanguageManager.T("lx_the_storyboard_was_not_made_72155"));
                 storyBoard = CreateFallbackStoryBoard();
             }
 
-            LogToMainWindow($"📖 Story created: {storyBoard.Scenes.Count} scenes");
-            LogToMainWindow($"👤 Glavni lik: {storyBoard.MainCharacter}");
-            LogToMainWindow($"🎬 Tema: {storyBoard.OverallTheme}");
+            LogToMainWindow(LanguageManager.F("lx_story_made_scenes_bfdaf", storyBoard.Scenes.Count));
+            LogToMainWindow(LanguageManager.F("lx_main_character_83fca", storyBoard.MainCharacter));
+            LogToMainWindow(LanguageManager.F("lx_theme_5b6d3", storyBoard.OverallTheme));
 
             string ffmpegForBeat = AppPaths.FFmpeg;
             _beatInfo = await BeatDetection.AnalyzeAudio(audioPath, ffmpegForBeat, _cts?.Token ?? CancellationToken.None);
             if (_beatInfo.IsValid)
-                LogToMainWindow($"🥁 Beat detection: {_beatInfo.BPM:F0} BPM, {_beatInfo.BeatTimes.Count} udaraca, confidence={_beatInfo.Confidence:F2}");
+                LogToMainWindow(LanguageManager.F("lx_beat_detection_f_bpm_beats_ecaf8", _beatInfo.BPM, _beatInfo.BeatTimes.Count, _beatInfo.Confidence));
             else
-                LogToMainWindow("🥁 Beat detection: no rhythm found, using Whisper durations");
+                LogToMainWindow(LanguageManager.T("lx_beat_detection_no_rhythm_found_7366f"));
 
             // Piano Mode log
             if (_beatInfo.PianoMode)
-                LogToMainWindow($"🎹 Piano mode active: {_beatInfo.PhraseBeats.Count} melodic phrases, note density={_beatInfo.NoteDensity:F2} " +
-                    $"({(_beatInfo.NoteDensity < 0.3 ? "tiha/spora" : _beatInfo.NoteDensity > 0.7 ? "brza/gusta" : "umjerena")}) " +
-                    $"→ dynamic shot pacing {(4.5 - _beatInfo.NoteDensity * 2.7):F1}s average");
+                LogToMainWindow(LanguageManager.F("lx_piano_mode_melodic_phrases_note_965ce", _beatInfo.PhraseBeats.Count, _beatInfo.NoteDensity, LanguageManager.T(_beatInfo.NoteDensity < 0.3 ? "lx_notes_slow" : _beatInfo.NoteDensity > 0.7 ? "lx_notes_fast" : "lx_notes_medium"), (4.5 - _beatInfo.NoteDensity * 2.7)));
 
             _audioStartSeconds = _beatInfo.AudioStartSeconds;
             // ── LOOK-AHEAD: dynamic cut-advance based on BPM ─────────────────
@@ -3957,8 +3955,8 @@ namespace UltraVideoEditor
             _cutAdvanceMs = Math.Max(60, Math.Min(150, bpmBasedAdvance));
 
             if (_audioStartSeconds > 0.05)
-                LogToMainWindow($"🔇 Audio start offset: {_audioStartSeconds:F2}s silence at start → video starts exactly when music does");
-            LogToMainWindow($"✂️ Cut-advance: {_cutAdvanceMs:F0}ms look-ahead (BPM={_beatInfo.BPM:F0}) — rez ide ispred beata");
+                LogToMainWindow(LanguageManager.F("lx_f_s_of_silence_at_7da0c", _audioStartSeconds));
+            LogToMainWindow(LanguageManager.F("lx_cuts_come_f_ms_early_7f89c", _cutAdvanceMs, _beatInfo.BPM));
 
             // DURATION FIX: totalDuration mora biti efektivno trajanje audio streama,
             // ne raw trajanje fajla. RenderEngine koristi -ss AudioStartSeconds na audio inputu
@@ -3970,19 +3968,19 @@ namespace UltraVideoEditor
                 double rawTotalDuration = totalDuration;
                 totalDuration = Math.Max(10.0, totalDuration - _audioStartSeconds);
                 _totalDuration = totalDuration;
-                LogToMainWindow($"⏱ Duration correction: {rawTotalDuration:F1}s → {totalDuration:F1}s (subtracted {_audioStartSeconds:F2}s Beat-Lock offset)");
+                LogToMainWindow(LanguageManager.F("lx_length_corrected_f_s_f_be836", rawTotalDuration, totalDuration, _audioStartSeconds));
             }
 
             _lyricQueryCache.Clear();  // reset refrain cache za svaki novi video
             _ambientFileByType.Clear(); // AMBIENT FIX: new video → new temp folder → fresh sound choices
 
             bool visionOk = await VisionAnalyzer.InitializeAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
-            LogToMainWindow(visionOk ? "🧠 VisionAnalyzer: ONNX active" : "🧠 VisionAnalyzer: FFmpeg mod");
+            LogToMainWindow(LanguageManager.T(visionOk ? "lx_vision_onnx" : "lx_vision_ffmpeg"));
 
             // Try Qwen2-VL — if successful, used as priority 1 ahead of ONNX
             bool qwenOk = await VisionAnalyzer.InitializeQwenAsync(LogToMainWindow, _cts?.Token ?? CancellationToken.None);
             if (qwenOk)
-                LogToMainWindow("🤖 VisionAnalyzer: Qwen2-VL active — using AI image analysis");
+                LogToMainWindow(LanguageManager.T("lx_picture_analysis_qwen_vl_is_fe8c0"));
 
             MotionAnalyzer.ClearCache();
             _lastClipMotion = null;
@@ -4052,7 +4050,7 @@ namespace UltraVideoEditor
                 double bpmBasedMax = Math.Round((60.0 / _beatInfo.BPM) * beatsPerCut, 2);
                 // Clamp: never less than 1.5s (not enough time to see), never more than 8s
                 MAX_LYRIC_SCENE_DURATION = Math.Max(1.5, Math.Min(8.0, bpmBasedMax));
-                LogToMainWindow($"🥁 BPM {_beatInfo.BPM:F0} × {beatsPerCut} udarca = max {MAX_LYRIC_SCENE_DURATION:F1}s po kadru");
+                LogToMainWindow(LanguageManager.F("lx_bpm_f_beats_at_most_b294e", _beatInfo.BPM, beatsPerCut, MAX_LYRIC_SCENE_DURATION));
             }
             else
             {
@@ -4064,7 +4062,7 @@ namespace UltraVideoEditor
                     "adventure" or "dance" => 2.5,
                     _ => 3.5   // YouTube Kids default bez BPM-a
                 };
-                LogToMainWindow($"🎬 No BPM, context '{_detectedContext}' → max {MAX_LYRIC_SCENE_DURATION}s per frame");
+                LogToMainWindow(LanguageManager.F("lx_no_bpm_setting_at_most_cc045", _detectedContext, MAX_LYRIC_SCENE_DURATION));
             }
 
             for (int si = 0; si < storyBoard.Scenes.Count; si++)
@@ -4117,7 +4115,7 @@ namespace UltraVideoEditor
                         if (bestMatch != null)
                         {
                             double wordSync = Math.Max(0, bestMatch.StartSecond - cutAdvanceSec);
-                            LogToMainWindow($"   🔤 WordSync scene {si + 1}: '{bestMatch.Word}' @ {bestMatch.StartSecond:F2}s → StartTime {sc.StartTime:F2}s → {wordSync:F2}s");
+                            LogToMainWindow(LanguageManager.F("lx_word_timing_scene_at_f_33548", si + 1, bestMatch.Word, bestMatch.StartSecond, sc.StartTime, wordSync));
                             sc.StartTime = wordSync;
                         }
                     }
@@ -4192,11 +4190,11 @@ namespace UltraVideoEditor
             // Called AFTER computing StartTime/Duration, but ONLY for instrumental music
             ApplyRhythmicPacing(storyBoard.Scenes, _lyricTimestamps.Count > 0);
 
-            LogToMainWindow($"📊 Audio duration: {FormatTime(totalDuration)} | Lyrics: {FormatTime(lyricsTotalDuration)} | Instrumental remainder: {FormatTime(Math.Max(0, remainingDuration))}");
+            LogToMainWindow(LanguageManager.F("lx_song_length_lyrics_instrumental_rest_94f40", FormatTime(totalDuration), FormatTime(lyricsTotalDuration), FormatTime(Math.Max(0, remainingDuration))));
 
             if (remainingDuration > 1.5)
             {
-                LogToMainWindow($"🎵 Detected instrumental section: {FormatTime(remainingDuration)} (total duration: {FormatTime(totalDuration)}, lyrics: {FormatTime(lyricsTotalDuration)})");
+                LogToMainWindow(LanguageManager.F("lx_instrumental_part_found_whole_song_b36a5", FormatTime(remainingDuration), FormatTime(totalDuration), FormatTime(lyricsTotalDuration)));
 
                 List<string> bRollKeywords = new List<string>();
 
@@ -4380,7 +4378,7 @@ namespace UltraVideoEditor
                 int bRollCount = Math.Max(1, (int)Math.Ceiling(remainingDuration / bRollDurationPerClip));
                 double actualDurationPerClip = remainingDuration / bRollCount;
 
-                LogToMainWindow($"🎬 Creating {bRollCount} B-roll shots for the instrumental part ({actualDurationPerClip:F1}s each)");
+                LogToMainWindow(LanguageManager.F("lx_making_extra_shots_for_the_46223", bRollCount, actualDurationPerClip));
                 _currentLyric = null;          // v1.4: instrumental — the vision AI judges mood, not a lyric
                 _lyricNamesSeason = false;
 
@@ -4446,7 +4444,7 @@ namespace UltraVideoEditor
                         Energy = 2,
                         Emotion = _detectedContext == "lullaby" ? "calm" : "happy"
                     });
-                    LogToMainWindow($"   B-roll uvod {i + 1}: {introClipDuration:F1}s - '{kw}' → {(string.IsNullOrEmpty(bMediaPath) ? "❌ nema medija" : "✅ OK")}");
+                    LogToMainWindow(LanguageManager.F("lx_intro_shot_f_s_13163", i + 1, introClipDuration, kw, LanguageManager.T(string.IsNullOrEmpty(bMediaPath) ? "lx_no_media" : "lx_media_ok")));
                 }
 
                 for (int i = introSegments.Count - 1; i >= 0; i--)
@@ -4556,7 +4554,7 @@ namespace UltraVideoEditor
                             string safeQuery = ultraSafeFallbacks[i % ultraSafeFallbacks.Length];
                             bMediaPath = await SearchAndDownloadMedia(safeQuery, _pixabayMinHeight, bRollMediaType, _cts?.Token ?? CancellationToken.None, strictSeasonFilter: false);
                             if (!string.IsNullOrEmpty(bMediaPath))
-                                LogToMainWindow($"   ✅ Outro {i + 1}: ultra-safe fallback successful ('{safeQuery}')");
+                                LogToMainWindow(LanguageManager.F("lx_outro_the_safest_search_worked_61d5a", i + 1, safeQuery));
                         }
 
                         // OUTRO-FIX: If all attempts fail, recycle clip from pool
@@ -4565,7 +4563,7 @@ namespace UltraVideoEditor
                         {
                             bMediaPath = outroRecyclePool[recycleIdx % outroRecyclePool.Count];
                             recycleIdx++;
-                            LogToMainWindow($"   ♻️ Outro {i + 1}: reciklirani kadar (pool={outroRecyclePool.Count})");
+                            LogToMainWindow(LanguageManager.F("lx_outro_a_shot_used_again_510b5", i + 1, outroRecyclePool.Count));
                         }
 
                         if (!string.IsNullOrEmpty(bMediaPath) && bRollMediaType == "video")
@@ -4592,12 +4590,12 @@ namespace UltraVideoEditor
                             Energy = 2,
                             Emotion = _detectedContext == "lullaby" ? "calm" : "happy"
                         });
-                        LogToMainWindow($"   B-roll outro {i + 1}/{outroClips}: {outroClipDuration:F1}s - '{kw}' → {(string.IsNullOrEmpty(bMediaPath) ? "❌ nema medija" : "✅ OK")}{(isFadeOutClip ? " [fade-out]" : "")}");
+                        LogToMainWindow(LanguageManager.F("lx_outro_shot_f_s_a8c72", i + 1, outroClips, outroClipDuration, kw, LanguageManager.T(string.IsNullOrEmpty(bMediaPath) ? "lx_no_media" : "lx_media_ok"), (isFadeOutClip ? LanguageManager.T("lx_fade_out_mark") : "")));
                     }
                 }
 
                 totalDuration = introPortion + lyricsTotalDuration + outroPortion;
-                LogToMainWindow($"📊 Nakon dodavanja B-roll: uvod={introPortion:F1}s, stihovi={lyricsTotalDuration:F1}s, outro={outroPortion:F1}s, UKUPNO={totalDuration:F1}s");
+                LogToMainWindow(LanguageManager.F("lx_after_the_extra_shots_intro_3bacc", introPortion, lyricsTotalDuration, outroPortion, totalDuration));
             }
 
             try
@@ -4650,7 +4648,7 @@ namespace UltraVideoEditor
                     // "Leti kupite sladoled" → summer, "Kad je zima nosi cizme" → winter
                     string lyricSeason = StrictQueryEngine.DetectSeasonFromLyric(lyricForQuery);
                     _lyricNamesSeason = lyricSeason != null;   // v1.4: strict season for this line's clips
-                    LogToMainWindow($"   🗓 Season: song={_songContext.Season}, this line={lyricSeason ?? "none"}");
+                    LogToMainWindow(LanguageManager.F("lx_season_song_this_line_a12c0", _songContext.Season, lyricSeason ?? "none"));
 
                     // FIX-SEASON: Uvijek sinkronizuj _currentSeason sa lyric sezonom
                     // Ranije: mijenjalo se samo ako lyricSeason != globalna sezona
@@ -4672,7 +4670,7 @@ namespace UltraVideoEditor
                                 Theme = _songContext.Theme,
                                 VisualStyle = _songContext.VisualStyle
                             };
-                            LogToMainWindow($"   🗓 ✅ Season changed to: {lyricSeason}");
+                            LogToMainWindow(LanguageManager.F("lx_season_changed_to_c34a4", lyricSeason));
                         }
                     }
                     // Ako lyricSeason == null → _currentSeason ostaje isti kao prethodni stih (ispravno)
@@ -4691,7 +4689,7 @@ namespace UltraVideoEditor
                             // GetHardCodedQuery returns only if there is a direct keyword match in the lyric
                             actionMapDirectHit = StrictQueryEngine.ValidateAndFilter(directQuery, _songContext);
                             if (!string.IsNullOrEmpty(actionMapDirectHit))
-                                LogToMainWindow($"   🎯 ActionMap direktni hit (prioritet): '{actionMapDirectHit}'");
+                                LogToMainWindow(LanguageManager.F("lx_direct_match_from_the_word_dc02e", actionMapDirectHit));
                         }
                     }
 
@@ -4705,7 +4703,7 @@ namespace UltraVideoEditor
                         if (!string.IsNullOrEmpty(directed))
                             primaryQuery = StrictQueryEngine.ValidateAndFilter(directed, _songContext);
                         if (!string.IsNullOrEmpty(primaryQuery))
-                            LogToMainWindow($"   🎬 Director query: '{primaryQuery}'");
+                            LogToMainWindow(LanguageManager.F("lx_director_s_search_fc226", primaryQuery));
                     }
 
                     // v1.4 LITERAL FIRST: when the line names a concrete thing a child can see (ice cream,
@@ -4717,7 +4715,7 @@ namespace UltraVideoEditor
                         SerbianText.HasAny(SerbianText.Normalize(lyricForQuery), _concreteThingStems) &&
                         !string.Equals(primaryQuery, actionMapDirectHit, StringComparison.OrdinalIgnoreCase))
                     {
-                        LogToMainWindow($"   🎯 The line names a concrete thing — '{actionMapDirectHit}' instead of '{primaryQuery}'");
+                        LogToMainWindow(LanguageManager.F("lx_the_line_names_a_concrete_de4c3", actionMapDirectHit, primaryQuery));
                         primaryQuery = actionMapDirectHit;
                     }
 
@@ -4730,7 +4728,7 @@ namespace UltraVideoEditor
                         primaryQuery = !string.IsNullOrEmpty(actionMapDirectHit) && MentionsChild(actionMapDirectHit)
                             ? actionMapDirectHit
                             : primaryQuery + " with child";
-                        LogToMainWindow($"   👧 No child in '{before}' → '{primaryQuery}'");
+                        LogToMainWindow(LanguageManager.F("lx_no_child_in_f2fbf", before, primaryQuery));
                     }
 
                     // LAYER 1: Ollama — with semantic classification of the lyric (FIX Tag-Semantic Gap)
@@ -4756,7 +4754,7 @@ namespace UltraVideoEditor
                                 };
                                 needsCloseUp = closeUpTriggers.Any(t => lyricLow.Contains(t));
                             }
-                            LogToMainWindow($"   🏷 LyricTag: {lyricTag} | Sentiment: {lyricSentiment} | CloseUp: {needsCloseUp}");
+                            LogToMainWindow(LanguageManager.F("lx_line_tag_feeling_close_up_c9cd7", lyricTag, lyricSentiment, needsCloseUp));
                             string ollamaPrompt = StrictQueryEngine.BuildOllamaPrompt(lyricForQuery, _songContext, lyricTag, lyricSentiment, needsCloseUp);
                             string ollamaRaw = await _ollama.GenerateAsync(ollamaPrompt, model: OllamaClient.QueryModel, ct: _cts?.Token ?? CancellationToken.None);
                             string ollamaFiltered = StrictQueryEngine.FilterOllamaQuery(ollamaRaw, _songContext);
@@ -4764,9 +4762,9 @@ namespace UltraVideoEditor
                             {
                                 primaryQuery = StrictQueryEngine.ValidateAndFilter(ollamaFiltered, _songContext);
                                 if (!string.IsNullOrEmpty(primaryQuery))
-                                    LogToMainWindow($"   🤖 Ollama query: '{primaryQuery}'");
+                                    LogToMainWindow(LanguageManager.F("lx_ollama_search_43ac4", primaryQuery));
                                 else
-                                    LogToMainWindow($"   ⚠️ Ollama query odbijen filterom: '{ollamaFiltered}'");
+                                    LogToMainWindow(LanguageManager.F("lx_the_filter_rejected_the_ollama_d24ea", ollamaFiltered));
                             }
                             else
                             {
@@ -4774,7 +4772,7 @@ namespace UltraVideoEditor
                                 string rawPreview = string.IsNullOrWhiteSpace(ollamaRaw)
                                     ? "(empty answer)"
                                     : ollamaRaw.Substring(0, Math.Min(80, ollamaRaw.Length)).Replace("\n", "↵").Replace("\r", "");
-                                LogToMainWindow($"   ⚠️ Ollama did not return a usable query | Raw: '{rawPreview}'");
+                                LogToMainWindow(LanguageManager.F("lx_ollama_gave_no_usable_search_52255", rawPreview));
                             }
 
                             // LITERAL SYNC FIX: ActionMap direct hit beats Ollama
@@ -4783,13 +4781,13 @@ namespace UltraVideoEditor
                             if (!string.IsNullOrEmpty(actionMapDirectHit))
                             {
                                 if (primaryQuery != actionMapDirectHit)
-                                    LogToMainWindow($"   🎯 ActionMap override: '{primaryQuery}' → '{actionMapDirectHit}' (literal sync)");
+                                    LogToMainWindow(LanguageManager.F("lx_the_word_list_wins_literal_5b666", primaryQuery, actionMapDirectHit));
                                 primaryQuery = actionMapDirectHit;
                             }
                         }
                         catch (Exception ollamaEx)
                         {
-                            LogToMainWindow($"   ⚠️ Ollama error: {ollamaEx.Message}");
+                            LogToMainWindow(LanguageManager.F("lx_ollama_error_64628", ollamaEx.Message));
                         }
                     }
 
@@ -4801,7 +4799,7 @@ namespace UltraVideoEditor
                         {
                             primaryQuery = StrictQueryEngine.ValidateAndFilter(mapQuery, _songContext);
                             if (!string.IsNullOrEmpty(primaryQuery))
-                                LogToMainWindow($"   📖 Mapa fallback: '{primaryQuery}'");
+                                LogToMainWindow(LanguageManager.F("lx_from_the_word_list_7a1f3", primaryQuery));
                         }
                     }
 
@@ -4809,7 +4807,7 @@ namespace UltraVideoEditor
                     if (string.IsNullOrEmpty(primaryQuery))
                     {
                         primaryQuery = StrictQueryEngine.GetSmartFallback(_songContext);
-                        LogToMainWindow($"   🔄 SmartFallback: '{primaryQuery}'");
+                        LogToMainWindow(LanguageManager.F("lx_backup_search_40cd1", primaryQuery));
                     }
 
                     // FIX-COOLDOWN: Anti-ponavljanje vizuelnih tema unutar 4 scene (~12-16s)
@@ -4839,7 +4837,7 @@ namespace UltraVideoEditor
                                              primaryQuery.Contains("kid", StringComparison.OrdinalIgnoreCase)
                                 ? primaryQuery
                                 : $"{primaryQuery} children";
-                            LogToMainWindow($"   🔄 Cooldown variant (theme '{queryTheme}' was scene {lastUsed}): '{variant}'");
+                            LogToMainWindow(LanguageManager.F("lx_another_variant_theme_was_used_f178b", queryTheme, lastUsed, variant));
                             primaryQuery = variant;
                         }
 
@@ -4858,9 +4856,9 @@ namespace UltraVideoEditor
                     // filtered for spring clips. _currentSeason now keeps the lyric's season
                     // (or the previous lyric's, if this line names none).
 
-                    LogToMainWindow($"🎬 Scene {i + 1}: Energy={scene.Energy}, Action={scene.Action}, Duration={scene.Duration:F1}s");
-                    LogToMainWindow($"   📝 Lyric: '{(lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)}'");
-                    LogToMainWindow($"   🎯 Query: '{primaryQuery}'" + (multiMatches.Count > 1 ? $" (+ {multiMatches.Count - 1} multi-anchor)" : ""));
+                    LogToMainWindow(LanguageManager.F("lx_scene_energy_action_length_f_c288c", i + 1, scene.Energy, scene.Action, scene.Duration));
+                    LogToMainWindow(LanguageManager.F("lx_line_16996", (lyricForQuery.Length > 50 ? lyricForQuery.Substring(0, 50) + "..." : lyricForQuery)));
+                    LogToMainWindow(LanguageManager.F("lx_search_05d49", primaryQuery, (multiMatches.Count > 1 ? LanguageManager.F("lx_more_searches", multiMatches.Count - 1) : "")));
 
                     // ── HYBRID CONTENT SELECTOR ────────────────────────────────────────────────
                     scene.ContentTag = DetermineContentTag(scene);
@@ -4872,7 +4870,7 @@ namespace UltraVideoEditor
                     else
                         effectiveMediaType = mediaType;        // default iz UI
 
-                    LogToMainWindow($"⁠   🎞 ContentTag={scene.ContentTag ?? "UI-default"} → mediaType={effectiveMediaType}");
+                    LogToMainWindow(LanguageManager.F("lx_content_media_type_66631", scene.ContentTag ?? "UI-default", effectiveMediaType));
                     // ──────────────────────────────────────────────────────────────────
 
                     AnnounceToUser(LF("scene_progress", i + 1, count, scene.Description), 10 + (i * 70 / count));
@@ -4886,12 +4884,12 @@ namespace UltraVideoEditor
                         var subSceneQueries = DetectSubSceneQueries(scene.Description, styleConsistency);
                         if (subSceneQueries != null && subSceneQueries.Count >= 2 && mediaType == "video")
                         {
-                            LogToMainWindow($"   🎬 Sub-scene detection: {subSceneQueries.Count} visual objects → clip montage");
+                            LogToMainWindow(LanguageManager.F("lx_several_things_in_the_line_d31e1", subSceneQueries.Count));
                             mediaPath = await BuildSubSceneVideo(subSceneQueries, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                             if (mediaPath != null)
-                                LogToMainWindow($"   ✅ Sub-scene video created: {subSceneQueries.Count} clips");
+                                LogToMainWindow(LanguageManager.F("lx_montage_made_clips_f59f0", subSceneQueries.Count));
                             else
-                                LogToMainWindow($"   ⚠ Sub-scene video failed, using the standard path");
+                                LogToMainWindow(LanguageManager.T("lx_the_montage_failed_the_usual_b3c2e"));
                         }
 
                         // v1.4: a scene longer than two shots becomes a montage of video clips (a single
@@ -4900,7 +4898,7 @@ namespace UltraVideoEditor
                         if (longScene && effectiveMediaType == "photo")
                         {
                             effectiveMediaType = "video";
-                            LogToMainWindow($"   🎞 Scene {i + 1}: {scene.Duration:F1}s long → several video clips instead of one photo");
+                            LogToMainWindow(LanguageManager.F("lx_scene_f_s_long_several_df309", i + 1, scene.Duration));
                         }
 
                         // ── ZERO-FALLBACK: Multi-anchor za duge scene ─────────────────────────
@@ -4912,10 +4910,10 @@ namespace UltraVideoEditor
                         if (string.IsNullOrEmpty(mediaPath) &&
                             multiMatches.Count >= 2 && effectiveMediaType == "video" && scene.Duration > 4.0)
                         {
-                            LogToMainWindow($"   🎬 Multi-anchor: {multiMatches.Count} hard-coded queries → clip montage");
+                            LogToMainWindow(LanguageManager.F("lx_fixed_searches_a_montage_of_9b899", multiMatches.Count));
                             mediaPath = await BuildSubSceneVideo(multiMatches, scene.Duration, _tempVideoFolder, _cts?.Token ?? CancellationToken.None);
                             if (mediaPath != null)
-                                LogToMainWindow($"   ✅ Multi-anchor video created");
+                                LogToMainWindow(LanguageManager.T("lx_montage_made_78499"));
                         }
 
                         if (string.IsNullOrEmpty(mediaPath) && effectiveMediaType == "video" &&
@@ -4979,15 +4977,15 @@ namespace UltraVideoEditor
                                 _cts?.Token ?? CancellationToken.None, scene.Duration,
                                 strictSeasonFilter: !seasonNeutralQuery);
                             if (!string.IsNullOrEmpty(mediaPath))
-                                LogToMainWindow($"   ✅ {attemptLabel} successful");
+                                LogToMainWindow(LanguageManager.F("lx_worked_7d334", attemptLabel));
                             else
-                                LogToMainWindow($"   ⚠️ {attemptLabel} did not return any media");
+                                LogToMainWindow(LanguageManager.F("lx_found_nothing_05534", attemptLabel));
                         }
                     }
                     catch (Exception sceneEx) when (sceneEx is not OperationCanceledException)
                     {
                         AppLog.Error($"AI creator: finding media for scene {i + 1}", sceneEx);
-                        LogToMainWindow($"   ⚠️ Scene {i + 1}: error while searching ({sceneEx.Message}) — trying the safe query");
+                        LogToMainWindow(LanguageManager.F("lx_scene_search_error_trying_the_48e92", i + 1, sceneEx.Message));
                         mediaPath = null;
                         try
                         {
@@ -5011,7 +5009,7 @@ namespace UltraVideoEditor
                         if (effectiveMediaType == "video")
                         {
                             double videoDuration = await GetVideoDuration(mediaPath);
-                            LogToMainWindow($"📹 Video duration: {videoDuration:F1}s, needed: {scene.Duration:F1}s");
+                            LogToMainWindow(LanguageManager.F("lx_video_length_f_s_needed_b27d7", videoDuration, scene.Duration));
 
                             if (videoDuration > scene.Duration + 0.5)
                             {
@@ -5019,7 +5017,7 @@ namespace UltraVideoEditor
                             }
                             else if (videoDuration < scene.Duration - 0.5)
                             {
-                                LogToMainWindow($"   🔁 Short video ({videoDuration:F1}s < {scene.Duration:F1}s) — RenderEngine will loop");
+                                LogToMainWindow(LanguageManager.F("lx_short_video_f_s_f_9267b", videoDuration, scene.Duration));
                                 finalPath = mediaPath;
                             }
                         }
@@ -5028,7 +5026,7 @@ namespace UltraVideoEditor
                         if (ambientPath != null)
                         {
                             scene.AmbientPath = ambientPath;
-                            LogToMainWindow($"🔊 Ambient sound for scene {i + 1}: {scene.AmbientSound}");
+                            LogToMainWindow(LanguageManager.F("lx_ambient_sound_for_scene_d3fe8", i + 1, scene.AmbientSound));
                         }
 
                         scene.VisionScore = _lastDownloadedVisionScore;
@@ -5037,7 +5035,7 @@ namespace UltraVideoEditor
                         scene.IsOutdoor = _lastDownloadedIsOutdoor;
 
                         if (scene.IsStaticClip)
-                            LogToMainWindow($"   🎬 Static clip — Ken Burns will be applied in render");
+                            LogToMainWindow(LanguageManager.T("lx_still_picture_it_will_get_c9221"));
 
                         _segments.Add(new TimelineSegment
                         {
@@ -5061,11 +5059,11 @@ namespace UltraVideoEditor
                             Sentiment = StrictQueryEngine.ClassifySentiment(
                                 i < _lyricLines?.Count ? _lyricLines[i] : "").ToString()
                         });
-                        LogToMainWindow($"✅ Scene {i + 1}: media downloaded");
+                        LogToMainWindow(LanguageManager.F("lx_scene_media_downloaded_382f3", i + 1));
                     }
                     else
                     {
-                        LogToMainWindow($"❌ Scene {i + 1}: no media - skipping!");
+                        LogToMainWindow(LanguageManager.F("lx_scene_no_media_skipped_01051", i + 1));
                     }
 
                     await Task.Delay(300, _cts?.Token ?? CancellationToken.None);
@@ -5079,7 +5077,7 @@ namespace UltraVideoEditor
                 // scene.AmbientPath is already set directly in the loop above, so nothing
                 // needs to be copied here.
                 if (_enableAmbientSounds && storyBoard.Scenes.Any(sc => !string.IsNullOrEmpty(sc.AmbientPath)))
-                    LogToMainWindow("🔊 Ambient sounds prepared — mixing with the video timeline in progress...");
+                    LogToMainWindow(LanguageManager.T("lx_ambient_sounds_ready_mixing_them_219e5"));
 
                 if (_segments.Count >= 8)
                 {
@@ -5095,17 +5093,17 @@ namespace UltraVideoEditor
 
                     foreach (var bad in lowQuality)
                     {
-                        LogToMainWindow($"   🗑 Quality Gate: removing scene '{bad.Description}' (Score={bad.VisionScore:F1}/10)");
+                        LogToMainWindow(LanguageManager.F("lx_quality_check_removing_scene_score_ece0d", bad.Description, bad.VisionScore));
                         _segments.Remove(bad);
                     }
 
                     if (lowQuality.Count > 0)
-                        LogToMainWindow($"✂️ Quality Gate: removed {lowQuality.Count} weak frame(s) — {_segments.Count} scenes remaining");
+                        LogToMainWindow(LanguageManager.F("lx_quality_check_removed_weak_shot_0d49d", lowQuality.Count, _segments.Count));
                 }
 
                 AnnounceToUser(L("generation_done_reviewing"), 95);
                 LogToMainWindow("═══════════════════════════════════════");
-                LogToMainWindow($"📋 SCENE OVERVIEW — {_segments.Count} scenes ready");
+                LogToMainWindow(LanguageManager.F("lx_scene_overview_scenes_ready_0ce1d", _segments.Count));
                 LogToMainWindow("═══════════════════════════════════════");
 
                 const double DISPLAY_CURSOR = 4.0;
@@ -5123,9 +5121,9 @@ namespace UltraVideoEditor
 
                 int missingCount = _segments.Count(s => string.IsNullOrEmpty(s.Path) || !File.Exists(s.Path));
                 if (missingCount > 0)
-                    LogToMainWindow($"⚠ {missingCount} scenes have no media — will be skipped in render");
+                    LogToMainWindow(LanguageManager.F("lx_scenes_have_no_media_and_c0d74", missingCount));
                 else
-                    LogToMainWindow($"✅ All scenes have media. Starting render...");
+                    LogToMainWindow(LanguageManager.T("lx_every_scene_has_media_starting_dce75"));
 
                 // v1.4 SCENE REVIEW: hear what every clip shows and replace any of them
                 // before the video is assembled (skipped for auto-render / unattended runs).
@@ -5153,12 +5151,12 @@ namespace UltraVideoEditor
 
                     if (string.IsNullOrEmpty(autoPath))
                     {
-                        LogToMainWindow("⚠️ Auto-Render: save path not set");
+                        LogToMainWindow(LanguageManager.T("lx_automatic_render_no_place_to_329dd"));
                     }
                     else
                     {
                         AutoRenderOutputPath = autoPath;
-                        LogToMainWindow($"🚀 Auto-Render: starting render → {autoPath}");
+                        LogToMainWindow(LanguageManager.F("lx_automatic_render_starting_b1557", autoPath));
                         await TriggerAutoRender(autoPath);
                     }
                 }
@@ -5167,7 +5165,7 @@ namespace UltraVideoEditor
             finally
             {
                 btnGenerate.IsEnabled = true;
-                btnGenerate.Content = "🎬 CREATE VIDEO";
+                btnGenerate.Content = LanguageManager.T("lx_create_the_video_68758");
 
                 // v1.4 CLEANUP: only what the timeline does NOT use is deleted. Before, the whole
                 // temporary folder was deleted after the auto-render — the clips the timeline
@@ -5205,8 +5203,7 @@ namespace UltraVideoEditor
                 Filter = "MP4 video|*.mp4",
                 DefaultExt = "mp4",
                 FileName = "iskra_video.mp4",
-                Title = "Select where to save video"
-            };
+                Title = LanguageManager.T("lx_choose_where_to_save_the_ff790")};
             if (dlg.ShowDialog() == true)
             {
                 txtAutoRenderPath.Text = dlg.FileName;
@@ -5221,7 +5218,7 @@ namespace UltraVideoEditor
                 var mainWindow = System.Windows.Application.Current?.MainWindow as MainWindow;
                 if (mainWindow == null)
                 {
-                    LogToMainWindow("⚠️ Auto-Render: MainWindow is not available");
+                    LogToMainWindow(LanguageManager.T("lx_automatic_render_the_main_window_97e77"));
                     return;
                 }
 
@@ -5234,15 +5231,15 @@ namespace UltraVideoEditor
                 if (string.IsNullOrEmpty(mainWindow.currentProjectFolder))
                     mainWindow.currentProjectFolder = folder ?? string.Empty;
 
-                LogToMainWindow($"🎬 Auto-Render: output → {outputPath}");
-                AnnounceToUser("Starting render...", 99);
+                LogToMainWindow(LanguageManager.F("lx_automatic_render_the_video_goes_58ef0", outputPath));
+                AnnounceToUser(LanguageManager.T("lx_starting_the_render_b2d59"), 99);
 
                 // Direktno pokretanje rendera sa output putanjom
                 await mainWindow.StartRenderToPath(outputPath);
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"⚠️ Auto-Render error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_automatic_render_error_b4e3c", ex.Message));
             }
         }
 
@@ -5268,42 +5265,36 @@ namespace UltraVideoEditor
             int lowEnergy = segs.Count(s => s.Energy <= 2);
 
             LogToMainWindow("═══════════════════════════════════════");
-            LogToMainWindow("📊 VALIDATION REPORT — Automatska provjera kvaliteta");
+            LogToMainWindow(LanguageManager.T("lx_check_report_automatic_quality_check_4e387"));
             LogToMainWindow("═══════════════════════════════════════");
-            LogToMainWindow($"  ✅ Total scenes: {totalSegs}");
-            LogToMainWindow($"  ⏱ Total duration: {FormatTime(totalDur)}");
-            LogToMainWindow($"  ⭐ Average Vision Score: {avgScore:F1}/10" +
-                            (avgScore >= 6.5 ? " — Dobar" : avgScore >= 5.0 ? " — Prihvatljiv" : " — ⚠ Slab"));
-            LogToMainWindow($"  🌿 Priroda/Outdoor kadrovi: {outdoorCount}/{totalSegs}" +
-                            (outdoorCount >= totalSegs / 2 ? " ✅" : " ⚠ Malo outdoor"));
+            LogToMainWindow(LanguageManager.F("lx_scenes_in_total_f7193", totalSegs));
+            LogToMainWindow(LanguageManager.F("lx_total_length_b74fc", FormatTime(totalDur)));
+            LogToMainWindow(LanguageManager.F("lx_average_picture_score_f_6f534", avgScore, LanguageManager.T(avgScore >= 6.5 ? "lx_score_good" : avgScore >= 5.0 ? "lx_score_ok" : "lx_score_weak")));
+            LogToMainWindow(LanguageManager.F("lx_nature_and_outdoor_shots_ea3c3", outdoorCount, totalSegs, (outdoorCount >= totalSegs / 2 ? " ✅" : LanguageManager.T("lx_few_outdoor"))));
             double humanPresenceRatio = (double)childrenCount / totalSegs;
-            LogToMainWindow($"  👧 Children/Family shots: {childrenCount}/{totalSegs}" +
-                (childrenCount == 0 ? " ⚠️ No children in the footage!" :
-                 humanPresenceRatio < 0.70 ? $" ⚠️ Only {humanPresenceRatio:P0} — the goal is at least 70%!" :
-                 $" ✅ ({humanPresenceRatio:P0})"));
-            LogToMainWindow($"  🎬 Static shots (Ken Burns applied): {staticCount}/{totalSegs}");
-            LogToMainWindow($"  ⚡ High energy (scene 4-5): {highEnergy} scenes");
-            LogToMainWindow($"  🌊 Low energy (scene 1-2): {lowEnergy} scenes");
+            LogToMainWindow(LanguageManager.F("lx_shots_with_children_or_family_fb248", childrenCount, totalSegs, (childrenCount == 0 ? LanguageManager.T("lx_no_children") :
+                 humanPresenceRatio < 0.70 ? LanguageManager.F("lx_children_only", humanPresenceRatio) :
+                 $" ✅ ({humanPresenceRatio:P0})")));
+            LogToMainWindow(LanguageManager.F("lx_still_shots_with_ken_burns_3f350", staticCount, totalSegs));
+            LogToMainWindow(LanguageManager.F("lx_high_energy_levels_scenes_c412b", highEnergy));
+            LogToMainWindow(LanguageManager.F("lx_low_energy_levels_scenes_e9342", lowEnergy));
 
             bool hasWarnings = false;
             if (avgScore < 5.0)
-            { LogToMainWindow("  ⚠ WARNING: Average score is low. Consider regenerating."); hasWarnings = true; }
+            { LogToMainWindow(LanguageManager.T("lx_warning_the_average_score_is_43270")); hasWarnings = true; }
             if (outdoorCount < totalSegs / 3)
-            { LogToMainWindow("  ⚠ WARNING: Few outdoor scenes — possible indoor/dark shots."); hasWarnings = true; }
+            { LogToMainWindow(LanguageManager.T("lx_warning_few_outdoor_scenes_there_19aff")); hasWarnings = true; }
             if (staticCount > totalSegs / 2)
-            { LogToMainWindow($"  ⚠ INFO: More than half of scenes are static ({staticCount}) — Ken Burns applied to all."); }
+            { LogToMainWindow(LanguageManager.F("lx_note_more_than_half_of_eba2b", staticCount)); }
 
             if (!hasWarnings)
-                LogToMainWindow("  🎉 All checks passed — video should be free of 'nonsense'!");
+                LogToMainWindow(LanguageManager.T("lx_every_check_passed_the_video_0f040"));
 
-            LogToMainWindow($"  🎵 Context: {_detectedContext} | Mood: {_detectedMood}");
-            LogToMainWindow("  📝 Description: Shots are predominantly " +
-                (outdoorCount > childrenCount ? "priroda i vanjski prostori" : "djeca i porodica") +
-                $", ukupno {FormatTime(totalDur)} materijala.");
+            LogToMainWindow(LanguageManager.F("lx_setting_mood_49d0d", _detectedContext, _detectedMood));
+            LogToMainWindow(LanguageManager.F("lx_description_mostly_shots_pieces_of_3b12f", LanguageManager.T(outdoorCount > childrenCount ? "lx_mostly_nature" : "lx_mostly_children"), FormatTime(totalDur)));
             LogToMainWindow("═══════════════════════════════════════");
 
-            AnnounceToUser($"Validation Report: {totalSegs} scenes, average score {avgScore:F1}, " +
-                $"{outdoorCount} outdoor, {childrenCount} children's shots.", 0);
+            AnnounceToUser(LanguageManager.F("lx_check_report_scenes_average_score_f0b2b", totalSegs, avgScore, outdoorCount, childrenCount), 0);
         }
 
         private string _lastShotType = "";
@@ -5347,12 +5338,12 @@ namespace UltraVideoEditor
                     // v1.4: 60 instead of 40 — silhouettes against windows and dim rooms passed before
                     if (yavg < 60)
                     {
-                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — too dark (min=60)");
+                        LogToMainWindow(LanguageManager.F("lx_brightness_f_too_dark_at_141fc", yavg));
                         return false;
                     }
                     if (yavg > 235)
                     {
-                        LogToMainWindow($"   📊 Brightness {yavg:F0}/255 — preekspozirano (max=235)");
+                        LogToMainWindow(LanguageManager.F("lx_brightness_f_too_bright_at_aaba2", yavg));
                         return false;
                     }
                 }
@@ -5370,7 +5361,7 @@ namespace UltraVideoEditor
 
                     if (pinkDiff > 14 && uavg >= 126)
                     {
-                        LogToMainWindow($"   📊 Pink colour cast (V={vavg:F0}, U={uavg:F0})");
+                        LogToMainWindow(LanguageManager.F("lx_pink_colour_cast_v_f_77daa", vavg, uavg));
                         return false;
                     }
                 }
@@ -5386,7 +5377,7 @@ namespace UltraVideoEditor
         private async Task<string> TrimVideoToDuration(string inputPath, double targetDuration, string tempDir)
         {
             var sw = Stopwatch.StartNew();
-            LogToMainWindow($"✂️ Trim/Loop: {Path.GetFileName(inputPath)} → {targetDuration:F1}s");
+            LogToMainWindow(LanguageManager.F("lx_trim_or_loop_f_s_2bbe1", Path.GetFileName(inputPath), targetDuration));
 
             try
             {
@@ -5434,11 +5425,11 @@ namespace UltraVideoEditor
                     args = $"-ss 0 -i \"{inputPath}\" -t {targetDuration.ToString(CultureInfo.InvariantCulture)} " +
                            $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                            $"{encArgs} -fps_mode cfr -pix_fmt yuv420p -an -avoid_negative_ts make_zero -y \"{outputPath}\"";
-                    LogToMainWindow($"   ✂ Trim+normalizacija FPS: {actualDuration:F1}s → {targetDuration:F1}s @ 25fps [{_targetResolution}]");
+                    LogToMainWindow(LanguageManager.F("lx_trimmed_to_fps_f_s_117e5", actualDuration, targetDuration, _targetResolution));
                 }
                 else
                 {
-                    LogToMainWindow($"   🔁 Short video ({actualDuration:F1}s < {targetDuration:F1}s) — RenderEngine will loop");
+                    LogToMainWindow(LanguageManager.F("lx_short_video_f_s_f_9267b", actualDuration, targetDuration));
                     return inputPath;
                 }
 
@@ -5462,16 +5453,16 @@ namespace UltraVideoEditor
 
                 if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
                 {
-                    LogToMainWindow($"✅ Trim/Loop successful in {sw.ElapsedMilliseconds}ms");
+                    LogToMainWindow(LanguageManager.F("lx_trim_or_loop_done_in_a67a8", sw.ElapsedMilliseconds));
                     return outputPath;
                 }
 
-                LogToMainWindow($"⚠️ Trim/Loop failed — using original");
+                LogToMainWindow(LanguageManager.T("lx_trim_or_loop_failed_the_70897"));
                 return inputPath;
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Trim error: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_trimming_error_79970", ex.Message));
                 return inputPath;
             }
         }
@@ -5525,7 +5516,7 @@ namespace UltraVideoEditor
             _lastDownloadedDescription = null; // v1.4: never show the previous clip's description
             // ZERO-FALLBACK guard: null keywords → immediately null (caller will GenerateBlackFrame)
             if (string.IsNullOrWhiteSpace(keywords)) return null;
-            LogToMainWindow($"🔍 SearchAndDownloadMedia: '{keywords.Substring(0, Math.Min(60, keywords.Length))}...', type={mediaType}");
+            LogToMainWindow(LanguageManager.F("lx_searching_and_downloading_type_a3c28", keywords.Substring(0, Math.Min(60, keywords.Length)), mediaType));
 
             // v1.4: one shared Pixabay key (the same one the Media providers window edits)
             string apiKey = MediaProviderSettings.LoadPixabayKey();
@@ -5541,7 +5532,7 @@ namespace UltraVideoEditor
                     {
                         newKey = dlg.ApiKey;
                         if (!MediaProviderSettings.SavePixabayKey(newKey))
-                            LogToMainWindow("❌ The Pixabay key could not be saved.");
+                            LogToMainWindow(LanguageManager.T("lx_the_pixabay_key_could_not_55a54"));
                         apiKey = newKey;
                     }
                 });
@@ -5661,7 +5652,7 @@ namespace UltraVideoEditor
                                 string hitId = hit["id"]?.ToString() ?? "";
                                 if (!string.IsNullOrEmpty(hitId) && !_seenPixabayIds.Add(hitId))
                                 {
-                                    LogToMainWindow($"⏭ Deduplication: skipping shot ID {hitId} (already used)");
+                                    LogToMainWindow(LanguageManager.F("lx_duplicate_skipping_shot_already_used_b093a", hitId));
                                     continue;
                                 }
                                 var videos = hit["videos"] as JObject;
@@ -5685,7 +5676,7 @@ namespace UltraVideoEditor
 
                                     if (_usedMediaUrls.Contains(dlUrl))
                                     {
-                                        LogToMainWindow($"   ⏭ Skipping already used video URL (hit {hitIdx + 1})");
+                                        LogToMainWindow(LanguageManager.F("lx_skipping_a_video_that_was_89c7e", hitIdx + 1));
                                         continue;
                                     }
 
@@ -5828,19 +5819,19 @@ namespace UltraVideoEditor
                                         (coldLine ? tagSeason != _currentSeason : tagSeason is "winter" or "autumn") &&
                                         hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   🗓 Not a {_currentSeason} clip (tags) — skipped without downloading");
+                                        LogToMainWindow(LanguageManager.F("lx_not_a_clip_by_its_22385", _currentSeason));
                                         continue;
                                     }
 
                                     bool notForKids = IskraKidsSafeQuery.IsUnsuitableForKids(hitTags, _currentLyric, out string notForKidsReason);
                                     if (notForKids)
-                                        LogToMainWindow($"   ⏭ Not for a children's video ({notForKidsReason})");
+                                        LogToMainWindow(LanguageManager.F("lx_not_for_a_children_s_19721", notForKidsReason));
                                     bool hasBadTag = universalBadTags.Any(t => hitTags.Contains(t))
                                                   || contextBadTags.Where(t => !(warmDrinkLine && IsCozyTag(t))).Any(t => hitTags.Contains(t))
                                                   || adultWithoutChild || notForKids;
                                     if (hasBadTag)
                                     {
-                                        LogToMainWindow($"   ⏭ Skipping inappropriate content (tags: {hitTags.Substring(0, Math.Min(60, hitTags.Length))})");
+                                        LogToMainWindow(LanguageManager.F("lx_skipping_unsuitable_content_tags_2c172", hitTags.Substring(0, Math.Min(60, hitTags.Length))));
                                         continue;
                                     }
 
@@ -5849,14 +5840,14 @@ namespace UltraVideoEditor
                                     string fileName = $"AI_{Guid.NewGuid().ToString().Substring(0, 8)}.mp4";
                                     string fullPath = NewDownloadPath(fileName);
 
-                                    LogToMainWindow($"   ⬇ Downloading video hit {hitIdx + 1}/{sortedHits.Count} (format: {fmt}): {dlUrl.Substring(dlUrl.LastIndexOf('/') + 1)}");
+                                    LogToMainWindow(LanguageManager.F("lx_downloading_video_result_format_34c93", hitIdx + 1, sortedHits.Count, fmt, dlUrl.Substring(dlUrl.LastIndexOf('/') + 1)));
                                     await DownloadToFileAsync(dlUrl, fullPath, ct);   // v1.4: the file is closed before anyone reads it
 
                                     string ffmpegForBright = AppPaths.FFmpeg;
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegForBright, ct);
                                     if (!brightnessOk && hitOffset < sortedHits.Count - 2)
                                     {
-                                        LogToMainWindow($"   ⏭ Rejected due to brightness/tint (too dark/bright or pink tint)");
+                                        LogToMainWindow(LanguageManager.T("lx_rejected_too_dark_too_bright_27b67"));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5878,7 +5869,7 @@ namespace UltraVideoEditor
                                     // (simpler search words) has a better chance than more results of this one
                                     if (analyzedHere > 6)
                                     {
-                                        LogToMainWindow("   ⏭ Six clips analysed for this search without a good one — trying a simpler search");
+                                        LogToMainWindow(LanguageManager.T("lx_six_clips_checked_for_this_53006"));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         break;
@@ -5905,7 +5896,7 @@ namespace UltraVideoEditor
                                         if (tagsHaveChild)
                                         {
                                             vision.HasChildren = true;
-                                            LogToMainWindow($"   👶 TagBoost: Pixabay tags contain child keyword — HasChildren override=True");
+                                            LogToMainWindow(LanguageManager.T("lx_the_pixabay_tags_mention_a_1e6fc"));
                                         }
                                     }
 
@@ -5927,7 +5918,7 @@ namespace UltraVideoEditor
                                     if (vision.RetryNeeded && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
                                         string lyricPreview = _currentLyric?.Length > 40 ? _currentLyric.Substring(0, 40) + "..." : _currentLyric;
-                                        LogToMainWindow($"   🔄 Qwen: scene doesn't match the lyric '{lyricPreview}' — looking for a better clip...");
+                                        LogToMainWindow(LanguageManager.F("lx_qwen_the_scene_does_not_6e21e", lyricPreview));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5940,7 +5931,7 @@ namespace UltraVideoEditor
                                     // query instead.
                                     if (vision.Score < 4.0)
                                     {
-                                        LogToMainWindow($"   ⚠ VisionScore {vision.Score:F1}/10 — odbacujem ({vision.RejectReason}), trazim bolji...");
+                                        LogToMainWindow(LanguageManager.F("lx_picture_score_f_rejected_looking_fe533", vision.Score, vision.RejectReason));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         break;
@@ -5956,7 +5947,7 @@ namespace UltraVideoEditor
                                     // rule threw away 37 clips in one test — each after a full vision analysis.
                                     if (false && clipMotion.HasStrongMotion)
                                     {
-                                        LogToMainWindow($"   🚫 KidsFilter: Camera motion too aggressive (mag:{clipMotion.Magnitude:F0}) — rejecting for children's video...");
+                                        LogToMainWindow(LanguageManager.F("lx_camera_moves_too_much_movement_d4bc1", clipMotion.Magnitude));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5979,7 +5970,7 @@ namespace UltraVideoEditor
                                                         clipMotion.Magnitude < 3.0;
                                     if (isAnimalClip && isFrozenClip && hitOffset < sortedHits.Count - 3 && !relax)
                                     {
-                                        LogToMainWindow($"   🐦 FrozenAnimal: animal shot with no motion (mag:{clipMotion.Magnitude:F1}) — looking for animated clip...");
+                                        LogToMainWindow(LanguageManager.F("lx_an_animal_that_does_not_e314b", clipMotion.Magnitude));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -5993,7 +5984,7 @@ namespace UltraVideoEditor
 
                                     if (!motionOk && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
-                                        LogToMainWindow("   Motion mismatch (end:" + (prevForMatch?.EndDirection.ToString() ?? "null") + " -> start:" + clipMotion.Direction + ") -- trazim bolji...");
+                                        LogToMainWindow(LanguageManager.F("lx_the_movement_does_not_continue_56b10", (prevForMatch?.EndDirection.ToString() ?? "null"), clipMotion.Direction));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         break;
@@ -6016,7 +6007,7 @@ namespace UltraVideoEditor
                                                                  !hitTagsForShot.Contains("park");
                                     if (isTooWideWithoutChild && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
-                                        LogToMainWindow($"   📐 PATCH9 30%Rule: wide shot without children — too static for ages 2-6, looking for medium/close shot...");
+                                        LogToMainWindow(LanguageManager.T("lx_a_wide_shot_without_children_68cd2"));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6035,7 +6026,7 @@ namespace UltraVideoEditor
                                                        (_lastShotType == "close" && shotType == "wide");
                                     if (false && needsBridge) // v1.4: off — see the note above
                                     {
-                                        LogToMainWindow($"   🌉 Bridge: {_lastShotType}→{shotType} is too big a jump — looking for a medium shot...");
+                                        LogToMainWindow(LanguageManager.F("lx_from_to_is_too_big_a8608", _lastShotType, shotType));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6043,7 +6034,7 @@ namespace UltraVideoEditor
 
                                     if (false && shotType == _lastShotType) // v1.4: off — see the note above
                                     {
-                                        LogToMainWindow($"   🎬 Shot composition: dva uzastopna '{shotType}' — trazim drugi tip...");
+                                        LogToMainWindow(LanguageManager.F("lx_two_shots_in_a_row_c6492", shotType));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6088,7 +6079,7 @@ namespace UltraVideoEditor
 
                                     if (strictSeasonReject)
                                     {
-                                        LogToMainWindow($"   🗓 StrictSeason: clip={clipSeasonTag}, song={_currentSeason} — not compatible, looking for consistent clip...");
+                                        LogToMainWindow(LanguageManager.F("lx_clip_in_song_in_they_8ef4d", clipSeasonTag, _currentSeason));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6113,7 +6104,7 @@ namespace UltraVideoEditor
 
                                     if (seasonClash && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
-                                        LogToMainWindow($"   🗓 Seasonal clash ({_lastSeasonTag} → {clipSeasonTag}) — looking for consistent clip...");
+                                        LogToMainWindow(LanguageManager.F("lx_seasons_do_not_match_looking_e17a2", _lastSeasonTag, clipSeasonTag));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6138,7 +6129,7 @@ namespace UltraVideoEditor
                                                            && hitOffset < sortedHits.Count - 2 && !relax;
                                         if (rejectStock)
                                         {
-                                            LogToMainWindow($"   📸 PATCH10 Candid: rejecting 'commercial/stock' shot (adult posing) — looking for authentic moment...");
+                                            LogToMainWindow(LanguageManager.T("lx_rejecting_a_posed_stock_shot_733a7"));
                                             try { File.Delete(fullPath); } catch { }
                                             _usedMediaUrls.Remove(dlUrl);
                                             continue;
@@ -6175,7 +6166,7 @@ namespace UltraVideoEditor
                                         {
                                             string matched = vision.Labels.FirstOrDefault(l =>
                                                 gymLabels.Any(g => l.ToLower().Contains(g))) ?? "";
-                                            LogToMainWindow($"   🚫 PATCH11 GymTechVisionBlock: Qwen detektovao '{matched}' — odbacujem momentalno...");
+                                            LogToMainWindow(LanguageManager.F("lx_qwen_saw_rejected_at_once_01dc8", matched));
                                             try { File.Delete(fullPath); } catch { }
                                             _usedMediaUrls.Remove(dlUrl);
                                             continue;
@@ -6207,7 +6198,7 @@ namespace UltraVideoEditor
                                                        hitOffset < sortedHits.Count - 2 && !relax;
                                     if (indoorClash)
                                     {
-                                        LogToMainWindow($"   🏠 PATCH10 Indoor/Outdoor: outdoor song, indoor shot ({hitTagsForShot.Substring(0, Math.Min(30, hitTagsForShot.Length))}) — lookim outdoor kadar...");
+                                        LogToMainWindow(LanguageManager.F("lx_outdoor_song_indoor_shot_looking_cd4df", hitTagsForShot.Substring(0, Math.Min(30, hitTagsForShot.Length))));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6220,7 +6211,7 @@ namespace UltraVideoEditor
                                                      !(_detectedContext == "winter" || _detectedSeason == "winter");
                                     if (tempClash && hitOffset < sortedHits.Count - 2 && !relax)
                                     {
-                                        LogToMainWindow($"   🌡 PATCH9 Warm Filter: cold/blue palette — not OK for children's video, looking for warmer shot...");
+                                        LogToMainWindow(LanguageManager.T("lx_cold_blue_colours_are_not_e9ca7"));
                                         try { File.Delete(fullPath); } catch { }
                                         _usedMediaUrls.Remove(dlUrl);
                                         continue;
@@ -6235,7 +6226,7 @@ namespace UltraVideoEditor
                                         // Reject if more than 0.20 darker than average (significant drop)
                                         if (lumDrop > 0.20 && hitOffset < sortedHits.Count - 2 && !relax)
                                         {
-                                            LogToMainWindow($"   ☀ PATCH10 ToneMatch: shot too dark (lum:{vision.Luminance:F2} vs avg:{avgLum:F2}) — looking for warmer shot...");
+                                            LogToMainWindow(LanguageManager.F("lx_shot_too_dark_brightness_f_ad681", vision.Luminance, avgLum));
                                             try { File.Delete(fullPath); } catch { }
                                             _usedMediaUrls.Remove(dlUrl);
                                             continue;
@@ -6274,13 +6265,12 @@ namespace UltraVideoEditor
                                         if (currentSentiment == SentimentPolarity.Positive)
                                         {
                                             finalScore = Math.Min(10.0, vision.Score + 1.5);
-                                            LogToMainWindow($"   😊 Smile bonus +1.5 (sentiment=Positive): {vision.Score:F1} → {finalScore:F1}");
+                                            LogToMainWindow(LanguageManager.F("lx_smile_bonus_happy_line_f_4f6ab", vision.Score, finalScore));
                                         }
                                     }
 
                                     string visionTag = vision.QwenUsed ? "Qwen" : vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : ("FFmpeg" + (string.IsNullOrEmpty(vision.RejectReason) ? "" : $": {vision.RejectReason}"));
-                                    LogToMainWindow($"   ✅ Score {finalScore:F1}/10 [{visionTag}, {visionClock.Elapsed.TotalSeconds:F0}s, candidate {analyzedHere}] | Motion:{clipMotion.Direction} | Shot:{shotType} | Season:{clipSeasonTag} | " +
-                                        $"Children:{vision.HasChildren} Outdoor:{vision.IsOutdoor} Smile:{vision.HasSmile}");
+                                    LogToMainWindow(LanguageManager.F("lx_score_f_f_s_candidate_5ab8b", finalScore, visionTag, visionClock.Elapsed.TotalSeconds, analyzedHere, clipMotion.Direction, shotType, clipSeasonTag, vision.HasChildren, vision.IsOutdoor, vision.HasSmile));
 
                                     _lastDownloadedVisionScore = finalScore;
                                     _lastDownloadedDescription = vision.Description;
@@ -6292,7 +6282,7 @@ namespace UltraVideoEditor
                                 }
                             }
 
-                            LogToMainWindow($"   ⚠ All {sortedHits.Count} video results for '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' already used");
+                            LogToMainWindow(LanguageManager.F("lx_all_video_results_for_are_e9879", sortedHits.Count, searchQ.Substring(0, Math.Min(40, searchQ.Length))));
                             // Page rotation — increment page for the next call of the same query
                             if (_queryPageMap.ContainsKey(pageKey) && _queryPageMap[pageKey] < 5)
                                 _queryPageMap[pageKey]++;
@@ -6315,7 +6305,7 @@ namespace UltraVideoEditor
                                 if (string.IsNullOrEmpty(dlUrl)) continue;
                                 if (_usedMediaUrls.Contains(dlUrl))
                                 {
-                                    LogToMainWindow($"   ⏭ Skipping already used image (hit {hitIdx + 1})");
+                                    LogToMainWindow(LanguageManager.F("lx_skipping_a_picture_that_was_631fa", hitIdx + 1));
                                     continue;
                                 }
                                 // v1.4: pictures were not checked at all (only videos were) — the
@@ -6325,7 +6315,7 @@ namespace UltraVideoEditor
                                     IskraKidsSafeQuery.IsUnsuitableForKids(imgTags, _currentLyric, out _))
                                 {
                                     IskraKidsSafeQuery.IsUnsuitableForKids(imgTags, _currentLyric, out string imgReason);
-                                    LogToMainWindow($"   ⏭ Picture not for a children's video ({imgReason ?? imgTags.Substring(0, Math.Min(50, imgTags.Length))})");
+                                    LogToMainWindow(LanguageManager.F("lx_picture_not_for_a_children_d7566", imgReason ?? imgTags.Substring(0, Math.Min(50, imgTags.Length))));
                                     continue;
                                 }
 
@@ -6336,7 +6326,7 @@ namespace UltraVideoEditor
                                 await DownloadToFileAsync(dlUrl, fullPath, ct);   // v1.4: the file is closed before anyone reads it
                                 return fullPath;
                             }
-                            LogToMainWindow($"   ⚠ All images for '{searchQ.Substring(0, Math.Min(40, searchQ.Length))}' already used");
+                            LogToMainWindow(LanguageManager.F("lx_all_pictures_for_are_already_99978", searchQ.Substring(0, Math.Min(40, searchQ.Length))));
                         }
                     }
                     finally
@@ -6351,7 +6341,7 @@ namespace UltraVideoEditor
                 }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"❌ Error in attempt {attempt + 1}: {ex.Message}");
+                    LogToMainWindow(LanguageManager.F("lx_error_in_attempt_c5318", attempt + 1, ex.Message));
                 }
             }
 
@@ -6364,7 +6354,7 @@ namespace UltraVideoEditor
             {
                 try
                 {
-                    LogToMainWindow($"   🔄 Pixabay exhausted — trying Pexels fallback for '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+                    LogToMainWindow(LanguageManager.F("lx_nothing_more_on_pixabay_trying_93bd6", keywords.Substring(0, Math.Min(50, keywords.Length))));
 
                     var registry = MediaProviderRegistry.Instance;
                     var fallbackProviders = registry.Configured
@@ -6373,7 +6363,7 @@ namespace UltraVideoEditor
 
                     if (fallbackProviders.Count == 0)
                     {
-                        LogToMainWindow("   ℹ No fallback providers configured (Pexels/Coverr). Add API key in Settings → Providers.");
+                        LogToMainWindow(LanguageManager.T("lx_no_other_providers_are_set_47a84"));
                     }
 
                     foreach (var provider in fallbackProviders)
@@ -6381,7 +6371,7 @@ namespace UltraVideoEditor
                         ct.ThrowIfCancellationRequested();
                         try
                         {
-                            LogToMainWindow($"   🌐 [{provider.Name}] Searching: '{keywords.Substring(0, Math.Min(50, keywords.Length))}'...");
+                            LogToMainWindow(LanguageManager.F("lx_searching_4f205", provider.Name, keywords.Substring(0, Math.Min(50, keywords.Length))));
 
                             double minDur = minDurationSeconds > 0 ? minDurationSeconds : 4.0;
                             var results = await provider.SearchAsync(
@@ -6396,7 +6386,7 @@ namespace UltraVideoEditor
 
                             if (safeResults.Count == 0)
                             {
-                                LogToMainWindow($"   ⏭ [{provider.Name}] 0 kid-safe results for this query");
+                                LogToMainWindow(LanguageManager.F("lx_no_results_safe_for_children_5d0f6", provider.Name));
                                 continue;
                             }
 
@@ -6431,7 +6421,7 @@ namespace UltraVideoEditor
                                 string pexelsDedupeKey = !string.IsNullOrEmpty(pexelsVideoIdMatch) ? $"pexels_{pexelsVideoIdMatch}" : null;
                                 if (pexelsDedupeKey != null && _usedMediaUrls.Contains(pexelsDedupeKey))
                                 {
-                                    LogToMainWindow($"   ⏭ [Pexels] Skipping ID {pexelsVideoIdMatch} (already used)");
+                                    LogToMainWindow(LanguageManager.F("lx_pexels_skipping_already_used_6406d", pexelsVideoIdMatch));
                                     continue;
                                 }
 
@@ -6447,7 +6437,7 @@ namespace UltraVideoEditor
 
                                 try
                                 {
-                                    LogToMainWindow($"   ⬇ [{provider.Name}] Downloading: {pexelsDlFile.Substring(0, Math.Min(40, pexelsDlFile.Length))}");
+                                    LogToMainWindow(LanguageManager.F("lx_downloading_fab6b", provider.Name, pexelsDlFile.Substring(0, Math.Min(40, pexelsDlFile.Length))));
                                     _usedMediaUrls.Add(result.DownloadUrl);
                                     if (pexelsDedupeKey != null) _usedMediaUrls.Add(pexelsDedupeKey);
 
@@ -6467,7 +6457,7 @@ namespace UltraVideoEditor
                                     var brightnessOk = await CheckBrightnessAndTint(fullPath, ffmpegPath, ct);
                                     if (!brightnessOk)
                                     {
-                                        LogToMainWindow($"   ⏭ [{provider.Name}] Rejected — brightness/tint problem");
+                                        LogToMainWindow(LanguageManager.F("lx_rejected_brightness_or_tint_problem_4286c", provider.Name));
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6486,12 +6476,12 @@ namespace UltraVideoEditor
                                     if (!vision.HasChildren && pexelsHasChildTag)
                                     {
                                         vision.HasChildren = true;
-                                        LogToMainWindow($"   👶 [{provider.Name}] TagBoost: HasChildren override=True");
+                                        LogToMainWindow(LanguageManager.F("lx_the_tags_mention_a_child_11416", provider.Name));
                                     }
 
                                     if (vision.Score < 3.5)
                                     {
-                                        LogToMainWindow($"   ⚠ [{provider.Name}] VisionScore {vision.Score:F1}/10 — looking for better...");
+                                        LogToMainWindow(LanguageManager.F("lx_picture_score_f_looking_for_9ccc3", provider.Name, vision.Score));
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6502,7 +6492,7 @@ namespace UltraVideoEditor
                                     var clipMotion = await MotionAnalyzer.AnalyzeAsync(fullPath, ffmpegPath, ct);
                                     if (clipMotion.HasStrongMotion)
                                     {
-                                        LogToMainWindow($"   🚫 [{provider.Name}] Preagresivan pokret — odbacujem");
+                                        LogToMainWindow(LanguageManager.F("lx_the_camera_moves_too_much_35fa7", provider.Name));
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6514,7 +6504,7 @@ namespace UltraVideoEditor
                                                     resultTagsLower.Contains("wildlife") || resultTagsLower.Contains("flamingo");
                                     if (isAnimal && clipMotion.Direction == MotionDirection.Static && clipMotion.Magnitude < 3.0)
                                     {
-                                        LogToMainWindow($"   🐦 [{provider.Name}] Frozen animal — looking for animated...");
+                                        LogToMainWindow(LanguageManager.F("lx_an_animal_that_does_not_6052b", provider.Name));
                                         _usedMediaUrls.Remove(result.DownloadUrl);
                                         if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                         try { File.Delete(fullPath); } catch { }
@@ -6530,7 +6520,7 @@ namespace UltraVideoEditor
                                     }
 
                                     string visionTag = vision.QwenUsed ? "Qwen" : vision.OnnxUsed ? $"ONNX:{vision.TopLabel}" : ("FFmpeg" + (string.IsNullOrEmpty(vision.RejectReason) ? "" : $": {vision.RejectReason}"));
-                                    LogToMainWindow($"   ✅ [{provider.Name}] Score {finalScore:F1}/10 [{visionTag}] | Motion:{clipMotion.Direction} | Children:{vision.HasChildren}");
+                                    LogToMainWindow(LanguageManager.F("lx_score_f_movement_children_b30f4", provider.Name, finalScore, visionTag, clipMotion.Direction, vision.HasChildren));
 
                                     _lastDownloadedVisionScore = finalScore;
                                     _lastDownloadedDescription = vision.Description;
@@ -6542,26 +6532,26 @@ namespace UltraVideoEditor
                                 catch (OperationCanceledException) { throw; }
                                 catch (Exception ex)
                                 {
-                                    LogToMainWindow($"   ❌ [{provider.Name}] Download error: {ex.Message.Substring(0, Math.Min(60, ex.Message.Length))}");
+                                    LogToMainWindow(LanguageManager.F("lx_download_error_a649f", provider.Name, ex.Message.Substring(0, Math.Min(60, ex.Message.Length))));
                                     _usedMediaUrls.Remove(result.DownloadUrl);
                                     if (pexelsDedupeKey != null) _usedMediaUrls.Remove(pexelsDedupeKey);
                                     try { File.Delete(fullPath); } catch { }
                                 }
                             }
 
-                            LogToMainWindow($"   ⚠ [{provider.Name}] All results rejected or used");
+                            LogToMainWindow(LanguageManager.F("lx_every_result_was_rejected_or_5d1da", provider.Name));
                         }
                         catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
                         {
-                            LogToMainWindow($"   ❌ [{provider.Name}] Search error: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                            LogToMainWindow(LanguageManager.F("lx_search_error_cc77e", provider.Name, ex.Message.Substring(0, Math.Min(80, ex.Message.Length))));
                         }
                     }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    LogToMainWindow($"   ❌ Pexels fallback error: {ex.Message.Substring(0, Math.Min(80, ex.Message.Length))}");
+                    LogToMainWindow(LanguageManager.F("lx_pexels_error_0e2dc", ex.Message.Substring(0, Math.Min(80, ex.Message.Length))));
                 }
             }
             // ══════════════════════════════════════════════════════════════════
@@ -6599,7 +6589,7 @@ namespace UltraVideoEditor
                 else
                 {
                     logoDuration = 5;
-                    LogToMainWindow($"⚠️ Invalid logo duration '{txtLogoDuration.Text}' — using default of 5 seconds.");
+                    LogToMainWindow(LanguageManager.F("lx_the_logo_length_is_not_f1e0c", txtLogoDuration.Text));
                 }
                 var logoItem = new TimelineItem
                 {
@@ -6628,7 +6618,7 @@ namespace UltraVideoEditor
                 introDuration = 0.5;
             else
                 introDuration = 4.0;
-            LogToMainWindow($"🎬 Intro duration: {introDuration:F1}s (AudioStart={_beatInfo?.AudioStartSeconds:F2}s)");
+            LogToMainWindow(LanguageManager.F("lx_intro_length_f_s_music_3b93d", introDuration, _beatInfo?.AudioStartSeconds));
             string introImagePath = await CreateTextImage(songTitle, introDuration, true);
             var introItem = new TimelineItem
             {
@@ -6669,7 +6659,7 @@ namespace UltraVideoEditor
                 if (anchorSegment != null)
                 {
                     anchorBrightnessValue = 0.3 + (anchorSegment.VisionScore / 10.0) * 0.4;
-                    LogToMainWindow($"🎨 Color Match anchor: '{anchorSegment.Description}' (Score={anchorSegment.VisionScore:F1}, Brightness={anchorBrightnessValue:F3})");
+                    LogToMainWindow(LanguageManager.F("lx_colour_reference_score_f_brightness_b6601", anchorSegment.Description, anchorSegment.VisionScore, anchorBrightnessValue));
                 }
             }
 
@@ -6737,7 +6727,7 @@ namespace UltraVideoEditor
                     newItem.Keyframes.Add(new AnimationKeyframe { Time = 0, Zoom = 1.0f, X = 0, Y = 0 });
                     newItem.Keyframes.Add(new AnimationKeyframe { Time = segment.Duration * 0.5f, Zoom = 1.04f, X = xEnd * 0.4f, Y = yEnd * 0.3f });
                     newItem.Keyframes.Add(new AnimationKeyframe { Time = segment.Duration, Zoom = 1.08f, X = xEnd, Y = yEnd });
-                    LogToMainWindow($"   📷 ZoomPan efekt primijenjen (ContentTag={segment.ContentTag})");
+                    LogToMainWindow(LanguageManager.F("lx_zoom_and_pan_applied_6f690", segment.ContentTag));
                 }
                 else
                 {
@@ -6791,7 +6781,7 @@ namespace UltraVideoEditor
                     if (!string.IsNullOrEmpty(_ambientAudioPath) && File.Exists(_ambientAudioPath))
                     {
                         audioItem.Path = _ambientAudioPath;
-                        LogToMainWindow("🎵 Using mixed audio with ambient sounds");
+                        LogToMainWindow(LanguageManager.T("lx_using_the_music_mixed_with_64cbf"));
                     }
                     // v1.4 TIMELINE SYNC: every scene sits at cursor + (its time in the song), so the
                     // song itself starts at the cursor (after logo and title). It was placed at 0,
@@ -6831,7 +6821,7 @@ namespace UltraVideoEditor
                     // Ramp: koristimo srednji korak umjesto punog skoka
                     transEnergy = currentEnergy + Math.Sign(nextEnergy - currentEnergy) * 1;
                     transEnergy = Math.Max(1, Math.Min(5, transEnergy));
-                    LogToMainWindow($"   ⚡ EnergyRamp: {currentEnergy}→{nextEnergy} (delta={energyDelta}) → ramp transEnergy={transEnergy}");
+                    LogToMainWindow(LanguageManager.F("lx_energy_change_difference_transition_ener_9d80b", currentEnergy, nextEnergy, energyDelta, transEnergy));
                 }
                 else
                 {
@@ -6849,7 +6839,7 @@ namespace UltraVideoEditor
                                       || (currentItem.Type != nextItem.Type);  // Video↔Image and in generic case
                 double fadeDuration = mediaTypeSwitches ? 1.0 : (transEnergy >= 4 ? 0.3 : 0.4);
                 if (mediaTypeSwitches)
-                    LogToMainWindow($"   🔄 Hybrid crossfade 1000ms: {currentItem.Type}({currentContentTag ?? "?"}) → {nextItem.Type}({nextContentTag ?? "?"})");
+                    LogToMainWindow(LanguageManager.F("lx_one_second_crossfade_35c5b", currentItem.Type, currentContentTag ?? "?", nextItem.Type, nextContentTag ?? "?"));
                 // ─────────────────────────────────────────────────────────────────────
 
                 // v1.4: no pops or whooshes in calm songs (a lullaby full of pops sounded broken),
@@ -6935,9 +6925,9 @@ namespace UltraVideoEditor
                 }
             });
 
-            LogToMainWindow("🎬 Updating timeline view...");
+            LogToMainWindow(LanguageManager.T("lx_updating_the_timeline_94efb"));
             await Dispatcher.InvokeAsync(() => mainWindow.UpdateTimelineDisplay());
-            LogToMainWindow("✅ Timeline view updated");
+            LogToMainWindow(LanguageManager.T("lx_timeline_updated_56f1b"));
 
             int segmentsCount = _segments?.Count ?? 0;
             double segmentsTotal = _segments?.Sum(s => s.Duration) ?? 0;
@@ -6978,7 +6968,7 @@ namespace UltraVideoEditor
             string q = StrictQueryEngine.ValidateAndFilter(query, _songContext);
             if (string.IsNullOrWhiteSpace(q))
             {
-                LogToMainWindow($"🚫 Scene review: query '{query}' rejected by the safety filter");
+                LogToMainWindow(LanguageManager.F("lx_scene_review_the_safety_filter_aff4c", query));
                 return false;
             }
 
@@ -6988,7 +6978,7 @@ namespace UltraVideoEditor
             if (seg.LyricIndex >= 0 && seg.LyricIndex < _lyricLines.Count)
                 _currentLyric = _lyricLines[seg.LyricIndex];
 
-            LogToMainWindow($"🔁 Scene review: new clip for line {seg.LyricIndex + 1} with '{q}'");
+            LogToMainWindow(LanguageManager.F("lx_scene_review_a_new_clip_13ae3", seg.LyricIndex + 1, q));
             string path = await SearchAndDownloadMedia(q, _pixabayMinHeight, mediaType, ct, seg.Duration, strictSeasonFilter: false);
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
                 return false;
@@ -7008,7 +6998,7 @@ namespace UltraVideoEditor
             seg.IsStaticClip = _lastDownloadedIsStatic;
             seg.HasChildren = _lastDownloadedHasChildren;
             seg.IsOutdoor = _lastDownloadedIsOutdoor;
-            LogToMainWindow($"   ✅ Replaced: {Path.GetFileName(finalPath)} (score {seg.VisionScore:F1}) — {seg.VisionDescription}");
+            LogToMainWindow(LanguageManager.F("lx_replaced_score_f_2bc5b", Path.GetFileName(finalPath), seg.VisionScore, seg.VisionDescription));
             return true;
         }
 
@@ -7569,7 +7559,7 @@ namespace UltraVideoEditor
             double clipDuration = targetDuration / clipCount;
             var clipPaths = new List<string>();
 
-            LogToMainWindow($"🎬 MultiClip: {clipCount} clips × {clipDuration:F1}s = {targetDuration:F1}s total");
+            LogToMainWindow(LanguageManager.F("lx_several_clips_f_s_f_54c73", clipCount, clipDuration, targetDuration));
 
             for (int c = 0; c < clipCount; c++)
             {
@@ -7633,7 +7623,7 @@ namespace UltraVideoEditor
             if ((proc.ExitCode != 0 || !File.Exists(outputPath) || new FileInfo(outputPath).Length < 1000)
                 && (ffmpegErr.Contains("nvenc") || ffmpegErr.Contains("No NVENC") || ffmpegErr.Contains("Cannot load")))
             {
-                LogToMainWindow("⚠ MultiClip: NVENC unavailable, using libx264...");
+                LogToMainWindow(LanguageManager.T("lx_several_clips_nvenc_is_not_340f2"));
                 string argsCpu = $"-nostdin -f concat -safe 0 -i \"{concatList}\" " +
                                  $"-vf \"scale={_targetWidth}:{_targetHeight}:flags=lanczos,fps=25,format=yuv420p\" " +
                                  $"-c:v libx264 -preset fast -crf 23 -profile:v high -level 4.1 " +
@@ -7658,14 +7648,14 @@ namespace UltraVideoEditor
                 ffmpegErr = se2.Result;
                 if (proc2.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
                 {
-                    LogToMainWindow($"✅ MultiClip merged (libx264): {preparedPaths.Count} clips → {targetDuration:F1}s");
+                    LogToMainWindow(LanguageManager.F("lx_clips_joined_libx_clips_f_b8957", preparedPaths.Count, targetDuration));
                     return outputPath;
                 }
             }
 
             if (proc.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 1000)
             {
-                LogToMainWindow($"✅ MultiClip merged: {preparedPaths.Count} clips → {targetDuration:F1}s");
+                LogToMainWindow(LanguageManager.F("lx_clips_joined_clips_f_s_9ae1e", preparedPaths.Count, targetDuration));
                 return outputPath;
             }
 
@@ -7676,12 +7666,12 @@ namespace UltraVideoEditor
                     .Where(l => l.Contains("Error") || l.Contains("Invalid") || l.Contains("failed") || l.Contains("error") || l.Contains("moov"))
                     .Take(5));
                 if (!string.IsNullOrEmpty(realError))
-                    LogToMainWindow($"⚠ MultiClip FFmpeg error: {realError}");
+                    LogToMainWindow(LanguageManager.F("lx_joining_the_clips_ffmpeg_error_59fa8", realError));
                 else
-                    LogToMainWindow($"⚠ MultiClip FFmpeg exit={proc.ExitCode}");
+                    LogToMainWindow(LanguageManager.F("lx_joining_the_clips_ffmpeg_ended_b527c", proc.ExitCode));
             }
 
-            LogToMainWindow("⚠ MultiClip concat failed — using the first clip");
+            LogToMainWindow(LanguageManager.T("lx_joining_the_clips_failed_the_4bc0f"));
             return clipPaths[0];
         }
         #endregion
@@ -7812,7 +7802,7 @@ namespace UltraVideoEditor
                     catch (Exception ex) { AppLog.Warn($"Could not delete the unused file {f}: {ex.Message}"); }
                 }
                 if (deleted > 0)
-                    LogToMainWindow($"🧹 Removed {deleted} unused downloads and temporary files ({bytes / (1024.0 * 1024.0):F0} MB)");
+                    LogToMainWindow(LanguageManager.F("lx_removed_unused_downloads_and_temporary_7e301", deleted, bytes / (1024.0 * 1024.0)));
             }
             catch (Exception ex)
             {
@@ -7888,7 +7878,7 @@ namespace UltraVideoEditor
         {
             if (wordTimings == null) return;
             _wordTimings = wordTimings;
-            LogToMainWindow($"🔤 Word timings set: {_wordTimings.Count} words");
+            LogToMainWindow(LanguageManager.F("lx_word_timings_set_words_b88b5", _wordTimings.Count));
         }
 
         /// <summary>
@@ -7902,11 +7892,11 @@ namespace UltraVideoEditor
                 MediaProviderSettings.SaveKey(providerName, key);
                 if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
                     _pixabayApiKey = key;
-                LogToMainWindow($"✅ API key for {providerName} saved.");
+                LogToMainWindow(LanguageManager.F("lx_api_key_for_saved_4faf3", providerName));
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Error saving key for {providerName}: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_saving_the_key_for_failed_53a61", providerName, ex.Message));
             }
         }
 
@@ -7921,11 +7911,11 @@ namespace UltraVideoEditor
                 MediaProviderSettings.DeleteKey(providerName);
                 if (string.Equals(providerName, "Pixabay", StringComparison.OrdinalIgnoreCase))
                     _pixabayApiKey = null;
-                LogToMainWindow($"🗑 API key for {providerName} deleted.");
+                LogToMainWindow(LanguageManager.F("lx_api_key_for_deleted_d39d0", providerName));
             }
             catch (Exception ex)
             {
-                LogToMainWindow($"❌ Error deleting key for {providerName}: {ex.Message}");
+                LogToMainWindow(LanguageManager.F("lx_deleting_the_key_for_failed_2a838", providerName, ex.Message));
             }
         }
     }

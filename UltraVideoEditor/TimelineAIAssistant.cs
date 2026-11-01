@@ -224,12 +224,7 @@ namespace UltraVideoEditor
 
             if (cmd == null || cmd.Action == "unknown")
             {
-                result.Error = "Command not recognized. Try:\n" +
-                               "• \"remove clips shorter than 2 seconds\"\n" +
-                               "• \"keep only clips with faces\"\n" +
-                               "• \"sortiraj po skoru\"\n" +
-                               "• \"keep first 10\"\n" +
-                               "• \"remove static clips\"";
+                result.Error = LanguageManager.T("lx_the_command_was_not_understood_97110");
                 return result;
             }
 
@@ -330,7 +325,7 @@ namespace UltraVideoEditor
                     break;
 
                 default:
-                    result.Error = $"Nepoznata akcija: {cmd.Action}";
+                    result.Error = LanguageManager.F("lx_unknown_action_cb206", cmd.Action);
                     return result;
             }
 

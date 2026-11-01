@@ -77,7 +77,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Select source video",
+                Title  = LanguageManager.T("lx_choose_the_source_video_5e8f1"),
                 Filter = "Video files|*.mp4;*.avi;*.mov;*.mkv;*.wmv;*.flv|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
@@ -92,7 +92,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Select a song",
+                Title  = LanguageManager.T("lx_choose_a_song_2b284"),
                 Filter = "Audio files|*.mp3;*.wav;*.m4a;*.flac;*.ogg;*.aac|All files|*.*",
             };
             if (dlg.ShowDialog() == true)
@@ -107,7 +107,7 @@ namespace UltraVideoEditor
         {
             var dlg = new SaveFileDialog
             {
-                Title      = "Save highlight video",
+                Title      = LanguageManager.T("lx_save_the_highlight_video_b0705"),
                 Filter     = "MP4 video|*.mp4",
                 FileName   = Path.GetFileName(TxtOutputPath.Text),
                 InitialDirectory = Path.GetDirectoryName(TxtOutputPath.Text),
@@ -146,12 +146,12 @@ namespace UltraVideoEditor
 
             if (!File.Exists(videoPath))
             {
-                ShowError("Check the video file path.");
+                ShowError(LanguageManager.T("lx_check_the_path_of_the_b193e"));
                 return;
             }
             if (useMusic && !File.Exists(musicPath))
             {
-                ShowError("Check the audio file path, or disable the music option.");
+                ShowError(LanguageManager.T("lx_check_the_path_of_the_2523a"));
                 return;
             }
 
@@ -161,7 +161,7 @@ namespace UltraVideoEditor
             _result    = null;
             _activeSegments.Clear();
             SegmentsPanel.Children.Clear();
-            TxtSegmentCount.Text         = "Analyzing…";
+            TxtSegmentCount.Text         = LanguageManager.T("lx_analysing_3331c");
             TxtReport.Text               = "";
             BtnApplyToTimeline.IsEnabled = false;
             BtnRender.IsEnabled          = false;
@@ -199,25 +199,23 @@ namespace UltraVideoEditor
 
                     // Accessibility: najavi rezultat
                     AutomationProperties.SetName(TxtReport,
-                        $"Analysis complete. Selected {_result.Segments.Count} segments, " +
-                        $"total {AIHighlightEngine.FormatTime(_result.TotalDuration)}. " +
-                        "Check the Preview tab for details.");
+                        LanguageManager.F("lx_analysis_finished_parts_selected_in_eb154", _result.Segments.Count, AIHighlightEngine.FormatTime(_result.TotalDuration)));
                 }
                 else
                 {
                     ShowError(_result.Error ?? "Analysis failed.");
-                    TxtSegmentCount.Text = "Analysis failed.";
+                    TxtSegmentCount.Text = LanguageManager.T("lx_the_analysis_failed_029cb");
                 }
             }
             catch (OperationCanceledException)
             {
-                TxtReport.Text       = "Analysis was cancelled.";
-                TxtSegmentCount.Text = "Cancelled.";
+                TxtReport.Text       = LanguageManager.T("lx_the_analysis_was_cancelled_0a302");
+                TxtSegmentCount.Text = LanguageManager.T("lx_cancelled_d3e41");
                 SetProgress(0, "Cancelled.");
             }
             catch (Exception ex)
             {
-                ShowError($"Unexpected error: {ex.Message}");
+                ShowError(LanguageManager.F("lx_unexpected_error_4c3a7", ex.Message));
             }
             finally
             {
@@ -286,9 +284,7 @@ namespace UltraVideoEditor
 
             // Accessibility
             AutomationProperties.SetName(card,
-                $"Segment {seg.Order}, {AIHighlightEngine.FormatTime(seg.Duration)}, " +
-                $"skor {seg.ImportanceScore:F0}. " +
-                $"{seg.ContentDescription}. Arc: {seg.ArcDescription}.");
+                LanguageManager.F("lx_part_score_f_arc_5e9f4", seg.Order, AIHighlightEngine.FormatTime(seg.Duration), seg.ImportanceScore, seg.ContentDescription, seg.ArcDescription));
 
             // Layout: thumbnail levo, info desno
             var grid = new Grid();
@@ -396,8 +392,7 @@ namespace UltraVideoEditor
             chk.Checked   += (_, _) => onToggle(true);
             chk.Unchecked += (_, _) => onToggle(false);
             AutomationProperties.SetName(chk,
-                $"Include segment {seg.Order}, " +
-                $"duration {seg.Duration:F1} seconds");
+                LanguageManager.F("lx_include_part_length_f_seconds_5bb1f", seg.Order, seg.Duration));
 
             // Skor badge
             string scoreColor = seg.ImportanceScore >= 70 ? "#10B981"
@@ -418,7 +413,7 @@ namespace UltraVideoEditor
                     Foreground = Brushes.White,
                 },
             };
-            AutomationProperties.SetName(scoreBadge, $"Importance score: {seg.ImportanceScore:F0} out of 100");
+            AutomationProperties.SetName(scoreBadge, LanguageManager.F("lx_importance_f_of_3f8c5", seg.ImportanceScore));
 
             header.Children.Add(scoreBadge);
             header.Children.Add(chk);
@@ -448,13 +443,13 @@ namespace UltraVideoEditor
                     Margin       = new Thickness(0, 0, 0, 4),
                     Child = new TextBlock
                     {
-                        Text       = $"Arc: {seg.ArcDescription}",
+                        Text       = LanguageManager.F("lx_arc_08ac9", seg.ArcDescription),
                         FontSize   = 11,
                         Foreground = new SolidColorBrush(Color.FromRgb(167, 139, 250)),
                         TextTrimming = TextTrimming.CharacterEllipsis,
                     },
                 };
-                AutomationProperties.SetName(arcBorder, $"Arc razvoj kadra: {seg.ArcDescription}");
+                AutomationProperties.SetName(arcBorder, LanguageManager.F("lx_how_the_shot_develops_b901a", seg.ArcDescription));
                 infoPanel.Children.Add(arcBorder);
             }
 
@@ -467,7 +462,7 @@ namespace UltraVideoEditor
                     Margin      = new Thickness(0, 2, 0, 0),
                 };
                 AutomationProperties.SetName(barPanel,
-                    $"Frejmovi: {string.Join(", ", seg.FrameScores.Select(s => $"{s:F0}"))}");
+                    LanguageManager.F("lx_frames_91a53", string.Join(", ", seg.FrameScores.Select(s => $"{s:F0}"))));
 
                 foreach (double fs in seg.FrameScores)
                 {
@@ -504,7 +499,7 @@ namespace UltraVideoEditor
             {
                 infoPanel.Children.Add(new TextBlock
                 {
-                    Text       = $"🎵 Beat rez: {AIHighlightEngine.FormatTime(seg.BeatTimestamp)}",
+                    Text       = LanguageManager.F("lx_cut_on_the_beat_fec9a", AIHighlightEngine.FormatTime(seg.BeatTimestamp)),
                     FontSize   = 10,
                     Foreground = FindBrush("TextMutedBrush"),
                     Margin     = new Thickness(0, 3, 0, 0),
@@ -579,12 +574,12 @@ namespace UltraVideoEditor
 
             if (useMusic && !File.Exists(musicPath))
             {
-                ShowError("Audio file not found. Check the path.");
+                ShowError(LanguageManager.T("lx_the_audio_file_was_not_fa867"));
                 return;
             }
             if (string.IsNullOrEmpty(outputPath))
             {
-                ShowError("Select the output video path.");
+                ShowError(LanguageManager.T("lx_choose_where_to_save_the_30a9e"));
                 return;
             }
 
@@ -599,8 +594,8 @@ namespace UltraVideoEditor
             if (File.Exists(outputPath))
             {
                 var confirm = MessageBox.Show(
-                    $"File already exists:\n{outputPath}\n\nOverwrite it?",
-                    "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    LanguageManager.F("lx_the_file_already_exists_n_fbef6", outputPath),
+                    LanguageManager.T("lx_confirm_52529"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.Yes) return;
             }
 
@@ -636,23 +631,20 @@ namespace UltraVideoEditor
                     ct         : _cts.Token);
 
                 MessageBox.Show(
-                    $"✅ Video successfully rendered!\n\n{outputPath}\n\n" +
-                    $"Duration: {AIHighlightEngine.FormatTime(renderResult.TotalDuration)}\n" +
-                    $"Segments: {renderResult.Segments.Count}\n" +
-                    $"Resolution: {resolution}",
-                    "Render complete",
+                    LanguageManager.F("lx_the_video_is_ready_n_8271b", outputPath, AIHighlightEngine.FormatTime(renderResult.TotalDuration), renderResult.Segments.Count, resolution),
+                    LanguageManager.T("lx_render_finished_27a4f"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (OperationCanceledException)
             {
                 SetProgress(0, "Render cancelled.");
-                MessageBox.Show("Render was cancelled.", "Cancelled",
+                MessageBox.Show(LanguageManager.T("lx_the_render_was_cancelled_1225b"), LanguageManager.T("lx_cancelled_a1bf9"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
-                ShowError($"Error during render: {ex.Message}");
+                ShowError(LanguageManager.F("lx_render_error_3e177", ex.Message));
             }
             finally
             {
@@ -670,7 +662,7 @@ namespace UltraVideoEditor
         {
             if (_activeSegments.Count == 0)
             {
-                ShowError("No segments selected.");
+                ShowError(LanguageManager.T("lx_no_parts_are_selected_f9e02"));
                 return;
             }
 
@@ -688,7 +680,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(TxtReport.Text)) return;
             Clipboard.SetText(TxtReport.Text);
             string orig = BtnCopyReport.Content?.ToString() ?? "";
-            BtnCopyReport.Content = "✓ Kopirano!";
+            BtnCopyReport.Content = LanguageManager.T("lx_copied_71d1b");
             var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             t.Tick += (_, _) => { BtnCopyReport.Content = orig; t.Stop(); };
             t.Start();
@@ -699,7 +691,7 @@ namespace UltraVideoEditor
             if (string.IsNullOrEmpty(TxtReport.Text)) return;
             var dlg = new SaveFileDialog
             {
-                Title    = "Save report",
+                Title    = LanguageManager.T("lx_save_the_report_d54bd"),
                 Filter   = "Text file|*.txt",
                 FileName = $"highlight_report_{DateTime.Now:yyyyMMdd_HHmm}.txt",
             };
@@ -708,10 +700,10 @@ namespace UltraVideoEditor
                 try
                 {
                     File.WriteAllText(dlg.FileName, TxtReport.Text, System.Text.Encoding.UTF8);
-                    MessageBox.Show($"Saved:\n{dlg.FileName}", "Saved",
+                    MessageBox.Show(LanguageManager.F("lx_saved_n_d0306", dlg.FileName), LanguageManager.T("lx_saved_c0ae8"),
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch (Exception ex) { ShowError($"Error: {ex.Message}"); }
+                catch (Exception ex) { ShowError(LanguageManager.F("lx_error_f93e6", ex.Message)); }
             }
         }
 
@@ -741,8 +733,8 @@ namespace UltraVideoEditor
             if (_analyzing || _rendering)
             {
                 var c = MessageBox.Show(
-                    "Operation in progress. Cancel and close?",
-                    "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    LanguageManager.T("lx_work_is_in_progress_stop_50614"),
+                    LanguageManager.T("lx_confirm_52529"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (c != MessageBoxResult.Yes) return;
                 _cts?.Cancel();
             }
@@ -761,7 +753,7 @@ namespace UltraVideoEditor
 
         private void SetAnalyzeButtonToCancel()
         {
-            BtnAnalyze.Content =  "⏹ Cancel";
+            BtnAnalyze.Content =  LanguageManager.T("lx_cancel_3bdb2");
             BtnAnalyze.Click  -= BtnAnalyze_Click;
             BtnAnalyze.Click  += BtnCancelAnalysis_Click;
             BtnAnalyze.IsEnabled = true;
@@ -769,7 +761,7 @@ namespace UltraVideoEditor
 
         private void SetAnalyzeButtonToAnalyze()
         {
-            BtnAnalyze.Content =  "🔍 Analyze video";
+            BtnAnalyze.Content =  LanguageManager.T("lx_analyse_the_video_d8f6f");
             BtnAnalyze.Click  -= BtnCancelAnalysis_Click;
             BtnAnalyze.Click  += BtnAnalyze_Click;
         }
@@ -783,7 +775,7 @@ namespace UltraVideoEditor
             }
             TxtReport.Text           = $"⚠️  {message}";
             ProgressPanel.Visibility = Visibility.Collapsed;
-            MessageBox.Show(message, "AI Highlight Engine — Error",
+            MessageBox.Show(message, LanguageManager.T("lx_ai_highlights_error_d66b9"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 

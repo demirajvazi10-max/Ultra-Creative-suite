@@ -54,6 +54,7 @@ namespace UltraVideoEditor
             if (items == null || items.Count == 0) return (null, 0);
             double total = TotalLength(items);
             if (total < 0.2) return (null, 0);
+            items = items.Where(i => !TrackSet.IsHidden(i.TrackIndex)).ToList();   // v2.0: a hidden track is switched off
 
             var parts = new List<Part>();
 
@@ -68,7 +69,7 @@ namespace UltraVideoEditor
             //    not for AI creator stock footage, not for muted clips, not for clips with a changed speed
             var ownVideos = items.Where(v => v != null && v.IsVideo && !v.IsImage &&
                                              !RenderEngine.IsAiCreatorClip(v) && v.Volume > 0 && v.Duration > 0.01 &&
-                                             Math.Abs((v.VideoEffect?.Speed ?? 1.0) - 1.0) < 0.001 &&
+                                             Math.Abs((v.VideoEffect?.Speed ?? 1.0) - 1.0) < 0.001 && !SpeedRamp.Has(v) &&
                                              !string.IsNullOrEmpty(v.Path) && File.Exists(v.Path)).ToList();
             var videoParts = new List<Part>();
             foreach (var v in ownVideos)
@@ -151,13 +152,15 @@ namespace UltraVideoEditor
                 args.Append($"-t {Math.Max(0.05, p.Duration).ToString("0.###", inv)} -i \"{p.Path}\" ");
                 long delayMs = (long)Math.Round(p.Start * 1000);
                 // v1.4 (R5): the clip's audio effects, then its volume (or volume curve) in timeline time
-                string fx = p.Item != null ? AudioEffects.GetFFmpegFilter(p.Item.AudioFx) : "";
+                string fx = p.Item != null ? AudioEffects.GetFFmpegFilter(p.Item.AudioFx, p.Duration) : "";
                 string vol = p.Item != null && AudioAutomation.HasCurve(p.Item)
                     ? AudioAutomation.VolumeFilter(p.Item, p.Start)
                     : $"volume={p.Volume.ToString("0.###", inv)}";
                 graph.Append($"[{k + 1}:a]aformat=sample_rates=48000:channel_layouts=stereo," +
                              (fx.Length > 0 ? fx + "," : "") +
-                             $"adelay={delayMs}:all=1,{vol}[a{k + 1}];");
+                             $"adelay={delayMs}:all=1,{vol}" +
+                             (p.Item != null && TrackMixer.Filter(p.Item.TrackIndex) is string tf && tf.Length > 0 ? "," + tf : "") +   // v2.0
+                             $"[a{k + 1}];");
             }
             graph.Append("[0:a]");
             for (int k = 1; k <= parts.Count; k++) graph.Append($"[a{k}]");
@@ -183,7 +186,8 @@ namespace UltraVideoEditor
                   .Append(';').Append(p.Duration.ToString("0.###", inv))
                   .Append(';').Append(p.Volume.ToString("0.###", inv))
                   .Append(';').Append(p.Item != null ? AudioAutomation.VolumeFilter(p.Item, p.Start) : "")
-                  .Append(';').Append(p.Item != null ? AudioEffects.GetFFmpegFilter(p.Item.AudioFx) : "");
+                  .Append(';').Append(p.Item != null ? AudioEffects.GetFFmpegFilter(p.Item.AudioFx, p.Duration) : "")
+                  .Append(';').Append(p.Item != null ? TrackMixer.Filter(p.Item.TrackIndex) : "");   // v2.0: a mixer change mixes again
             }
             byte[] hash = SHA1.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
             return Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
@@ -201,10 +205,11 @@ namespace UltraVideoEditor
             catch { }
         }
 
-        /// <summary>The video clip on screen at a timeline time (Video 2 is on top of Video 1).</summary>
+        /// <summary>The video clip on screen at a timeline time (the highest video track that is not hidden).</summary>
         public static TimelineItem VideoAt(IEnumerable<TimelineItem> items, double t) =>
-            items?.Where(i => i != null && (i.IsVideo || i.IsImage) && t >= i.Start && t < i.Start + i.Duration)
-                  .OrderByDescending(i => i.TrackIndex)
+            items?.Where(i => i != null && (i.IsVideo || i.IsImage) && t >= i.Start && t < i.Start + i.Duration &&
+                              TrackSet.IsVideo(i.TrackIndex) && !TrackSet.IsHidden(i.TrackIndex))
+                  .OrderByDescending(i => TrackSet.SortKey(i.TrackIndex))
                   .FirstOrDefault();
     }
 }

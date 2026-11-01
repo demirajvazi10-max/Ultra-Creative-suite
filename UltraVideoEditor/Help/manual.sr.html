@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="sr-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultra Video Editor – priručnik</title>
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #1b1b1b; --muted: #555; --accent: #0b5cad; --line: #d0d7de; --code: #f3f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16181b; --fg: #e8e8e8; --muted: #b0b0b0; --accent: #7cb7ff; --line: #3a3f45; --code: #23272c; } }
+  body { background: var(--bg); color: var(--fg); font: 17px/1.6 "Segoe UI", system-ui, sans-serif; max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  h1 { font-size: 1.9rem; margin-top: 0; }
+  h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.15rem; margin-top: 1.6rem; }
+  a { color: var(--accent); }
+  kbd { font-family: Consolas, monospace; background: var(--code); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; white-space: nowrap; }
+  nav ul { columns: 2; }
+  @media (max-width: 40rem) { nav ul { columns: 1; } }
+  .note { color: var(--muted); }
+  :focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+<h1>Ultra Video Editor – priručnik</h1>
+<p>Verzija 2.0. Autor: Demir Ajvazi.</p>
+<p>Svaki naslov na ovoj stranici je jedan odeljak. U čitaču ekrana taster <kbd>H</kbd> ide od naslova do naslova, <kbd>2</kbd> kroz glavne odeljke, a <kbd>Insert+F6</kbd> (JAWS) ili <kbd>NVDA+F7</kbd> (NVDA) otvara spisak naslova. <a href="shortcuts.html">Spisak svih prečica na tastaturi</a> se u programu otvara tasterom <kbd>F1</kbd>, a ovaj priručnik sa <kbd>Ctrl+F1</kbd>.</p>
+</header>
+
+<nav aria-label="Sadržaj">
+<h2>Sadržaj</h2>
+<ul>
+<li><a href="#start">Prvi koraci</a></li>
+<li><a href="#basics">Osnovna montaža</a></li>
+<li><a href="#playback">Puštanje i slušanje</a></li>
+<li><a href="#tracks">Trake i slojevi</a></li>
+<li><a href="#editing">Napredna montaža</a></li>
+<li><a href="#colour">Boja</a></li>
+<li><a href="#sound">Zvuk i mikseta traka</a></li>
+<li><a href="#titles">Naslovi, titlovi i animacija</a></li>
+<li><a href="#masks">Maske i praćenje objekata</a></li>
+<li><a href="#ai">Opisi i AI alati</a></li>
+<li><a href="#ad">Audio-deskripcija za gledaoce, korak po korak</a></li>
+<li><a href="#export">Izvoz i razmena</a></li>
+<li><a href="#settings">Podešavanja, prikaz i pomoć</a></li>
+</ul>
+</nav>
+
+<main>
+<section aria-labelledby="start">
+<h2 id="start">Prvi koraci</h2>
+<h3>Glavni prozor</h3>
+<p>Prozor ima traku menija (do nje se stiže tasterom <kbd>Alt</kbd>), listu klipova, plejer i kartice za efekte, titlove, tranzicije i animacije. Svaka komanda u menijima ima svoju prečicu, i čitač ekrana je čita uz komandu, na primer „Otvori Ctrl+O“.</p>
+<p>Lista klipova je tajmlajn u obliku teksta: jedan red za svaki klip, sa brojem, imenom, vrstom, trakom, dužinom, početkom, krajem i opisom. <kbd>Ctrl+L</kbd> vraća fokus na nju odakle god da ste. <kbd>Ctrl+Tab</kbd> i <kbd>Ctrl+Shift+Tab</kbd> idu kroz kartice.</p>
+<h3>Šta program izgovara</h3>
+<p>Sve što se dešava čita se preko čitača ekrana: šta je komanda uradila, napredak dužih poslova na svakih četvrt, i greške sa uputstvom šta da se uradi. Log nikad ne morate da otvarate da biste znali šta se desilo, ali <kbd>Ctrl+Shift+L</kbd> ga prikazuje kad hoćete ponovo da pročitate.</p>
+<h3>Poništavanje</h3>
+<p><kbd>Ctrl+Z</kbd> poništava, a <kbd>Ctrl+Y</kbd> vraća skoro svaku izmenu: montažu, trake, efekte, miksetu, uvoz. Prozor zatvoren sa Otkaži ne menja ništa i ne ostavlja prazan korak za poništavanje.</p>
+</section>
+
+<section aria-labelledby="basics">
+<h2 id="basics">Osnovna montaža</h2>
+<h3>Projekti</h3>
+<p><kbd>Ctrl+N</kbd> pravi nov projekat, <kbd>Ctrl+O</kbd> otvara postojeći, <kbd>Ctrl+S</kbd> čuva, a <kbd>F12</kbd> čuva pod drugim imenom. Na svaka dva minuta promenjeni projekat se kopira na stranu; ako se program nije normalno zatvorio, sledeći put nudi da vrati tu kopiju.</p>
+<h3>Dodavanje materijala</h3>
+<p><kbd>Ctrl+I</kbd> dodaje video snimke i slike, <kbd>Ctrl+Shift+I</kbd> zvučne fajlove. Timeline, Uvoz sa YouTube-a donosi video ili MP3, jedan snimak ili celu plejlistu.</p>
+<h3>Kretanje kroz klipove</h3>
+<p>U listi klipova strelice idu od klipa do klipa, <kbd>Page Up</kbd> i <kbd>Page Down</kbd> preskaču pet klipova, <kbd>Home</kbd> i <kbd>End</kbd> idu na prvi i poslednji klip, a <kbd>Ctrl+G</kbd> na klip po broju. <kbd>F4</kbd>, Gde sam, izgovara poziciju i šta je ispod plejheda na svakoj traci, koliko ima do sledećeg reza, i opis slike kad postoji.</p>
+<h3>Menjanje klipova</h3>
+<p><kbd>Ctrl+Strelica levo</kbd> i <kbd>Ctrl+Strelica desno</kbd> pomeraju klip, <kbd>Ctrl+D</kbd> menja njegovu dužinu, <kbd>Ctrl+Alt+V</kbd> jačinu zvuka, a <kbd>Ctrl+Alt+S</kbd> brzinu. <kbd>Ctrl+X</kbd> seče klip na mestu plejheda; <kbd>Q</kbd> i <kbd>W</kbd> skraćuju njegov početak ili kraj do plejheda. <kbd>Delete</kbd> briše izabrani klip; <kbd>Shift+Delete</kbd> ga briše i zatvara prazninu (ripple brisanje), pa se klipovi posle njega i slojevi iznad pomeraju unazad. <kbd>Ctrl+C</kbd> i <kbd>Ctrl+V</kbd> kopiraju i lepe klipove.</p>
+<h3>Markeri</h3>
+<p><kbd>Ctrl+M</kbd> dodaje marker na mestu plejheda, <kbd>Ctrl+Shift+N</kbd> i <kbd>Ctrl+Shift+Zarez</kbd> idu na sledeći i prethodni marker, a <kbd>Ctrl+Shift+X</kbd> seče klipove na svim markerima.</p>
+</section>
+
+<section aria-labelledby="playback">
+<h2 id="playback">Puštanje i slušanje</h2>
+<h3>Jedan klip</h3>
+<p><kbd>Ctrl+Razmak</kbd> pušta ili pauzira izabrani klip. <kbd>Alt+Strelica levo</kbd> i <kbd>Alt+Strelica desno</kbd> pomeraju za pet sekundi, sa <kbd>Shift</kbd> za desetinku sekunde; <kbd>Zarez</kbd> i <kbd>Tačka</kbd> pomeraju za jedan frejm.</p>
+<h3>Ceo tajmlajn, uživo</h3>
+<p><kbd>Ctrl+Shift+Razmak</kbd> pušta ceo tajmlajn uživo, bez renderovanja: glavnu traku sa tranzicijama, slojeve, boju, naslove i titlove, sa celim miksom zvuka. <kbd>Razmak</kbd> pauzira i nastavlja, a strelice i zarez i tačka pomeraju kao i inače.</p>
+<ul>
+<li><kbd>L</kbd> pušta; ponovo pritisnut dok svira ide 2 pa 4 puta brže, bez zvuka. Na kraju, <kbd>L</kbd> kreće ponovo od početka.</li>
+<li><kbd>J</kbd> pušta unazad; ponovo pritisnut 2 pa 4 puta brže (samo slika).</li>
+<li><kbd>K</kbd> zaustavlja. <kbd>Razmak</kbd> ili <kbd>L</kbd> vraćaju normalno puštanje sa zvukom.</li>
+<li><kbd>Ctrl+Alt+Shift+Razmak</kbd> menja veličinu žive slike: automatska, 640, 960, 1280 ili 1920 piksela širine. Automatska počinje sa 960 i smanjuje se za korak kad računar ne stiže, i to izgovori.</li>
+</ul>
+<p>Ken Burns pokret i stabilizacija vide se samo u izvozu i u pregledu celog videa.</p>
+<h3>Pregled celog videa</h3>
+<p><kbd>Ctrl+Alt+Razmak</kbd> renderuje ceo video malo i brzo, sa slikom, slojevima, naslovima, bojom i zvukom, i pušta ga. Ponovo pritisnut dok se pravi, zaustavlja. Ako se ništa nije promenilo, isti pregled se pušta odmah.</p>
+<h3>Kopije za pregled (proxy)</h3>
+<p>Prikaz, Napravi kopije za pregled velikih klipova: klipovi viši od 1080 linija dobijaju manje kopije koje glatko idu i na sporijem računaru. Izvoz uvek koristi originale.</p>
+</section>
+
+<section aria-labelledby="tracks">
+<h2 id="tracks">Trake i slojevi</h2>
+<h3>Trake</h3>
+<p><kbd>Ctrl+Alt+N</kbd> dodaje video traku, a <kbd>Ctrl+Alt+Shift+N</kbd> audio traku, do 60 od svake. <kbd>Ctrl+Alt+Page Up</kbd> i <kbd>Ctrl+Alt+Page Down</kbd> idu na prethodnu ili sledeću traku i kažu šta je na njoj; lista klipova tada prikazuje tu traku. <kbd>Ctrl+Strelica gore</kbd> i <kbd>Ctrl+Strelica dole</kbd> premeštaju izabrani klip na traku iznad ili ispod (posle poslednje trake pravi se nova).</p>
+<p><kbd>Ctrl+Alt+R</kbd> daje traci ime (Muzika, Naracija, Naslovi), <kbd>Ctrl+Alt+K</kbd> je zaključava da se njeni klipovi ne mogu menjati, <kbd>Ctrl+Alt+H</kbd> isključuje i uključuje traku sloja, a <kbd>Ctrl+Alt+I</kbd> čita sve trake. Timeline, Ukloni praznu traku uklanja traku na kojoj ste kad na njoj nema klipova. Više video trake crtaju se preko nižih.</p>
+<h3>Slojevi</h3>
+<p>Izaberite klip sa slikom i pritisnite <kbd>Ctrl+Alt+L</kbd>, Sloj i boja. Označite Premesti ovaj klip na traku sloja: on se tada crta preko glavne slike dok traje. Izaberite položaj (ceo kadar, sredina, ugao ili sopstveni), veličinu, providnost, zeleno ili plavo platno, i da li se čuje njegov zvuk.</p>
+<p>Sloj dobija i način stapanja (screen, multiply, overlay, soft light, lighten, darken, add, difference) i masku (pogledajte <a href="#masks">Maske</a>). U istom prozoru LUT fajl boja (.cube) boji klip, i na glavnoj slici i na sloju.</p>
+</section>
+
+<section aria-labelledby="editing">
+<h2 id="editing">Napredna montaža</h2>
+<h3>J i L rezovi</h3>
+<p><kbd>Ctrl+Alt+U</kbd> odvaja zvuk video klipa u poseban klip. Zatim <kbd>Ctrl+[</kbd> pomera početak izabranog klipa pola sekunde ranije, a <kbd>Ctrl+]</kbd> produžava njegov kraj za pola sekunde; sa <kbd>Shift</kbd> rade obrnuto. Tako zvuk počinje pre slike, ili traje i posle nje.</p>
+<h3>Slip, roll i slide</h3>
+<p><kbd>Alt+[</kbd> i <kbd>Alt+]</kbd> rade slip: klip ostaje na mestu i iste dužine, ali pokazuje raniji ili kasniji deo svog fajla. <kbd>Ctrl+Alt+[</kbd> i <kbd>Ctrl+Alt+]</kbd> pomeraju rez prema sledećem klipu pola sekunde ranije ili kasnije (roll). <kbd>Shift+Alt+[</kbd> i <kbd>Shift+Alt+]</kbd> pomeraju klip između suseda (slide): sadržaj i dužina ostaju isti, a klipovi oko njega postaju kraći ili duži.</p>
+<h3>Brzina i promena brzine unutar klipa</h3>
+<p><kbd>Ctrl+Alt+S</kbd> menja brzinu klipa; Efekti klipa dodaju i glatko usporenje. <kbd>Ctrl+Alt+Shift+S</kbd>, promena brzine unutar klipa, glatko menja brzinu unutar video klipa: izaberite gotov oblik (ubrzava, usporava, usporenje u sredini, ubrzanje u sredini), ili postavite plejhed na neko mesto, podesite brzinu u procentima i dodajte tačku. Klip na tajmlajnu zadržava dužinu, a prozor kaže koliko snimka sada koristi.</p>
+<h3>Multicam</h3>
+<p><kbd>Ctrl+Alt+Shift+M</kbd>: označite od 2 do 9 video klipova istog događaja i izaberite glavni zvuk. Kamere se poravnaju po zvuku (ili po mestima na tajmlajnu), i za svaku se izgovori pomeraj. Pustite tajmlajn i pritiskajte <kbd>1</kbd> do <kbd>9</kbd> da sečete na kameru; kad je zaustavljen, broj menja kameru dela ispod plejheda. Timeline, Pročitaj multicam rezove nabraja sve rezove.</p>
+<h3>Složeni klipovi</h3>
+<p>Označite dva ili više klipova (<kbd>Shift</kbd> ili <kbd>Ctrl</kbd> sa strelicama) i pritisnite <kbd>Ctrl+Alt+G</kbd>: postaju jedan klip, renderovan jednom sa svojim slojevima, naslovima, bojom i zvukom. <kbd>Ctrl+Alt+Shift+G</kbd> ga rastavlja i vraća klipove na njihova mesta, spremne za izmene.</p>
+<h3>Tranzicije</h3>
+<p>Na kartici Tranzicije izaberite tranziciju i pritisnite <kbd>Enter</kbd> ili <kbd>Razmak</kbd> da je stavite na izabrani klip; <kbd>F1</kbd> tu čita njen opis. Bez izabrane tranzicije rezovi dobijaju kratko blago pretapanje. Tranzicije se vide u živom puštanju i u izvozu.</p>
+</section>
+
+<section aria-labelledby="colour">
+<h2 id="colour">Boja</h2>
+<h3>Efekti klipa</h3>
+<p><kbd>Ctrl+Alt+E</kbd> otvara Efekte klipa: svetlina, kontrast, zasićenje, temperatura, nijansa, srednji tonovi, senke, svetla mesta, vinjeta i oštrina, po želji za celu traku; stabilizacija, brzina i glatko usporenje; i zvuk samog klipa (ekvilajzer u tri opsega, uklanjanje šuma, jasniji glas, kompresor, utišavanje na početku i kraju).</p>
+<h3>Balans boja, krive i jedna boja</h3>
+<p>Efekti klipa imaju i balans boja posebno za senke, srednje tonove i svetla mesta, i krive za sve boje i posebno za crvenu, zelenu i plavu, sa po pet tačaka i gotovim oblicima. Samo jedna boja menja nijansu, zasićenje ili svetlinu crvenih, žutih, zelenih, cijan, plavih ili magenta tonova, ili zadržava samo tu boju, a ostatak pretvara u crno-belo. Uzmi boju uzima boju iz dela slike i kaže koja je.</p>
+<h3>Prozor za korekciju (power window)</h3>
+<p>U Efektima klipa, Prozor za korekciju primenjuje celu korekciju samo unutar ovala ili pravougaonika (sredina, širina, visina, meka ivica), u postepenom gornjem, donjem, levom ili desnom delu (na primer nebo), ili svuda osim prozora. Mogu se menjati samo podešavanja koja važe za izabrani oblik, i program kaže koja.</p>
+<h3>Boja opisana rečima</h3>
+<p><kbd>Ctrl+Alt+C</kbd>, Boja ovde, meri sliku na mestu plejheda i opisuje je rečima: svetlina, kontrast, izgubljene crne i bele, toplo ili hladno, zelenkast ili ljubičast ton, koliko su boje jake i koje su glavne boje. Ponovo pritisnut, opisuje ceo klip. U Efektima klipa, Analiziraj boju radi isto za podešavanja u prozoru, a Uskladi boju čini da klip izgleda kao neki drugi klip.</p>
+</section>
+
+<section aria-labelledby="sound">
+<h2 id="sound">Zvuk i mikseta traka</h2>
+<h3>Jačina kroz vreme</h3>
+<p><kbd>Ctrl+Shift+V</kbd> postavlja tačku jačine na mestu plejheda u izabranom klipu; jačina se glatko menja od tačke do tačke. Timeline, Stišaj muziku ispod govora to radi umesto vas.</p>
+<h3>Mikseta traka</h3>
+<p><kbd>Ctrl+Alt+M</kbd> otvara miksetu traka: jačina, utišavanje, solo, ekvilajzer u tri opsega, kompresor, levo-desno, odsecanje basova, uklanjanje šuma, de-eser, eho prostorije i limiter za svaku traku sa zvukom, pored podešavanja svakog klipa. Čuva se sa projektom.</p>
+<h3>Automatika trake</h3>
+<p><kbd>Ctrl+Alt+Shift+V</kbd> postavlja tačku jačine trake na mestu plejheda: jačina cele trake se glatko menja od tačke do tačke, nezavisno od njenih klipova. Meni Uređivanje čita tačke i uklanja jednu ili sve.</p>
+</section>
+
+<section aria-labelledby="titles">
+<h2 id="titles">Naslovi, titlovi i animacija</h2>
+<h3>Naslovi</h3>
+<p><kbd>Ctrl+Alt+T</kbd> stavlja naslov preko izabranog klipa, sa drugim redom po želji, položajem (sredina, donja trećina, gore, dole, uglovi), veličinom, bojom, tamnom trakom iza teksta, načinom ulaska (pojavljivanje, klizanje nagore, klizanje sa desne strane, zum), kad počinje i koliko traje.</p>
+<h3>Titlovi</h3>
+<p>Kartica Titlovi drži titlove sa njihovim vremenima. Veštačka inteligencija, Transkribuj audio ih piše iz govora pomoću Whisper-a, a Sinhronizuj tekst postavlja tekst pesme reč po reč.</p>
+<h3>Animacija sa keyframe-ovima</h3>
+<p>Na kartici Animacije, <kbd>Ctrl+K</kbd> dodaje keyframe sa zumom, rotacijom, položajem i providnošću, a <kbd>Ctrl+Shift+K</kbd> ga uklanja. Svaki keyframe ima krivu do sledećeg: ravnomerno, polako kreće pa ubrzava, brzo kreće pa usporava, polako kreće i polako staje, ili drži vrednost pa skače na sledećem keyframe-u. Spisak keyframe-ova uz svaki čita i krivu.</p>
+</section>
+
+<section aria-labelledby="masks">
+<h2 id="masks">Maske i praćenje objekata</h2>
+<h3>Maske</h3>
+<p>U prozoru Sloj i boja (<kbd>Ctrl+Alt+L</kbd>) sloj može imati masku: oval, pravougaonik, zaobljeni pravougaonik, romb, trougao, zvezda, srce, ili sopstveni oblik zadat tačkama (x y; x y; … u procentima). Maska ima svoje mesto i veličinu unutar sloja i meku ivicu; može se izvrnuti, pomerati tokom klipa sa jednog mesta i veličine na drugo, ili pratiti objekat.</p>
+<h3>Praćenje objekta</h3>
+<p><kbd>Ctrl+Alt+O</kbd>: opišite rečima nešto u izabranom klipu (čovek u crvenoj jakni, registarska tablica, pas) i AI za sliku ga pronađe, ili izaberite deo slike u kome je. Editor ga prati kroz klip i kaže kuda je išao i gde ga je izgubio. Objekat se može zamagliti, pikselizovati, pokriti crnim pravougaonikom ili osvetliti dok ostatak potamni; na klipu sloja njegova maska ga može pratiti; a klip sloja (natpis, strelica, logo) može se kretati zajedno sa objektom na slici ispod.</p>
+</section>
+
+<section aria-labelledby="ai">
+<h2 id="ai">Opisi i AI alati</h2>
+<h3>Opisi vaših klipova</h3>
+<p><kbd>Ctrl+Shift+F</kbd> opisuje kadar ispod plejheda. <kbd>Ctrl+Alt+D</kbd> opisuje izabrani klip deo po deo u pozadini, dok vi nastavljate da radite; Veštačka inteligencija, Opiši sve moje klipove to radi za svaki klip. Sa Gemini ključem opise piše Gemini, a bez njega lokalni model u Ollama-i.</p>
+<h3>AI pravljenje spota</h3>
+<p>Veštačka inteligencija, Video Engine pravi gotov spot od pesme i njenog teksta: za svaki stih bira kadrove, seče ih po muzici, sa tekstom sinhronizovanim reč po reč i karaoke titlovima, a svaka scena može da se pregleda i promeni.</p>
+<h3>Ostali AI alati</h3>
+<p>Meni Veštačka inteligencija ima i pregled videa, pametno prepoznavanje scena (<kbd>Ctrl+Shift+D</kbd>), izdvajanje najboljih delova (<kbd>Ctrl+Shift+H</kbd>), AI asistenta za tajmlajn (<kbd>Ctrl+Shift+T</kbd>), obradu boje (<kbd>Ctrl+Shift+G</kbd>), grupni izvoz (<kbd>Ctrl+Shift+B</kbd>), šablone projekata (<kbd>Ctrl+Shift+P</kbd>), pravljenje glasa i transkripciju.</p>
+</section>
+
+<section aria-labelledby="ad">
+<h2 id="ad">Audio-deskripcija za gledaoce, korak po korak</h2>
+<ol>
+<li><kbd>Ctrl+Alt+A</kbd> otvara prozor. Video klip izabran u listi klipova se sam upiše; inače izaberite klip u polju Video sa tajmlajna, ili bilo koji fajl dugmetom Izaberi video.</li>
+<li>Samo jednom, po želji: nalepite Gemini API ključ (besplatan, sa Google AI Studio-a) i pritisnite Proveri i sačuvaj ključ. Sa njim Gemini gleda ceo video sa zvukom i piše najbolje opise.</li>
+<li>Izaberite kako se opisi pišu i koliko često, pa pritisnite Napiši tekst opisa. Enter u polju za video radi isto.</li>
+<li>Pročitajte tekst i ispravite ga kako želite: jedan red za svaki opis, vreme | tekst.</li>
+<li>Izaberite glas (Microsoft-ovi prirodni glasovi su besplatni; Google HD glasovima treba Google Cloud ključ) i koliko se muzika stiša ispod glasa.</li>
+<li>Pritisnite Napravi video sa audio-deskripcijom. Pored videa dobijate video sa opisom (.mp4), tekst za YouTube (.txt) i titl sa opisima (.vtt).</li>
+</ol>
+<p>Prozor izgovara napredak na svakih četvrt; Zaustavi prekida posao; kratak zvuk se čuje kad se posao završi ili ne uspe.</p>
+</section>
+
+<section aria-labelledby="export">
+<h2 id="export">Izvoz i razmena</h2>
+<h3>Izvoz</h3>
+<p><kbd>Ctrl+E</kbd> izvozi video. Datoteka, Opcije izvoza bira format: MP4 sa H.264, H.265 ili H.265 10-bit; MOV sa ProRes 422 HQ, DNxHR HQ ili DNxHR HQX 10-bit; MKV sa FFV1 bez gubitka, za arhivu; WebM ili AVI. Kvalitet ide do Maksimalnog, broj frejmova u sekundi prati video ili se bira (od 24 do 60), a zatamnjenje na početku i kraju i topli izgled boja mogu da se isključe. Datoteka, Izvezi za Shorts/TikTok/Instagram pravi uspravne i kvadratne verzije.</p>
+<h3>Rad sa drugim programima za montažu</h3>
+<p>Datoteka, Izvezi tajmlajn ga zapisuje kao OpenTimelineIO (.otio), kao EDL, ili kao Final Cut 7 XML sa svim video i audio trakama, da bi drugi montažer ili kolorista mogao da nastavi rad u svom programu.</p>
+<p><kbd>Ctrl+Alt+Shift+I</kbd>, Uvezi tajmlajn, čita XML, OTIO i EDL fajlove sa njihovim trakama, mestima i početnim tačkama klipova. Zvuk video klipa se vraća uz klip, a premešteni fajlovi se traže pored fajla tajmlajna. Birate: Da menja trenutni tajmlajn, Ne ga dodaje posle kraja. Klipovi čiji fajlovi nedostaju navode se po imenu i izostavljaju.</p>
+</section>
+
+<section aria-labelledby="settings">
+<h2 id="settings">Podešavanja, prikaz i pomoć</h2>
+<p>Prikaz, Jezik: engleski, srpski ili nemački; pomoć i ovaj priručnik prate izabrani jezik. Prikaz, Režim prikaza: standardni, pristupačnost (čitač ekrana) ili slabovidost; <kbd>Ctrl+Shift+A</kbd> uključuje pristupačni režim, a <kbd>Ctrl+Shift+Plus</kbd> i <kbd>Ctrl+Shift+Minus</kbd> povećavaju i smanjuju tekst i kontrole. Prikaz, Tema: tamna, visoki kontrast ili svetla.</p>
+<p>Pomoć, Prečice na tastaturi (<kbd>F1</kbd>) otvara <a href="shortcuts.html">spisak svih prečica</a>, napravljen iz menija programa na jeziku koji koristite. Pomoć, Ažuriranja proverava da li postoji nova verzija. Pomoć, Preuzmi biblioteku zvukova sa Adobe-a dodaje ambijentalne zvukove za AI pravljenje spota.</p>
+</section>
+</main>
+<footer><p class="note">Ultra Video Editor 2.0 · Demir Ajvazi</p></footer>
+</body>
+</html>

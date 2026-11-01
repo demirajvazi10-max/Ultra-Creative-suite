@@ -187,7 +187,7 @@ namespace UltraVideoEditor
 
         private void BtnNewTemplate_Click(object sender, RoutedEventArgs e)
         {
-            TxtTemplateName.Text = $"Template {_templates.Count + 1}";
+            TxtTemplateName.Text = LanguageManager.F("lx_template_4f4ef", _templates.Count + 1);
             TxtTemplateDesc.Text = "";
             CmbExportProfile.SelectedIndex = 0;
             CmbLanguage.SelectedIndex      = 0;
@@ -208,7 +208,7 @@ namespace UltraVideoEditor
             string name = TxtTemplateName.Text.Trim();
             if (string.IsNullOrEmpty(name))
             {
-                MessageBox.Show("Enter a template name.", "Template",
+                MessageBox.Show(LanguageManager.T("lx_enter_a_name_for_the_a0820"), LanguageManager.T("lx_template_3ec1a"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -231,15 +231,15 @@ namespace UltraVideoEditor
             RefreshList();
             int idx = _templates.FindIndex(t => t.Name == name);
             if (idx >= 0) TemplateList.SelectedIndex = idx;
-            MessageBox.Show($"Template \"{name}\" saved.", "Template",
+            MessageBox.Show(LanguageManager.F("lx_template_saved_617e4", name), LanguageManager.T("lx_template_3ec1a"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void BtnDeleteTemplate_Click(object sender, RoutedEventArgs e)
         {
             if (_current == null) return;
-            var r = MessageBox.Show($"Obrisati template \"{_current.Name}\"?",
-                "Potvrda", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var r = MessageBox.Show(LanguageManager.F("lx_delete_the_template_11467", _current.Name),
+                LanguageManager.T("lx_confirm_52529"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r != MessageBoxResult.Yes) return;
             DeleteTemplateFile(_current);
             _templates.Remove(_current);
@@ -256,7 +256,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Import template",
+                Title  = LanguageManager.T("lx_import_a_template_759fb"),
                 Filter = "Iskra Template|*.iskrat|All files|*.*",
             };
             if (dlg.ShowDialog() != true) return;
@@ -275,7 +275,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Import error: {ex.Message}", "Error",
+                MessageBox.Show(LanguageManager.F("lx_import_error_6838b", ex.Message), LanguageManager.T("lx_error_7f2f6"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -285,7 +285,7 @@ namespace UltraVideoEditor
             if (_current == null) return;
             var dlg = new SaveFileDialog
             {
-                Title      = "Export template",
+                Title      = LanguageManager.T("lx_export_the_template_47168"),
                 Filter     = "Iskra Template|*.iskrat",
                 FileName   = _current.Name,
                 DefaultExt = "iskrat",
@@ -295,12 +295,12 @@ namespace UltraVideoEditor
             {
                 File.WriteAllText(dlg.FileName,
                     JsonConvert.SerializeObject(_current, Formatting.Indented));
-                MessageBox.Show("Template izvezen.", "Template",
+                MessageBox.Show(LanguageManager.T("lx_template_exported_0b8f1"), LanguageManager.T("lx_template_3ec1a"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export error: {ex.Message}", "Error",
+                MessageBox.Show(LanguageManager.F("lx_export_error_f4ece", ex.Message), LanguageManager.T("lx_error_7f2f6"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -312,13 +312,8 @@ namespace UltraVideoEditor
             if (_current == null) return;
             OnApply?.Invoke(_current);
             MessageBox.Show(
-                $"Template \"{_current.Name}\" applied to the current project.\n\n" +
-                $"Color grade: {_current.ColorGradePreset}\n" +
-                $"Jezik: {_current.Language}\n" +
-                $"YouTube: {(_current.ExportYouTube ? "✅" : "❌")}  " +
-                $"Reels: {(_current.ExportReels ? "✅" : "❌")}  " +
-                $"MP3: {(_current.ExportMP3 ? "✅" : "❌")}",
-                "Template primenjen",
+                LanguageManager.F("lx_template_applied_to_the_current_71b62", _current.Name, _current.ColorGradePreset, _current.Language, (_current.ExportYouTube ? "✅" : "❌"), (_current.ExportReels ? "✅" : "❌"), (_current.ExportMP3 ? "✅" : "❌")),
+                LanguageManager.T("lx_template_applied_b0350"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
             Close();

@@ -79,7 +79,7 @@ namespace UltraVideoEditor
             new ExportFormat
             {
                 Id = "report", Label = "Accessibility Report",
-                Description = "TXT report with audio-description and navigation markers",
+                Description = LanguageManager.T("lx_txt_report_with_the_audio_bd384"),
             },
         };
     }

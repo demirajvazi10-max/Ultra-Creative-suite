@@ -58,7 +58,7 @@ namespace UltraVideoEditor
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
-            Announce("Provjeram Ollama...");
+            Announce(LanguageManager.T("lx_checking_ollama_d9c55"));
             try
             {
                 _ollama         = new OllamaClient();
@@ -75,7 +75,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                txtOllamaInfo.Text          = "Ollama is not available — using the local engine";
+                txtOllamaInfo.Text          = LanguageManager.T("lx_ollama_is_not_available_the_498a1");
                 txtOllamaInfo.Foreground    = System.Windows.Media.Brushes.Orange;
                 chkUseOllama.IsChecked      = false;
                 chkUseOllama.IsEnabled      = false;
@@ -87,7 +87,7 @@ namespace UltraVideoEditor
             {
                 if (txtFreesoundInfo != null)
                 {
-                    txtFreesoundInfo.Text       = $"🔊 Local library: {soundCount} sounds — ambient sounds active";
+                    txtFreesoundInfo.Text       = LanguageManager.F("lx_local_library_sounds_ambient_sounds_a6d2a", soundCount);
                     txtFreesoundInfo.Foreground = System.Windows.Media.Brushes.LightGreen;
                 }
             }
@@ -95,13 +95,13 @@ namespace UltraVideoEditor
             {
                 if (txtFreesoundInfo != null)
                 {
-                    txtFreesoundInfo.Text       = "⚠️ Assets/Sounds/ is empty — add MP3/WAV files for ambient sounds";
+                    txtFreesoundInfo.Text       = LanguageManager.T("lx_assets_sounds_is_empty_add_8a2d3");
                     txtFreesoundInfo.Foreground = System.Windows.Media.Brushes.Orange;
                 }
                 if (chkAmbient != null) chkAmbient.IsEnabled = false;
             }
 
-            UpdateStatus("Ready. Enter the song lyrics and press ANALYZE.");
+            UpdateStatus(LanguageManager.T("lx_ready_enter_the_song_lyrics_eb57b"));
             txtLyrics.Focus();
         }
 
@@ -111,7 +111,7 @@ namespace UltraVideoEditor
             var lyrics = ParseLyrics();
             if (lyrics.Count == 0)
             {
-                Announce("Enter the song lyrics, one per line.");
+                Announce(LanguageManager.T("lx_enter_the_song_lyrics_one_a1c5c"));
                 return;
             }
 
@@ -122,8 +122,7 @@ namespace UltraVideoEditor
             _shots = VideoEngine.GenerateFromLyrics(lyrics, dur, intent);
 
             RefreshShotList();
-            Announce($"Analyzed: {_shots.Count} lines, {_shots.Count(s => s.IsChorus)} chorus lines detected. " +
-                     $"Duration: {FormatTime(dur)}. Shot list preview is ready.");
+            Announce(LanguageManager.F("lx_analysed_lines_chorus_lines_found_3b186", _shots.Count, _shots.Count(s => s.IsChorus), FormatTime(dur)));
         }
 
         private void RefreshShotList()
@@ -140,8 +139,7 @@ namespace UltraVideoEditor
             }).ToList();
 
             int choruses = _shots.Count(s => s.IsChorus);
-            txtShotCount.Text = $"({_shots.Count} kadrova | {choruses} refrena | " +
-                                $"prosj. vibe {_shots.Average(s => s.Data.VibeScore):F1}/10)";
+            txtShotCount.Text = LanguageManager.F("lx_shots_chorus_lines_average_mood_0b6b8", _shots.Count, choruses, _shots.Average(s => s.Data.VibeScore));
         }
 
         private void lstShots_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -149,11 +147,7 @@ namespace UltraVideoEditor
             if (lstShots.SelectedItem is ShotViewModel vm)
             {
                 var s = vm.Shot;
-                Announce($"Kadar {s.LyricIndex + 1}: {s.Lyric}. " +
-                         $"{s.Data.ShotType}, vibe {s.Data.VibeScore}/10. " +
-                         $"Query: {s.Data.SearchQuery}. " +
-                         $"Pokret: {s.Data.MotionIntent}. " +
-                         $"Most: {s.Data.VisualBridge}.");
+                Announce(LanguageManager.F("lx_shot_mood_search_movement_link_cd20d", s.LyricIndex + 1, s.Lyric, s.Data.ShotType, s.Data.VibeScore, s.Data.SearchQuery, s.Data.MotionIntent, s.Data.VisualBridge));
             }
         }
 
@@ -175,8 +169,8 @@ namespace UltraVideoEditor
             var lyrics = ParseLyrics();
             if (lyrics.Count == 0)
             {
-                WpfMessageBox.Show("Enter the song lyrics.",
-                    "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                WpfMessageBox.Show(LanguageManager.T("lx_enter_lyrics"),
+                    LanguageManager.T("lx_warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -211,20 +205,20 @@ namespace UltraVideoEditor
                 bool   useOllama  = chkUseOllama.IsChecked == true && _ollamaAvailable;
 
                 // ── Step 1: Generate shot list ──────────────────────
-                Announce("Generating the shot list...", 5);
+                Announce(LanguageManager.T("lx_making_the_shot_list_e4c30"), 5);
 
                 if (useOllama)
                 {
-                    Announce("Ollama is analyzing the lyrics and generating professional queries...", 8);
+                    Announce(LanguageManager.T("lx_ollama_is_reading_the_lyrics_b36ef"), 8);
                     string prompt    = VideoEngine.BuildOllamaPrompt(lyrics, duration, intent);
                     string aiOutput  = await _ollama.GenerateAsync(prompt, ct: _cts.Token);
                     _shots           = VideoEngine.MergeWithAIOutput(lyrics, duration, aiOutput);
-                    Announce($"Ollama generated {_shots.Count} shots.", 15);
+                    Announce(LanguageManager.F("lx_ollama_made_shots_c58b6", _shots.Count), 15);
                 }
                 else
                 {
                     _shots = VideoEngine.GenerateFromLyrics(lyrics, duration, intent);
-                    Announce($"Lokalni engine generisao {_shots.Count} kadrova.", 15);
+                    Announce(LanguageManager.F("lx_the_local_engine_made_shots_a19d3", _shots.Count), 15);
                 }
 
                 RefreshShotList();
@@ -261,14 +255,14 @@ namespace UltraVideoEditor
                     if (!string.IsNullOrEmpty(path))
                         downloaded.Add((path, shot));
                     else
-                        Announce($"Warning: shot {i+1} was not downloaded.");
+                        Announce(LanguageManager.F("lx_warning_shot_was_not_downloaded_723bc", i+1));
                 }
 
                 // ── Korak 2b: Lokalni ambijentalni zvukovi ────────────
                 var ambientFiles = new Dictionary<int, string>(); // shotIndex -> ambientPath
                 if (downloaded.Count > 0 && chkAmbient?.IsChecked == true)
                 {
-                    Announce("Selecting ambient sounds from the local library...", 93);
+                    Announce(LanguageManager.T("lx_choosing_ambient_sounds_from_the_58f3d"), 93);
 
                     var processedScenes = new HashSet<string>();
                     for (int i = 0; i < downloaded.Count; i++)
@@ -286,11 +280,11 @@ namespace UltraVideoEditor
                         if (!string.IsNullOrEmpty(ambPath))
                             ambientFiles[i] = ambPath;
                     }
-                    Announce($"Selected {ambientFiles.Count} ambient sounds.", 96);
+                    Announce(LanguageManager.F("lx_ambient_sounds_chosen_6fbb7", ambientFiles.Count), 96);
                 }
 
                 // ── Korak 3: Dodaj na timeline ────────────────────────
-                Announce("Adding to timeline...", 97);
+                Announce(LanguageManager.T("lx_adding_to_the_timeline_6368d"), 97);
                 mainWin.SaveState();
 
                 // Remove existing video/image clips
@@ -357,7 +351,7 @@ namespace UltraVideoEditor
                 }
 
                 mainWin.UpdateTimelineDisplay();
-                Announce("Done!", 100);
+                Announce(LanguageManager.T("lx_done_55823"), 100);
 
                 int choruses = downloaded.Count(d => d.shot.IsChorus);
                 WpfMessageBox.Show(
@@ -374,11 +368,11 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                Announce("Stopped.");
+                Announce(LanguageManager.T("lx_stopped_8fcc7"));
             }
             catch (Exception ex)
             {
-                WpfMessageBox.Show($"Error: {ex.Message}", "Error",
+                WpfMessageBox.Show(LanguageManager.F("generic_error", ex.Message), LanguageManager.T("generic_error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -394,7 +388,7 @@ namespace UltraVideoEditor
         {
             if (_shots == null || _shots.Count == 0)
             {
-                Announce("No shot list. Press ANALYZE first.");
+                Announce(LanguageManager.T("lx_there_is_no_shot_list_708d5"));
                 return;
             }
 
@@ -409,7 +403,7 @@ namespace UltraVideoEditor
                 File.WriteAllText(dlg.FileName,
                     VideoEngine.ToJson(_shots),
                     System.Text.Encoding.UTF8);
-                Announce($"Shot lista sacuvana: {Path.GetFileName(dlg.FileName)}");
+                Announce(LanguageManager.F("lx_shot_list_saved_b658a", Path.GetFileName(dlg.FileName)));
             }
         }
 
@@ -563,7 +557,7 @@ namespace UltraVideoEditor
         {
             _cts?.Cancel();
             btnStop.IsEnabled = false;
-            Announce("Zaustavljanje...");
+            Announce(LanguageManager.T("lx_stopping_746be"));
         }
 
         private void btnClose_Click(object sender, RoutedEventArgs e)

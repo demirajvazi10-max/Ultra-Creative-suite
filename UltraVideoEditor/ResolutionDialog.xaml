@@ -19,6 +19,8 @@
             <ComboBoxItem Content="📺 1920×1080 (Full HD)" Tag="1920x1080"/>
             <ComboBoxItem Content="🎬 2560×1440 (2K)" Tag="2560x1440"/>
             <ComboBoxItem Content="🚀 3840×2160 (4K)" Tag="3840x2160"/>
+            <ComboBoxItem Content="📲 1080×1920 (vertical: Reels, Shorts, TikTok)" Tag="1080x1920"/>
+            <ComboBoxItem Content="⬛ 1080×1080 (square)" Tag="1080x1080"/>
         </ComboBox>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">

@@ -42,7 +42,7 @@ namespace UltraVideoEditor
             UiScaling.Register(this);
             _originalItems = new List<TimelineItem>(timelineItems);
             _workingItems  = new List<TimelineItem>(timelineItems);
-            TxtSubtitle.Text = $"Timeline: {timelineItems.Count} clips  ·  Ollama (local AI) + rule-based fallback";
+            TxtSubtitle.Text = LanguageManager.F("lx_timeline_clips_ollama_local_ai_a2ebf", timelineItems.Count);
         }
 
         // ── Primeri ───────────────────────────────────────────────────
@@ -67,7 +67,7 @@ namespace UltraVideoEditor
             // Provjera da li postoji mikrofon
             if (WaveInEvent.DeviceCount == 0)
             {
-                ShowStatus("⚠️  Microphone not found.", null, true, isError: true);
+                ShowStatus(LanguageManager.T("lx_no_microphone_found_650ac"), null, true, isError: true);
                 return;
             }
 
@@ -95,7 +95,7 @@ namespace UltraVideoEditor
 
                 _waveIn.StartRecording();
                 _recording = true;
-                BtnMic.Content = "⏹ Stop";
+                BtnMic.Content = LanguageManager.T("lx_stop_e3f8b");
                 SetMicButtonColor(true);
                 ShowStatus(LanguageManager.T("loc_recording_cmd"), null, true, false);
 
@@ -105,7 +105,7 @@ namespace UltraVideoEditor
             }
             catch (Exception ex)
             {
-                ShowStatus($"⚠️  Microphone error: {ex.Message}", null, true, isError: true);
+                ShowStatus(LanguageManager.F("lx_microphone_error_22337", ex.Message), null, true, isError: true);
                 _recording = false;
             }
         }
@@ -114,7 +114,7 @@ namespace UltraVideoEditor
         {
             if (!_recording) return;
             _recording = false;
-            BtnMic.Content = "🎙 Govori";
+            BtnMic.Content = LanguageManager.T("lx_speak_c72cf");
             SetMicButtonColor(false);
             _waveIn?.StopRecording();
             _waveIn?.Dispose();
@@ -129,7 +129,7 @@ namespace UltraVideoEditor
             {
                 BtnMic.IsEnabled     = false;
                 BtnExecute.IsEnabled = false;
-                ShowStatus("⏳ Transkribujem snimak (Whisper large-v3)…", null, true, false);
+                ShowStatus(LanguageManager.T("lx_transcribing_the_recording_whisper_large_e9e0d"), null, true, false);
 
                 string ffmpegPath = AppPaths.FFmpeg;
 
@@ -143,20 +143,20 @@ namespace UltraVideoEditor
                 if (result.Success && !string.IsNullOrWhiteSpace(result.FullText))
                 {
                     TxtCommand.Text = result.FullText.Trim();
-                    ShowStatus($"✅ Prepoznato: \"{result.FullText.Trim()}\"", null, true, false);
+                    ShowStatus(LanguageManager.F("lx_heard_3d7a2", result.FullText.Trim()), null, true, false);
                     // Execute automatically
                     await Task.Delay(400);
                     BtnExecute_Click(null, null);
                 }
                 else
                 {
-                    ShowStatus("⚠️  Whisper did not recognize the command. Please try again.",
+                    ShowStatus(LanguageManager.T("lx_whisper_did_not_understand_the_b4a56"),
                                result.ErrorMessage, true, isError: true);
                 }
             }
             catch (Exception ex)
             {
-                ShowStatus($"⚠️  Transcription error: {ex.Message}", null, true, isError: true);
+                ShowStatus(LanguageManager.F("lx_transcription_error_a463c", ex.Message), null, true, isError: true);
             }
             finally
             {
@@ -203,7 +203,7 @@ namespace UltraVideoEditor
                                $"{result.OriginalCount} → {result.ResultCount} clips", true);
 
                     AddHistory(cmd, result);
-                    TxtSubtitle.Text = $"Timeline: {_workingItems.Count} clips (preview — not applied)";
+                    TxtSubtitle.Text = LanguageManager.F("lx_timeline_clips_preview_not_applied_07935", _workingItems.Count);
                     BtnUndoLast.IsEnabled = true;
                     BtnApplyAll.IsEnabled = true;
                     TxtCommand.Clear();
@@ -215,17 +215,17 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                ShowStatus("Cancelled.", null, false);
+                ShowStatus(LanguageManager.T("lx_cancelled_d3e41"), null, false);
             }
             catch (Exception ex)
             {
-                ShowStatus($"Error: {ex.Message}", null, false, isError: true);
+                ShowStatus(LanguageManager.F("lx_error_f93e6", ex.Message), null, false, isError: true);
             }
             finally
             {
                 _running             = false;
                 BtnExecute.IsEnabled = true;
-                BtnExecute.Content   = "▶ Execute";
+                BtnExecute.Content   = LanguageManager.T("lx_run_f5147");
                 _cts?.Dispose(); _cts = null;
             }
         }
@@ -236,7 +236,7 @@ namespace UltraVideoEditor
         {
             if (_undoStack.Count == 0) return;
             _workingItems = _undoStack.Pop();
-            TxtSubtitle.Text = $"Timeline: {_workingItems.Count} clips (undone)";
+            TxtSubtitle.Text = LanguageManager.F("lx_timeline_clips_undone_ea59c", _workingItems.Count);
             BtnUndoLast.IsEnabled = _undoStack.Count > 0;
             if (_undoStack.Count == 0) _hasChanges = false;
 
@@ -244,7 +244,7 @@ namespace UltraVideoEditor
             if (HistoryPanel.Children.Count > 0)
                 HistoryPanel.Children.RemoveAt(HistoryPanel.Children.Count - 1);
 
-            ShowStatus("↩ Last command has been undone.", null, true);
+            ShowStatus(LanguageManager.T("lx_the_last_command_is_undone_54bd0"), null, true);
         }
 
         // ── Primeni na timeline ───────────────────────────────────────
@@ -254,10 +254,8 @@ namespace UltraVideoEditor
             if (!_hasChanges) return;
 
             var confirm = MessageBox.Show(
-                $"Apply changes to the timeline?\n\n" +
-                $"Original: {_originalItems.Count} clips\n" +
-                $"New state: {_workingItems.Count} clips",
-                "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                LanguageManager.F("lx_apply_the_changes_to_the_9be94", _originalItems.Count, _workingItems.Count),
+                LanguageManager.T("lx_confirm_04a21"), MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -328,7 +326,7 @@ namespace UltraVideoEditor
             sp.Children.Add(row);
             sp.Children.Add(new TextBlock
             {
-                Text       = $"{result.OriginalCount} → {result.ResultCount} clips  ·  {result.Summary}",
+                Text       = LanguageManager.F("lx_clips_0a25d", result.OriginalCount, result.ResultCount, result.Summary),
                 Foreground = ThemeBrushes.TextSecondary,
                 FontSize   = 11,
                 TextWrapping = TextWrapping.Wrap,
@@ -337,7 +335,7 @@ namespace UltraVideoEditor
 
             entry.Child = sp;
             AutomationProperties.SetName(entry,
-                $"Command {cmd}, {result.OriginalCount} to {result.ResultCount} clips");
+                LanguageManager.F("lx_command_to_clips_bf2b6", cmd, result.OriginalCount, result.ResultCount));
             HistoryPanel.Children.Add(entry);
         }
 
@@ -376,8 +374,8 @@ namespace UltraVideoEditor
             if (_hasChanges)
             {
                 var r = MessageBox.Show(
-                    "You have unapplied changes. Apply them before closing?",
-                    "Unapplied changes",
+                    LanguageManager.T("lx_some_changes_are_not_applied_b0b82"),
+                    LanguageManager.T("lx_changes_not_applied_2dd38"),
                     MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (r == MessageBoxResult.Cancel) return;
                 if (r == MessageBoxResult.Yes) { BtnApplyAll_Click(sender, e); return; }

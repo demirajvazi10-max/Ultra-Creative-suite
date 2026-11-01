@@ -34,7 +34,7 @@ namespace UltraVideoEditor
         {
             var dlg = new OpenFileDialog
             {
-                Title      = "Select Iskra projects",
+                Title      = LanguageManager.T("lx_choose_iskra_projects_b5686"),
                 Filter     = "Iskra project|*.iskra|All files|*.*",
                 Multiselect = true,
             };
@@ -62,7 +62,7 @@ namespace UltraVideoEditor
         {
             using var dlg = new System.Windows.Forms.FolderBrowserDialog
             {
-                Description         = "Select output folder",
+                Description         = LanguageManager.T("lx_choose_the_output_folder_d5b9f"),
                 UseDescriptionForTitle = true,
             };
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
@@ -106,8 +106,8 @@ namespace UltraVideoEditor
             var pending = _jobs.Where(j => j.Status == BatchJobStatus.Pending).ToList();
             if (pending.Count == 0)
             {
-                MessageBox.Show("No projects in queue. Add new ones or remove completed ones.",
-                    "Batch Export", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(LanguageManager.T("lx_there_are_no_projects_in_187cd"),
+                    LanguageManager.T("lx_batch_export_2e1cc"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -120,7 +120,7 @@ namespace UltraVideoEditor
 
             _running             = true;
             _cts                 = new CancellationTokenSource();
-            BtnStartBatch.Content = "⏹ Cancel";
+            BtnStartBatch.Content = LanguageManager.T("lx_cancel_3bdb2");
             ProgressPanel.Visibility = Visibility.Visible;
             TotalProgressBar.Value   = 0;
             BtnOpenFolder.IsEnabled  = false;
@@ -147,7 +147,7 @@ namespace UltraVideoEditor
             {
                 _running = false;
                 _cts?.Dispose(); _cts = null;
-                BtnStartBatch.Content = "▶ Start Batch Export";
+                BtnStartBatch.Content = LanguageManager.T("lx_start_the_batch_export_3b9c2");
                 ProgressPanel.Visibility = Visibility.Collapsed;
                 JobsList.Items.Refresh();
                 UpdateJobCount();
@@ -220,8 +220,8 @@ namespace UltraVideoEditor
         {
             if (_running)
             {
-                var r = MessageBox.Show("Batch export is in progress. Cancel it?",
-                    "Cancel", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                var r = MessageBox.Show(LanguageManager.T("lx_the_batch_export_is_running_24423"),
+                    LanguageManager.T("lx_cancel_77dfd"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (r != MessageBoxResult.Yes) return;
                 _cts?.Cancel();
             }

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UltraVideoEditor": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

@@ -39,7 +39,7 @@ namespace UltraVideoEditor
 
             Loaded += (s, e) => txtDuration.Focus();
 
-            AutomationProperties.SetName(this, "Duration dialog");
+            AutomationProperties.SetName(this, LanguageManager.T("lx_clip_length_4e615"));
         }
 
         private void Ok_Click(object sender, RoutedEventArgs e)

@@ -94,7 +94,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrWhiteSpace(txtSearch.Text))
             {
-                WpfMessageBox.Show("Enter a search term", "Search", MessageBoxButton.OK, MessageBoxImage.Warning);
+                WpfMessageBox.Show(LanguageManager.T("lx_enter_search"), LanguageManager.T("lx_search_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -238,24 +238,24 @@ namespace UltraVideoEditor
             if (selectedCount > 0)
             {
                 btnDownload.IsEnabled = true;
-                btnDownload.Content = _isVideoMode ? $"📥 DOWNLOAD VIDEO ({selectedCount})" : $"📥 DOWNLOAD IMAGES ({selectedCount})";
+                btnDownload.Content = LanguageManager.F(_isVideoMode ? "lx_pix_dl_video_n" : "lx_pix_dl_images_n", selectedCount);
 
                 if (selectedCount == 1 && lstResults.SelectedItem is PixabayMediaItem item)
                 {
                     string type = _isVideoMode ? "🎥 Video" : "📷 Image";
-                    txtSelectedInfo.Text = $"{type}: {item.Title}\n👍 {item.Likes} likes | 👁️ {item.Views} views | 📥 {item.Downloads} downloads\n👤 Author: {item.User}\n📏 {item.Dimensions}";
+                    txtSelectedInfo.Text = LanguageManager.F("lx_n_likes_views_downloads_n_077f4", type, item.Title, item.Likes, item.Views, item.Downloads, item.User, item.Dimensions);
                     if (!string.IsNullOrEmpty(item.Duration))
                         txtSelectedInfo.Text += $"\n⏱️ Duration: {item.Duration}";
                 }
                 else
                 {
-                    txtSelectedInfo.Text = $"✅ Selected {selectedCount} items. Press the download button.";
+                    txtSelectedInfo.Text = LanguageManager.F("lx_items_selected_press_the_download_189f1", selectedCount);
                 }
             }
             else
             {
                 btnDownload.IsEnabled = false;
-                btnDownload.Content = _isVideoMode ? "📥 DOWNLOAD VIDEO" : "📥 DOWNLOAD IMAGES";
+                btnDownload.Content = LanguageManager.T(_isVideoMode ? "lx_pix_dl_video" : "lx_pix_dl_images");
                 txtSelectedInfo.Text = L("psd_select_hint");
             }
         }
@@ -292,7 +292,7 @@ namespace UltraVideoEditor
                         DownloadedMediaPaths.Add(fullPath);
                         downloaded++;
 
-                        btnDownload.Content = $"⏳ Preuzeto {downloaded}/{selectedItems.Count}...";
+                        btnDownload.Content = LanguageManager.F("lx_downloaded_4893c", downloaded, selectedItems.Count);
                     }
                 }
 
@@ -304,7 +304,7 @@ namespace UltraVideoEditor
                 WpfMessageBox.Show(LF("psd_download_error2", ex.Message), L("error_title"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 btnDownload.IsEnabled = true;
-                btnDownload.Content = _isVideoMode ? "📥 DOWNLOAD VIDEO" : "📥 DOWNLOAD IMAGES";
+                btnDownload.Content = LanguageManager.T(_isVideoMode ? "lx_pix_dl_video" : "lx_pix_dl_images");
             }
         }
 

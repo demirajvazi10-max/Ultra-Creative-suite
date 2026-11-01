@@ -83,7 +83,7 @@ namespace UltraVideoEditor
                 : $"❌ FFmpeg not found! Expected location: {_ffmpegPath}"));
 
             AddFinding(FindingItem.Info("—", "🔄 Provjera Ollama..."));
-            SetStatus("Provjera Ollama...", "#FF9800");
+            SetStatus(LanguageManager.T("lx_checking_ollama_1bbf8"), "#FF9800");
 
             _ollama = new OllamaClient();
 
@@ -97,7 +97,7 @@ namespace UltraVideoEditor
             if (!running)
             {
                 AddFinding(FindingItem.Info("—", "❌ Ollama is not running — start the Ollama desktop app"));
-                SetStatus("⚠️ Ollama is not running — analysis will not work without it.", "#FF5722");
+                SetStatus(LanguageManager.T("lx_ollama_is_not_running_the_a9f30"), "#FF5722");
                 // Do NOT block the button — user can try anyway
                 return;
             }
@@ -125,12 +125,12 @@ namespace UltraVideoEditor
             if (detectedModel != null)
             {
                 AddFinding(FindingItem.Info("—", $"🤖 Using model: {detectedModel}"));
-                SetStatus($"✅ {detectedModel} active. Select a video and press ANALYZE.", "#00E676");
+                SetStatus(LanguageManager.F("lx_is_on_choose_a_video_32c80", detectedModel), "#00E676");
             }
             else
             {
                 AddFinding(FindingItem.Info("—", "⚠️ Qwen model not found. Check: ollama list"));
-                SetStatus("⚠️ Qwen not confirmed — try anyway.", "#FF9800");
+                SetStatus(LanguageManager.T("lx_qwen_is_not_confirmed_you_55b5c"), "#FF9800");
             }
         }
 
@@ -139,7 +139,7 @@ namespace UltraVideoEditor
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Title  = "Select video to analyze",
+                Title  = LanguageManager.T("lx_choose_the_video_to_analyse_9f632"),
                 Filter = "Video files|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.webm|All files|*.*"
             };
             if (dlg.ShowDialog() == true)
@@ -168,7 +168,7 @@ namespace UltraVideoEditor
             }
             else
             {
-                SetStatus("No video files on the timeline. Use 'Open' for manual selection.", "#FF9800");
+                SetStatus(LanguageManager.T("lx_there_are_no_video_files_922e2"), "#FF9800");
             }
         }
 
@@ -180,7 +180,7 @@ namespace UltraVideoEditor
             badgeProblems.Visibility = Visibility.Collapsed;
             badgeScore.Visibility    = Visibility.Collapsed;
             btnExport.IsEnabled      = false;
-            SetStatus($"Video loaded: {Path.GetFileName(path)}", "#00E676");
+            SetStatus(LanguageManager.F("lx_video_loaded_70de0", Path.GetFileName(path)), "#00E676");
         }
 
         private async void btnAnalyze_Click(object sender, RoutedEventArgs e)
@@ -191,13 +191,13 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrEmpty(_videoPath) || !File.Exists(_videoPath))
             {
-                SetStatus("Select a video file before analyzing.", "#FF9800");
+                SetStatus(LanguageManager.T("lx_choose_a_video_file_before_ac2e4"), "#FF9800");
                 AddFinding(FindingItem.Info("—", "❌ Video file does not exist or was not selected."));
                 return;
             }
             if (!File.Exists(_ffmpegPath))
             {
-                SetStatus("FFmpeg not found. Check Ffmpeg/ffmpeg.exe.", "#FF5722");
+                SetStatus(LanguageManager.T("lx_ffmpeg_was_not_found_check_aa09e"), "#FF5722");
                 AddFinding(FindingItem.Info("—", $"❌ FFmpeg not found at: {_ffmpegPath}"));
                 return;
             }
@@ -234,12 +234,12 @@ namespace UltraVideoEditor
             }
             catch (OperationCanceledException)
             {
-                SetStatus("Analysis cancelled.", "#FF9800");
+                SetStatus(LanguageManager.T("lx_the_analysis_was_cancelled_a40a8"), "#FF9800");
                 AddFinding(FindingItem.Info("—", "Analysis cancelled by the user."));
             }
             catch (Exception ex)
             {
-                SetStatus($"Error: {ex.Message}", "#FF5722");
+                SetStatus(LanguageManager.F("lx_error_f93e6", ex.Message), "#FF5722");
             }
             finally
             {
@@ -268,7 +268,7 @@ namespace UltraVideoEditor
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Title      = "Save report",
+                Title      = LanguageManager.T("lx_save_the_report_d54bd"),
                 Filter     = "Text file|*.txt",
                 FileName   = $"VideoReview_{Path.GetFileNameWithoutExtension(_videoPath)}_{DateTime.Now:yyyyMMdd_HHmm}.txt"
             };
@@ -287,7 +287,7 @@ namespace UltraVideoEditor
                 sb.AppendLine();
             }
             File.WriteAllText(dlg.FileName, sb.ToString(), Encoding.UTF8);
-            SetStatus($"Report saved: {dlg.FileName}", "#00E676");
+            SetStatus(LanguageManager.F("lx_report_saved_c29eb", dlg.FileName), "#00E676");
         }
 
         private void btnSaveFeedback_Click(object sender, RoutedEventArgs e)
@@ -300,7 +300,7 @@ namespace UltraVideoEditor
                 $"[{DateTime.Now:dd.MM.yyyy HH:mm}] {Path.GetFileName(_videoPath ?? "")}\n{feedback}\n\n",
                 Encoding.UTF8);
 
-            SetStatus("💾 Comment saved for training.", "#FFD54F");
+            SetStatus(LanguageManager.T("lx_comment_saved_for_learning_2636b"), "#FFD54F");
             txtTeachFeedback.Text = "";
         }
 
@@ -328,14 +328,14 @@ namespace UltraVideoEditor
 
             if (duration <= 0)
             {
-                SetStatus("Unable to read video duration.", "#FF5722");
+                SetStatus(LanguageManager.T("lx_the_video_length_cannot_be_7aedd"), "#FF5722");
                 AddFinding(FindingItem.Info("—", "❌ Duration is 0 — ffprobe/ffmpeg failed to read video."));
                 return;
             }
 
             _totalFrames = (int)(duration / opts.IntervalSec);
 
-            SetStatus($"Analyzing {Path.GetFileName(_videoPath)} ({duration:F0}s) — {_totalFrames} frames...", "#FF9800");
+            SetStatus(LanguageManager.F("lx_analysing_f_s_frames_4a7e9", Path.GetFileName(_videoPath), duration, _totalFrames), "#FF9800");
             AddFinding(FindingItem.Info("00:00", $"Video: {Path.GetFileName(_videoPath)} | Duration: {FormatTime(duration)} | Interval: {opts.IntervalSec}s"));
 
             AddFinding(FindingItem.Info("—", "   Looking for Qwen model..."));
@@ -344,7 +344,7 @@ namespace UltraVideoEditor
 
             if (string.IsNullOrEmpty(model))
             {
-                SetStatus("Qwen2-VL is not available.", "#FF5722");
+                SetStatus(LanguageManager.T("lx_qwen_vl_is_not_available_4e018"), "#FF5722");
                 return;
             }
 
@@ -397,7 +397,7 @@ namespace UltraVideoEditor
                     }
 
                     // Qwen analiza
-                    SetStatus($"Analyzing frame {FormatTime(timestamp)} ({i + 1}/{_totalFrames})...", "#FF9800");
+                    SetStatus(LanguageManager.F("lx_analysing_the_frame_at_d8852", FormatTime(timestamp), i + 1, _totalFrames), "#FF9800");
                     string prompt = BuildReviewPrompt(opts.CheckCuts, opts.CheckQuality, opts.CheckLogic,
                                                       opts.CheckRepeat, opts.CheckFreeze, prevDesc);
                     string raw = null;
@@ -548,7 +548,7 @@ namespace UltraVideoEditor
                 // Zakljucak
                 SetProgress(100, "Analysis complete.");
                 double avgScore = scoredFrames > 0 ? totalScore / scoredFrames : 0;
-                string grade    = avgScore >= 8 ? "Excellent" : avgScore >= 6 ? "Good" : avgScore >= 4 ? "Average" : "Poor";
+                string grade    = LanguageManager.T(avgScore >= 8 ? "lx_grade_excellent" : avgScore >= 6 ? "lx_grade_good" : avgScore >= 4 ? "lx_grade_average" : "lx_grade_poor");
                 string gradeIcon = avgScore >= 8 ? "🏆" : avgScore >= 6 ? "👍" : avgScore >= 4 ? "⚠️" : "❌";
 
                 AddFinding(FindingItem.Summary(FormatTime(duration),
@@ -558,9 +558,9 @@ namespace UltraVideoEditor
                 // Ekstrakcija teksta iz videa putem Qwen OCR
                 await TryExtractLyricsWithQwen(_videoPath, model, duration, ct);
 
-                txtProblemCount.Text       = $"{problemCount} problems";
+                txtProblemCount.Text       = LanguageManager.F("lx_problems_223c8", problemCount);
                 badgeProblems.Visibility   = problemCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-                txtScoreLabel.Text         = $"Score: {avgScore:F1}/10";
+                txtScoreLabel.Text         = LanguageManager.F("lx_score_f_10455", avgScore);
                 badgeScore.Visibility      = Visibility.Visible;
                 badgeScore.Background      =
                     avgScore >= 7 ? ThemeBrushes.ApplyBrush :
@@ -569,7 +569,7 @@ namespace UltraVideoEditor
                 txtScoreLabel.Foreground   = ThemeBrushes.ButtonTextBrush;
 
                 SetStatus(
-                    $"Done — {problemCount} problems | Score: {avgScore:F1}/10 ({grade})",
+                    LanguageManager.F("lx_done_problems_score_f_6bc92", problemCount, avgScore, grade),
                     avgScore >= 7 ? "#00E676" : avgScore >= 5 ? "#FF9800" : "#FF5722");
             }
             finally
@@ -1019,8 +1019,7 @@ namespace UltraVideoEditor
             pbProgress.Value = pct;
             txtPct.Text      = $"{pct}%";
 
-            txtFrameCounter.Text = $"Frejm {_processedFrames} / {_totalFrames}  |  " +
-                                   $"{FormatTime(currentTs)} / {FormatTime(totalDuration)}";
+            txtFrameCounter.Text = LanguageManager.F("lx_frame_a1bdc", _processedFrames, _totalFrames, FormatTime(currentTs), FormatTime(totalDuration));
 
             if (_processedFrames >= 2)
             {
@@ -1030,15 +1029,15 @@ namespace UltraVideoEditor
                 double etaSec   = perFrame * remaining;
 
                 txtETA.Text = etaSec > 60
-                    ? $"Preostalo: ~{(int)(etaSec / 60)}m {(int)(etaSec % 60)}s"
-                    : $"Preostalo: ~{(int)etaSec}s";
+                    ? LanguageManager.F("lx_eta_min", (int)(etaSec / 60), (int)(etaSec % 60))
+                    : LanguageManager.F("lx_eta_sec", (int)etaSec);
             }
             else
             {
-                txtETA.Text = "Calculating duration...";
+                txtETA.Text = LanguageManager.T("lx_reading_the_length_7cfb8");
             }
 
-            txtStatus.Text = $"🔍 Analyzing frame at {FormatTime(currentTs)}...";
+            txtStatus.Text = LanguageManager.F("lx_analysing_the_frame_at_27c1d", FormatTime(currentTs));
         }
 
         private void SetProgress(int pct, string statusMsg = null)

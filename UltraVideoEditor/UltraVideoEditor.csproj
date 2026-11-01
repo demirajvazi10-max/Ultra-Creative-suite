@@ -13,7 +13,7 @@
 		     Naslov prozora i "About" dijalog čitaju ovu vrednost u runtime-u
 		     (MainWindow.xaml.cs -> GetAppVersion()), tako da se nigde više ne
 		     ručno kuca broj verzije. -->
-		<Version>1.4.5</Version>
+		<Version>2.0.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -31,6 +31,12 @@
 		<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
 		</ItemGroup>
 
+	<!-- v2.0: the manual (Help, Manual) is built into the program and opened in the browser -->
+	<ItemGroup>
+		<!-- WithCulture=false: "manual.sr.html" is a file for Serbian, not a satellite resource for the sr culture -->
+		<EmbeddedResource Include="Help\manual.*.html" LogicalName="UltraVideoEditor.Help.%(Filename)%(Extension)" WithCulture="false" />
+	</ItemGroup>
+
 	<!-- v1.4: the test project lives in the Tests folder and is built on its own -->
 	<ItemGroup>
 		<Compile Remove="Tests\**" />
@@ -39,7 +45,7 @@
 		<Page Remove="Tests\**" />
 	</ItemGroup>
 
-	<!-- v1.4.5: backup folders are never built (a .cs or .xaml copy there would be a second definition) -->
+	<!-- v1.4.6: backup folders are never built (a .cs or .xaml copy there would be a second definition) -->
 	<ItemGroup>
 		<Compile Remove="Backup_*\**" />
 		<EmbeddedResource Remove="Backup_*\**" />

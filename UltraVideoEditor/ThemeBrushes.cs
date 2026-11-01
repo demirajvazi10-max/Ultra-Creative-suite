@@ -1,6 +1,5 @@
 namespace UltraVideoEditor
-{
-    /// <summary>
+{    /// <summary>
     /// Reads the current theme's brushes live from Application resources.
     /// Use this instead of hardcoding colors in code-behind (e.g. when building
     /// list rows or other UI dynamically), so that content built in C# also

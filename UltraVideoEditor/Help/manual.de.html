@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultra Video Editor – Handbuch</title>
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #1b1b1b; --muted: #555; --accent: #0b5cad; --line: #d0d7de; --code: #f3f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16181b; --fg: #e8e8e8; --muted: #b0b0b0; --accent: #7cb7ff; --line: #3a3f45; --code: #23272c; } }
+  body { background: var(--bg); color: var(--fg); font: 17px/1.6 "Segoe UI", system-ui, sans-serif; max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  h1 { font-size: 1.9rem; margin-top: 0; }
+  h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.15rem; margin-top: 1.6rem; }
+  a { color: var(--accent); }
+  kbd { font-family: Consolas, monospace; background: var(--code); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; white-space: nowrap; }
+  nav ul { columns: 2; }
+  @media (max-width: 40rem) { nav ul { columns: 1; } }
+  .note { color: var(--muted); }
+  :focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+<h1>Ultra Video Editor – Handbuch</h1>
+<p>Version 2.0. Von Demir Ajvazi.</p>
+<p>Jede Überschrift auf dieser Seite ist ein Abschnitt. Mit einem Screenreader springt <kbd>H</kbd> von Überschrift zu Überschrift, <kbd>2</kbd> durch die Hauptabschnitte, und <kbd>Einfg+F6</kbd> (JAWS) oder <kbd>NVDA+F7</kbd> (NVDA) öffnet die Liste der Überschriften. Die <a href="shortcuts.html">Liste aller Tastenkürzel</a> öffnet sich im Programm mit <kbd>F1</kbd>, dieses Handbuch mit <kbd>Strg+F1</kbd>.</p>
+</header>
+
+<nav aria-label="Inhalt">
+<h2>Inhalt</h2>
+<ul>
+<li><a href="#start">Erste Schritte</a></li>
+<li><a href="#basics">Grundlegender Schnitt</a></li>
+<li><a href="#playback">Abspielen und Anhören</a></li>
+<li><a href="#tracks">Spuren und Ebenen</a></li>
+<li><a href="#editing">Fortgeschrittener Schnitt</a></li>
+<li><a href="#colour">Farbe</a></li>
+<li><a href="#sound">Ton und Spurmischer</a></li>
+<li><a href="#titles">Titel, Untertitel und Animation</a></li>
+<li><a href="#masks">Masken und Objektverfolgung</a></li>
+<li><a href="#ai">Beschreibungen und KI-Werkzeuge</a></li>
+<li><a href="#ad">Audiodeskription für Zuschauer, Schritt für Schritt</a></li>
+<li><a href="#export">Export und Austausch</a></li>
+<li><a href="#settings">Einstellungen, Anzeige und Hilfe</a></li>
+</ul>
+</nav>
+
+<main>
+<section aria-labelledby="start">
+<h2 id="start">Erste Schritte</h2>
+<h3>Das Hauptfenster</h3>
+<p>Das Fenster hat eine Menüleiste (erreichbar mit <kbd>Alt</kbd>), die Clipliste, den Player und Registerkarten für Effekte, Untertitel, Übergänge und Animation. Jeder Menübefehl zeigt sein Tastenkürzel, und Screenreader lesen es mit dem Befehl vor, zum Beispiel „Öffnen Strg+O“.</p>
+<p>Die Clipliste ist die Zeitleiste in Textform: eine Zeile pro Clip mit Nummer, Name, Art, Spur, Länge, Anfang, Ende und Beschreibung. <kbd>Strg+L</kbd> bringt den Fokus von überall dorthin. <kbd>Strg+Tab</kbd> und <kbd>Strg+Umschalt+Tab</kbd> wechseln zwischen den Registerkarten.</p>
+<h3>Was das Programm ansagt</h3>
+<p>Alles, was geschieht, wird über den Screenreader angesagt: was ein Befehl getan hat, der Fortschritt längerer Arbeiten in Vierteln und Fehler mit dem, was zu tun ist. Das Protokoll müssen Sie nie öffnen, um zu wissen, was passiert ist, aber <kbd>Strg+Umschalt+L</kbd> zeigt es, wenn Sie etwas noch einmal lesen möchten.</p>
+<h3>Rückgängig</h3>
+<p><kbd>Strg+Z</kbd> macht fast jede Änderung rückgängig und <kbd>Strg+Y</kbd> stellt sie wieder her: Schnitt, Spuren, Effekte, Mischer, Importe. Ein mit Abbrechen geschlossenes Fenster ändert nichts und hinterlässt keinen leeren Rückgängig-Schritt.</p>
+</section>
+
+<section aria-labelledby="basics">
+<h2 id="basics">Grundlegender Schnitt</h2>
+<h3>Projekte</h3>
+<p><kbd>Strg+N</kbd> beginnt ein neues Projekt, <kbd>Strg+O</kbd> öffnet eines, <kbd>Strg+S</kbd> speichert und <kbd>F12</kbd> speichert unter einem anderen Namen. Alle zwei Minuten wird ein geändertes Projekt zur Seite kopiert; wurde das Programm nicht normal beendet, bietet es beim nächsten Start an, diese Kopie wiederherzustellen.</p>
+<h3>Material hinzufügen</h3>
+<p><kbd>Strg+I</kbd> fügt Videos und Bilder hinzu, <kbd>Strg+Umschalt+I</kbd> Tondateien. Zeitleiste, Von YouTube importieren holt ein Video oder eine MP3, ein einzelnes Video oder eine ganze Playlist.</p>
+<h3>Durch die Clips bewegen</h3>
+<p>In der Clipliste gehen die Pfeiltasten von Clip zu Clip, <kbd>Bild auf</kbd> und <kbd>Bild ab</kbd> springen fünf Clips, <kbd>Pos1</kbd> und <kbd>Ende</kbd> gehen zum ersten und letzten Clip, und <kbd>Strg+G</kbd> springt zu einem Clip nach seiner Nummer. <kbd>F4</kbd>, Wo bin ich, sagt die Position und was unter dem Abspielkopf auf jeder Spur liegt, wie lange es bis zum nächsten Schnitt ist, und die Bildbeschreibung, wenn es eine gibt.</p>
+<h3>Clips ändern</h3>
+<p><kbd>Strg+Pfeil links</kbd> und <kbd>Strg+Pfeil rechts</kbd> verschieben einen Clip, <kbd>Strg+D</kbd> legt seine Länge fest, <kbd>Strg+Alt+V</kbd> seine Lautstärke und <kbd>Strg+Alt+S</kbd> sein Tempo. <kbd>Strg+X</kbd> schneidet den Clip am Abspielkopf; <kbd>Q</kbd> und <kbd>W</kbd> kürzen Anfang oder Ende bis zum Abspielkopf. <kbd>Entf</kbd> löscht den gewählten Clip; <kbd>Umschalt+Entf</kbd> löscht ihn und schließt die Lücke (Ripple-Löschen), sodass spätere Clips und die Ebenen darüber nachrücken. <kbd>Strg+C</kbd> und <kbd>Strg+V</kbd> kopieren und fügen Clips ein.</p>
+<h3>Marker</h3>
+<p><kbd>Strg+M</kbd> setzt einen Marker am Abspielkopf, <kbd>Strg+Umschalt+N</kbd> und <kbd>Strg+Umschalt+Komma</kbd> springen zum nächsten und vorherigen Marker, und <kbd>Strg+Umschalt+X</kbd> schneidet die Clips an allen Markern.</p>
+</section>
+
+<section aria-labelledby="playback">
+<h2 id="playback">Abspielen und Anhören</h2>
+<h3>Ein Clip</h3>
+<p><kbd>Strg+Leertaste</kbd> spielt den gewählten Clip ab oder hält ihn an. <kbd>Alt+Pfeil links</kbd> und <kbd>Alt+Pfeil rechts</kbd> springen fünf Sekunden, mit <kbd>Umschalt</kbd> eine Zehntelsekunde; <kbd>Komma</kbd> und <kbd>Punkt</kbd> gehen ein Bild weiter.</p>
+<h3>Die ganze Zeitleiste, live</h3>
+<p><kbd>Strg+Umschalt+Leertaste</kbd> spielt die ganze Zeitleiste live, ohne vorher zu rendern: die Hauptspur mit ihren Übergängen, die Ebenen, Farbe, Titel und Untertitel, mit der vollständigen Tonmischung. <kbd>Leertaste</kbd> hält an und setzt fort, und Pfeiltasten sowie Komma und Punkt springen wie gewohnt.</p>
+<ul>
+<li><kbd>L</kbd> spielt ab; während der Wiedergabe erneut gedrückt 2- und dann 4-fach schneller, ohne Ton. Am Ende beginnt <kbd>L</kbd> wieder von vorn.</li>
+<li><kbd>J</kbd> spielt rückwärts; erneut gedrückt 2- und dann 4-fach (nur Bild).</li>
+<li><kbd>K</kbd> hält an. <kbd>Leertaste</kbd> oder <kbd>L</kbd> kehren zur normalen Wiedergabe mit Ton zurück.</li>
+<li><kbd>Strg+Alt+Umschalt+Leertaste</kbd> ändert die Größe des Live-Bildes: automatisch, 640, 960, 1280 oder 1920 Pixel breit. Automatisch beginnt mit 960 und wird eine Stufe kleiner, wenn der Computer nicht mitkommt, und sagt es an.</li>
+</ul>
+<p>Ken-Burns-Bewegung und Stabilisierung sind nur im Export und in der Vorschau des ganzen Videos zu sehen.</p>
+<h3>Vorschau des ganzen Videos</h3>
+<p><kbd>Strg+Alt+Leertaste</kbd> rendert das ganze Video klein und schnell, mit Bild, Ebenen, Titeln, Farbe und Ton, und spielt es ab. Erneut gedrückt, während sie entsteht, bricht sie ab. Hat sich nichts geändert, läuft dieselbe Vorschau sofort.</p>
+<h3>Vorschaukopien (Proxys)</h3>
+<p>Ansicht, Vorschaukopien großer Clips erstellen: Clips mit mehr als 1080 Zeilen bekommen kleinere Kopien, die auch auf langsameren Computern flüssig laufen. Der Export verwendet immer die Originale.</p>
+</section>
+
+<section aria-labelledby="tracks">
+<h2 id="tracks">Spuren und Ebenen</h2>
+<h3>Spuren</h3>
+<p><kbd>Strg+Alt+N</kbd> fügt eine Videospur hinzu und <kbd>Strg+Alt+Umschalt+N</kbd> eine Audiospur, bis zu 60 von jeder Art. <kbd>Strg+Alt+Bild auf</kbd> und <kbd>Strg+Alt+Bild ab</kbd> gehen zur vorherigen oder nächsten Spur und sagen, was darauf liegt; die Clipliste zeigt dann diese Spur. <kbd>Strg+Pfeil oben</kbd> und <kbd>Strg+Pfeil unten</kbd> verschieben den gewählten Clip auf die Spur darüber oder darunter (nach der letzten Spur entsteht eine neue).</p>
+<p><kbd>Strg+Alt+R</kbd> benennt die Spur (Musik, Sprecher, Titel), <kbd>Strg+Alt+K</kbd> sperrt sie, damit ihre Clips nicht geändert werden können, <kbd>Strg+Alt+H</kbd> schaltet eine Ebenenspur aus und ein, und <kbd>Strg+Alt+I</kbd> liest alle Spuren vor. Zeitleiste, Leere Spur entfernen entfernt die aktuelle Spur, wenn sie keine Clips enthält. Höhere Videospuren werden über tieferen gezeichnet.</p>
+<h3>Ebenen</h3>
+<p>Wählen Sie einen Bildclip und drücken Sie <kbd>Strg+Alt+L</kbd>, Ebene und Farbe. Markieren Sie Diesen Clip auf die Ebenenspur verschieben: Er wird dann über das Hauptbild gezeichnet, solange er dauert. Wählen Sie die Position (Vollbild, Mitte, eine Ecke oder eigene), die Größe, die Deckkraft, einen grünen oder blauen Hintergrund und ob sein eigener Ton zu hören ist.</p>
+<p>Eine Ebene bekommt auch einen Mischmodus (Screen, Multiply, Overlay, Soft Light, Lighten, Darken, Add, Difference) und eine Maske (siehe <a href="#masks">Masken</a>). Im selben Fenster färbt eine Farb-LUT (.cube-Datei) den Clip, auf dem Hauptbild ebenso wie auf einer Ebene.</p>
+</section>
+
+<section aria-labelledby="editing">
+<h2 id="editing">Fortgeschrittener Schnitt</h2>
+<h3>J- und L-Schnitte</h3>
+<p><kbd>Strg+Alt+U</kbd> löst den Ton eines Videoclips in einen eigenen Clip. Danach lässt <kbd>Strg+[</kbd> den gewählten Clip eine halbe Sekunde früher beginnen und <kbd>Strg+]</kbd> eine halbe Sekunde später enden; mit <kbd>Umschalt</kbd> wirken sie umgekehrt. So beginnt der Ton vor dem Bild oder läuft danach weiter.</p>
+<h3>Slip, Roll und Slide</h3>
+<p><kbd>Alt+[</kbd> und <kbd>Alt+]</kbd> verschieben den Inhalt (Slip): Der Clip bleibt an seinem Platz und behält seine Länge, zeigt aber einen früheren oder späteren Teil seiner Datei. <kbd>Strg+Alt+[</kbd> und <kbd>Strg+Alt+]</kbd> verschieben den Schnitt zum nächsten Clip eine halbe Sekunde früher oder später (Roll). <kbd>Umschalt+Alt+[</kbd> und <kbd>Umschalt+Alt+]</kbd> schieben den Clip zwischen seinen Nachbarn (Slide): Inhalt und Länge bleiben, die Clips daneben werden kürzer oder länger.</p>
+<h3>Tempo und Geschwindigkeitsrampen</h3>
+<p><kbd>Strg+Alt+S</kbd> legt das Tempo eines Clips fest; die Clip-Effekte bieten zusätzlich eine flüssige Zeitlupe. <kbd>Strg+Alt+Umschalt+S</kbd>, Geschwindigkeitsrampe, ändert das Tempo innerhalb eines Videoclips gleichmäßig: Wählen Sie eine fertige Form (beschleunigt, verlangsamt, Zeitlupe in der Mitte, schnell in der Mitte) oder setzen Sie den Abspielkopf an eine Stelle, stellen Sie das Tempo in Prozent ein und fügen Sie einen Punkt hinzu. Der Clip behält seine Länge in der Zeitleiste, und das Fenster sagt, wie viel der Aufnahme er nun verwendet.</p>
+<h3>Multicam</h3>
+<p><kbd>Strg+Alt+Umschalt+M</kbd>: Markieren Sie 2 bis 9 Videoclips desselben Ereignisses und wählen Sie den Hauptton. Die Kameras werden an ihrem Ton ausgerichtet (oder an ihrer Position in der Zeitleiste), und der Versatz jeder Kamera wird angesagt. Spielen Sie die Zeitleiste ab und drücken Sie <kbd>1</kbd> bis <kbd>9</kbd>, um auf eine Kamera zu schneiden; im Stillstand wechselt eine Zahl die Kamera des Teils unter dem Abspielkopf. Zeitleiste, Multicam-Schnitte vorlesen nennt jeden Schnitt.</p>
+<h3>Verschachtelte Clips</h3>
+<p>Markieren Sie zwei oder mehr Clips (<kbd>Umschalt</kbd> oder <kbd>Strg</kbd> mit den Pfeiltasten) und drücken Sie <kbd>Strg+Alt+G</kbd>: Sie werden ein einziger Clip, einmal gerendert mit ihren Ebenen, Titeln, Farben und Tönen. <kbd>Strg+Alt+Umschalt+G</kbd> löst ihn auf und legt die Clips wieder an ihre Stelle, bereit für Änderungen.</p>
+<h3>Übergänge</h3>
+<p>Wählen Sie auf der Registerkarte Übergänge einen Übergang und drücken Sie <kbd>Eingabe</kbd> oder <kbd>Leertaste</kbd>, um ihn auf den gewählten Clip zu legen; <kbd>F1</kbd> liest dort seine Beschreibung vor. Ohne gewählten Übergang bekommen Schnitte eine kurze weiche Überblendung. Übergänge sind in der Live-Wiedergabe und im Export zu sehen.</p>
+</section>
+
+<section aria-labelledby="colour">
+<h2 id="colour">Farbe</h2>
+<h3>Clip-Effekte</h3>
+<p><kbd>Strg+Alt+E</kbd> öffnet die Clip-Effekte: Helligkeit, Kontrast, Sättigung, Farbtemperatur, Tönung, Mitteltöne, Schatten, Lichter, Vignette und Schärfe, auf Wunsch für die ganze Spur; Stabilisierung, Tempo und flüssige Zeitlupe; und der eigene Ton des Clips (Dreiband-Equalizer, Rauschminderung, klarere Stimme, Kompressor, Ein- und Ausblenden).</p>
+<h3>Farbbalance, Kurven und eine Farbe</h3>
+<p>Die Clip-Effekte haben auch eine Farbbalance getrennt für Schatten, Mitteltöne und Lichter sowie Kurven für alle Farben und getrennt für Rot, Grün und Blau, mit je fünf Punkten und fertigen Formen. Nur eine Farbe verschiebt Farbton, Sättigung oder Helligkeit von Rot-, Gelb-, Grün-, Cyan-, Blau- oder Magentatönen, oder behält nur diese Farbe und macht den Rest schwarzweiß. Farbe nehmen übernimmt eine Farbe aus einem Bildteil und sagt, welche es ist.</p>
+<h3>Power Window (Korrekturbereich)</h3>
+<p>In den Clip-Effekten wendet der Korrekturbereich die ganze Korrektur nur innerhalb eines Ovals oder Rechtecks an (Mitte, Breite, Höhe, weiche Kante), in einem verlaufenden oberen, unteren, linken oder rechten Teil (zum Beispiel dem Himmel) oder überall außer dem Bereich. Nur die Einstellungen, die für die gewählte Form gelten, lassen sich ändern, und das Programm sagt, welche.</p>
+<h3>Farbe in Worten</h3>
+<p><kbd>Strg+Alt+C</kbd>, Farbe hier, misst das Bild am Abspielkopf und beschreibt es in Worten: Helligkeit, Kontrast, verlorene Schwarz- und Weißwerte, warm oder kühl, ein Grün- oder Magentastich, wie kräftig die Farben sind und welches die Hauptfarben sind. Erneut gedrückt, beschreibt es den ganzen Clip. In den Clip-Effekten macht Farbe analysieren dasselbe für die Einstellungen im Fenster, und Farbe angleichen lässt den Clip wie einen anderen Clip aussehen.</p>
+</section>
+
+<section aria-labelledby="sound">
+<h2 id="sound">Ton und Spurmischer</h2>
+<h3>Lautstärke im Verlauf</h3>
+<p><kbd>Strg+Umschalt+V</kbd> setzt im gewählten Clip einen Lautstärkepunkt am Abspielkopf; die Lautstärke ändert sich gleichmäßig von Punkt zu Punkt. Zeitleiste, Musik unter Sprache absenken erledigt das für Sie.</p>
+<h3>Spurmischer</h3>
+<p><kbd>Strg+Alt+M</kbd> öffnet den Spurmischer: Lautstärke, Stumm, Solo, Dreiband-Equalizer, Kompressor, Panorama, Trittschallfilter, Rauschminderung, De-Esser, Raumhall und Limiter für jede Spur mit Ton, zusätzlich zu den Einstellungen jedes Clips. Er wird mit dem Projekt gespeichert.</p>
+<h3>Spur-Automation</h3>
+<p><kbd>Strg+Alt+Umschalt+V</kbd> setzt einen Lautstärkepunkt der Spur am Abspielkopf: Die Lautstärke der ganzen Spur ändert sich gleichmäßig von Punkt zu Punkt, unabhängig von ihren Clips. Das Menü Bearbeiten liest die Punkte vor und entfernt einen oder alle.</p>
+</section>
+
+<section aria-labelledby="titles">
+<h2 id="titles">Titel, Untertitel und Animation</h2>
+<h3>Titel</h3>
+<p><kbd>Strg+Alt+T</kbd> legt einen Titel über den gewählten Clip, mit einer zweiten Zeile auf Wunsch, Position (Mitte, unteres Drittel, oben, unten, Ecken), Größe, Farbe, einem dunklen Band dahinter, der Art des Erscheinens (Einblenden, nach oben gleiten, von rechts gleiten, Zoom), wann er beginnt und wie lange er bleibt.</p>
+<h3>Untertitel</h3>
+<p>Die Registerkarte Untertitel enthält Untertitel mit ihren Zeiten. Künstliche Intelligenz, Audio transkribieren schreibt sie aus der Sprache mit Whisper, und Text synchronisieren setzt Liedtexte Wort für Wort.</p>
+<h3>Keyframe-Animation</h3>
+<p>Auf der Registerkarte Animation fügt <kbd>Strg+K</kbd> einen Keyframe mit Zoom, Drehung, Position und Deckkraft hinzu, und <kbd>Strg+Umschalt+K</kbd> entfernt ihn. Jeder Keyframe hat eine Kurve bis zum nächsten: linear, langsamer Start, langsames Ende, weicher Start und weiches Ende, oder Halten (der Wert springt beim nächsten Keyframe). Die Keyframe-Liste liest die Kurve mit jedem Keyframe vor.</p>
+</section>
+
+<section aria-labelledby="masks">
+<h2 id="masks">Masken und Objektverfolgung</h2>
+<h3>Masken</h3>
+<p>Unter Ebene und Farbe (<kbd>Strg+Alt+L</kbd>) kann eine Ebene eine Maske haben: Oval, Rechteck, abgerundetes Rechteck, Raute, Dreieck, Stern, Herz oder eine eigene Form aus Punkten (x y; x y; … in Prozent). Die Maske hat ihren eigenen Platz und ihre eigene Größe in der Ebene und eine weiche Kante; sie kann umgekehrt werden, sich während des Clips von einem Ort und einer Größe zu anderen bewegen oder einem Objekt folgen.</p>
+<h3>Objekt verfolgen</h3>
+<p><kbd>Strg+Alt+O</kbd>: Beschreiben Sie etwas im gewählten Clip in Worten (der Mann in der roten Jacke, das Nummernschild, der Hund), und die Bild-KI findet es, oder wählen Sie den Bildteil, in dem es ist. Der Editor verfolgt es durch den Clip und sagt, wohin es ging und wo er es verloren hat. Das Objekt kann weichgezeichnet, verpixelt, mit einem schwarzen Kasten verdeckt oder hervorgehoben werden, während der Rest dunkler wird; auf einem Ebenenclip kann seine Maske ihm folgen; und ein Ebenenclip (eine Beschriftung, ein Pfeil, ein Logo) kann sich mit einem Objekt im Bild darunter bewegen.</p>
+</section>
+
+<section aria-labelledby="ai">
+<h2 id="ai">Beschreibungen und KI-Werkzeuge</h2>
+<h3>Beschreibungen Ihrer Clips</h3>
+<p><kbd>Strg+Umschalt+F</kbd> beschreibt das Bild unter dem Abspielkopf. <kbd>Strg+Alt+D</kbd> beschreibt den gewählten Clip abschnittsweise im Hintergrund, während Sie weiterarbeiten; Künstliche Intelligenz, Alle meine Clips beschreiben macht das für jeden Clip. Mit einem Gemini-Schlüssel kommen die Beschreibungen von Gemini, ohne ihn vom lokalen Modell in Ollama.</p>
+<h3>KI-Musikvideo</h3>
+<p>Künstliche Intelligenz, Video Engine macht aus einem Lied und seinem Text ein fertiges Musikvideo: Für jede Zeile werden Aufnahmen gewählt und zur Musik geschnitten, mit wortgenauer Textsynchronisation und Karaoke-Untertiteln, und jede Szene kann geprüft und geändert werden.</p>
+<h3>Weitere KI-Werkzeuge</h3>
+<p>Das Menü Künstliche Intelligenz bietet außerdem Videoprüfung, intelligente Szenenerkennung (<kbd>Strg+Umschalt+D</kbd>), Highlights (<kbd>Strg+Umschalt+H</kbd>), den KI-Assistenten für die Zeitleiste (<kbd>Strg+Umschalt+T</kbd>), die Farbbearbeitung (<kbd>Strg+Umschalt+G</kbd>), den Stapelexport (<kbd>Strg+Umschalt+B</kbd>), Projektvorlagen (<kbd>Strg+Umschalt+P</kbd>), Sprachausgabe und Transkription.</p>
+</section>
+
+<section aria-labelledby="ad">
+<h2 id="ad">Audiodeskription für Zuschauer, Schritt für Schritt</h2>
+<ol>
+<li><kbd>Strg+Alt+A</kbd> öffnet das Fenster. Ein in der Clipliste gewählter Videoclip wird eingetragen; sonst wählen Sie einen Clip unter Video aus der Zeitleiste oder eine beliebige Datei mit Video wählen.</li>
+<li>Nur einmal, auf Wunsch: Fügen Sie einen Gemini-API-Schlüssel ein (kostenlos, aus Google AI Studio) und drücken Sie Schlüssel prüfen und speichern. Damit sieht sich Gemini das ganze Video mit Ton an und schreibt die besten Beschreibungen.</li>
+<li>Wählen Sie, wie und wie oft beschrieben wird, und drücken Sie Beschreibungsskript schreiben. Die Eingabetaste im Videofeld tut dasselbe.</li>
+<li>Lesen Sie den Text und korrigieren Sie ihn nach Belieben: eine Zeile pro Beschreibung, Zeit | Text.</li>
+<li>Wählen Sie die Stimme (die natürlichen Stimmen von Microsoft sind kostenlos; Google-HD-Stimmen brauchen einen Google-Cloud-Schlüssel) und wie weit die Musik darunter abgesenkt wird.</li>
+<li>Drücken Sie Video mit Audiodeskription erstellen. Neben dem Video entstehen das beschriebene Video (.mp4), der Text für YouTube (.txt) und eine Beschreibungsspur (.vtt).</li>
+</ol>
+<p>Das Fenster sagt den Fortschritt in jedem Viertel an; Stopp bricht die Arbeit ab; ein kurzer Ton erklingt, wenn sie fertig ist oder fehlschlägt.</p>
+</section>
+
+<section aria-labelledby="export">
+<h2 id="export">Export und Austausch</h2>
+<h3>Export</h3>
+<p><kbd>Strg+E</kbd> exportiert das Video. Datei, Exportoptionen wählt das Format: MP4 mit H.264, H.265 oder H.265 10-Bit; MOV mit ProRes 422 HQ, DNxHR HQ oder DNxHR HQX 10-Bit; MKV mit verlustfreiem FFV1 zur Archivierung; WebM oder AVI. Die Qualität reicht bis Maximal, die Bildrate folgt dem Video oder wird gewählt (24 bis 60), und Ein- und Ausblenden sowie der warme Farblook lassen sich abschalten. Datei, Für Shorts/TikTok/Instagram exportieren erstellt Hoch- und Quadratformate.</p>
+<h3>Arbeiten mit anderen Schnittprogrammen</h3>
+<p>Datei, Zeitleiste exportieren schreibt sie als OpenTimelineIO (.otio), als EDL oder als Final-Cut-7-XML mit allen Video- und Audiospuren, damit ein anderer Cutter oder Colorist die Arbeit in seinem Programm fortsetzen kann.</p>
+<p><kbd>Strg+Alt+Umschalt+I</kbd>, Zeitleiste importieren, liest XML-, OTIO- und EDL-Dateien mit ihren Spuren, Positionen und In-Punkten. Der Ton eines Videoclips wird wieder mit ihm verbunden, und verschobene Dateien werden neben der Zeitleistendatei gesucht. Sie wählen: Ja ersetzt die aktuelle Zeitleiste, Nein fügt sie nach ihrem Ende an. Clips mit fehlenden Dateien werden genannt und ausgelassen.</p>
+</section>
+
+<section aria-labelledby="settings">
+<h2 id="settings">Einstellungen, Anzeige und Hilfe</h2>
+<p>Ansicht, Sprache: Englisch, Serbisch oder Deutsch; die Hilfe und dieses Handbuch folgen der gewählten Sprache. Ansicht, Anzeigemodus: sehend, Barrierefreiheit (Screenreader) oder Sehbehinderung; <kbd>Strg+Umschalt+A</kbd> schaltet den Barrierefreiheitsmodus um, und <kbd>Strg+Umschalt+Plus</kbd> und <kbd>Strg+Umschalt+Minus</kbd> machen Text und Bedienelemente größer oder kleiner. Ansicht, Design: dunkel, hoher Kontrast oder hell.</p>
+<p>Hilfe, Tastenkürzel (<kbd>F1</kbd>) öffnet die <a href="shortcuts.html">Liste aller Tastenkürzel</a>, erstellt aus den Menüs des Programms in der Sprache, die Sie verwenden. Hilfe, Nach Updates suchen prüft auf eine neue Version. Hilfe, Geräuschbibliothek von Adobe herunterladen fügt Umgebungsgeräusche für das KI-Musikvideo hinzu.</p>
+</section>
+</main>
+<footer><p class="note">Ultra Video Editor 2.0 · Demir Ajvazi</p></footer>
+</body>
+</html>
