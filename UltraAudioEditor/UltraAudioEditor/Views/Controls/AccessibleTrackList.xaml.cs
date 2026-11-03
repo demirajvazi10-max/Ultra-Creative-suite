@@ -24,6 +24,12 @@ namespace UltraAudioEditor.Views.Controls
         public AudioClip? Clip  { get; set; }
     }
 
+    /// <summary>Red markera u listi (posle svih traka). Izbor reda pomera poziciju na marker.</summary>
+    public class MarkerRow
+    {
+        public double Time { get; set; }
+    }
+
     public partial class AccessibleTrackList : UserControl
     {
         private MainViewModel? _vm;
@@ -31,6 +37,8 @@ namespace UltraAudioEditor.Views.Controls
         private Slider?        _playheadSlider;
         private TextBlock?     _playheadTimeBlock;
         private WF.ContextMenuStrip? _contextMenu;
+        private bool _refreshing;          // true dok RefreshList programski menja izbor
+        private double? _selectedMarker;   // marker čiji je red izabran (za ponovni izbor posle osvežavanja)
 
         public AccessibleTrackList()
         {
@@ -45,6 +53,7 @@ namespace UltraAudioEditor.Views.Controls
             if (_vm == null) return;
 
             _vm.Project.Tracks.CollectionChanged += (_, __) => RefreshList();
+            _vm.Project.Markers.CollectionChanged += (_, __) => RefreshList();
             _vm.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName is nameof(MainViewModel.PlayheadPosition)
@@ -91,7 +100,20 @@ namespace UltraAudioEditor.Views.Controls
 
         private void NativeListView_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            if (_vm == null) return;
+            if (_vm == null || _refreshing) return;
+
+            // Red markera: pomeri poziciju na marker. Traka ostaje izabrana, pa
+            // Ctrl+X odmah seče izabranu traku baš na tom markeru.
+            var markerRow = SelectedMarkerRow();
+            if (markerRow != null && nativeListView.SelectedItems.Count == 1)
+            {
+                _selectedMarker = markerRow.Time;
+                _vm.GoToMarker(markerRow.Time);
+                UpdateStatus();
+                return;
+            }
+            _selectedMarker = null;
+
             var rows = SelectedRows();
 
             if (rows.Count == 1)
@@ -110,36 +132,62 @@ namespace UltraAudioEditor.Views.Controls
 
         private void NativeListView_KeyDown(object? sender, WF.KeyEventArgs e)
         {
+            if (_vm == null) return;
             var rows = SelectedRows();
             var clipRows = rows.Where(r => r.Clip != null).ToList();
+            bool plain = !e.Control && !e.Shift && !e.Alt;
+
+            // Delete na redu markera briše taj marker.
+            var markerRow = SelectedMarkerRow();
+            if (markerRow != null && e.KeyCode == WF.Keys.Delete && plain)
+            {
+                _vm.DeleteMarker(markerRow.Time);
+                e.Handled = e.SuppressKeyPress = true;
+                return;
+            }
 
             if (e.KeyCode == WF.Keys.F2 && !e.Control && !e.Shift && clipRows.Count == 1)
             {
-                OpenSetPos(clipRows[0].Track, clipRows[0].Clip!);
-                e.Handled = true;
+                if (_vm.Gate("setpos")) OpenSetPos(clipRows[0].Track, clipRows[0].Clip!);
+                e.Handled = e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == WF.Keys.Delete && !e.Control && !e.Shift && clipRows.Count > 0)
             {
                 DelClips(clipRows);
                 e.Handled = true;
             }
-            else if (e.KeyCode == WF.Keys.Right && e.Control && !e.Shift && clipRows.Count > 0)
+            else if (e.KeyCode == WF.Keys.Right && e.Control && !e.Shift && !e.Alt && clipRows.Count > 0)
             {
-                MoveClips(clipRows, +1.0); e.Handled = true;
+                if (_vm.Gate("clipmove")) MoveClips(clipRows, +1.0); e.Handled = e.SuppressKeyPress = true;
             }
-            else if (e.KeyCode == WF.Keys.Left && e.Control && !e.Shift && clipRows.Count > 0)
+            else if (e.KeyCode == WF.Keys.Left && e.Control && !e.Shift && !e.Alt && clipRows.Count > 0)
             {
-                MoveClips(clipRows, -1.0); e.Handled = true;
+                if (_vm.Gate("clipmove")) MoveClips(clipRows, -1.0); e.Handled = e.SuppressKeyPress = true;
             }
-            else if (e.KeyCode == WF.Keys.Right && e.Control && e.Shift && clipRows.Count > 0)
+            else if (e.KeyCode == WF.Keys.Right && e.Control && e.Shift && !e.Alt && clipRows.Count > 0)
             {
-                MoveClips(clipRows, +0.1); e.Handled = true;
+                if (_vm.Gate("clipmove")) MoveClips(clipRows, +0.1); e.Handled = e.SuppressKeyPress = true;
             }
-            else if (e.KeyCode == WF.Keys.Left && e.Control && e.Shift && clipRows.Count > 0)
+            else if (e.KeyCode == WF.Keys.Left && e.Control && e.Shift && !e.Alt && clipRows.Count > 0)
             {
-                MoveClips(clipRows, -0.1); e.Handled = true;
+                if (_vm.Gate("clipmove")) MoveClips(clipRows, -0.1); e.Handled = e.SuppressKeyPress = true;
+            }
+            else
+            {
+                // Sve ostale prečice editora (Ctrl+X, M, F6, Ctrl+R, Ctrl+Z, Space...) —
+                // isto mesto kao i za ostatak prozora, da rade i kad je fokus u listi.
+                var key = KeyInterop.KeyFromVirtualKey((int)e.KeyCode);
+                var mods = ModifierKeys.None;
+                if (e.Control) mods |= ModifierKeys.Control;
+                if (e.Shift) mods |= ModifierKeys.Shift;
+                if (e.Alt) mods |= ModifierKeys.Alt;
+                if (_vm.HandleKey(key, mods, fromList: true))
+                    e.Handled = e.SuppressKeyPress = true;
             }
         }
+
+        private MarkerRow? SelectedMarkerRow() =>
+            nativeListView.SelectedItems.Cast<WF.ListViewItem>().Select(i => i.Tag as MarkerRow).FirstOrDefault(r => r != null);
 
         private List<TrackRow> SelectedRows() =>
             nativeListView.SelectedItems.Cast<WF.ListViewItem>()
@@ -150,6 +198,9 @@ namespace UltraAudioEditor.Views.Controls
         {
             if (_contextMenu == null || _vm == null) return;
             _contextMenu.Items.Clear();
+
+            var markerRow = SelectedMarkerRow();
+            if (markerRow != null) { ShowMarkerMenu(markerRow.Time); return; }
 
             var rows = SelectedRows();
             if (rows.Count == 0) return;
@@ -178,13 +229,29 @@ namespace UltraAudioEditor.Views.Controls
             MAddHeader(string.Format(Lang.T("batch_selected"), rows.Count));
             MAddSeparator();
             if (tracks.Count > 0)
-                MAddItem(Lang.T("batch_mute"), () => { foreach (var t in tracks) t.IsMuted = true; RefreshList(); });
+                MAddItem(Lang.T("batch_mute"), () => { _vm.PushUndo(); foreach (var t in tracks) t.IsMuted = true; RefreshList(); });
             if (clips.Count > 0)
             {
                 MAddItem(Lang.T("batch_move_fwd"), () => MoveClips(clips, +1.0));
                 MAddItem(Lang.T("batch_move_back"), () => MoveClips(clips, -1.0));
                 MAddItem(Lang.T("batch_delete_clips"), () => DelClips(clips));
             }
+        }
+
+        // ── Meni markera ──────────────────────────────────────────────────
+        private void ShowMarkerMenu(double time)
+        {
+            int n = _vm!.Project.Markers.IndexOf(time) + 1;
+            MAddHeader(string.Format(Lang.T("marker_row_name"), n, _vm.Project.Markers.Count) + "  " + FormatSec(time));
+            MAddSeparator();
+            MAddItem(Lang.T("mk_goto"), () => _vm.GoToMarker(time));
+            if (_vm.SelectedTrack != null)
+                MAddItem(string.Format(Lang.T("mk_split_here"), _vm.SelectedTrack.Name),
+                    () => { _vm.GoToMarker(time); _vm.SplitAtPlayheadCommand.Execute(null); });
+            MAddItem(Lang.T("menu_delete_between"), () => { _vm.GoToMarker(time + 0.01); _vm.DeleteBetweenMarkersCommand.Execute(null); });
+            MAddSeparator();
+            MAddItem(Lang.T("mk_delete"), () => _vm.DeleteMarker(time));
+            MAddItem(Lang.T("menu_clear_markers"), () => _vm.ClearMarkers());
         }
 
         // ── Meni trake ────────────────────────────────────────────────────
@@ -211,10 +278,17 @@ namespace UltraAudioEditor.Views.Controls
             MAddItem(Lang.T("trk_demucs"), () => OpenDemucsDialog(track));
             MAddSeparator();
 
+            if (_vm!.HasClipboard)
+                MAddItem(string.Format(Lang.T("trk_paste_here"), FormatSec(ph)),
+                    () => { _vm.SelectedTrack = track; _vm.PasteClipCommand.Execute(null); });
+            MAddItem(string.Format(Lang.T("trk_record_here"), FormatSec(ph)),
+                () => { _vm.SelectedTrack = track; _vm.RecordCommand.Execute(null); });
+            MAddSeparator();
+
             MAddItem((track.IsMuted ? "[x] " : "[ ] ") + Lang.T("trk_mute"),
-                () => { track.IsMuted = !track.IsMuted; _vm!.Announce($"Mute {(track.IsMuted ? "On" : "Off")}"); RefreshList(); });
+                () => { _vm!.PushUndo(); track.IsMuted = !track.IsMuted; _vm!.Announce($"Mute {(track.IsMuted ? "On" : "Off")}"); RefreshList(); });
             MAddItem((track.IsSolo ? "[x] " : "[ ] ") + Lang.T("trk_solo"),
-                () => { track.IsSolo = !track.IsSolo; _vm!.Announce($"Solo {(track.IsSolo ? "On" : "Off")}"); RefreshList(); });
+                () => { _vm!.PushUndo(); track.IsSolo = !track.IsSolo; _vm!.Announce($"Solo {(track.IsSolo ? "On" : "Off")}"); RefreshList(); });
             MAddSeparator();
 
             MAddItem(string.Format(Lang.T("trk_volume_menu"), track.Volume), () => SetVolumeDialog(track));
@@ -248,7 +322,7 @@ namespace UltraAudioEditor.Views.Controls
             MAddItem(Lang.T("trk_move_down"), () => { _vm!.SelectedTrack = track; _vm.MoveTrackDownCommand.Execute(null); });
             MAddItem(Lang.T("trk_duplicate"), () => { _vm!.SelectedTrack = track; _vm.DuplicateTrackCommand.Execute(null); });
             MAddItem(Lang.T("trk_rename"),
-                () => { var d = new SetValueDialog(Lang.T("trk_rename_title"), Lang.T("trk_rename_prompt"), track.Name, ""); d.Owner = win; if (d.ShowDialog() == true && !string.IsNullOrWhiteSpace(d.ResultValue)) { track.Name = d.ResultValue.Trim(); RefreshList(); } });
+                () => { var d = new SetValueDialog(Lang.T("trk_rename_title"), Lang.T("trk_rename_prompt"), track.Name, ""); d.Owner = win; if (d.ShowDialog() == true && !string.IsNullOrWhiteSpace(d.ResultValue)) { _vm!.PushUndo(); track.Name = d.ResultValue.Trim(); RefreshList(); } });
             MAddSeparator();
             MAddItem(Lang.T("trk_delete"), () => { _vm!.SelectedTrack = track; _vm.RemoveTrackCommand.Execute(null); });
         }
@@ -262,11 +336,19 @@ namespace UltraAudioEditor.Views.Controls
             MAddHeader(string.Format(Lang.T("clip_header"), FormatSec(clip.StartTime), FormatSec(clip.Duration), FormatSec(clip.StartTime + clip.Duration)));
             MAddSeparator();
 
+            bool covers = clip.StartTime < ph && clip.StartTime + clip.Duration > ph;
+            if (covers)
+                MAddItem(string.Format(Lang.T("clip_split_menu"), FormatSec(ph)),
+                    () => { _vm!.SelectedTrack = track; _vm.SelectedClip = clip; _vm.SplitAtPlayheadCommand.Execute(null); });
+            MAddItem(Lang.T("clip_copy_menu"), () => { _vm!.SelectedTrack = track; _vm.SelectedClip = clip; _vm.CopyClipCommand.Execute(null); });
+            MAddItem(Lang.T("clip_preview_menu"), () => _vm!.PreviewCutCommand.Execute(null));
+            MAddSeparator();
+
             MAddItem(Lang.T("clip_set_pos_menu"), () => OpenSetPos(track, clip));
             MAddItem(string.Format(Lang.T("clip_set_playhead"), FormatSec(ph)),
-                () => { clip.StartTime = Math.Max(0, ph); _vm!.Announce(string.Format(Lang.T("clip_at"), FormatSec(clip.StartTime))); RefreshList(); });
+                () => { _vm!.PushUndo(); clip.StartTime = Math.Max(0, ph); _vm!.Announce(string.Format(Lang.T("clip_at"), FormatSec(clip.StartTime))); _vm.NotifyEdited(); });
             MAddItem(Lang.T("clip_set_at_pos"),
-                () => { double p = AskPos(Lang.T("clip_set_title"), clip.StartTime); if (p >= 0) { clip.StartTime = Math.Max(0, p); _vm!.Announce(string.Format(Lang.T("clip_at"), FormatSec(clip.StartTime))); RefreshList(); } });
+                () => { double p = AskPos(Lang.T("clip_set_title"), clip.StartTime); if (p >= 0) { _vm!.PushUndo(); clip.StartTime = Math.Max(0, p); _vm!.Announce(string.Format(Lang.T("clip_at"), FormatSec(clip.StartTime))); _vm.NotifyEdited(); } });
             MAddSeparator();
 
             MAddItem(string.Format(Lang.T("clip_move_fwd_1"), FormatSec(clip.StartTime + 1)), () => MoveClips(new() { new TrackRow { Track = track, Clip = clip } }, +1.0));
@@ -291,7 +373,8 @@ namespace UltraAudioEditor.Views.Controls
 
         private void OpenFx(string title, AudioTrack track, EffectType type)
         {
-            var dlg = new EffectDialog(title, track.Effects, type) { Owner = Window.GetWindow(this) };
+            _vm?.PushUndo();
+            var dlg = new EffectDialog(title, track.Effects, type, () => _vm?.PlayPauseCommand.Execute(null)) { Owner = Window.GetWindow(this) };
             dlg.ShowDialog();
             RefreshList();
         }
@@ -362,13 +445,12 @@ namespace UltraAudioEditor.Views.Controls
                 // IsMoveToPointEnabled to ispravlja.
                 IsMoveToPointEnabled = true
             };
-            _playheadSlider.SetValue(AutomationProperties.NameProperty,
-                "Playhead position. Left/right arrows for 0.1 second. Ctrl+arrows for 1 second. " +
-                "Home for start. End for end. Space to play. Enter or Tab for the track list.");
+            _playheadSlider.SetValue(AutomationProperties.NameProperty, Lang.T("slider_name"));
             _playheadSlider.ValueChanged += (_, ev) =>
             {
-                if (_vm != null && Math.Abs(_vm.PlayheadPosition - ev.NewValue) > 0.001)
-                    _vm.PlayheadPosition = ev.NewValue;
+                // Promena iz koda (praćenje reprodukcije) nije korisnikov skok.
+                if (!_syncingSlider && _vm != null && Math.Abs(_vm.PlayheadPosition - ev.NewValue) > 0.001)
+                    _vm.SeekTo(ev.NewValue, announce: false);
                 if (_playheadTimeBlock != null) _playheadTimeBlock.Text = FormatSec(ev.NewValue);
             };
             Grid.SetColumn(_playheadSlider, 1); grid.Children.Add(_playheadSlider);
@@ -395,7 +477,7 @@ namespace UltraAudioEditor.Views.Controls
             {
                 if (_vm == null) return;
                 double p = AskPos(Lang.T("goto_title"), _vm.PlayheadPosition);
-                if (p >= 0) { _vm.PlayheadPosition = Math.Clamp(p, 0, _vm.Project.Duration); SyncSlider(); }
+                if (p >= 0) { _vm.SeekTo(p); SyncSlider(); }
             };
             Grid.SetColumn(btnGoto, 3); grid.Children.Add(btnGoto);
 
@@ -412,9 +494,14 @@ namespace UltraAudioEditor.Views.Controls
         private void SyncSlider()
         {
             if (_vm == null || _playheadSlider == null) return;
-            _playheadSlider.Maximum = Math.Max(10, _vm.Project.Duration);
-            if (Math.Abs(_playheadSlider.Value - _vm.PlayheadPosition) > 0.001)
-                _playheadSlider.Value = _vm.PlayheadPosition;
+            _syncingSlider = true;
+            try
+            {
+                _playheadSlider.Maximum = Math.Max(10, _vm.Project.Duration);
+                if (Math.Abs(_playheadSlider.Value - _vm.PlayheadPosition) > 0.001)
+                    _playheadSlider.Value = _vm.PlayheadPosition;
+            }
+            finally { _syncingSlider = false; }
             if (_playheadTimeBlock != null) _playheadTimeBlock.Text = FormatSec(_vm.PlayheadPosition);
         }
 
@@ -425,9 +512,15 @@ namespace UltraAudioEditor.Views.Controls
         {
             if (_vm == null) return;
 
-            var prevTrack = _activeTrack;
+            // Izbor posle osvežavanja prati ViewModel (posle Undo-a, sečenja, snimanja...
+            // ViewModel zna koja traka/klip su sada izabrani), a ne staru vrstu u listi.
+            var prevTrack = _vm.SelectedTrack ?? _activeTrack;
             var prevClip  = _vm.SelectedClip;
+            _activeTrack  = prevTrack;
 
+            _refreshing = true;
+            _vm.SuppressSelectionAnnounce = true;
+            try {
             nativeListView.BeginUpdate();
             nativeListView.Items.Clear();
             WF.ListViewItem? toReselect = null;
@@ -478,10 +571,31 @@ namespace UltraAudioEditor.Views.Controls
                 }
             }
 
+            // Markeri — po jedan red posle svih traka, redom po vremenu.
+            int mCount = _vm.Project.Markers.Count, mi = 1;
+            foreach (var m in _vm.Project.Markers)
+            {
+                var lvi = new WF.ListViewItem(new[]
+                {
+                    n.ToString(), Lang.T("marker_col"), string.Format(Lang.T("marker_row_name"), mi, mCount), "",
+                    FormatSec(m), "", "", ""
+                })
+                { Tag = new MarkerRow { Time = m }, ForeColor = System.Drawing.Color.FromArgb(239, 191, 39) };
+                nativeListView.Items.Add(lvi);
+                if (_selectedMarker.HasValue && Math.Abs(_selectedMarker.Value - m) < 0.0005) toReselect = lvi;
+                n++; mi++;
+            }
+
             nativeListView.EndUpdate();
 
             if (toReselect != null) { toReselect.Selected = true; toReselect.Focused = true; toReselect.EnsureVisible(); }
             else if (nativeListView.Items.Count > 0) { nativeListView.Items[0].Selected = true; }
+            }
+            finally
+            {
+                _refreshing = false;
+                _vm.SuppressSelectionAnnounce = false;
+            }
 
             SyncSlider(); UpdateStatus();
         }
@@ -555,9 +669,7 @@ namespace UltraAudioEditor.Views.Controls
                 {
                     var nt = _vm.AddTrackInternal(System.IO.Path.GetFileNameWithoutExtension(sp));
                     nt.Type = sp.Contains("vocal") ? TrackType.Vocal : TrackType.Instrumental;
-                    double dur = 0;
-                    try { using var r = new AudioFileReader(sp); dur = r.TotalTime.TotalSeconds; } catch { }
-                    nt.Clips.Add(new AudioClip { Name = System.IO.Path.GetFileName(sp), FilePath = sp, StartTime = clip.StartTime, Duration = dur, WaveformData = AudioEngine.LoadWaveformData(sp) });
+                    nt.Clips.Add(_vm.CreateClipFromFile(sp, clip.StartTime));
                     added++;
                 }
                 RefreshList();
@@ -583,7 +695,7 @@ namespace UltraAudioEditor.Views.Controls
             double dur = _vm.Project.Tracks.SelectMany(t => t.Clips)
                 .Select(c => c.StartTime + c.Duration).DefaultIfEmpty(0).Max();
             TxtProjectStatus.Text = string.Format(Lang.T("status_summary"), _vm.Project.Name, _vm.Project.Tracks.Count, clips, FormatSec(dur));
-            TxtPlayhead.Text      = $"Playhead: {_vm.TimeDisplay}  ({_vm.PlayheadPosition:F3}s)";
+            TxtPlayhead.Text      = $"Playhead: {_vm.TimeDisplay}  ({_vm.PlayheadPosition:F3}s)" + (_vm.HasSelection ? "  |  " + _vm.SelectionText : "");
 
             int selCount = nativeListView.SelectedItems.Count;
             if (selCount > 1)
@@ -609,8 +721,11 @@ namespace UltraAudioEditor.Views.Controls
         // ════════════════════════════════════════════════════════════════════
         // HELPERS
         // ════════════════════════════════════════════════════════════════════
-        private void Seek(double delta) { if (_vm != null) { _vm.PlayheadPosition = Math.Clamp(_vm.PlayheadPosition + delta, 0, _vm.Project.Duration); _vm.Announce($"Playhead {_vm.TimeDisplay}"); } }
-        private void SeekTo(double pos) { if (_vm != null) { _vm.PlayheadPosition = Math.Clamp(pos, 0, _vm.Project.Duration); _vm.Announce($"Playhead {_vm.TimeDisplay}"); } }
+        // Pomeranje ide preko ViewModel-a: dok muzika svira, reprodukcija se nastavlja sa
+        // novog mesta; kad ne svira, čuje se kratak delić (preslušavanje pri pomeranju).
+        private void Seek(double delta) { if (_vm != null && _vm.Gate("seek", 25)) _vm.SeekBy(delta); }
+        private void SeekTo(double pos) { _vm?.SeekTo(pos); }
+        private bool _syncingSlider;
         private void OpenSetPos(AudioTrack track, AudioClip clip) { if (_vm != null) { _vm.SelectedTrack = track; _vm.SelectedClip = clip; _vm.OpenSetClipPositionDialog(); } }
 
         private void DelClips(List<TrackRow> rows)
@@ -627,23 +742,25 @@ namespace UltraAudioEditor.Views.Controls
 
         private void MoveClips(List<TrackRow> rows, double d)
         {
+            _vm?.PushUndo();
             foreach (var r in rows.Where(r => r.Clip != null))
                 r.Clip!.StartTime = Math.Max(0, r.Clip.StartTime + d);
             if (rows.Count == 1 && rows[0].Clip != null)
                 _vm?.Announce(string.Format(Lang.T("clip_at"), FormatSec(rows[0].Clip!.StartTime)));
-            RefreshList();
+            _vm?.NotifyEdited();
         }
 
-        private void ImportAt(AudioTrack track, double position)
+        private async void ImportAt(AudioTrack track, double position)
         {
             if (_vm == null) return;
             var dlg = new OpenFileDialog { Title = $"{Lang.T("trk_import_at_pos_title")} {FormatSec(position)}", Filter = "Audio|*.wav;*.mp3;*.ogg;*.flac;*.m4a;*.aiff|All|*.*" };
             if (dlg.ShowDialog() != true) return;
-            double dur = 5;
-            try { using var r = new AudioFileReader(dlg.FileName); dur = r.TotalTime.TotalSeconds; } catch { }
-            var clip = new AudioClip { Name = System.IO.Path.GetFileName(dlg.FileName), FilePath = dlg.FileName, StartTime = Math.Max(0, position), Duration = dur, WaveformData = AudioEngine.LoadWaveformData(dlg.FileName) };
+            var readable = await _vm.EnsureReadableAsync(dlg.FileName);
+            if (readable == null) return;
+            _vm.PushUndo();
+            var clip = _vm.CreateClipFromFile(readable, position);
             _vm.SelectedTrack = track; track.Clips.Add(clip); _vm.SelectedClip = clip;
-            RefreshList();
+            _vm.NotifyEdited();
         }
 
         private void CombineDialog(AudioTrack t1, AudioTrack t2)
@@ -685,7 +802,7 @@ namespace UltraAudioEditor.Views.Controls
             var d = new SetValueDialog(track.Name, "0-100:", (track.Volume * 100).ToString("F0"), "%");
             d.Owner = Window.GetWindow(this);
             if (d.ShowDialog() == true && float.TryParse(d.ResultValue, out float v))
-            { track.Volume = Math.Clamp(v / 100f, 0f, 1f); RefreshList(); }
+            { _vm?.PushUndo(); track.Volume = Math.Clamp(v / 100f, 0f, 1f); RefreshList(); }
         }
 
         private void SetPanDialog(AudioTrack track)
@@ -693,7 +810,7 @@ namespace UltraAudioEditor.Views.Controls
             var d = new SetValueDialog(track.Name, "-100..100:", (track.Pan * 100).ToString("F0"), "");
             d.Owner = Window.GetWindow(this);
             if (d.ShowDialog() == true && float.TryParse(d.ResultValue, out float v))
-            { track.Pan = Math.Clamp(v / 100f, -1f, 1f); RefreshList(); }
+            { _vm?.PushUndo(); track.Pan = Math.Clamp(v / 100f, -1f, 1f); RefreshList(); }
         }
 
         private double AskPos(string title, double cur)

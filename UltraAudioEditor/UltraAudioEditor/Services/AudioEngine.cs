@@ -10,114 +10,205 @@ namespace UltraAudioEditor.Services
     // DSP EFEKTI — svaki čuva referencu na TrackEffects i čita LIVE vrijednosti
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Parametarski ekvilajzer: bas polica, srednji opseg (frekvencija + širina), visoka
+    /// polica, i filteri koji seku krajeve (high-pass za brujanje/bas, low-pass za šuštanje).
+    /// Sve se čita uživo; filteri se prave iznova samo kad se neka vrednost promeni.
+    /// </summary>
     public class EqualizerSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider _source;
         private readonly TrackEffects _fx;
-        private BiQuadFilter[] _lowFilters, _midFilters, _highFilters;
-        private float _lastLow, _lastMid, _lastHigh;
+        private BiQuadFilter[][] _chain = Array.Empty<BiQuadFilter[]>();
+        private string _key = "";
         public WaveFormat WaveFormat => _source.WaveFormat;
 
-        public EqualizerSampleProvider(ISampleProvider source, TrackEffects fx)
-        {
-            _source = source; _fx = fx;
-            int ch = source.WaveFormat.Channels, sr = source.WaveFormat.SampleRate;
-            _lowFilters  = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.LowShelf(sr,200f,0.7f,fx.EqLow)).ToArray();
-            _midFilters  = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.PeakingEQ(sr,1000f,0.7f,fx.EqMid)).ToArray();
-            _highFilters = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.HighShelf(sr,8000f,0.7f,fx.EqHigh)).ToArray();
-            _lastLow = fx.EqLow; _lastMid = fx.EqMid; _lastHigh = fx.EqHigh;
-        }
+        public EqualizerSampleProvider(ISampleProvider source, TrackEffects fx) { _source = source; _fx = fx; Rebuild(); }
 
-        private void RebuildIfChanged()
+        private void Rebuild()
         {
-            if (_lastLow == _fx.EqLow && _lastMid == _fx.EqMid && _lastHigh == _fx.EqHigh) return;
+            string key = $"{_fx.EqLow}|{_fx.EqMid}|{_fx.EqHigh}|{_fx.EqLowFreq}|{_fx.EqMidFreq}|{_fx.EqMidQ}|{_fx.EqHighFreq}|{_fx.HighPassFreq}|{_fx.LowPassFreq}";
+            if (key == _key) return;
+            _key = key;
             int ch = WaveFormat.Channels, sr = WaveFormat.SampleRate;
-            _lowFilters  = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.LowShelf(sr,200f,0.7f,_fx.EqLow)).ToArray();
-            _midFilters  = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.PeakingEQ(sr,1000f,0.7f,_fx.EqMid)).ToArray();
-            _highFilters = Enumerable.Range(0,ch).Select(_=>BiQuadFilter.HighShelf(sr,8000f,0.7f,_fx.EqHigh)).ToArray();
-            _lastLow = _fx.EqLow; _lastMid = _fx.EqMid; _lastHigh = _fx.EqHigh;
+            float nyq = sr / 2f - 100;
+            _chain = Enumerable.Range(0, ch).Select(_ =>
+            {
+                var list = new List<BiQuadFilter>();
+                if (_fx.HighPassFreq >= 10) { var f = Math.Min(_fx.HighPassFreq, nyq); list.Add(BiQuadFilter.HighPassFilter(sr, f, 0.7071f)); list.Add(BiQuadFilter.HighPassFilter(sr, f, 0.7071f)); }
+                if (Math.Abs(_fx.EqLow) > 0.05f)  list.Add(BiQuadFilter.LowShelf(sr, Math.Clamp(_fx.EqLowFreq, 20, nyq), 0.7f, _fx.EqLow));
+                if (Math.Abs(_fx.EqMid) > 0.05f)  list.Add(BiQuadFilter.PeakingEQ(sr, Math.Clamp(_fx.EqMidFreq, 20, nyq), Math.Clamp(_fx.EqMidQ, 0.1f, 10f), _fx.EqMid));
+                if (Math.Abs(_fx.EqHigh) > 0.05f) list.Add(BiQuadFilter.HighShelf(sr, Math.Clamp(_fx.EqHighFreq, 20, nyq), 0.7f, _fx.EqHigh));
+                if (_fx.LowPassFreq >= 100 && _fx.LowPassFreq < nyq) { list.Add(BiQuadFilter.LowPassFilter(sr, _fx.LowPassFreq, 0.7071f)); list.Add(BiQuadFilter.LowPassFilter(sr, _fx.LowPassFreq, 0.7071f)); }
+                return list.ToArray();
+            }).ToArray();
         }
 
         public int Read(float[] buffer, int offset, int count)
         {
             int read = _source.Read(buffer, offset, count);
             if (!_fx.EqEnabled) return read;
-            RebuildIfChanged();
+            Rebuild();
             int ch = WaveFormat.Channels;
             for (int i = 0; i < read; i++)
             {
-                int c = i % ch;
-                float s = buffer[offset + i];
-                s = _lowFilters[c].Transform(s);
-                s = _midFilters[c].Transform(s);
-                s = _highFilters[c].Transform(s);
-                buffer[offset + i] = s;
+                var filters = _chain[i % ch];
+                float smp = buffer[offset + i];
+                for (int k = 0; k < filters.Length; k++) smp = filters[k].Transform(smp);
+                buffer[offset + i] = smp;
             }
             return read;
         }
     }
 
+    /// <summary>
+    /// Kratko utišavanje na početku i kraju svakog klipa (5 ms) — rez nikad ne "pukne",
+    /// bez obzira gde je talas presečen. Kraći od 5 ms se ne čuje, a uklanja klik.
+    /// </summary>
+    public class EdgeFadeSampleProvider : ISampleProvider
+    {
+        private readonly ISampleProvider _src;
+        private readonly long _total;           // ukupno uzoraka (svi kanali) koji će se pročitati
+        private readonly int _fade;             // uzoraka u fade-u (svi kanali)
+        private readonly bool _fadeStart;
+        private long _pos;
+        public WaveFormat WaveFormat => _src.WaveFormat;
+        public EdgeFadeSampleProvider(ISampleProvider src, double seconds, bool fadeStart)
+        {
+            _src = src; _fadeStart = fadeStart;
+            int ch = src.WaveFormat.Channels;
+            _total = (long)(seconds * src.WaveFormat.SampleRate) * ch;
+            _fade = (int)(0.005 * src.WaveFormat.SampleRate) * ch;
+        }
+        public int Read(float[] buffer, int offset, int count)
+        {
+            int n = _src.Read(buffer, offset, count);
+            for (int i = 0; i < n; i++, _pos++)
+            {
+                float g = 1f;
+                if (_fadeStart && _pos < _fade) g = _pos / (float)_fade;
+                long left = _total - _pos;
+                if (left < _fade) g = Math.Min(g, Math.Max(0, left) / (float)_fade);
+                if (g < 1f) buffer[offset + i] *= g;
+            }
+            return n;
+        }
+    }
+
+    /// <summary>
+    /// Reverb po modelu "Freeverb" (Jezar, javni domen) — 8 paralelnih comb filtera sa
+    /// prigušenjem visokih + 4 serijska allpass filtera, POSEBNO za levi i desni kanal
+    /// (desni ima malo duže linije = prirodna stereo širina), plus pre-delay.
+    /// Ranije su 4 kratka comb filtera radila nad preplitanim stereo uzorcima, pa ni
+    /// najveća "soba" nije mogla da zazvuči kao sala.
+    ///   ReverbRoom     0..1 -> dužina repa (od kupatila do katedrale)
+    ///   ReverbDamping  0..1 -> 0 svetli/tvrdi zidovi, 1 tamni/meki prostor
+    ///   ReverbPreDelay ms   -> vreme do prvog odjeka (veći prostor = duže)
+    ///   ReverbMix      0..1 -> koliko odjeka u odnosu na originalni zvuk
+    /// </summary>
     public class ReverbSampleProvider : ISampleProvider
     {
+        private static readonly int[] CombTuning = { 1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617 };
+        private static readonly int[] AllpassTuning = { 556, 441, 341, 225 };
+        private const int StereoSpread = 23;
+        private const float FixedGain = 0.015f, ScaleWet = 3f;
+
+        private sealed class Comb
+        {
+            private readonly float[] _buf; private int _i; private float _store;
+            public Comb(int n) { _buf = new float[Math.Max(1, n)]; }
+            public float Process(float input, float feedback, float damp1, float damp2)
+            {
+                float output = _buf[_i];
+                _store = output * damp2 + _store * damp1;
+                _buf[_i] = input + _store * feedback;
+                if (++_i >= _buf.Length) _i = 0;
+                return output;
+            }
+            public void Clear() { Array.Clear(_buf); _store = 0; }
+        }
+        private sealed class Allpass
+        {
+            private readonly float[] _buf; private int _i;
+            public Allpass(int n) { _buf = new float[Math.Max(1, n)]; }
+            public float Process(float input)
+            {
+                float bufout = _buf[_i];
+                float output = -input + bufout;
+                _buf[_i] = input + bufout * 0.5f;
+                if (++_i >= _buf.Length) _i = 0;
+                return output;
+            }
+            public void Clear() => Array.Clear(_buf);
+        }
+
         private readonly ISampleProvider _source;
         private readonly TrackEffects _fx;
-        private readonly float[] _comb1, _comb2, _comb3, _comb4;
-        private readonly float[] _allpass1, _allpass2;
-        private int _c1, _c2, _c3, _c4, _a1, _a2;
+        private readonly Comb[] _combL, _combR;
+        private readonly Allpass[] _apL, _apR;
+        private readonly float[] _preL, _preR;
+        private int _preIdx;
+        private bool _wasOn;
         public WaveFormat WaveFormat => _source.WaveFormat;
 
         public ReverbSampleProvider(ISampleProvider source, TrackEffects fx)
         {
             _source = source; _fx = fx;
-            int sr = source.WaveFormat.SampleRate;
-            // Freeschlager Moorer comb + allpass mreža
-            _comb1 = new float[(int)(sr * 0.0297)];
-            _comb2 = new float[(int)(sr * 0.0371)];
-            _comb3 = new float[(int)(sr * 0.0411)];
-            _comb4 = new float[(int)(sr * 0.0437)];
-            _allpass1 = new float[(int)(sr * 0.005)];
-            _allpass2 = new float[(int)(sr * 0.0017)];
+            double k = source.WaveFormat.SampleRate / 44100.0;
+            _combL = CombTuning.Select(n => new Comb((int)(n * k))).ToArray();
+            _combR = CombTuning.Select(n => new Comb((int)((n + StereoSpread) * k))).ToArray();
+            _apL = AllpassTuning.Select(n => new Allpass((int)(n * k))).ToArray();
+            _apR = AllpassTuning.Select(n => new Allpass((int)((n + StereoSpread) * k))).ToArray();
+            int preMax = (int)(source.WaveFormat.SampleRate * 0.25) + 1;   // do 250 ms
+            _preL = new float[preMax]; _preR = new float[preMax];
+        }
+
+        private void ClearAll()
+        {
+            foreach (var c in _combL) c.Clear(); foreach (var c in _combR) c.Clear();
+            foreach (var a in _apL) a.Clear(); foreach (var a in _apR) a.Clear();
+            Array.Clear(_preL); Array.Clear(_preR);
         }
 
         public int Read(float[] buffer, int offset, int count)
         {
             int read = _source.Read(buffer, offset, count);
-            if (!_fx.ReverbEnabled) return read;
-            float fb = 0.5f + _fx.ReverbRoom * 0.35f;
-            float mix = _fx.ReverbMix;
-            for (int i = 0; i < read; i++)
+            if (!_fx.ReverbEnabled) { _wasOn = false; return read; }
+            if (!_wasOn) { ClearAll(); _wasOn = true; }   // bez ostatka starog repa pri uključivanju
+
+            int ch = WaveFormat.Channels;
+            float room = Math.Clamp(_fx.ReverbRoom, 0f, 1f);
+            float feedback = room * 0.28f + 0.7f;                       // 0.70 .. 0.98
+            float damp1 = Math.Clamp(_fx.ReverbDamping, 0f, 1f) * 0.4f;
+            float damp2 = 1f - damp1;
+            float mix = Math.Clamp(_fx.ReverbMix, 0f, 1f);
+            float dry = 1f - mix * 0.5f;
+            int pre = Math.Clamp((int)(_fx.ReverbPreDelay / 1000f * WaveFormat.SampleRate), 0, _preL.Length - 1);
+
+            for (int i = 0; i + ch - 1 < read; i += ch)
             {
-                float dry = buffer[offset + i];
-                // 4 parallel comb filters
-                float wet = 0;
-                wet += ProcessComb(_comb1, ref _c1, dry, fb * 0.96f);
-                wet += ProcessComb(_comb2, ref _c2, dry, fb * 0.93f);
-                wet += ProcessComb(_comb3, ref _c3, dry, fb * 0.91f);
-                wet += ProcessComb(_comb4, ref _c4, dry, fb * 0.89f);
-                wet *= 0.25f;
-                // 2 series allpass
-                wet = ProcessAllpass(_allpass1, ref _a1, wet);
-                wet = ProcessAllpass(_allpass2, ref _a2, wet);
-                buffer[offset + i] = dry * (1f - mix) + wet * mix;
+                float l = buffer[offset + i];
+                float r = ch > 1 ? buffer[offset + i + 1] : l;
+                float input = (l + r) * FixedGain;
+
+                // pre-delay
+                _preL[_preIdx] = input;
+                int rd = _preIdx - pre; if (rd < 0) rd += _preL.Length;
+                float delayed = _preL[rd];
+                if (++_preIdx >= _preL.Length) _preIdx = 0;
+
+                float outL = 0, outR = 0;
+                for (int c = 0; c < _combL.Length; c++)
+                {
+                    outL += _combL[c].Process(delayed, feedback, damp1, damp2);
+                    outR += _combR[c].Process(delayed, feedback, damp1, damp2);
+                }
+                for (int a = 0; a < _apL.Length; a++) { outL = _apL[a].Process(outL); outR = _apR[a].Process(outR); }
+
+                buffer[offset + i] = l * dry + outL * mix * ScaleWet;
+                if (ch > 1) buffer[offset + i + 1] = r * dry + outR * mix * ScaleWet;
             }
             return read;
-        }
-
-        private static float ProcessComb(float[] buf, ref int pos, float input, float feedback)
-        {
-            float output = buf[pos];
-            buf[pos] = input + output * feedback;
-            pos = (pos + 1) % buf.Length;
-            return output;
-        }
-
-        private static float ProcessAllpass(float[] buf, ref int pos, float input)
-        {
-            float bufout = buf[pos];
-            float output = -input + bufout;
-            buf[pos] = input + bufout * 0.5f;
-            pos = (pos + 1) % buf.Length;
-            return output;
         }
     }
 
@@ -128,6 +219,7 @@ namespace UltraAudioEditor.Services
         private float[] _buffer;
         private int _pos, _delaySamples;
         private float _lastDelayTime;
+        private bool _wasOn;
         public WaveFormat WaveFormat => _source.WaveFormat;
 
         public DelaySampleProvider(ISampleProvider source, TrackEffects fx)
@@ -141,7 +233,8 @@ namespace UltraAudioEditor.Services
         public int Read(float[] buffer, int offset, int count)
         {
             int read = _source.Read(buffer, offset, count);
-            if (!_fx.DelayEnabled) return read;
+            if (!_fx.DelayEnabled) { _wasOn = false; return read; }
+            if (!_wasOn) { Array.Clear(_buffer); _wasOn = true; }
             // Ažuriraj delay time ako se promijenio
             if (Math.Abs(_lastDelayTime - _fx.DelayTime) > 0.001f)
             {
@@ -156,7 +249,7 @@ namespace UltraAudioEditor.Services
                 float delayed = _buffer[readPos];
                 _buffer[_pos] = dry + delayed * _fx.DelayFeedback;
                 _pos = (_pos + 1) % _buffer.Length;
-                buffer[offset + i] = dry + delayed * 0.7f;
+                buffer[offset + i] = dry + delayed * Math.Clamp(_fx.DelayMix, 0f, 1f) * 1.5f;
             }
             return read;
         }
@@ -180,6 +273,7 @@ namespace UltraAudioEditor.Services
             float sr = WaveFormat.SampleRate;
             float attackCoeff  = (float)Math.Exp(-1.0 / (sr * _fx.CompAttack  / 1000.0));
             float releaseCoeff = (float)Math.Exp(-1.0 / (sr * _fx.CompRelease / 1000.0));
+            float makeup = (float)Math.Pow(10.0, _fx.CompMakeup / 20.0);   // pojačanje posle kompresije
             for (int i = 0; i < read; i++)
             {
                 float input = Math.Abs(buffer[offset + i]);
@@ -191,7 +285,7 @@ namespace UltraAudioEditor.Services
                     float overDb = 20f * (float)Math.Log10(_envelope / threshold);
                     gain = (float)Math.Pow(10.0, -overDb * (1f - 1f / _fx.CompRatio) / 20.0);
                 }
-                buffer[offset + i] *= gain;
+                buffer[offset + i] *= gain * makeup;
             }
             return read;
         }
@@ -259,38 +353,59 @@ namespace UltraAudioEditor.Services
         }
     }
 
+    /// <summary>
+    /// Chorus: po kanalu, kašnjenje 7–27 ms koje se njiše LFO-om (levi i desni kanal
+    /// u suprotnoj fazi = širok stereo). Ranije je kašnjenje bilo svega par uzoraka
+    /// nad preplitanim stereo signalom, pa se efekat skoro nije čuo.
+    ///   ChorusDepth 0..1 — koliko se kašnjenje njiše
+    ///   ChorusRate  Hz   — brzina njihanja
+    ///   ChorusMix   0..1 — koliko "drugog glasa" u odnosu na original
+    /// </summary>
     public class ChorusSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider _source;
         private readonly TrackEffects _fx;
-        private readonly float[] _delayBuf;
+        private readonly float[][] _buf;
         private int _pos;
-        private float _lfoPhase;
+        private double _phase;
+        private bool _wasOn;
         public WaveFormat WaveFormat => _source.WaveFormat;
 
         public ChorusSampleProvider(ISampleProvider source, TrackEffects fx)
         {
             _source = source; _fx = fx;
-            _delayBuf = new float[source.WaveFormat.SampleRate / 4];
+            int len = (int)(source.WaveFormat.SampleRate * 0.05) + 2;   // 50 ms
+            _buf = Enumerable.Range(0, Math.Max(1, source.WaveFormat.Channels)).Select(_ => new float[len]).ToArray();
         }
 
         public int Read(float[] buffer, int offset, int count)
         {
             int read = _source.Read(buffer, offset, count);
-            if (!_fx.ChorusEnabled) return read;
-            float sr = WaveFormat.SampleRate;
-            float lfoInc = 2f * (float)Math.PI * 0.8f / sr;
-            for (int i = 0; i < read; i++)
+            if (!_fx.ChorusEnabled) { _wasOn = false; return read; }
+            if (!_wasOn) { foreach (var b in _buf) Array.Clear(b); _wasOn = true; }
+
+            int ch = WaveFormat.Channels, len = _buf[0].Length;
+            double sr = WaveFormat.SampleRate;
+            double baseMs = 7 + 10 * Math.Clamp(_fx.ChorusDepth, 0f, 1f);
+            double swingMs = 10 * Math.Clamp(_fx.ChorusDepth, 0f, 1f);
+            double inc = 2 * Math.PI * Math.Clamp(_fx.ChorusRate, 0.05f, 10f) / sr;
+            float mix = Math.Clamp(_fx.ChorusMix, 0f, 1f);
+
+            for (int i = 0; i + ch - 1 < read; i += ch)
             {
-                float dry = buffer[offset + i];
-                float lfo = (float)Math.Sin(_lfoPhase);
-                _lfoPhase += lfoInc;
-                if (_lfoPhase > 2 * Math.PI) _lfoPhase -= 2f * (float)Math.PI;
-                int delaySamples = Math.Clamp((int)(5 + _fx.ChorusDepth * 15 + lfo * _fx.ChorusDepth * 10), 1, _delayBuf.Length - 1);
-                int readPos = (_pos - delaySamples + _delayBuf.Length) % _delayBuf.Length;
-                _delayBuf[_pos] = dry;
-                _pos = (_pos + 1) % _delayBuf.Length;
-                buffer[offset + i] = (dry + _delayBuf[readPos] * 0.7f) * 0.85f;
+                for (int c = 0; c < ch; c++)
+                {
+                    float dry = buffer[offset + i + c];
+                    _buf[c][_pos] = dry;
+                    double lfo = Math.Sin(_phase + (c == 1 ? Math.PI : 0));
+                    double d = (baseMs + swingMs * lfo) / 1000.0 * sr;
+                    double rp = _pos - d; while (rp < 0) rp += len;
+                    int i0 = (int)rp; int i1 = (i0 + 1) % len; float frac = (float)(rp - i0);
+                    float wet = _buf[c][i0 % len] * (1 - frac) + _buf[c][i1] * frac;   // linearna interpolacija = bez krckanja
+                    buffer[offset + i + c] = dry * (1f - mix * 0.5f) + wet * mix;
+                }
+                if (++_pos >= len) _pos = 0;
+                _phase += inc; if (_phase > 2 * Math.PI) _phase -= 2 * Math.PI;
             }
             return read;
         }
@@ -306,6 +421,9 @@ namespace UltraAudioEditor.Services
         private MixingSampleProvider? _mixer;
         private readonly List<AudioFileReader> _readers = new();
         private bool _disposed;
+
+        /// <summary>Kašnjenje izlaza zvuka; koristi se i za poravnanje snimka sa podlogom.</summary>
+        public const int OutputLatencyMs = 100;
 
         public bool IsPlaying => _waveOut?.PlaybackState == PlaybackState.Playing;
         public float MasterVolume { get; set; } = 0.8f;
@@ -326,13 +444,11 @@ namespace UltraAudioEditor.Services
             var waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(project.SampleRate, 2);
             _mixer = new MixingSampleProvider(waveFormat) { ReadFully = true };
 
-            bool anySolo = project.Tracks.Any(t => t.IsSolo);
-
+            // Mute / Solo / Master se NE primenjuju ovde jednom pri pokretanju, nego
+            // uživo u LiveVolumeSampleProvider-u — klik na Mute ili Solo dok svira
+            // čuje se odmah, bez ponovnog puštanja.
             foreach (var track in project.Tracks)
             {
-                if (track.IsMuted) continue;
-                if (anySolo && !track.IsSolo) continue;
-
                 foreach (var clip in track.Clips)
                 {
                     if (string.IsNullOrEmpty(clip.FilePath) || !File.Exists(clip.FilePath)) continue;
@@ -355,56 +471,91 @@ namespace UltraAudioEditor.Services
                         if (reader.WaveFormat.SampleRate != project.SampleRate)
                             src = new WdlResamplingSampleProvider(src, project.SampleRate);
 
-                        // ── LIVE DSP LANAC ── svaki provider drži referencu na track.Effects
-                        src = new NoiseGateSampleProvider(src, track.Effects);
-                        src = new CompressorSampleProvider(src, track.Effects);
-                        src = new PitchShiftSampleProvider(src, track.Effects);
-                        src = new EqualizerSampleProvider(src, track.Effects);
-                        src = new BassBoostSampleProvider(src, track.Effects);
-                        src = new ChorusSampleProvider(src, track.Effects);
-                        src = new DelaySampleProvider(src, track.Effects);
-                        src = new ReverbSampleProvider(src, track.Effects);
+                        // ── LIVE DSP LANAC ── redosled iz track.Effects.Order, vrednosti se čitaju uživo
+                        double fromInClip = Math.Max(0, fromPosition - clip.StartTime);
+                        src = new EdgeFadeSampleProvider(src, clip.Duration - fromInClip, fadeStart: fromInClip < 0.005);
+                        src = BuildEffectChain(src, track.Effects);
 
-                        // Volume (čita live iz track.Volume)
-                        var vol = new LiveVolumeSampleProvider(src, track, MasterVolume);
+                        // Jačina, panorama, mute/solo i kriva jačine — sve uživo
+                        var vol = new LiveVolumeSampleProvider(src, track, project, () => MasterVolume,
+                            Math.Max(fromPosition, clip.StartTime));
 
-                        // Offset (početak klipa)
+                        // Offset (početak klipa) + dužina klipa u JEDNOM OffsetSampleProvider-u.
+                        // Ranije je TakeSamples bio na spoljnom provider-u koji je već sadržao
+                        // tišinu kašnjenja, pa je klip koji počinje posle playhead-a bio odsečen
+                        // na kraju tačno za dužinu tog kašnjenja (vidljivo posle sečenja klipa).
                         double delay = Math.Max(0, clip.StartTime - fromPosition);
-                        ISampleProvider final = delay > 0
-                            ? new OffsetSampleProvider(vol) { DelayBySamples = (int)(delay * project.SampleRate * 2) }
-                            : (ISampleProvider)vol;
-
                         double remaining = clip.Duration - Math.Max(0, fromPosition - clip.StartTime);
-                        var trimmed = new OffsetSampleProvider(final)
-                            { TakeSamples = (int)(remaining * project.SampleRate * 2) };
+                        var trimmed = new OffsetSampleProvider(vol)
+                        {
+                            DelayBySamples = (int)(delay * project.SampleRate) * 2,      // paran broj = levi/desni kanal ostaju na mestu
+                            TakeSamples    = (int)(remaining * project.SampleRate) * 2
+                        };
 
                         _mixer.AddMixerInput(trimmed);
                     }
-                    catch { }
+                    catch (Exception ex) { DebugLog.Write($"Play: clip '{clip.Name}' skipped: {ex.Message}"); }
                 }
             }
 
-            _waveOut = new WaveOutEvent { DesiredLatency = 100 };
+            _waveOut = new WaveOutEvent { DesiredLatency = OutputLatencyMs };
             _waveOut.Init(_mixer);
-            _waveOut.PlaybackStopped += (s, e) => PlaybackStopped?.Invoke(this, EventArgs.Empty);
+            // PlaybackStopped se prosleđuje SAMO za ovaj, trenutni WaveOut. Ranije je i
+            // ručno zaustavljanje prethodnog (koje Play() radi na početku) javljalo "stalo",
+            // pa je stanje "svira" odmah padalo na false i Space je ponovo puštao umesto
+            // da pauzira.
+            int gen = ++_generation;
+            var wo = _waveOut;
+            wo.PlaybackStopped += (s, e) => { if (gen == _generation && ReferenceEquals(wo, _waveOut)) PlaybackStopped?.Invoke(this, EventArgs.Empty); };
             _waveOut.Play();
 
             _posTimer = new System.Timers.Timer(50);
             _posTimer.Elapsed += (s, e) =>
+            {
+                // Zakasneli otkucaj starog tajmera (posle skoka na novu poziciju) se ignoriše,
+                // inače bi vratio poziciju na staro mesto.
+                if (gen != _generation) return;
                 PositionChanged?.Invoke(this, _playStartOffset + (DateTime.UtcNow - _playStartTime).TotalSeconds);
+            };
             _posTimer.Start();
         }
 
+        private volatile int _generation;
+
         public void Stop()
         {
+            _generation++;
             _posTimer?.Stop(); _posTimer?.Dispose(); _posTimer = null;
             _waveOut?.Stop(); _waveOut?.Dispose(); _waveOut = null;
             foreach (var r in _readers) try { r.Dispose(); } catch { }
             _readers.Clear();
         }
 
-        public void Pause() { _posTimer?.Stop(); _waveOut?.Pause(); }
+        public void Pause() { _generation++; _posTimer?.Stop(); _waveOut?.Pause(); }
         public void Resume() { _waveOut?.Play(); _posTimer?.Start(); }
+
+        /// <summary>Lanac efekata trake, redom iz fx.Order (nedostajući efekti se dodaju na kraj).</summary>
+        public static ISampleProvider BuildEffectChain(ISampleProvider src, TrackEffects fx)
+        {
+            var order = (fx.Order ?? TrackEffects.DefaultOrder()).Distinct().ToList();
+            foreach (var t in TrackEffects.DefaultOrder()) if (!order.Contains(t)) order.Add(t);
+            foreach (var t in order)
+            {
+                src = t switch
+                {
+                    EffectType.NoiseGate  => new NoiseGateSampleProvider(src, fx),
+                    EffectType.Compressor => new CompressorSampleProvider(src, fx),
+                    EffectType.PitchShift => new PitchShiftSampleProvider(src, fx),
+                    EffectType.Equalizer  => new EqualizerSampleProvider(src, fx),
+                    EffectType.BassBoost  => new BassBoostSampleProvider(src, fx),
+                    EffectType.Chorus     => new ChorusSampleProvider(src, fx),
+                    EffectType.Delay      => new DelaySampleProvider(src, fx),
+                    EffectType.Reverb     => new ReverbSampleProvider(src, fx),
+                    _ => src
+                };
+            }
+            return src;
+        }
 
         // ── Statičke operacije ────────────────────────────────────────────────
 
@@ -482,75 +633,164 @@ namespace UltraAudioEditor.Services
             }
         }
 
-        public static void ExportMixdown(AudioProject project, string outputPath,
-            ExportFormat format, int bitRate = 192, Action<int>? progress = null)
+        // ── IZVOZ ─────────────────────────────────────────────────────────────
+        // Dva koraka:
+        //  1) RenderMix: miks svih traka u privremeni 32-bit float WAV + merenje
+        //     najglasnijeg vrha. Float NE seče signal iznad 0 dBFS, pa tačno znamo
+        //     koliko je miks preglasan pre nego što išta izgubimo.
+        //  2) EncodeMix: iz tog fajla pravi konačni format (WAV/MP3/M4A/AIFF), uz
+        //     opcionu korekciju glasnoće (gain) da miks ne bi bio izobličen.
+        // Između ta dva koraka editor korisnika pita šta da radi ako je miks preglasan.
+
+        public sealed class MixRenderResult
+        {
+            public string TempPath { get; init; } = "";
+            public float Peak { get; init; }          // 1.0 = 0 dBFS
+            public double Seconds { get; init; }
+            public int TracksMixed { get; init; }
+            public int TracksSkipped { get; init; }  // mute / van solo-a
+            public int ClipsMixed { get; init; }
+            public int MissingFiles { get; init; }
+            public double PeakDb => Peak <= 0.000001f ? -120 : 20 * Math.Log10(Peak);
+            public bool IsClipping => Peak > 1.0f;
+        }
+
+        private sealed class PeakMeterSampleProvider : ISampleProvider
+        {
+            private readonly ISampleProvider _src;
+            public float Peak { get; private set; }
+            public PeakMeterSampleProvider(ISampleProvider src) { _src = src; }
+            public WaveFormat WaveFormat => _src.WaveFormat;
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int n = _src.Read(buffer, offset, count);
+                float p = Peak;
+                for (int i = 0; i < n; i++) { float a = Math.Abs(buffer[offset + i]); if (a > p) p = a; }
+                Peak = p;
+                return n;
+            }
+        }
+
+        public static MixRenderResult RenderMix(AudioProject project, Action<int>? progress = null)
         {
             var waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(project.SampleRate, 2);
             // ReadFully = false: mikser MORA da javi kraj (Read vrati 0) čim sve trake završe.
             // Sa ReadFully = true, mikser zauvijek vraća tišinu i WaveFileWriter piše u nedogled
             // dok ne probije limit veličine WAV chunk-a -> "WAV file too large".
-            // (NAPOMENA: mikser za LIVE reprodukciju u Play() gore ostaje ReadFully=true namjerno —
-            // tamo treba da nastavi da vraća tišinu da WaveOutEvent ne prekine plejbek naglo.)
             var mixer = new MixingSampleProvider(waveFormat) { ReadFully = false };
             bool anySolo = project.Tracks.Any(t => t.IsSolo);
             var readers = new List<AudioFileReader>();
+            int tracksMixed = 0, tracksSkipped = 0, clipsMixed = 0, missing = 0;
 
             foreach (var track in project.Tracks)
             {
-                if (track.IsMuted || (anySolo && !track.IsSolo)) continue;
+                if (track.IsMuted || (anySolo && !track.IsSolo)) { if (track.Clips.Count > 0) tracksSkipped++; continue; }
+                int before = clipsMixed;
                 foreach (var clip in track.Clips)
                 {
-                    if (!File.Exists(clip.FilePath)) continue;
+                    if (!File.Exists(clip.FilePath)) { missing++; continue; }
                     try
                     {
                         var reader = new AudioFileReader(clip.FilePath);
                         readers.Add(reader);
                         if (clip.TrimStart > 0)
-                            reader.CurrentTime = TimeSpan.FromSeconds(clip.TrimStart);
+                            reader.CurrentTime = TimeSpan.FromSeconds(Math.Min(clip.TrimStart, Math.Max(0, reader.TotalTime.TotalSeconds - 0.01)));
                         ISampleProvider src = reader.WaveFormat.Channels == 1
                             ? (ISampleProvider)new MonoToStereoSampleProvider(reader) : reader;
                         if (reader.WaveFormat.SampleRate != project.SampleRate)
                             src = new WdlResamplingSampleProvider(src, project.SampleRate);
-                        src = new NoiseGateSampleProvider(src, track.Effects);
-                        src = new CompressorSampleProvider(src, track.Effects);
-                        src = new PitchShiftSampleProvider(src, track.Effects);
-                        src = new EqualizerSampleProvider(src, track.Effects);
-                        src = new BassBoostSampleProvider(src, track.Effects);
-                        src = new ChorusSampleProvider(src, track.Effects);
-                        src = new DelaySampleProvider(src, track.Effects);
-                        src = new ReverbSampleProvider(src, track.Effects);
-                        var vol = new VolumeSampleProvider(src) { Volume = track.Volume };
+                        src = new EdgeFadeSampleProvider(src, clip.Duration, fadeStart: true);
+                        src = BuildEffectChain(src, track.Effects);
+                        // Isto kao reprodukcija: jačina, panorama i kriva jačine (master = 100%)
+                        var vol = new LiveVolumeSampleProvider(src, track, project, () => 1f, clip.StartTime);
                         var offset = new OffsetSampleProvider(vol)
                         {
-                            DelayBySamples = (int)(clip.StartTime * project.SampleRate * 2),
-                            TakeSamples    = (int)(clip.Duration   * project.SampleRate * 2)
+                            DelayBySamples = (int)(clip.StartTime * project.SampleRate) * 2,
+                            TakeSamples    = (int)(clip.Duration   * project.SampleRate) * 2
                         };
                         mixer.AddMixerInput(offset);
+                        clipsMixed++;
                     }
-                    catch { }
+                    catch (Exception ex) { DebugLog.Write($"RenderMix: clip '{clip.Name}' skipped: {ex.Message}"); }
                 }
+                if (clipsMixed > before) tracksMixed++;
             }
 
             progress?.Invoke(10);
-            var wav16 = new SampleToWaveProvider16(mixer);
-            string tmp = Path.Combine(Path.GetTempPath(), $"ultraaudio_{Guid.NewGuid()}.wav");
-            WaveFileWriter.CreateWaveFile(tmp, wav16);
-            progress?.Invoke(60);
+            var meter = new PeakMeterSampleProvider(mixer);
+            string tmp = Path.Combine(Path.GetTempPath(), $"ultraaudio_mix_{Guid.NewGuid()}.wav");
             try
             {
-                if (format == ExportFormat.MP3)
-                {
-                    using var rr = new AudioFileReader(tmp);
-                    using var mp3 = new NAudio.Lame.LameMP3FileWriter(outputPath, rr.WaveFormat, bitRate);
-                    rr.CopyTo(mp3);
-                }
-                else File.Copy(tmp, outputPath, true);
+                WaveFileWriter.CreateWaveFile(tmp, new SampleToWaveProvider(meter));
             }
             finally
             {
                 foreach (var rr in readers) try { rr.Dispose(); } catch { }
-                progress?.Invoke(100);
-                if (File.Exists(tmp)) try { File.Delete(tmp); } catch { }
+            }
+            double secs = 0;
+            try { using var r = new WaveFileReader(tmp); secs = r.TotalTime.TotalSeconds; } catch { }
+            progress?.Invoke(60);
+            return new MixRenderResult
+            {
+                TempPath = tmp, Peak = meter.Peak, Seconds = secs,
+                TracksMixed = tracksMixed, TracksSkipped = tracksSkipped, ClipsMixed = clipsMixed, MissingFiles = missing
+            };
+        }
+
+        /// <summary>
+        /// Pravi konačni fajl iz privremenog float miksa. gain = 1 ostavlja miks kakav jeste
+        /// (vrhovi iznad 0 dBFS se tada odsecaju pri prelasku u 16-bit).
+        /// </summary>
+        public static void EncodeMix(string floatWavPath, string outputPath, ExportFormat format,
+            float gain = 1f, int bitRate = 192, Action<int>? progress = null)
+        {
+            using var reader = new AudioFileReader(floatWavPath);
+            ISampleProvider sp = reader;
+            if (Math.Abs(gain - 1f) > 0.0001f) sp = new VolumeSampleProvider(sp) { Volume = gain };
+            var pcm16 = new SampleToWaveProvider16(sp);
+            progress?.Invoke(70);
+            switch (format)
+            {
+                case ExportFormat.MP3:
+                    using (var mp3 = new NAudio.Lame.LameMP3FileWriter(outputPath, pcm16.WaveFormat, bitRate))
+                        CopyProvider(pcm16, mp3.Write);
+                    break;
+                case ExportFormat.M4A:
+                    // AAC preko Windows Media Foundation (ugrađeno u Windows 10/11).
+                    NAudio.MediaFoundation.MediaFoundationApi.Startup();
+                    MediaFoundationEncoder.EncodeToAac(pcm16, outputPath, Math.Max(96, bitRate) * 1000);
+                    break;
+                case ExportFormat.AIFF:
+                    using (var aiff = new AiffFileWriter(outputPath, pcm16.WaveFormat))
+                        CopyProvider(pcm16, aiff.Write);
+                    break;
+                default:
+                    WaveFileWriter.CreateWaveFile(outputPath, pcm16);
+                    break;
+            }
+            progress?.Invoke(100);
+        }
+
+        private static void CopyProvider(IWaveProvider src, Action<byte[], int, int> write)
+        {
+            var buf = new byte[src.WaveFormat.AverageBytesPerSecond];
+            int n;
+            while ((n = src.Read(buf, 0, buf.Length)) > 0) write(buf, 0, n);
+        }
+
+        /// <summary>Stari jednostavni izvoz (bez pitanja) — koristi ga "Kombinuj trake".</summary>
+        public static void ExportMixdown(AudioProject project, string outputPath,
+            ExportFormat format, int bitRate = 192, Action<int>? progress = null)
+        {
+            var mix = RenderMix(project, progress);
+            try
+            {
+                float gain = mix.IsClipping ? 0.98f / mix.Peak : 1f;
+                EncodeMix(mix.TempPath, outputPath, format, gain, bitRate, progress);
+            }
+            finally
+            {
+                try { File.Delete(mix.TempPath); } catch { }
             }
         }
 
@@ -799,20 +1039,49 @@ namespace UltraAudioEditor.Services
     {
         private readonly ISampleProvider _source;
         private readonly AudioTrack _track;
-        private readonly float _masterVolume;
+        private readonly AudioProject _project;
+        private readonly Func<float> _master;
+        private float _current = -1f;   // poslednja primenjena jačina (za glatku promenu)
+        private readonly double _startTime;   // vreme na vremenskoj liniji prvog uzorka koji ovaj provider propušta
+        private long _frames;
         public WaveFormat WaveFormat => _source.WaveFormat;
 
-        public LiveVolumeSampleProvider(ISampleProvider source, AudioTrack track, float masterVolume)
-        { _source = source; _track = track; _masterVolume = masterVolume; }
+        public LiveVolumeSampleProvider(ISampleProvider source, AudioTrack track, AudioProject project, Func<float> master, double startTime = 0)
+        { _source = source; _track = track; _project = project; _master = master; _startTime = startTime; }
 
         public int Read(float[] buffer, int offset, int count)
         {
             int read = _source.Read(buffer, offset, count);
-            float vol = _track.Volume * _masterVolume;
-            for (int i = 0; i < read; i++) buffer[offset + i] *= vol;
+            bool anySolo = false;
+            try { anySolo = _project.Tracks.Any(t => t.IsSolo); } catch { }
+            bool audible = !_track.IsMuted && (!anySolo || _track.IsSolo);
+            int chn = Math.Max(1, WaveFormat.Channels);
+            // kriva jačine na KRAJU ovog bloka (unutar bloka se glatko prelazi do nje)
+            double tEnd = _startTime + (_frames + read / chn) / (double)WaveFormat.SampleRate;
+            _frames += read / chn;
+            float env = 1f;
+            try { env = _track.EnvelopeGainAt(tEnd); } catch { }
+            float target = audible ? _track.Volume * _master() * env : 0f;
+            if (_current < 0) _current = target;
+            // Linearni prelaz preko bloka umesto skoka — bez "klika" pri mute/solo/jačini.
+            float step = read > 0 ? (target - _current) / read : 0;
+            // Panorama (ranije se Pan čuvao, ali se nigde nije primenjivao): signal je
+            // ovde uvek stereo, parni uzorci = levo, neparni = desno.
+            float pan = Math.Clamp(_track.Pan, -1f, 1f);
+            float gl = pan > 0 ? 1f - pan : 1f, gr = pan < 0 ? 1f + pan : 1f;
+            bool stereo = WaveFormat.Channels == 2;
+            for (int i = 0; i < read; i++)
+            {
+                _current += step;
+                float g = stereo ? ((i & 1) == 0 ? gl : gr) : 1f;
+                buffer[offset + i] *= _current * g;
+            }
+            _current = target;
             return read;
         }
     }
 
-    public enum ExportFormat { WAV, MP3, OGG, FLAC, M4A, AIFF }
+    // OGG i FLAC su izbačeni: NAudio nema enkoder za njih, pa je stari kod samo
+    // kopirao WAV pod tim imenom (fajl sa pogrešnom ekstenzijom).
+    public enum ExportFormat { WAV, MP3, M4A, AIFF }
 }

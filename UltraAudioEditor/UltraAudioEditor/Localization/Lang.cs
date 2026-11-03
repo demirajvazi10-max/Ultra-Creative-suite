@@ -8,10 +8,10 @@ namespace UltraAudioEditor.Localization
     // Centralni sistem za prevode. Konvencija ista kao LanguageManager u Video Editoru.
     // XAML koristi {DynamicResource L_kljuc}, kod koristi Lang.T("kljuc").
     // Novi jezik = dodati kolonu u tabelu ispod.
-    public static class Lang
+    public static partial class Lang
     {
         public static string Current { get; private set; } = "en";
-        public static event Action LanguageChanged;
+        public static event Action? LanguageChanged;
 
         private static readonly string SettingsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -22,7 +22,6 @@ namespace UltraAudioEditor.Localization
         {
             // ===== Main window / naslov =====
             ["app_title"] = ("Ultra Audio Editor — Professional Audio Editor", "Ultra Audio Editor — Profesionalni Audio Editor"),
-            ["statusbar_ready"] = ("Ultra Audio Editor v1.0 | JAWS accessible", "Ultra Audio Editor v1.0 | JAWS pristupacno"),
 
             // ===== Meni: Fajl =====
             ["menu_file"] = ("_File", "_Fajl"),
@@ -169,11 +168,9 @@ namespace UltraAudioEditor.Localization
             ["new_project_confirm"] = ("New project? All unsaved changes will be lost.", "Novi projekat? Sve nesnimljene izmjene biti će izgubljene."),
             ["new_project_title"] = ("New project", "Novi projekat"),
             ["new_project_created"] = ("New project created.", "Novi projekat kreiran."),
-            ["export_done_announce"] = ("Export finished: {0}", "Izvoz završen: {0}"),
             ["export_done_msg"] = ("Audio exported successfully:\n{0}", "Audio uspješno izvezen:\n{0}"),
             ["export_done_title"] = ("Export finished", "Izvoz završen"),
             ["stopped"] = ("Stopped. Position at the beginning.", "Zaustavljeno. Pozicija na početku."),
-            ["record_hint"] = ("Recording: this feature requires audio input setup. Use Settings to choose a microphone.", "Snimanje: ova funkcija zahtijeva podešavanje audio ulaza. Koristite Settings da odaberete mikrofon."),
             ["nothing_to_undo"] = ("Nothing to undo.", "Ništa za poništiti."),
             ["undone"] = ("Undone.", "Poništeno."),
             ["nothing_to_redo"] = ("Nothing to redo.", "Ništa za ponavljati."),
@@ -243,7 +240,6 @@ namespace UltraAudioEditor.Localization
             ["effect_enabled"] = ("Effect enabled", "Efekat uključen"),
             ["fx_delay"] = ("Delay", "Kašnjenje"),
             ["fx_gain"] = ("Gain", "Pojačanje"),
-            ["fx_close_hint"] = ("Close dialog. The effect remains applied.", "Zatvori dijalog. Efekat ostaje primijenjen."),
             ["fx_range_hint"] = ("from {0} to {1}. Arrow keys to adjust.", "od {0} do {1}. Strelice za podešavanje."),
 
             // ===== AccessibleTrackList (kontekst meniji, JAWS najave) =====
@@ -413,8 +409,6 @@ namespace UltraAudioEditor.Localization
             ["acc_lang_menu"] = ("Language selection menu", "Meni za odabir jezika"),
             ["unexpected_error"] = ("Unexpected error: {0}\n\n{1}", "Neočekivana greška: {0}\n\n{1}"),
             ["unexpected_error_title"] = ("Ultra Audio Editor — Error", "Ultra Audio Editor - Greška"),
-            ["shortcuts_text"] = ("KEYBOARD SHORTCUTS — Ultra Audio Editor\n\nTRANSPORT:\n  Space          — Play / Pause\n  S              — Stop\n  R              — Record\n  L              — Loop on/off\n  Home           — Go to beginning\n  End            — Go to end\n\nFILE:\n  Ctrl+N         — New project\n  Ctrl+I         — Import audio\n  Ctrl+E         — Export audio\n\nEDIT:\n  Ctrl+Z         — Undo\n  Ctrl+Y         — Redo\n  Ctrl+D         — Duplicate track\n\nTRACKS:\n  Ctrl+Alt+T     — New track\n  Alt+Up         — Track up\n  Alt+Down       — Track down\n\nVIEW:\n  Ctrl++         — Zoom in\n  Ctrl+-         — Zoom out\n  Ctrl+0         — Fit to screen\n\nCLIPS:\n  Click clip        — Select clip\n  Double click      — Set position (dialog)\n  F2                — Set position of selected clip\n  Ctrl+Left         — Move clip left 1s\n  Ctrl+Right        — Move clip right 1s\n  Ctrl+Shift+Left   — Move clip left 0.1s\n  Ctrl+Shift+Right  — Move clip right 0.1s\n  Shift+Delete      — Delete clip\n  Right click       — Clip context menu\n\nNAVIGATION (JAWS):\n  Tab            — Next element\n  Shift+Tab      — Previous element\n  Enter/Space    — Activate button\n  Alt+F4         — Exit", "TASTATURNE PREČICE - Ultra Audio Editor\n\nTRANSPORT:\n  Space          — Reprodukuj / Pauziraj\n  S              — Zaustavi\n  R              — Snimi\n  L              — Loop uključi/isključi\n  Home           — Na početak\n  End            — Na kraj\n\nFAJL:\n  Ctrl+N         — Novi projekat\n  Ctrl+I         — Uvezi audio\n  Ctrl+E         — Izvezi audio\n\nUREĐIVANJE:\n  Ctrl+Z         — Poništi\n  Ctrl+Y         — Ponovi\n  Ctrl+D         — Dupliraj traku\n\nTRAKE:\n  Ctrl+Alt+T     — Nova traka\n  Alt+Up         — Traka gore\n  Alt+Down       — Traka dole\n\nPRIKAZ:\n  Ctrl++         — Uvećaj\n  Ctrl+-         — Umanji\n  Ctrl+0         — Podesi na ekran\n\nKLIPOVI:\n  Klik na klip      — Odaberi klip\n  Dvostruki klik    — Postavi poziciju (dialog)\n  F2                — Postavi poziciju odabranog klipa\n  Ctrl+Lijevo       — Pomjeri klip lijevo 1s\n  Ctrl+Desno        — Pomjeri klip desno 1s\n  Ctrl+Shift+Lijevo — Pomjeri klip lijevo 0.1s\n  Ctrl+Shift+Desno  — Pomjeri klip desno 0.1s\n  Shift+Delete      — Obriši klip\n  Desni klik        — Kontekst meni klipa\n\nNAVIGACIJA (JAWS):\n  Tab            — Sledeći element\n  Shift+Tab      — Prethodni element\n  Enter/Space    — Aktiviraj dugme\n  Alt+F4         — Izlaz"),
-            ["about_text"] = ("Ultra Audio Editor v1.0\n\nProfessional Windows audio editor with full accessibility.\nCompatible with the JAWS for Windows screen reader.\n\nCreated by Demir Ajvazi\n\nTechnologies:\n\u2022 WPF (.NET 8)\n\u2022 NAudio — audio engine\n\u2022 Anthropic Claude AI — AI features\n\nAI features require an Anthropic API key.\nGet it at: console.anthropic.com", "Ultra Audio Editor v1.0\n\nProfesionalni Windows audio editor sa punom pristupačnošću.\nKompatibilan sa JAWS for Windows čitačem ekrana.\n\nAutor: Demir Ajvazi\n\nTehnologije:\n\u2022 WPF (.NET 8)\n\u2022 NAudio — audio engine\n\u2022 Anthropic Claude AI — AI funkcije\n\nAI funkcije zahtijevaju Anthropic API ključ.\nDobijte ga na: console.anthropic.com"),
             ["clip_selected"] = ("Clip selected: {0}, position {1:F2}s, duration {2:F2}s. Press Enter to set position, Ctrl+arrows to move.", "Odabran klip: {0}, pozicija {1:F2}s, trajanje {2:F2}s. Pritisni Enter za postavljanje pozicije, Ctrl+strelice za pomjeranje."),
             ["audio_filter"] = ("Audio files|*.wav;*.mp3;*.ogg;*.flac;*.m4a;*.aiff;*.aif|WAV|*.wav|MP3|*.mp3|All files|*.*", "Audio fajlovi|*.wav;*.mp3;*.ogg;*.flac;*.m4a;*.aiff;*.aif|WAV|*.wav|MP3|*.mp3|Svi fajlovi|*.*"),
             ["describe_done"] = ("Audio description created. Available in the AI panel.", "Audio opis kreiran. Dostupan u AI panelu."),
@@ -446,7 +440,6 @@ namespace UltraAudioEditor.Localization
             ["acc_playhead_pos"] = ("Playhead position", "Playhead pozicija"),
             ["goto_btn"] = ("Go to...", "Idi na..."),
             ["goto_title"] = ("Go to position", "Idi na poziciju"),
-            ["playhead_hint"] = ("Arrows 0.1s  |  Ctrl+arrows 1s  |  Home/End  |  Space play  |  Shift+F10 menu", "Strelice 0.1s  |  Ctrl+strelice 1s  |  Home/End  |  Space reprodukcija  |  Shift+F10 meni"),
             ["tt_vocal"] = ("Microphone", "Mikrofon"),
             ["tt_instrumental"] = ("Guitar", "Gitara"),
             ["tt_audio"] = ("Audio", "Audio"),
@@ -467,7 +460,6 @@ namespace UltraAudioEditor.Localization
             ["filelist_nav_help"] = ("Up and down arrows to navigate. Shift F10 for menu. F2 to set position. Ctrl arrows to move. Delete to remove.", "Strelice gore i dole za navigaciju. Shift F10 za meni. F2 za postavljanje pozicije. Ctrl strelice za pomjeranje. Delete za brisanje."),
             ["col_name"] = ("Name", "Naziv"),
             ["col_num"] = ("#", "#"),
-            ["acc_list_help"] = ("Project list: tracks and clips. Use arrow keys to navigate rows and columns. F2 to set clip position. Ctrl+arrows to move a clip. Delete to remove selected clips. Shift+F10 or the Menu key opens the context menu. Ctrl+Click or Shift+Click to select multiple rows.", "Lista projekta: trake i klipovi. Strelice za kretanje kroz redove i kolone. F2 za poziciju klipa. Ctrl+strelice za pomjeranje klipa. Delete za brisanje izabranih klipova. Shift+F10 ili taster Meni otvara kontekstni meni. Ctrl+klik ili Shift+klik za izbor više redova."),
             ["col_track"] = ("Track", "Traka"),
             ["col_type"] = ("Type", "Tip"),
             ["col_status"] = ("Status", "Status"),
@@ -530,7 +522,7 @@ namespace UltraAudioEditor.Localization
 
         public static string T(string key)
         {
-            if (!Table.TryGetValue(key, out var v)) return key;
+            if (!Pro.TryGetValue(key, out var v) && !Extra.TryGetValue(key, out v) && !Table.TryGetValue(key, out v)) return key;
             return Current == "sr" ? v.sr : v.en;
         }
 
@@ -541,6 +533,10 @@ namespace UltraAudioEditor.Localization
             var res = Application.Current?.Resources;
             if (res == null) return;
             foreach (var kvp in Table)
+                res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
+            foreach (var kvp in Extra)   // Lang.Editing.cs — ima prednost
+                res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
+            foreach (var kvp in Pro)     // Lang.Pro.cs — najveća prednost
                 res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
         }
 
@@ -569,7 +565,7 @@ namespace UltraAudioEditor.Localization
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
                 File.WriteAllText(SettingsPath, Current);
             }
             catch { }

@@ -32,7 +32,9 @@
         <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding MoveTrackDownCommand}"/>
         <KeyBinding Key="D" Modifiers="Ctrl" Command="{Binding DuplicateTrackCommand}"/>
         <KeyBinding Key="W" Modifiers="Alt" Command="{Binding ToggleWorkspaceModeCommand}"/>
-        <KeyBinding Key="F6" Command="{Binding AnnounceStatusCommand}"/>
+        <!-- F6 / Shift+F6, Ctrl+X, Ctrl+C, Ctrl+V, M, P, Ctrl+R, Alt+strelice, Ctrl+Delete,
+             Ctrl+Shift+L idu kroz MainViewModel.HandleKey (PreviewKeyDown u MainWindow.xaml.cs
+             i KeyDown nativne liste) — jedno mesto za obe putanje, sa zaštitom od duplog okidanja. -->
         <!-- Clip pozicioniranje -->
         <KeyBinding Key="Left"  Modifiers="Ctrl"       Command="{Binding MoveClipLeftCommand}"/>
         <KeyBinding Key="Right" Modifiers="Ctrl"       Command="{Binding MoveClipRightCommand}"/>
@@ -77,24 +79,128 @@
                 <MenuItem Header="{DynamicResource L_menu_undo}" Command="{Binding UndoCommand}" AutomationProperties.Name="{DynamicResource L_acc_undo}"/>
                 <MenuItem Header="{DynamicResource L_menu_redo}" Command="{Binding RedoCommand}" AutomationProperties.Name="{DynamicResource L_acc_redo}"/>
                 <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_split}" Command="{Binding SplitAtPlayheadCommand}" AutomationProperties.Name="{DynamicResource L_menu_split}"/>
+                <MenuItem Header="{DynamicResource L_menu_cut_markers}" Command="{Binding CutAtAllMarkersCommand}" AutomationProperties.Name="{DynamicResource L_menu_cut_markers}"/>
+                <MenuItem Header="{DynamicResource L_menu_copy_clip}" Command="{Binding CopyClipCommand}" AutomationProperties.Name="{DynamicResource L_menu_copy_clip}"/>
+                <MenuItem Header="{DynamicResource L_menu_paste_clip}" Command="{Binding PasteClipCommand}" AutomationProperties.Name="{DynamicResource L_menu_paste_clip}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_delete_between}" Command="{Binding DeleteBetweenMarkersCommand}" AutomationProperties.Name="{DynamicResource L_menu_delete_between}"/>
+                <Separator/>
                 <MenuItem Header="{DynamicResource L_menu_normalize}" Command="{Binding NormalizeCommand}" AutomationProperties.Name="{DynamicResource L_acc_normalize_track}"/>
                 <MenuItem Header="{DynamicResource L_menu_fade_in}" Command="{Binding FadeInCommand}" AutomationProperties.Name="{DynamicResource L_acc_fade_in}"/>
                 <MenuItem Header="{DynamicResource L_menu_fade_out}" Command="{Binding FadeOutCommand}" AutomationProperties.Name="{DynamicResource L_acc_fade_out}"/>
             </MenuItem>
-            <MenuItem Header="{DynamicResource L_menu_clip}" AutomationProperties.Name="{DynamicResource L_acc_menu_clips}">
-                <MenuItem Header="{DynamicResource L_menu_set_position}" Command="{Binding SetClipPositionCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_set_clip_pos}"/>
-                <MenuItem Header="{DynamicResource L_menu_move_left_1s}" Command="{Binding MoveClipLeftCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_clip_left_1s}"/>
-                <MenuItem Header="{DynamicResource L_menu_move_right_1s}" Command="{Binding MoveClipRightCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_clip_right_1s}"/>
-                <MenuItem Header="{DynamicResource L_menu_move_left_01s}" Command="{Binding MoveClipLeftFineCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_fine_left}"/>
-                <MenuItem Header="{DynamicResource L_menu_move_right_01s}" Command="{Binding MoveClipRightFineCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_fine_right}"/>
+            <!-- Meni Klip: radi na klipu izabranom u listi. Bez posebnog AutomationProperties.Name —
+                 čitač ekrana čita isti tekst koji piše u meniju (zajedno sa prečicom). -->
+            <MenuItem Header="{DynamicResource L_menu_clip}">
+                <MenuItem Header="{DynamicResource L_menu_split}" Command="{Binding SplitAtPlayheadCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_copy_clip}" Command="{Binding CopyClipCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_paste_clip}" Command="{Binding PasteClipCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_preview}" Command="{Binding PreviewCutCommand}"/>
                 <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_delete_clip}" Command="{Binding DeleteClipCommand}"
-                          AutomationProperties.Name="{DynamicResource L_acc_delete_clip}"/>
+                <MenuItem Header="{DynamicResource L_menu_set_position}" Command="{Binding SetClipPositionCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_left_1s}" Command="{Binding MoveClipLeftCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_right_1s}" Command="{Binding MoveClipRightCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_left_01s}" Command="{Binding MoveClipLeftFineCommand}"/>
+                <MenuItem Header="{DynamicResource L_menu_move_right_01s}" Command="{Binding MoveClipRightFineCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_delete_clip}" Command="{Binding DeleteClipCommand}"/>
+            </MenuItem>
+            <!-- Izbor / Obrada / Alati — Sound Forge deo (MainViewModel.Pro.cs) -->
+            <MenuItem Header="{DynamicResource L_m_selection}">
+                <MenuItem Header="{DynamicResource L_m_sel_start}" Command="{Binding SelStartCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_end}" Command="{Binding SelEndCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_all}" Command="{Binding SelectAllCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_clip}" Command="{Binding SelectClipRangeCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_markers}" Command="{Binding SelectBetweenMarkersCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_clear}" Command="{Binding ClearSelectionCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_sel_play}" Command="{Binding PlaySelectionCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_sel_copy}" Command="{Binding CopyClipCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_cut}" Command="{Binding CutSelectionCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_delete}" Command="{Binding DeleteSelectionCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_trim}" Command="{Binding TrimToSelectionCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_sel_silence}" Command="{Binding SilenceSelectionCommand}"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_m_process}">
+                <MenuItem Header="{DynamicResource L_m_pr_gain}" Command="{Binding GainCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_pr_norm_peak}" Command="{Binding NormalizePeakCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_pr_norm_lufs}" Command="{Binding NormalizeLufsCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_pr_fade_in}" Command="{Binding FadeInProCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_pr_fade_out}" Command="{Binding FadeOutProCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_pr_reverse}" Command="{Binding ReverseCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_pr_ins_silence}" Command="{Binding InsertSilenceCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_pr_silences}" Command="{Binding RemoveSilencesCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_pr_channels}">
+                    <MenuItem Header="{DynamicResource L_m_pr_mono}" Command="{Binding ToMonoCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_swap}" Command="{Binding SwapChannelsCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_dc}" Command="{Binding RemoveDcCommand}"/>
+                </MenuItem>
+                <MenuItem Header="{DynamicResource L_m_pr_filters}">
+                    <MenuItem Header="{DynamicResource L_m_pr_highpass}" Command="{Binding HighPassCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_lowpass}" Command="{Binding LowPassCommand}"/>
+                </MenuItem>
+                <MenuItem Header="{DynamicResource L_m_pr_restore}">
+                    <MenuItem Header="{DynamicResource L_m_pr_learn_noise}" Command="{Binding LearnNoiseCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_noise}" Command="{Binding ReduceNoiseCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_clicks}" Command="{Binding RemoveClicksCommand}"/>
+                    <MenuItem Header="{DynamicResource L_m_pr_hum}" Command="{Binding RemoveHumCommand}"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_pr_apply_fx}" Command="{Binding ApplyEffectToSelectionCommand}"/>
+            </MenuItem>
+            <!-- Efekti za IZABRANU traku. Kvačica = efekat je uključen na toj traci. -->
+            <MenuItem Header="{DynamicResource L_menu_effects}" AutomationProperties.Name="{DynamicResource L_menu_effects}">
+                <MenuItem Header="{DynamicResource L_fxm_eq}" Command="{Binding OpenEffectCommand}" CommandParameter="Equalizer"
+                          IsChecked="{Binding SelectedTrack.Effects.EqEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_eq}"/>
+                <MenuItem Header="{DynamicResource L_fxm_reverb}" Command="{Binding OpenEffectCommand}" CommandParameter="Reverb"
+                          IsChecked="{Binding SelectedTrack.Effects.ReverbEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_reverb}"/>
+                <MenuItem Header="{DynamicResource L_fxm_delay}" Command="{Binding OpenEffectCommand}" CommandParameter="Delay"
+                          IsChecked="{Binding SelectedTrack.Effects.DelayEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_delay}"/>
+                <MenuItem Header="{DynamicResource L_fxm_comp}" Command="{Binding OpenEffectCommand}" CommandParameter="Compressor"
+                          IsChecked="{Binding SelectedTrack.Effects.CompressorEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_comp}"/>
+                <MenuItem Header="{DynamicResource L_fxm_gate}" Command="{Binding OpenEffectCommand}" CommandParameter="NoiseGate"
+                          IsChecked="{Binding SelectedTrack.Effects.NoiseGateEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_gate}"/>
+                <MenuItem Header="{DynamicResource L_fxm_bass}" Command="{Binding OpenEffectCommand}" CommandParameter="BassBoost"
+                          IsChecked="{Binding SelectedTrack.Effects.BassBostEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_bass}"/>
+                <MenuItem Header="{DynamicResource L_fxm_pitch}" Command="{Binding OpenEffectCommand}" CommandParameter="PitchShift"
+                          IsChecked="{Binding SelectedTrack.Effects.PitchEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_pitch}"/>
+                <MenuItem Header="{DynamicResource L_fxm_chorus}" Command="{Binding OpenEffectCommand}" CommandParameter="Chorus"
+                          IsChecked="{Binding SelectedTrack.Effects.ChorusEnabled, Mode=OneWay}" AutomationProperties.Name="{DynamicResource L_fxm_chorus}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_fx_all_off}" Command="{Binding DisableAllEffectsCommand}" AutomationProperties.Name="{DynamicResource L_menu_fx_all_off}"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_markers}" AutomationProperties.Name="{DynamicResource L_menu_markers}">
+                <MenuItem Header="{DynamicResource L_menu_add_marker}" Command="{Binding AddMarkerCommand}" AutomationProperties.Name="{DynamicResource L_menu_add_marker}"/>
+                <MenuItem Header="{DynamicResource L_menu_next_marker}" Command="{Binding NextMarkerCommand}" AutomationProperties.Name="{DynamicResource L_menu_next_marker}"/>
+                <MenuItem Header="{DynamicResource L_menu_prev_marker}" Command="{Binding PrevMarkerCommand}" AutomationProperties.Name="{DynamicResource L_menu_prev_marker}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_cut_markers}" Command="{Binding CutAtAllMarkersCommand}" AutomationProperties.Name="{DynamicResource L_menu_cut_markers}"/>
+                <MenuItem Header="{DynamicResource L_menu_delete_between}" Command="{Binding DeleteBetweenMarkersCommand}" AutomationProperties.Name="{DynamicResource L_menu_delete_between}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_delete_marker}" Command="{Binding DeleteMarkerCommand}" AutomationProperties.Name="{DynamicResource L_menu_delete_marker}"/>
+                <MenuItem Header="{DynamicResource L_menu_clear_markers}" Command="{Binding ClearMarkersCommand}" AutomationProperties.Name="{DynamicResource L_menu_clear_markers}"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_playback}" AutomationProperties.Name="{DynamicResource L_menu_playback}">
+                <MenuItem Header="{DynamicResource L_menu_play_pause}" Command="{Binding PlayPauseCommand}" AutomationProperties.Name="{DynamicResource L_menu_play_pause}"/>
+                <MenuItem Header="{DynamicResource L_menu_stop}" Command="{Binding StopCommand}" AutomationProperties.Name="{DynamicResource L_menu_stop}"/>
+                <MenuItem Header="{DynamicResource L_menu_record}" Command="{Binding RecordCommand}" AutomationProperties.Name="{DynamicResource L_menu_record}"/>
+                <MenuItem Header="{DynamicResource L_menu_preview}" Command="{Binding PreviewCutCommand}" AutomationProperties.Name="{DynamicResource L_menu_preview}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_nav_fwd}" Command="{Binding ForwardCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_nav_back}" Command="{Binding BackCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_nav_fwd_fine}" Command="{Binding ForwardFineCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_nav_back_fine}" Command="{Binding BackFineCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_nav_goto}" Command="{Binding GoToTimeCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_nav_scrub}" IsCheckable="True" IsChecked="{Binding ScrubEnabled}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_to_start}" Command="{Binding ToStartCommand}" AutomationProperties.Name="{DynamicResource L_menu_to_start}"/>
+                <MenuItem Header="{DynamicResource L_menu_to_end}" Command="{Binding ToEndCommand}" AutomationProperties.Name="{DynamicResource L_menu_to_end}"/>
+                <MenuItem Header="{DynamicResource L_menu_loop}" Command="{Binding LoopCommand}" AutomationProperties.Name="{DynamicResource L_menu_loop}"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_tracks}" AutomationProperties.Name="{DynamicResource L_acc_menu_tracks}">
                 <MenuItem Header="{DynamicResource L_menu_add_track}" Command="{Binding AddTrackCommand}" AutomationProperties.Name="{DynamicResource L_acc_add_track}"/>
@@ -121,6 +227,19 @@
                 <MenuItem Header="{DynamicResource L_menu_zoom_in}" Command="{Binding ZoomInCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_in}"/>
                 <MenuItem Header="{DynamicResource L_menu_zoom_out}" Command="{Binding ZoomOutCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_out}"/>
                 <MenuItem Header="{DynamicResource L_menu_zoom_fit}" Command="{Binding ZoomFitCommand}" AutomationProperties.Name="{DynamicResource L_acc_zoom_fit}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_where_am_i}" Command="{Binding QuickStatusCommand}" AutomationProperties.Name="{DynamicResource L_menu_where_am_i}"/>
+                <MenuItem Header="{DynamicResource L_menu_project_overview}" Command="{Binding AnnounceStatusCommand}" AutomationProperties.Name="{DynamicResource L_menu_project_overview}"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_m_tools}">
+                <MenuItem Header="{DynamicResource L_m_tl_stats}" Command="{Binding StatisticsCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_tl_whisper}" Command="{Binding TranscribeLocalCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_tl_envelope}" Command="{Binding EnvelopeCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_tl_fxorder}" Command="{Binding EffectOrderCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_m_tl_tags}" Command="{Binding TagsCommand}"/>
+                <MenuItem Header="{DynamicResource L_m_tl_batch}" Command="{Binding BatchConvertCommand}"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_language}" AutomationProperties.Name="{DynamicResource L_acc_lang_menu}">
                 <MenuItem x:Name="MenuLangEn" Header="{DynamicResource L_menu_lang_en}" IsCheckable="True" Click="LangEn_Click" AutomationProperties.Name="English"/>
@@ -128,6 +247,7 @@
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_help}" AutomationProperties.Name="{DynamicResource L_acc_menu_help}">
                 <MenuItem Header="{DynamicResource L_menu_shortcuts}" Click="ShowShortcuts_Click" AutomationProperties.Name="{DynamicResource L_acc_show_shortcuts}"/>
+                <MenuItem Header="{DynamicResource L_menu_log}" Command="{Binding ShowLogCommand}" AutomationProperties.Name="{DynamicResource L_menu_log}"/>
                 <MenuItem Header="{DynamicResource L_menu_about}" Click="ShowAbout_Click" AutomationProperties.Name="{DynamicResource L_acc_about}"/>
             </MenuItem>
         </Menu>
@@ -169,6 +289,16 @@
             <Separator/>
             <Button Command="{Binding AddTrackCommand}" ToolTip="{DynamicResource L_tt_new_track}"
                     Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_acc_add_track}">+ Traka</Button>
+            <Separator/>
+            <Button Command="{Binding SplitAtPlayheadCommand}" ToolTip="{DynamicResource L_menu_split}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_menu_split}"
+                    Content="{DynamicResource L_tb_split}"/>
+            <Button Command="{Binding AddMarkerCommand}" ToolTip="{DynamicResource L_menu_add_marker}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_menu_add_marker}"
+                    Content="{DynamicResource L_tb_marker}"/>
+            <Button Command="{Binding DeleteBetweenMarkersCommand}" ToolTip="{DynamicResource L_menu_delete_between}"
+                    Style="{StaticResource StdButton}" AutomationProperties.Name="{DynamicResource L_menu_delete_between}"
+                    Content="{DynamicResource L_tb_delete_between}"/>
         </ToolBar>
 
         <!-- ═══════════ TRANSPORT BAR ═══════════ -->
@@ -348,18 +478,27 @@
                                                 PlayheadPosition="{Binding DataContext.PlayheadPosition, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
                                                 ProjectDuration="{Binding DataContext.Project.Duration, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
                                                 ZoomLevel="{Binding DataContext.ZoomLevel, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                                                Markers="{Binding DataContext.Project.Markers, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                                                SelectionStart="{Binding DataContext.SelectionStartOrNaN, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                                                SelectionEnd="{Binding DataContext.SelectionEndOrNaN, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 AllowDrop="True" Drop="WaveformArea_Drop"
                                                 MouseLeftButtonDown="WaveformArea_MouseDown">
                                                 <ctrl:WaveformControl.ContextMenu>
                                                     <ContextMenu>
+                                                        <MenuItem Header="{DynamicResource L_menu_split}"
+                                                                  Command="{Binding PlacementTarget.Tag.SplitAtPlayheadCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                        <MenuItem Header="{DynamicResource L_menu_add_marker}"
+                                                                  Command="{Binding PlacementTarget.Tag.AddMarkerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                        <Separator/>
                                                         <MenuItem Header="{DynamicResource L_ctx_set_clip_pos}"
-                                                                  Command="{Binding DataContext.SetClipPositionCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                  Command="{Binding PlacementTarget.Tag.SetClipPositionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                                         <MenuItem Header="{DynamicResource L_menu_move_left_1s}"
-                                                                  Command="{Binding DataContext.MoveClipLeftCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                  Command="{Binding PlacementTarget.Tag.MoveClipLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                                         <MenuItem Header="{DynamicResource L_menu_move_right_1s}"
-                                                                  Command="{Binding DataContext.MoveClipRightCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                  Command="{Binding PlacementTarget.Tag.MoveClipRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                                         <MenuItem Header="{DynamicResource L_ctx_delete_clip}"
-                                                                  Command="{Binding DataContext.DeleteClipCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                  Command="{Binding PlacementTarget.Tag.DeleteClipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                                     </ContextMenu>
                                                 </ctrl:WaveformControl.ContextMenu>
                                             </ctrl:WaveformControl>
@@ -388,8 +527,39 @@
                             Foreground="{StaticResource BrText}"
                             AutomationProperties.Name="{DynamicResource L_acc_right_panel}">
                     <TabItem Header="{DynamicResource L_effects_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_effects}">
-                        <TextBlock Text="{DynamicResource L_select_track_effects}" Margin="8"
-                                   Foreground="{StaticResource BrTextSec}" FontSize="12"/>
+                        <StackPanel Margin="8">
+                            <TextBlock Text="{DynamicResource L_fx_panel_hint}" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{StaticResource BrTextSec}" Margin="0,0,0,8"/>
+                            <TextBlock FontSize="12" FontWeight="Medium" Foreground="{StaticResource BrText}" Margin="0,0,0,8"
+                                       Text="{Binding SelectedTrack.Name, Mode=OneWay, FallbackValue=—}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="Equalizer" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_eq}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_eq}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="Reverb" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_reverb}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_reverb}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="Delay" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_delay}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_delay}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="Compressor" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_comp}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_comp}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="NoiseGate" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_gate}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_gate}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="BassBoost" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_bass}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_bass}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="PitchShift" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_pitch}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_pitch}"/>
+                            <Button Command="{Binding OpenEffectCommand}" CommandParameter="Chorus" Style="{StaticResource StdButton}"
+                                    Margin="0,0,0,4" HorizontalAlignment="Stretch" Content="{DynamicResource L_fxm_chorus}"
+                                    AutomationProperties.Name="{DynamicResource L_fxm_chorus}"/>
+                            <Button Command="{Binding DisableAllEffectsCommand}" Style="{StaticResource StdButton}"
+                                    Margin="0,8,0,0" HorizontalAlignment="Stretch" Content="{DynamicResource L_menu_fx_all_off}"
+                                    AutomationProperties.Name="{DynamicResource L_menu_fx_all_off}"/>
+                        </StackPanel>
                     </TabItem>
                     <TabItem Header="{DynamicResource L_ai_panel_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_ai}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -478,14 +648,19 @@
                     <TabItem Header="{DynamicResource L_export_header}" AutomationProperties.Name="{DynamicResource L_acc_tab_export}">
                         <StackPanel Margin="8">
                             <TextBlock Text="{DynamicResource L_export_format}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource BrTextSec}" Margin="0,4,0,4"/>
-                            <ComboBox SelectedItem="{Binding ExportFormat}" AutomationProperties.Name="{DynamicResource L_acc_export_format}">
+                            <!-- SelectedValuePath="Content": ranije je SelectedItem (ComboBoxItem) bio vezan
+                                 za string svojstvo, pa izbor formata ovde nikad nije stizao do izvoza. -->
+                            <ComboBox SelectedValuePath="Content" SelectedValue="{Binding ExportFormat}" AutomationProperties.Name="{DynamicResource L_acc_export_format}">
                                 <ComboBoxItem>WAV</ComboBoxItem>
                                 <ComboBoxItem>MP3</ComboBoxItem>
-                                <ComboBoxItem>OGG</ComboBoxItem>
-                                <ComboBoxItem>FLAC</ComboBoxItem>
                                 <ComboBoxItem>M4A</ComboBoxItem>
                                 <ComboBoxItem>AIFF</ComboBoxItem>
+                                <ComboBoxItem>FLAC</ComboBoxItem>
+                                <ComboBoxItem>OGG</ComboBoxItem>
+                                <ComboBoxItem>OPUS</ComboBoxItem>
                             </ComboBox>
+                            <TextBlock Text="{DynamicResource L_export_format_help}" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{StaticResource BrTextSec}" Margin="0,8,0,0"/>
                             <Button Command="{Binding ExportCommand}" Style="{StaticResource AIButton}"
                                     Margin="0,16,0,0" HorizontalAlignment="Stretch" Height="36"
                                     AutomationProperties.Name="{DynamicResource L_acc_start_export}">Izvezi audio</Button>
@@ -522,7 +697,7 @@
                 </TextBlock>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{DynamicResource L_statusbar_ready}"
+                <TextBlock x:Name="TxtVersionInfo" Text="{DynamicResource L_statusbar_ready}"
                            Foreground="{StaticResource BrTextMuted}" FontSize="10"/>
             </StatusBarItem>
         </StatusBar>

@@ -19,10 +19,28 @@ namespace UltraAudioEditor.Views
             InitializeComponent();
             DataContext = new MainViewModel();
             Loaded += OnLoaded;
+            Closing += (_, __) => { try { VM.Dispose(); } catch { } };
+        }
+
+        /// <summary>Naslov prozora i statusna traka sa verzijom iz csproj-a (jedno mesto za verziju).</summary>
+        private void ApplyVersionTexts()
+        {
+            Title = $"{Lang.T("app_title")}  v{AppInfo.Version}";
+            TxtVersionInfo.Text = string.Format(Lang.T("statusbar_ready"), AppInfo.Version);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            ApplyVersionTexts();
+            VM.OnShowLog = () => new LogWindow(this).Show();
+            VM.OnOpenEffect = (track, type) =>
+            {
+                // Naslov sa nazivom trake — čitač ekrana odmah kaže na koju traku se efekat odnosi.
+                var dlg = new EffectDialog($"{EffectDialog.TitleFor(type)} — {track.Name}", track.Effects, type,
+                    () => VM.PlayPauseCommand.Execute(null)) { Owner = this };
+                dlg.ShowDialog();
+                AccessibleTrackList.Rebuild();
+            };
             VM.OnToggleWorkspaceMode = () =>
             {
                 if (VM.IsJawsMode) SetVisualMode(); else SetJawsMode();
@@ -63,7 +81,17 @@ namespace UltraAudioEditor.Views
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
             this.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
             UpdateLanguageChecks();
-            VM.Announce(Lang.T("app_loaded"));
+
+            // Prepoznavanje čitača ekrana (isti ScreenReaderDetector kao Ultra Studio i Video
+            // Editor): sa JAWS/NVDA/Narratorom program se otvara u pristupačnom modu (lista),
+            // bez njega u vizuelnom modu (talasni oblik). Alt+W i dalje ručno menja mod.
+            bool sr = Services.ScreenReaderDetector.IsScreenReaderRunning();
+            Services.DebugLog.Write("Screen reader detected: " + sr);
+            if (sr) SetJawsMode(); else SetVisualMode();
+            // Najava tek kad je prozor prikazan i čitač ekrana ga je "uhvatio".
+            Dispatcher.BeginInvoke(new Action(() =>
+                VM.Announce(sr ? Lang.T("sr_detected") : Lang.T("sr_not_detected"))),
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         private void MenuItem_Exit(object sender, RoutedEventArgs e)
@@ -78,7 +106,7 @@ namespace UltraAudioEditor.Views
             VM.AiApiKey = ((PasswordBox)sender).Password;
         }
 
-        private void WaveformArea_Drop(object sender, DragEventArgs e)
+        private async void WaveformArea_Drop(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
@@ -86,20 +114,15 @@ namespace UltraAudioEditor.Views
                 foreach (var file in files)
                 {
                     var ext = System.IO.Path.GetExtension(file).ToLower();
-                    if (ext is ".wav" or ".mp3" or ".ogg" or ".flac" or ".m4a" or ".aiff" or ".aif")
+                    if (ext is ".wav" or ".mp3" or ".ogg" or ".flac" or ".m4a" or ".aiff" or ".aif" or ".opus" or ".wma" or ".aac")
                     {
+                        var readable = await VM.EnsureReadableAsync(file);
+                        if (readable == null) continue;
                         var track = VM.AddTrackInternal(System.IO.Path.GetFileNameWithoutExtension(file));
-                        double dur = 5;
-                        try { using var r = new NAudio.Wave.AudioFileReader(file); dur = r.TotalTime.TotalSeconds; } catch { }
-                        track.Clips.Add(new Models.AudioClip
-                        {
-                            Name = System.IO.Path.GetFileName(file),
-                            FilePath = file,
-                            StartTime = 0,
-                            Duration = dur,
-                            WaveformData = Services.AudioEngine.LoadWaveformData(file)
-                        });
-                        VM.Announce(string.Format(Lang.T("dropped_file"), System.IO.Path.GetFileName(file), dur));
+                        var clip = VM.CreateClipFromFile(readable, 0);
+                        track.Clips.Add(clip);
+                        VM.NotifyEdited();
+                        VM.Announce(string.Format(Lang.T("dropped_file"), clip.Name, clip.Duration));
                     }
                 }
             }
@@ -177,6 +200,18 @@ namespace UltraAudioEditor.Views
             // ne palimo globalne transport prečice — kontrola sama hendla šta treba.
             bool focusInJaws = VM.IsJawsMode && AccessibleTrackList.IsKeyboardFocusWithin;
 
+            // Polja za unos teksta (API ključ, AI rezultati...) i otvoreni meniji zadržavaju
+            // svoje tastere (M, P, Ctrl+C...). Samo F6/Shift+F6 rade svuda.
+            var focused = Keyboard.FocusedElement;
+            bool inText = focused is TextBox || focused is PasswordBox || focused is MenuItem
+                          || (focused is ComboBox cb && cb.IsEditable);
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;   // Alt+strelice stižu kao Key.System
+            if ((!inText || key == Key.F6) && VM.HandleKey(key, mods, fromList: false))
+            {
+                e.Handled = true;
+                return;
+            }
+
             // Space — Play/Pause SAMO kad fokus nije u JAWS panelu
             if (e.Key == System.Windows.Input.Key.Space && noMods && !focusInJaws)
             {
@@ -198,13 +233,6 @@ namespace UltraAudioEditor.Views
                 && noMods && focusInJaws)
             {
                 // Ne radimo ništa — JAWS panel sam hendla Home/End
-                return;
-            }
-            // F6 — Status (uvijek OK)
-            if (e.Key == System.Windows.Input.Key.F6 && noMods)
-            {
-                VM.AnnounceProjectStatus();
-                e.Handled = true;
                 return;
             }
         }
@@ -260,19 +288,11 @@ namespace UltraAudioEditor.Views
                 e.Handled = true;
                 return;
             }
-            // F6 — čitaj status projekta
-            if (e.Key == System.Windows.Input.Key.F6)
-            {
-                VM.AnnounceProjectStatus();
-                e.Handled = true;
-                return;
-            }
         }
 
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(Lang.T("about_text"), Lang.T("about_title"),
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            new AboutWindow(this).ShowDialog();
         }
         // ─── Odabir jezika ────────────────────────────────────────────────
         private void LangEn_Click(object sender, RoutedEventArgs e) => SwitchLanguage("en");
@@ -282,6 +302,7 @@ namespace UltraAudioEditor.Views
         {
             Lang.SetLanguage(code);
             UpdateLanguageChecks();
+            ApplyVersionTexts();
             // Osvezi tekstove koji se postavljaju iz koda
             CurrentModeLabel.Text = VM.IsJawsMode ? Lang.T("jaws_mode_indicator") : Lang.T("visual_mode_indicator");
             AccessibleTrackList.Rebuild();

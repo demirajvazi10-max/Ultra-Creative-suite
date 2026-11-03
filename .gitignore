@@ -3,3 +3,13 @@ UltraVideoEditor/UltraVideoEditor - backup.zip
 UltraVideoEditor/Pexels.iskraprovider
 UltraVideoEditor/Pixabay.iskraprovider
 UltraVideoEditor/TEMPLATE.iskraprovider
+
+# Visual Studio / .NET build output - generated on every build, never commit
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+
+# Installer build output
+installer/Output/
