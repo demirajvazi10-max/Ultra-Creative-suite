@@ -39,7 +39,7 @@
 
 #define MyAppName "Ultra Studio"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #define MyAppVersion "2.0.0"
 #endif
 #define MyAppPublisher "Ultra Creative Suite"
 #define MyAppURL "https://github.com/demirajvazi10-max/Ultra-Creative-suite"
@@ -69,6 +69,7 @@ WizardStyle=modern
 ShowLanguageDialog=yes
 LanguageDetectionMethod=uilanguage
 UninstallDisplayIcon={app}\{#MyAppExeName}
+ChangesAssociations=yes
 ; SetupIconFile=app.ico
 
 [Languages]
@@ -102,6 +103,13 @@ Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createall
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Registry]
+; .ustudio projekti se otvaraju dvoklikom (HKA = za sve korisnike, jer instaler radi kao admin)
+Root: HKA; Subkey: "Software\Classes\.ustudio"; ValueType: string; ValueName: ""; ValueData: "UltraStudio.Project"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\UltraStudio.Project"; ValueType: string; ValueName: ""; ValueData: "Ultra Studio project"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\UltraStudio.Project\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
+Root: HKA; Subkey: "Software\Classes\UltraStudio.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent

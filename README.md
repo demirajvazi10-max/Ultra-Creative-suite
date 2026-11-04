@@ -32,8 +32,8 @@ Every app works for blind, low-vision, and sighted users equally: edit timelines
 This repository hosts the full Ultra Creative Suite as a monorepo. Every app lives in its own sibling subfolder — none of them is "the root project":
 
 - **`/UltraVideoEditor`** — Ultra Video Editor, the flagship AI-assisted video editor
-- **`/UltraAudioEditor`** — Ultra Audio Editor 2.0, a multi-track audio editor in the spirit of Sound Forge: keyboard selection (I / O) with processing of just the selected part, loudness normalization to LUFS, real noise removal from a learned noise profile, click and hum removal, recording, markers, effects with Sound Forge-style presets heard live, a parametric EQ, local Whisper transcription, batch conversion, and export to WAV, MP3, M4A, AIFF, FLAC, OGG and Opus with song tags
-- **`/UltraStudio`** — Ultra Studio, an AI-assisted photo editor with the same accessibility standard: a dual JAWS Mode / Visual Mode interface, local AI image description and editing suggestions, and AI-guided precise object extraction (Segment Anything)
+- **`/UltraAudioEditor`** — Ultra Audio Editor, a companion audio editor with the same accessibility standard
+- **`/UltraStudio`** — Ultra Studio, a photo editor, graphic design and page layout tool with the same accessibility standard: selections (including AI subject selection), adjustments and looks, filters, retouching, AI background tools, layers with blend modes and styles, a spoken design check, multi-page documents with text frames and PDF export (real, readable text), and Serbian typography and proofreading tools
 - **`/UltraCaptions`** — Ultra Captions, an accessible subtitle/caption editor combining Whisper auto-transcription with manual keyboard-driven timing
 - **`/UltraCast`** — Ultra Cast, an accessible screen recorder for tutorials, demos, and walkthroughs
 - **`/UltraRecord`** — Ultra Record, a multi-track audio recorder with audio-based clipping alerts instead of visual VU meters
@@ -70,7 +70,7 @@ Every app in the suite is built on the same accessibility principles, mostly via
 
 **Screen-reader-optimized dialogs** — proper focus management, labeled controls, and logical tab order throughout.
 
-Beyond this shared foundation, several apps add their own deeper accessibility features specific to what they do — AI-generated audio descriptions and an exportable accessibility report in Ultra Video Editor, a dual JAWS Mode/Visual Mode in Ultra Studio, spoken loudness and distortion statistics (F7) and a short audio preview on every cursor move in Ultra Audio Editor, audio-based clipping alerts instead of visual VU meters in Ultra Record, and so on. See each app's own README for its specifics.
+Beyond this shared foundation, several apps add their own deeper accessibility features specific to what they do — AI-generated audio descriptions and an exportable accessibility report in Ultra Video Editor, a dual JAWS Mode/Visual Mode in Ultra Studio, audio-based clipping alerts instead of visual VU meters in Ultra Record, and so on. See each app's own README for its specifics.
 
 ---
 

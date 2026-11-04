@@ -12,6 +12,7 @@ namespace UltraStudio
             base.OnStartup(e);
 
             Lang.Load();
+            Services.DebugLog.Write($"=== Ultra Studio {AppInfo.Version} started ===");
 
             // Globalni hendler za nepredviđene greške — naučeno večeras (Video/Audio
             // Editor su ovo dobili tek naknadno). Bez ovoga, neočekivana greška tiho

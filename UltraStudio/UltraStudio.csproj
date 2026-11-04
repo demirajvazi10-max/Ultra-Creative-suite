@@ -7,6 +7,7 @@
     <AssemblyName>UltraStudio</AssemblyName>
     <RootNamespace>UltraStudio</RootNamespace>
     <Product>Ultra Studio</Product>
+    <Version>2.0.0</Version>
     <Company>Demir Ajvazi</Company>
     <Authors>Demir Ajvazi</Authors>
     <Copyright>© 2026 Demir Ajvazi</Copyright>

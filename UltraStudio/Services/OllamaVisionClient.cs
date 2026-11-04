@@ -77,7 +77,61 @@ namespace UltraStudio.Services
                 "Describe this image in detail for someone who cannot see it: what's in the frame, " +
                 "the people/objects and what they're doing, the setting, composition, lighting, colors, " +
                 "and mood. Be thorough and specific, several sentences.";
-            return await ChatWithImageAsync(prompt, base64Image, ct);
+            return await ChatWithImageAsync(prompt + LanguageHint, base64Image, ct);
+        }
+
+        /// <summary>Odgovor na jeziku interfejsa (srpski latinicom ili engleski).</summary>
+        private static string LanguageHint =>
+            Lang.Current == "sr" ? " Answer in Serbian, using the Latin script." : "";
+
+        /// <summary>Opis isečka (šta je u selekciji) — kraći, fokusiran na sadržaj.</summary>
+        public async Task<string> DescribeRegionAsync(string base64Image, CancellationToken ct = default)
+        {
+            const string prompt =
+                "This is a cropped part of a larger photo (the user's current selection). Describe exactly what is " +
+                "in it: objects, people, text, colors and textures, and whether anything is cut off at the edges. " +
+                "Two to four sentences.";
+            return await ChatWithImageAsync(prompt + LanguageHint, base64Image, ct);
+        }
+
+        /// <summary>Opis rezultata posle izbora izgleda ili izmene — kako slika sada izgleda (boje, svetlo, raspoloženje).</summary>
+        public async Task<string> DescribeLookAsync(string base64Image, CancellationToken ct = default)
+        {
+            const string prompt =
+                "Describe in two or three sentences how this photo looks right now: overall brightness, contrast, " +
+                "color temperature (warm/cool), how saturated the colors are, and the mood this creates. " +
+                "Do not describe the objects in detail.";
+            return await ChatWithImageAsync(prompt + LanguageHint, base64Image, ct);
+        }
+
+        /// <summary>Okvir opisanog objekta (u pikselima originala) — rezerva kad SAM modeli nisu instalirani.</summary>
+        public async Task<(int x, int y, int w, int h)?> FindBoxForDescriptionAsync(
+            string base64Image, int origWidth, int origHeight, string description, CancellationToken ct = default)
+        {
+            string prompt =
+                $"This image is {origWidth}x{origHeight} pixels. The description may be in English or Serbian " +
+                $"(Latin or Cyrillic). Description: \"{description}\"\n" +
+                "Find that object and respond with ONLY a JSON object (no other text): " +
+                "{\"found\": true or false, \"x1\": left, \"y1\": top, \"x2\": right, \"y2\": bottom} — " +
+                "a tight bounding box in the original image's pixel coordinates (0,0 is top-left).";
+            string raw = await ChatWithImageAsync(prompt, base64Image, ct);
+            DebugLog.Write($"OllamaVisionClient: FindBox raw response = {raw}");
+            try
+            {
+                using var doc = JsonDocument.Parse(ExtractJson(raw));
+                var root = doc.RootElement;
+                if (root.TryGetProperty("found", out var f) && f.ValueKind == JsonValueKind.False) return null;
+                int? x1 = GetCoord(root, "x1"), y1 = GetCoord(root, "y1"), x2 = GetCoord(root, "x2"), y2 = GetCoord(root, "y2");
+                if (x1 == null || y1 == null || x2 == null || y2 == null) return null;
+                int l = Math.Clamp(Math.Min(x1.Value, x2.Value), 0, origWidth - 1), t = Math.Clamp(Math.Min(y1.Value, y2.Value), 0, origHeight - 1);
+                int r = Math.Clamp(Math.Max(x1.Value, x2.Value), l + 1, origWidth), b = Math.Clamp(Math.Max(y1.Value, y2.Value), t + 1, origHeight);
+                return (l, t, r - l, b - t);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write($"OllamaVisionClient: greška pri parsiranju okvira — {ex.Message}");
+                return null;
+            }
         }
 
         /// <summary>
@@ -87,16 +141,18 @@ namespace UltraStudio.Services
         /// </summary>
         public async Task<List<ImageSuggestion>> SuggestEditsAsync(string base64Image, CancellationToken ct = default)
         {
-            const string prompt =
+            string prompt =
                 "Look at this image as a photo editor would. Consider EACH of these adjustment types: " +
-                "brightness, contrast, saturation, sharpen, blur, grayscale, sepia. " +
+                "exposure, brightness, contrast, highlights, shadows, temperature, tint, vibrance, saturation, clarity, " +
+                "sharpen, vignette, grayscale, sepia. " +
                 "Respond with ONLY a JSON array, nothing else, no markdown fences — one object per adjustment " +
                 "you'd actually recommend (skip any that wouldn't meaningfully help this image; the array can " +
                 "be empty if none are needed):\n" +
-                "[{\"action\": \"brightness|contrast|saturation|sharpen|blur|grayscale|sepia\", " +
-                "\"value\": a number from -100 to 100 (0-10 for sharpen/blur), " +
+                "[{\"action\": \"exposure|brightness|contrast|highlights|shadows|temperature|tint|vibrance|saturation|clarity|sharpen|vignette|grayscale|sepia\", " +
+                "\"value\": a number from -100 to 100 (exposure: -2 to 2 EV; sharpen: 0-10; vignette: 0-100), " +
                 "\"reason\": \"short reason, under 12 words\"}]\n" +
-                "Only include adjustments with a genuine, specific reason — not a generic list of everything.";
+                "Only include adjustments with a genuine, specific reason — not a generic list of everything." +
+                (Lang.Current == "sr" ? " Write the reason in Serbian, Latin script; keep the action names in English." : "");
 
             string raw = await ChatWithImageAsync(prompt, base64Image, ct);
             string jsonPart = ExtractJsonArray(raw);

@@ -8,7 +8,7 @@ namespace UltraStudio.Localization
     // Isti mehanizam kao Ultra Audio Editor: XAML koristi {DynamicResource L_kljuc},
     // kod koristi Lang.T("kljuc"). Engleski je DEFAULT od prvog dana — naučeno
     // večeras da to nikad ne bude naknadna zakrpa.
-    public static class Lang
+    public static partial class Lang
     {
         public static string Current { get; private set; } = "en";
         public static event Action? LanguageChanged;
@@ -214,7 +214,8 @@ namespace UltraStudio.Localization
 
         public static string T(string key)
         {
-            if (!Table.TryGetValue(key, out var v)) return key;
+            // Pro (Studio 2.0) tabela ima prednost — tako se stari tekstovi osvežavaju bez diranja ove tabele
+            if (!Doc.TryGetValue(key, out var v) && !Pro.TryGetValue(key, out v) && !Table.TryGetValue(key, out v)) return key;
             return Current == "sr" ? v.sr : v.en;
         }
 
@@ -223,6 +224,10 @@ namespace UltraStudio.Localization
             var res = Application.Current?.Resources;
             if (res == null) return;
             foreach (var kvp in Table)
+                res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
+            foreach (var kvp in Pro)
+                res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
+            foreach (var kvp in Doc)
                 res["L_" + kvp.Key] = Current == "sr" ? kvp.Value.sr : kvp.Value.en;
         }
 

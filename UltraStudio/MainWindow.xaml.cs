@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using Microsoft.Win32;
+using System.Windows.Threading;
 using UltraStudio.Localization;
 using UltraStudio.Models;
 using UltraStudio.Services;
@@ -19,12 +20,11 @@ using WF = System.Windows.Forms;
 namespace UltraStudio
 {
     /// <summary>
-    /// Jedan red u listi podešavanja. Boolean = true za on/off stavke
-    /// (Grayscale/Sepia/Flip), false za numeričke (Brightness/Contrast/itd.)
+    /// Jedan red u listi podešavanja. Boolean = true za on/off stavke.
     /// </summary>
     public class AdjustmentRow
     {
-        public string Key { get; set; } = "";       // Lang.T ključ za naziv
+        public string Key { get; set; } = "";
         public bool IsBoolean { get; set; }
         public Func<ImageProject, double> GetNum { get; set; } = _ => 0;
         public Action<ImageProject, double> SetNum { get; set; } = (_, __) => { };
@@ -32,203 +32,191 @@ namespace UltraStudio
         public Action<ImageProject, bool> SetBool { get; set; } = (_, __) => { };
         public double Min, Max, Step;
         public string Unit { get; set; } = "";
+        public string Format { get; set; } = "+0.#;-0.#;0";
+
+        public string ValueText(ImageProject p) => IsBoolean
+            ? Lang.T(GetBool(p) ? "layer_on" : "layer_off")
+            : GetNum(p).ToString(Format, System.Globalization.CultureInfo.InvariantCulture) + Unit;
     }
 
     public partial class MainWindow : Window
     {
         private readonly ImageProject _project = new();
         private readonly OllamaVisionClient _ai = new();
-        private bool _describeBusy; // zamena za BtnDescribe.IsEnabled=false — videti BtnDescribe_Click
+        private readonly UndoManager _undo = new();
+        private SamSegmenter? _sam;
+        private bool _describeBusy;
+        private bool _busy;               // duga operacija u toku — blokira druge komande
         private List<AdjustmentRow> _rows = new();
-        private string? _lastSavePath;
         private bool _isVisualMode;
         private readonly Dictionary<AdjustmentRow, Slider> _sliderByRow = new();
         private readonly Dictionary<AdjustmentRow, CheckBox> _checkByRow = new();
+        private readonly Dictionary<AdjustmentRow, TextBlock> _valueLabelByRow = new();
 
-        // Trenutno selektovan sloj — jedan izvor istine za JAWS listu I
-        // vizuelni panel (isti princip kao _project za podešavanja), tako da
-        // Layers meni (Properties/Delete/Move/Duplicate) radi identično bez
-        // obzira u kom je modu korisnik.
         private Layer? _selectedLayer;
         private readonly Dictionary<Layer, Border> _visualRowByLayer = new();
+        private readonly bool _screenReaderDetected;
+
+        // Pregled se renderuje u pozadini; generacija odbacuje zastarele rezultate
+        private readonly DispatcherTimer _previewTimer;
+        private int _previewGen;
 
         public MainWindow()
         {
             InitializeComponent();
+            Session.CleanupOld();
 
-            // Bez ovoga, Tab/Shift+Tab ostaje "zarobljen" unutar liste čim
-            // fokus uđe u nju — videti komentar u Controls/TabAwareListView.cs.
             nativeAdjustList.Host = wfhAdjustments;
             nativeLayerList.Host = wfhLayers;
-            DebugLog.Write("MainWindow: TabAwareListView.Host povezan za nativeAdjustList i nativeLayerList.");
+
+            _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
+            _previewTimer.Tick += (_, __) => { _previewTimer.Stop(); _ = RenderPreviewAsync(); };
 
             Lang.ApplyToResources();
             BuildAdjustmentRows();
             SetupNativeList();
             BuildVisualPanel();
             SetupNativeLayerList();
+            BuildCommands();
 
-            // Automatska detekcija čitača ekrana umesto fiksnog podrazumevanog
-            // moda. JAWS/NVDA/Narrator aktivan -> JAWS mod (native, pristupačna
-            // lista). Ništa detektovano -> Vizuelni mod (WPF slideri/checkbox-ovi),
-            // jer native WinForms lista iz JAWS moda ne prati temu aplikacije
-            // pouzdano za sighted korisnike (to je bio uzrok "sve mi je belo"
-            // prijave — app je uvek kretao u JAWS modu, bez obzira ko ga pokrene).
-            // Ručni prekidač (dugmad i Alt+W) i dalje uvek radi u oba smera.
             _screenReaderDetected = ScreenReaderDetector.IsScreenReaderRunning();
             if (_screenReaderDetected) SetJawsMode(); else SetVisualMode();
 
             UpdateImageInfo();
-
-            // Najava moda se NE šalje ovde u konstruktoru — u tom trenutku
-            // prozor još nije prikazan, pa JAWS nije ni stigao da se "zakači"
-            // na njega, i live-region najava bi tiho propala. Umesto toga,
-            // čekamo Loaded, pa dodatno ubacujemo mali razmak preko Dispatcher-a
-            // (ApplicationIdle) da damo JAWS-u vremena da preuzme fokus na novi
-            // prozor pre nego što probamo da nešto najavimo.
+            UpdateTitle();
             Loaded += MainWindow_Loaded;
         }
 
-        // Detektovano stanje čitača ekrana pri pokretanju — čuvamo ga da bismo
-        // znali šta da najavimo/prikažemo posle Loaded, bez ponovnog pozivanja
-        // (relativno spor) provere procesa.
-        private readonly bool _screenReaderDetected;
-
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            Loaded -= MainWindow_Loaded; // samo jednom, ne na svaki naknadni Loaded
-
+            Loaded -= MainWindow_Loaded;
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                // INFORMATIVNO (za JAWS/čitače ekrana): status bar tekst + live-region
-                // AutomationEvent — isti, već proveren obrazac kao SetAiResult/SetStatus
-                // svugde drugde u appu.
-                SetStatus(Lang.T(_screenReaderDetected ? "statusbar_ready_sr_detected" : "statusbar_ready_visual"));
-
-                // ESTETSKI (za sve, posebno vizuelne korisnike): kratak animirani
-                // baner koji se pojavi, ostane par sekundi, pa nestane sam.
+                SetStatus(string.Format(Lang.T(_screenReaderDetected ? "statusbar_ready_sr_detected" : "statusbar_ready_visual"), AppInfo.Version));
                 ShowModeToast(_screenReaderDetected);
-            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+                // Dvoklik na .ustudio ili fotografiju u Exploreru: putanja stiže kao argument
+                var args = Environment.GetCommandLineArgs();
+                if (args.Length > 1 && File.Exists(args[1])) OpenPath(args[1]);
+            }), DispatcherPriority.ApplicationIdle);
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // BANER MODA — kratka, animirana, samonestajuća potvrda pri pokretanju
-        // (vizuelna potvrda uz audio najavu preko SetStatus iznad).
-        // ════════════════════════════════════════════════════════════════
         private void ShowModeToast(bool jawsMode)
         {
             ModeToastText.Text = Lang.T(jawsMode ? "mode_toast_jaws" : "mode_toast_visual");
             ModeToastDot.Fill = (System.Windows.Media.Brush)Resources[jawsMode ? "BrAccentAI" : "BrAccent"];
             ModeToast.Visibility = Visibility.Visible;
             ModeToast.Opacity = 0;
-
             var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(280));
-            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(600))
-            {
-                BeginTime = TimeSpan.FromMilliseconds(3000)
-            };
-            var storyboard = new System.Windows.Media.Animation.Storyboard();
+            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(600)) { BeginTime = TimeSpan.FromMilliseconds(3000) };
+            var sb = new System.Windows.Media.Animation.Storyboard();
             System.Windows.Media.Animation.Storyboard.SetTarget(fadeIn, ModeToast);
             System.Windows.Media.Animation.Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
             System.Windows.Media.Animation.Storyboard.SetTarget(fadeOut, ModeToast);
             System.Windows.Media.Animation.Storyboard.SetTargetProperty(fadeOut, new PropertyPath(UIElement.OpacityProperty));
-            storyboard.Children.Add(fadeIn);
-            storyboard.Children.Add(fadeOut);
-            storyboard.Completed += (_, __) => ModeToast.Visibility = Visibility.Collapsed;
-            storyboard.Begin();
+            sb.Children.Add(fadeIn); sb.Children.Add(fadeOut);
+            sb.Completed += (_, __) => ModeToast.Visibility = Visibility.Collapsed;
+            sb.Begin();
         }
 
         // ════════════════════════════════════════════════════════════════
-        // RED DEFINICIJE
+        // PODEŠAVANJA — redosled kao u Lightroom/Camera Raw
         // ════════════════════════════════════════════════════════════════
         private void BuildAdjustmentRows()
         {
+            AdjustmentRow N(string key, Func<ImageProject, double> get, Action<ImageProject, double> set, double min, double max, double step, string unit = "", string fmt = "+0.#;-0.#;0")
+                => new() { Key = key, GetNum = get, SetNum = set, Min = min, Max = max, Step = step, Unit = unit, Format = fmt };
+            AdjustmentRow B(string key, Func<ImageProject, bool> get, Action<ImageProject, bool> set)
+                => new() { Key = key, IsBoolean = true, GetBool = get, SetBool = set };
+
             _rows = new List<AdjustmentRow>
             {
-                new() { Key = "adj_brightness", GetNum = p => p.Brightness, SetNum = (p, v) => p.Brightness = v, Min = -100, Max = 100, Step = 5 },
-                new() { Key = "adj_contrast",   GetNum = p => p.Contrast,   SetNum = (p, v) => p.Contrast = v,   Min = -100, Max = 100, Step = 5 },
-                new() { Key = "adj_saturation", GetNum = p => p.Saturation, SetNum = (p, v) => p.Saturation = v, Min = -100, Max = 100, Step = 5 },
-                new() { Key = "adj_sharpen",    GetNum = p => p.Sharpen,    SetNum = (p, v) => p.Sharpen = v,    Min = 0, Max = 10, Step = 0.5 },
-                new() { Key = "adj_blur",       GetNum = p => p.Blur,       SetNum = (p, v) => p.Blur = v,       Min = 0, Max = 10, Step = 0.5 },
-                new() { Key = "adj_rotate",     GetNum = p => p.Rotate,     SetNum = (p, v) => p.Rotate = v,     Min = -180, Max = 180, Step = 5, Unit = "°" },
-                new() { Key = "adj_grayscale",  IsBoolean = true, GetBool = p => p.Grayscale,      SetBool = (p, v) => p.Grayscale = v },
-                new() { Key = "adj_sepia",      IsBoolean = true, GetBool = p => p.Sepia,          SetBool = (p, v) => p.Sepia = v },
-                new() { Key = "adj_flip_h",     IsBoolean = true, GetBool = p => p.FlipHorizontal, SetBool = (p, v) => p.FlipHorizontal = v },
-                new() { Key = "adj_flip_v",     IsBoolean = true, GetBool = p => p.FlipVertical,   SetBool = (p, v) => p.FlipVertical = v },
+                N("adj_exposure", p => p.Exposure, (p, v) => p.Exposure = v, -3, 3, 0.1, " EV", "+0.0#;-0.0#;0"),
+                N("adj_brightness", p => p.Brightness, (p, v) => p.Brightness = v, -100, 100, 5),
+                N("adj_contrast", p => p.Contrast, (p, v) => p.Contrast = v, -100, 100, 5),
+                N("adj_highlights", p => p.Highlights, (p, v) => p.Highlights = v, -100, 100, 5),
+                N("adj_shadows", p => p.Shadows, (p, v) => p.Shadows = v, -100, 100, 5),
+                N("adj_gamma", p => p.Gamma, (p, v) => p.Gamma = v, -100, 100, 5),
+                N("adj_temperature", p => p.Temperature, (p, v) => p.Temperature = v, -100, 100, 5),
+                N("adj_tint", p => p.Tint, (p, v) => p.Tint = v, -100, 100, 5),
+                N("adj_vibrance", p => p.Vibrance, (p, v) => p.Vibrance = v, -100, 100, 5),
+                N("adj_saturation", p => p.Saturation, (p, v) => p.Saturation = v, -100, 100, 5),
+                N("adj_hue", p => p.Hue, (p, v) => p.Hue = v, -180, 180, 5, "°"),
+                N("adj_clarity", p => p.Clarity, (p, v) => p.Clarity = v, -100, 100, 5),
+                N("adj_sharpen", p => p.Sharpen, (p, v) => p.Sharpen = v, 0, 10, 0.5, "", "0.#"),
+                N("adj_blur", p => p.Blur, (p, v) => p.Blur = v, 0, 10, 0.5, "", "0.#"),
+                N("adj_vignette", p => p.Vignette, (p, v) => p.Vignette = v, 0, 100, 5, "", "0"),
+                N("adj_fade", p => p.Fade, (p, v) => p.Fade = v, 0, 100, 5, "", "0"),
+                N("adj_posterize", p => p.Posterize, (p, v) => p.Posterize = v < 2 ? 0 : v, 0, 32, 1, "", "0"),
+                N("adj_threshold", p => p.Threshold, (p, v) => p.Threshold = v, 0, 100, 5, "", "0"),
+                B("adj_grayscale", p => p.Grayscale, (p, v) => p.Grayscale = v),
+                B("adj_sepia", p => p.Sepia, (p, v) => p.Sepia = v),
+                B("adj_invert", p => p.Invert, (p, v) => p.Invert = v),
             };
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // NATIVNA WIN32 LISTVIEW — isti obrazac kao Audio Editor
-        // ════════════════════════════════════════════════════════════════
+        private bool _listsInitialized;
+
         private void SetupNativeList()
         {
             nativeAdjustList.Columns.Clear();
+            nativeAdjustList.Items.Clear();
             nativeAdjustList.Columns.Add(Lang.T("col_adjustment"), 200, WF.HorizontalAlignment.Left);
             nativeAdjustList.Columns.Add(Lang.T("col_value"), 140, WF.HorizontalAlignment.Left);
-
             nativeAdjustList.BackColor = System.Drawing.Color.FromArgb(20, 20, 34);
             nativeAdjustList.ForeColor = System.Drawing.Color.White;
             nativeAdjustList.Font = new System.Drawing.Font("Segoe UI", 10);
             nativeAdjustList.AccessibleName = Lang.T("acc_list_help");
-            nativeAdjustList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeAdjustList);
-
-            nativeAdjustList.KeyDown += NativeAdjustList_KeyDown;
+            if (!_listsInitialized)
+            {
+                // Rukovaoci se kače samo jednom (SetupNativeList se ponovo zove pri promeni jezika)
+                nativeAdjustList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeAdjustList);
+                nativeAdjustList.KeyDown += NativeAdjustList_KeyDown;
+            }
             RefreshList();
         }
 
         private void RefreshList()
         {
-            nativeAdjustList.BeginUpdate();
             int selectedIndex = nativeAdjustList.SelectedIndices.Count > 0 ? nativeAdjustList.SelectedIndices[0] : 0;
-            nativeAdjustList.Items.Clear();
-            foreach (var row in _rows)
+            nativeAdjustList.BeginUpdate();
+            if (nativeAdjustList.Items.Count == _rows.Count)
             {
-                string valueText = row.IsBoolean
-                    ? (row.GetBool(_project) ? "On" : "Off")
-                    : $"{row.GetNum(_project):0.#}{row.Unit}";
-                var lvi = new WF.ListViewItem(new[] { Lang.T(row.Key), valueText }) { Tag = row };
-                nativeAdjustList.Items.Add(lvi);
+                // Samo vrednosti — bez brisanja liste, da fokus i JAWS ostanu na istom redu
+                for (int i = 0; i < _rows.Count; i++)
+                {
+                    var it = nativeAdjustList.Items[i];
+                    it.SubItems[0].Text = Lang.T(_rows[i].Key);
+                    it.SubItems[1].Text = _rows[i].ValueText(_project);
+                }
+            }
+            else
+            {
+                nativeAdjustList.Items.Clear();
+                foreach (var row in _rows)
+                    nativeAdjustList.Items.Add(new WF.ListViewItem(new[] { Lang.T(row.Key), row.ValueText(_project) }) { Tag = row });
             }
             nativeAdjustList.EndUpdate();
-
-            if (nativeAdjustList.Items.Count > 0)
+            if (nativeAdjustList.Items.Count > 0 && nativeAdjustList.SelectedIndices.Count == 0)
             {
-                int idx = Math.Min(selectedIndex, nativeAdjustList.Items.Count - 1);
-                nativeAdjustList.Items[idx].Selected = true;
+                var item = nativeAdjustList.Items[Math.Min(selectedIndex, nativeAdjustList.Items.Count - 1)];
+                item.Selected = true; item.Focused = true;
             }
-
-            // Isti izvor istine (ImageProject) za oba prikaza — kad god se JAWS
-            // lista osveži, prepiši i slidere/checkbox-ove (ako postoje — konstruktor
-            // zove RefreshList() pre BuildVisualPanel() prvi put, pa je ovo bezbedno).
-            if (_sliderByRow != null && _sliderByRow.Count > 0) SyncVisualPanelFromProject();
+            if (_sliderByRow.Count > 0) SyncVisualPanelFromProject();
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // VIZUELNI MOD — pravi WPF slideri/checkbox-ovi za sighted korisnike,
-        // isti obrazac kao Ultra Audio Editor (Alt+W). Grade se iz ISTIH _rows
-        // definicija kao JAWS lista — nema duplirane logike, samo drugi prikaz.
-        // ════════════════════════════════════════════════════════════════
         private void BuildVisualPanel()
         {
             VisualAdjustStack.Children.Clear();
-            _sliderByRow.Clear();
-            _checkByRow.Clear();
-
+            _sliderByRow.Clear(); _checkByRow.Clear(); _valueLabelByRow.Clear();
             foreach (var row in _rows)
             {
-                var container = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-
+                var container = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
                 if (row.IsBoolean)
                 {
-                    var check = new CheckBox
-                    {
-                        Content = Lang.T(row.Key),
-                        Foreground = (System.Windows.Media.Brush)Resources["BrText"],
-                        FontSize = 13
-                    };
-                    check.Checked += (_, __) => { if (_syncingVisualPanel) return; row.SetBool(_project, true); RefreshList(); RefreshPreview(); };
-                    check.Unchecked += (_, __) => { if (_syncingVisualPanel) return; row.SetBool(_project, false); RefreshList(); RefreshPreview(); };
+                    var check = new CheckBox { Content = Lang.T(row.Key), Foreground = (System.Windows.Media.Brush)Resources["BrText"], FontSize = 13 };
+                    check.Checked += (_, __) => { if (_syncingVisualPanel) return; SetBoolRow(row, true); };
+                    check.Unchecked += (_, __) => { if (_syncingVisualPanel) return; SetBoolRow(row, false); };
                     _checkByRow[row] = check;
                     container.Children.Add(check);
                 }
@@ -238,11 +226,10 @@ namespace UltraStudio
                     header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                     header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                     var label = new TextBlock { Text = Lang.T(row.Key), Foreground = (System.Windows.Media.Brush)Resources["BrText"], FontSize = 13 };
-                    var valueLabel = new TextBlock { Foreground = (System.Windows.Media.Brush)Resources["BrTextMuted"], FontSize = 12 };
+                    var valueLabel = new TextBlock { Foreground = (System.Windows.Media.Brush)Resources["BrTextSec"], FontSize = 12 };
                     Grid.SetColumn(label, 0); Grid.SetColumn(valueLabel, 1);
                     header.Children.Add(label); header.Children.Add(valueLabel);
                     container.Children.Add(header);
-
                     var slider = new Slider
                     {
                         Minimum = row.Min, Maximum = row.Max, SmallChange = row.Step, LargeChange = row.Step * 4,
@@ -251,38 +238,21 @@ namespace UltraStudio
                     slider.SetValue(AutomationProperties.NameProperty, Lang.T(row.Key));
                     slider.ValueChanged += (_, e) =>
                     {
-                        // _syncingVisualPanel štiti od beskonačne petlje: RefreshList()
-                        // ispod poziva SyncVisualPanelFromProject(), koja postavlja
-                        // slider.Value nazad iz _project — to SAMO PO SEBI ponovo
-                        // okida ovaj isti ValueChanged (jer se GetNum() vrednost skoro
-                        // nikad ne poklopi bit-za-bit sa onim što je slider upravo
-                        // javio, naročito posle AI predloga), što je ponovo zvalo
-                        // RefreshList()... i tako u krug, sinhrono, bez izlaza — to je
-                        // bio pravi uzrok potpunog zamrzavanja (log se prekidao usred
-                        // RefreshPreview poziva koji se nikad nije vratio). Kad je ova
-                        // zastavica podignuta, znači da MI upravo pišemo u slider
-                        // programski, ne korisnik — pa ovaj handler tad ništa ne radi.
                         if (_syncingVisualPanel) return;
-                        row.SetNum(_project, e.NewValue);
-                        valueLabel.Text = $"{e.NewValue:0.#}{row.Unit}";
-                        RefreshList();
-                        RefreshPreview();
+                        SetNumRow(row, Math.Round(e.NewValue / row.Step) * row.Step, announce: false);
                     };
+                    slider.MouseDoubleClick += (_, __) => SetNumRow(row, 0, announce: true); // dupli klik = nula, kao u Lightroomu
                     _sliderByRow[row] = slider;
+                    _valueLabelByRow[row] = valueLabel;
                     container.Children.Add(slider);
                 }
                 VisualAdjustStack.Children.Add(container);
             }
+            SyncVisualPanelFromProject();
         }
 
-        // Videti komentar u slider.ValueChanged iznad — ova zastavica postoji
-        // ISKLJUČIVO da spreči RefreshList -> SyncVisualPanelFromProject ->
-        // slider.Value= -> ValueChanged -> RefreshList -> ... beskonačnu petlju.
         private bool _syncingVisualPanel;
 
-        // Prepiše trenutne vrednosti iz _project u slidere/checkbox-ove BEZ
-        // ponovnog pokretanja ImageEngine obrade za svaku stavku pojedinačno
-        // (obrada se svakako radi jednom preko RefreshPreview posle).
         private void SyncVisualPanelFromProject()
         {
             _syncingVisualPanel = true;
@@ -290,11 +260,32 @@ namespace UltraStudio
             {
                 foreach (var kv in _sliderByRow) kv.Value.Value = kv.Key.GetNum(_project);
                 foreach (var kv in _checkByRow) kv.Value.IsChecked = kv.Key.GetBool(_project);
+                foreach (var kv in _valueLabelByRow) kv.Value.Text = kv.Key.ValueText(_project);
             }
-            finally
-            {
-                _syncingVisualPanel = false;
-            }
+            finally { _syncingVisualPanel = false; }
+        }
+
+        private void SetNumRow(AdjustmentRow row, double v, bool announce)
+        {
+            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
+            v = Math.Clamp(Math.Round(v, 3), row.Min, row.Max);
+            if (Math.Abs(v - row.GetNum(_project)) < 1e-9) { if (announce) SetStatus($"{Lang.T(row.Key)} {row.ValueText(_project)}"); return; }
+            Checkpoint(Lang.T(row.Key), merge: true);
+            row.SetNum(_project, v);
+            _project.LookName = "";
+            RefreshList();
+            RefreshPreview();
+            if (announce) SetStatus($"{Lang.T(row.Key)} {row.ValueText(_project)}");
+        }
+
+        private void SetBoolRow(AdjustmentRow row, bool v)
+        {
+            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); SyncVisualPanelFromProject(); return; }
+            Checkpoint(Lang.T(row.Key));
+            row.SetBool(_project, v);
+            RefreshList();
+            RefreshPreview();
+            SetStatus($"{Lang.T(row.Key)} {row.ValueText(_project)}");
         }
 
         private void SetVisualMode()
@@ -327,153 +318,146 @@ namespace UltraStudio
 
         private void BtnVisualMode_Click(object sender, RoutedEventArgs e) => SetVisualMode();
         private void BtnJawsMode_Click(object sender, RoutedEventArgs e) => SetJawsMode();
+
         private void NativeAdjustList_KeyDown(object? sender, WF.KeyEventArgs e)
         {
+            if (HandleWinFormsShortcut(e)) return;
             if (nativeAdjustList.SelectedItems.Count == 0) return;
             var row = (AdjustmentRow)nativeAdjustList.SelectedItems[0].Tag!;
 
             if (e.KeyCode == WF.Keys.Enter || e.KeyCode == WF.Keys.F2)
             {
-                if (row.IsBoolean)
-                {
-                    row.SetBool(_project, !row.GetBool(_project));
-                    RefreshList(); RefreshPreview();
-                }
-                else
-                {
-                    EditNumericRow(row);
-                }
-                e.Handled = true;
+                if (row.IsBoolean) SetBoolRow(row, !row.GetBool(_project));
+                else EditNumericRow(row);
+                e.Handled = e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == WF.Keys.Space && row.IsBoolean)
             {
-                row.SetBool(_project, !row.GetBool(_project));
-                RefreshList(); RefreshPreview();
-                e.Handled = true;
+                SetBoolRow(row, !row.GetBool(_project));
+                e.Handled = e.SuppressKeyPress = true;
+            }
+            else if (!row.IsBoolean && !e.Alt && !e.Control && (e.KeyCode == WF.Keys.Right || e.KeyCode == WF.Keys.Left))
+            {
+                // Strelice levo/desno menjaju vrednost (Shift = 5 koraka) — bez otvaranja dijaloga
+                double step = row.Step * (e.Shift ? 5 : 1) * (e.KeyCode == WF.Keys.Right ? 1 : -1);
+                SetNumRow(row, row.GetNum(_project) + step, announce: true);
+                e.Handled = e.SuppressKeyPress = true;
+            }
+            else if (e.KeyCode == WF.Keys.Delete || e.KeyCode == WF.Keys.Back)
+            {
+                if (row.IsBoolean) SetBoolRow(row, false); else SetNumRow(row, 0, announce: true);
+                e.Handled = e.SuppressKeyPress = true;
             }
         }
 
         private void EditNumericRow(AdjustmentRow row)
         {
             if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
-
-            var dlg = new SetValueDialog(Lang.T(row.Key), $"{Lang.T(row.Key)} ({row.Min} to {row.Max}{row.Unit}):",
-                row.GetNum(_project).ToString("0.#"), row.Unit) { Owner = this };
-            if (dlg.ShowDialog() == true &&
-                double.TryParse(dlg.ResultValue.Replace(',', '.'), System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out double v))
-            {
-                row.SetNum(_project, Math.Clamp(v, row.Min, row.Max));
-                RefreshList();
-                RefreshPreview();
-            }
+            var dlg = new SetValueDialog(Lang.T(row.Key), $"{Lang.T(row.Key)} ({row.Min} {Lang.T("to")} {row.Max}{row.Unit}):",
+                row.GetNum(_project).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), row.Unit) { Owner = this };
+            if (dlg.ShowDialog() == true && Ui.TryNum(dlg.ResultValue, out double v))
+                SetNumRow(row, v, announce: true);
         }
 
         // ════════════════════════════════════════════════════════════════
-        // SLOJEVI (grafički dizajn deo) — JAWS lista + vizuelni panel, isti
-        // dual-mod obrazac kao podešavanja gore, ali nad _project.Layers.
-        // Redosled u listi = redosled crtanja (poslednji = najviše, kao
-        // Photoshop/Canva "layer stack").
+        // SLOJEVI — JAWS lista + vizuelni panel
         // ════════════════════════════════════════════════════════════════
         private void SetupNativeLayerList()
         {
             nativeLayerList.Columns.Clear();
-            nativeLayerList.Columns.Add(Lang.T("col_layer_name"), 150, WF.HorizontalAlignment.Left);
+            nativeLayerList.Columns.Add(Lang.T("col_layer_name"), 140, WF.HorizontalAlignment.Left);
             nativeLayerList.Columns.Add(Lang.T("col_layer_type"), 70, WF.HorizontalAlignment.Left);
             nativeLayerList.Columns.Add(Lang.T("col_layer_visible"), 60, WF.HorizontalAlignment.Left);
             nativeLayerList.Columns.Add(Lang.T("col_layer_opacity"), 60, WF.HorizontalAlignment.Left);
-
+            nativeLayerList.Columns.Add(Lang.T("col_layer_position"), 110, WF.HorizontalAlignment.Left);
             nativeLayerList.BackColor = System.Drawing.Color.FromArgb(20, 20, 34);
             nativeLayerList.ForeColor = System.Drawing.Color.White;
             nativeLayerList.Font = new System.Drawing.Font("Segoe UI", 10);
             nativeLayerList.AccessibleName = Lang.T("acc_layer_list_help");
-            nativeLayerList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeLayerList);
-
-            nativeLayerList.KeyDown += NativeLayerList_KeyDown;
-            nativeLayerList.SelectedIndexChanged += (_, __) =>
+            if (!_listsInitialized)
             {
-                _selectedLayer = nativeLayerList.SelectedItems.Count > 0
-                    ? (Layer)nativeLayerList.SelectedItems[0].Tag!
-                    : null;
-                HighlightSelectedVisualRow();
-            };
+                nativeLayerList.HandleCreated += (s, e) => NativeTheme.DisableListViewHeaderTheme(nativeLayerList);
+                nativeLayerList.KeyDown += NativeLayerList_KeyDown;
+                nativeLayerList.SelectedIndexChanged += (_, __) =>
+                {
+                    if (_refreshingLayers) return;
+                    _selectedLayer = nativeLayerList.SelectedItems.Count > 0 ? (Layer)nativeLayerList.SelectedItems[0].Tag! : null;
+                    HighlightSelectedVisualRow();
+                };
+            }
+            _listsInitialized = true;
             RefreshLayerList();
         }
 
+        private bool _refreshingLayers;
+
         private void RefreshLayerList()
         {
-            nativeLayerList.BeginUpdate();
-            int selectedIndex = nativeLayerList.SelectedIndices.Count > 0 ? nativeLayerList.SelectedIndices[0] : -1;
-            nativeLayerList.Items.Clear();
-            foreach (var layer in _project.Layers)
+            _refreshingLayers = true;
+            try
             {
-                var lvi = new WF.ListViewItem(new[]
+                nativeLayerList.BeginUpdate();
+                nativeLayerList.Items.Clear();
+                // Najviši sloj prvi — kao Photoshop panel slojeva
+                for (int i = _project.Layers.Count - 1; i >= 0; i--)
                 {
-                    layer.Name,
-                    Lang.T(layer.TypeLabelKey),
-                    layer.Visible ? Lang.T("layer_on") : Lang.T("layer_off"),
-                    $"{layer.Opacity:0}%"
-                })
-                { Tag = layer };
-                nativeLayerList.Items.Add(lvi);
-            }
-            nativeLayerList.EndUpdate();
+                    var layer = _project.Layers[i];
+                    nativeLayerList.Items.Add(new WF.ListViewItem(new[]
+                    {
+                        layer.Name, Lang.T(layer.TypeLabelKey),
+                        layer.Visible ? Lang.T("layer_on") : Lang.T("layer_off"),
+                        $"{layer.Opacity:0}%",
+                        Describe.Position(layer.CenterX, layer.CenterY, _project.CanvasWidth, _project.CanvasHeight)
+                    }) { Tag = layer });
+                }
+                nativeLayerList.EndUpdate();
 
-            if (nativeLayerList.Items.Count > 0)
-            {
-                int idx = selectedIndex >= 0 ? Math.Min(selectedIndex, nativeLayerList.Items.Count - 1) : nativeLayerList.Items.Count - 1;
-                nativeLayerList.Items[idx].Selected = true;
-                _selectedLayer = (Layer)nativeLayerList.Items[idx].Tag!;
+                if (_selectedLayer != null && !_project.Layers.Contains(_selectedLayer)) _selectedLayer = null;
+                if (_selectedLayer == null && _project.Layers.Count > 0) _selectedLayer = _project.Layers[^1];
+                foreach (WF.ListViewItem it in nativeLayerList.Items)
+                    if (it.Tag == _selectedLayer) { it.Selected = true; it.Focused = true; it.EnsureVisible(); }
             }
-            else
-            {
-                _selectedLayer = null;
-            }
+            finally { _refreshingLayers = false; }
         }
 
         private void NativeLayerList_KeyDown(object? sender, WF.KeyEventArgs e)
         {
+            if (HandleWinFormsShortcut(e)) return;
             if (_selectedLayer == null) return;
-
             if (e.KeyCode == WF.Keys.Enter || e.KeyCode == WF.Keys.F2)
             {
                 OpenLayerProperties(_selectedLayer);
-                e.Handled = true;
+                e.Handled = e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == WF.Keys.Space)
             {
+                Checkpoint(Lang.T("hist_visibility"));
                 _selectedLayer.Visible = !_selectedLayer.Visible;
                 RefreshLayersUi();
-                e.Handled = true;
+                SetStatus($"{_selectedLayer.Name}: {(_selectedLayer.Visible ? Lang.T("layer_on") : Lang.T("layer_off"))}");
+                e.Handled = e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == WF.Keys.Delete)
             {
-                DeleteLayer_Click(sender!, new RoutedEventArgs());
-                e.Handled = true;
+                Execute("dellayer");
+                e.Handled = e.SuppressKeyPress = true;
             }
         }
 
-        // Vizuelni panel: jedan "red" po sloju sa checkbox-om vidljivosti,
-        // sliderom providnosti i dugmetom za svojstva — bira se klikom bilo
-        // gde na red (isto ponašanje kao selekcija u JAWS listi).
         private void RefreshVisualLayerPanel()
         {
             VisualLayerStack.Children.Clear();
             _visualRowByLayer.Clear();
-
-            foreach (var layer in _project.Layers)
+            for (int i = _project.Layers.Count - 1; i >= 0; i--)
             {
+                var layer = _project.Layers[i];
                 var border = new Border
                 {
-                    BorderBrush = (System.Windows.Media.Brush)Resources["BrBorder"],
-                    BorderThickness = new Thickness(1),
-                    Background = (System.Windows.Media.Brush)Resources["BrBgPanel"],
-                    Margin = new Thickness(0, 0, 0, 8),
-                    Padding = new Thickness(8),
-                    Cursor = System.Windows.Input.Cursors.Hand
+                    BorderBrush = (System.Windows.Media.Brush)Resources["BrBorder"], BorderThickness = new Thickness(1),
+                    Background = (System.Windows.Media.Brush)Resources["BrBgPanel"], Margin = new Thickness(0, 0, 0, 8),
+                    Padding = new Thickness(8), Cursor = Cursors.Hand
                 };
                 var stack = new StackPanel();
-
                 var header = new Grid();
                 header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -482,21 +466,16 @@ namespace UltraStudio
                     Text = $"{layer.Name} ({Lang.T(layer.TypeLabelKey)})",
                     Foreground = (System.Windows.Media.Brush)Resources["BrText"], FontSize = 12, FontWeight = FontWeights.Bold
                 };
-                var visCheck = new CheckBox { IsChecked = layer.Visible, VerticalAlignment = VerticalAlignment.Center,
-                    Content = Lang.T("layer_field_visible") };
-                visCheck.Checked += (_, __) => { layer.Visible = true; RefreshLayersUi(); };
-                visCheck.Unchecked += (_, __) => { layer.Visible = false; RefreshLayersUi(); };
+                var visCheck = new CheckBox { IsChecked = layer.Visible, VerticalAlignment = VerticalAlignment.Center, Content = Lang.T("layer_field_visible") };
+                visCheck.Checked += (_, __) => { if (layer.Visible) return; Checkpoint(Lang.T("hist_visibility")); layer.Visible = true; RefreshLayersUi(); };
+                visCheck.Unchecked += (_, __) => { if (!layer.Visible) return; Checkpoint(Lang.T("hist_visibility")); layer.Visible = false; RefreshLayersUi(); };
                 Grid.SetColumn(nameLbl, 0); Grid.SetColumn(visCheck, 1);
                 header.Children.Add(nameLbl); header.Children.Add(visCheck);
                 stack.Children.Add(header);
 
-                var opacitySlider = new Slider
-                {
-                    Minimum = 0, Maximum = 100, Value = layer.Opacity, SmallChange = 5, LargeChange = 20,
-                    Margin = new Thickness(0, 6, 0, 0)
-                };
+                var opacitySlider = new Slider { Minimum = 0, Maximum = 100, Value = layer.Opacity, SmallChange = 5, LargeChange = 20, Margin = new Thickness(0, 6, 0, 0) };
                 opacitySlider.SetValue(AutomationProperties.NameProperty, Lang.T("layer_field_opacity") + " — " + layer.Name);
-                opacitySlider.ValueChanged += (_, e) => { layer.Opacity = e.NewValue; RefreshPreview(); };
+                opacitySlider.ValueChanged += (_, e) => { Checkpoint(Lang.T("layer_field_opacity"), merge: true); layer.Opacity = e.NewValue; RefreshPreview(); };
                 stack.Children.Add(opacitySlider);
 
                 var editBtn = new Button
@@ -512,7 +491,6 @@ namespace UltraStudio
                 _visualRowByLayer[layer] = border;
                 VisualLayerStack.Children.Add(border);
             }
-
             HighlightSelectedVisualRow();
         }
 
@@ -522,325 +500,116 @@ namespace UltraStudio
                 kv.Value.BorderBrush = (System.Windows.Media.Brush)Resources[kv.Key == _selectedLayer ? "BrAccent" : "BrBorder"];
         }
 
-        /// <summary>Osvežava OBA prikaza slojeva + preview — jedina tačka posle bilo koje izmene liste slojeva.</summary>
         private void RefreshLayersUi()
         {
             RefreshLayerList();
-            RefreshVisualLayerPanel();
+            if (_isVisualMode) RefreshVisualLayerPanel();
             RefreshPreview();
+        }
+
+        /// <summary>Posle bilo koje veće izmene: liste, info, naslov, pregled.</summary>
+        private void RefreshAll()
+        {
+            RefreshList();
+            RefreshLayersUi();
+            UpdateImageInfo();
+            UpdateTitle();
         }
 
         private void OpenLayerProperties(Layer layer)
         {
+            Checkpoint(string.Format(Lang.T("hist_layer_props"), layer.Name));
             var dlg = new LayerPropertiesDialog(layer) { Owner = this };
-            if (dlg.ShowDialog() == true) RefreshLayersUi();
-        }
-
-        private string NextLayerName(string prefix)
-        {
-            string name = $"{prefix} {_project.NextLayerNumber}";
-            _project.NextLayerNumber++;
-            return name;
-        }
-
-        private void AddTextLayer_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new SetValueDialog(Lang.T("menu_add_text_layer"), Lang.T("layer_field_text"), Lang.T("layer_default_text"), "") { Owner = this };
-            if (dlg.ShowDialog() != true || string.IsNullOrWhiteSpace(dlg.ResultValue)) return;
-
-            var layer = new TextLayer
+            if (dlg.ShowDialog() == true)
             {
-                Name = NextLayerName("Text"),
-                Text = dlg.ResultValue.Trim(),
-                X = 40, Y = 40, Width = 400, Height = 60
-            };
-            _project.Layers.Add(layer);
-            _selectedLayer = layer;
-            RefreshLayersUi();
-        }
-
-        private void AddShapeLayer(ShapeKind kind, string namePrefix)
-        {
-            var layer = new ShapeLayer
-            {
-                Name = NextLayerName(namePrefix),
-                ShapeKind = kind,
-                X = 60, Y = 60,
-                Width = 200,
-                Height = kind == ShapeKind.Line ? 0 : 140
-            };
-            if (kind == ShapeKind.Line) { layer.FillEnabled = false; layer.StrokeEnabled = true; }
-            _project.Layers.Add(layer);
-            _selectedLayer = layer;
-            RefreshLayersUi();
-            OpenLayerProperties(layer);
-        }
-
-        private void AddRectangleLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Rectangle, "Rectangle");
-        private void AddEllipseLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Ellipse, "Ellipse");
-        private void AddLineLayer_Click(object sender, RoutedEventArgs e) => AddShapeLayer(ShapeKind.Line, "Line");
-
-        private void AddImageLayer_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new OpenFileDialog
-            {
-                Title = Lang.T("menu_add_image_layer"),
-                Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.webp|All files|*.*"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                var (w, h) = ImageEngine.GetDimensions(dlg.FileName);
-                // Uklopi u platno ako je veća od njega — isto ponašanje kao
-                // "fit to canvas" u standardnim dizajn alatima.
-                double scale = Math.Min(1.0, Math.Min((double)_project.CanvasWidth / w, (double)_project.CanvasHeight / h));
-
-                var layer = new ImageLayer
+                RefreshLayersUi();
+                string msg = Describe.Layer(layer, _project);
+                if (layer is TextLayer tl && tl.Wrap)
                 {
-                    Name = NextLayerName("Image"),
-                    SourcePath = dlg.FileName,
-                    X = 20, Y = 20,
-                    Width = Math.Max(1, w * scale),
-                    Height = Math.Max(1, h * scale)
-                };
-                _project.Layers.Add(layer);
-                _selectedLayer = layer;
-                RefreshLayersUi();
+                    int over = TextLayout.OverflowLines(tl);
+                    if (over > 0) msg += ". " + string.Format(Lang.T("frame_overflow"), over);
+                }
+                SetStatus(msg);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void LayerProperties_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
-            OpenLayerProperties(_selectedLayer);
-        }
-
-        private void DuplicateLayer_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
-
-            Layer copy = _selectedLayer switch
-            {
-                TextLayer t => new TextLayer { Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Bold = t.Bold, Italic = t.Italic, ColorHex = t.ColorHex },
-                ShapeLayer s => new ShapeLayer { ShapeKind = s.ShapeKind, FillEnabled = s.FillEnabled, FillColorHex = s.FillColorHex, StrokeEnabled = s.StrokeEnabled, StrokeColorHex = s.StrokeColorHex, StrokeWidth = s.StrokeWidth },
-                ImageLayer i => new ImageLayer { SourcePath = i.SourcePath },
-                _ => throw new InvalidOperationException()
-            };
-            copy.Name = _selectedLayer.Name + " " + Lang.T("layer_copy_suffix");
-            copy.X = _selectedLayer.X + 20;
-            copy.Y = _selectedLayer.Y + 20;
-            copy.Width = _selectedLayer.Width;
-            copy.Height = _selectedLayer.Height;
-            copy.Opacity = _selectedLayer.Opacity;
-            copy.Visible = _selectedLayer.Visible;
-
-            int idx = _project.Layers.IndexOf(_selectedLayer);
-            _project.Layers.Insert(idx + 1, copy);
-            _selectedLayer = copy;
-            RefreshLayersUi();
-        }
-
-        private void DeleteLayer_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLayer == null) { SetStatus(Lang.T("layer_none_selected")); return; }
-            _project.Layers.Remove(_selectedLayer);
-            _selectedLayer = null;
-            RefreshLayersUi();
-        }
-
-        private void MoveLayerUp_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLayer == null) return;
-            int idx = _project.Layers.IndexOf(_selectedLayer);
-            if (idx < _project.Layers.Count - 1) _project.Layers.Move(idx, idx + 1);
-            RefreshLayersUi();
-        }
-
-        private void MoveLayerDown_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedLayer == null) return;
-            int idx = _project.Layers.IndexOf(_selectedLayer);
-            if (idx > 0) _project.Layers.Move(idx, idx - 1);
-            RefreshLayersUi();
-        }
-
-        private void NewCanvas_Click(object sender, RoutedEventArgs e)
-        {
-            var wDlg = new SetValueDialog(Lang.T("menu_new_canvas"), Lang.T("canvas_width_prompt"), _project.CanvasWidth.ToString(), "px") { Owner = this };
-            if (wDlg.ShowDialog() != true || !int.TryParse(wDlg.ResultValue, out int newW) || newW < 1) return;
-
-            var hDlg = new SetValueDialog(Lang.T("menu_new_canvas"), Lang.T("canvas_height_prompt"), _project.CanvasHeight.ToString(), "px") { Owner = this };
-            if (hDlg.ShowDialog() != true || !int.TryParse(hDlg.ResultValue, out int newH) || newH < 1) return;
-
-            _project.OriginalPath = null;
-            _project.OriginalWidth = 0;
-            _project.OriginalHeight = 0;
-            _project.ResetAdjustments();
-            _project.Layers.Clear();
-            _project.CanvasWidth = newW;
-            _project.CanvasHeight = newH;
-            _lastSavePath = null;
-            _selectedLayer = null;
-
-            UpdateImageInfo();
-            RefreshLayersUi();
-            SetStatus(string.Format(Lang.T("canvas_created"), newW, newH));
+            else _undo.Rollback(_project);
         }
 
         // ════════════════════════════════════════════════════════════════
-        // LEKTURA DOKUMENTA — samostalni alat, odvojen od tekst-slojeva, za
-        // duže tekstove uvezene iz .txt/.docx (isti ProofreadingDialog kao
-        // za tekst-slojeve, samo pozvan bez veze sa platnom).
+        // UNDO / STATUS / NASLOV
         // ════════════════════════════════════════════════════════════════
-        private void ProofreadDocument_Click(object sender, RoutedEventArgs e)
+        private void Checkpoint(string label, bool merge = false)
         {
-            var openDlg = new OpenFileDialog
-            {
-                Title = Lang.T("menu_proofread_document"),
-                Filter = Lang.T("proof_open_filter")
-            };
-            if (openDlg.ShowDialog() != true) return;
-
-            string text;
-            try
-            {
-                text = DocumentTextExtractor.ExtractText(openDlg.FileName);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            var dlg = new ProofreadingDialog(text, string.Format(Lang.T("proof_title_document"), Path.GetFileName(openDlg.FileName))) { Owner = this };
-            if (dlg.ShowDialog() != true) return;
-
-            // Nudi čuvanje u istom formatu kao otvoreni fajl, plus TXT i DOCX
-            string inExt = Path.GetExtension(openDlg.FileName).ToLowerInvariant();
-            var saveDlg = new SaveFileDialog
-            {
-                Filter = Lang.T("proof_save_filter"),
-                FileName = Path.GetFileNameWithoutExtension(openDlg.FileName) + "_lektorisano" + (inExt is ".docx" or ".rtf" ? inExt : ".txt"),
-                FilterIndex = inExt switch { ".docx" => 2, ".rtf" => 3, _ => 1 }
-            };
-            if (saveDlg.ShowDialog() != true) return;
-
-            DocumentTextExtractor.SaveDocument(dlg.ResultText, saveDlg.FileName);
-            SetStatus(string.Format(Lang.T("proof_saved"), saveDlg.FileName));
+            _undo.Checkpoint(_project, label, merge);
+            UpdateTitle();
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // OTVARANJE / ČUVANJE SLIKE
-        // ════════════════════════════════════════════════════════════════
-        private void OpenImage_Click(object sender, RoutedEventArgs e)
+        private void UpdateTitle()
         {
-            var dlg = new OpenFileDialog
-            {
-                Title = Lang.T("menu_open_image"),
-                Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.webp|All files|*.*"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                var (w, h) = ImageEngine.GetDimensions(dlg.FileName);
-                _project.OriginalPath = dlg.FileName;
-                _project.OriginalWidth = w;
-                _project.OriginalHeight = h;
-                _project.CanvasWidth = w;
-                _project.CanvasHeight = h;
-                _project.ResetAdjustments();
-                // Nova fotografija = novi projekat — slojevi od PRETHODNE slike
-                // (tekst/oblici pozicionirani za drugu veličinu platna) se ne
-                // prenose automatski, isto kao što File > Open u drugim
-                // editorima ne čuva stari canvas.
-                _project.Layers.Clear();
-                _selectedLayer = null;
-                _lastSavePath = null;
-
-                UpdateImageInfo();
-                RefreshLayersUi();
-                SetStatus(string.Format(Lang.T("img_loaded"), Path.GetFileName(dlg.FileName), w, h));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            string name = _project.ProjectPath != null ? Path.GetFileNameWithoutExtension(_project.ProjectPath)
+                        : _project.OriginalPath != null ? Path.GetFileName(_project.OriginalPath)
+                        : Lang.T("untitled");
+            string page = _project.PageCount > 1 ? $" ({PageInfo()})" : "";
+            Title = $"{name}{page}{(_undo.Dirty ? " *" : "")} — Ultra Studio {AppInfo.Version}";
         }
 
-        private void Save_Click(object sender, RoutedEventArgs e)
+        private void UpdateImageInfo()
         {
-            if (!_project.HasCanvasContent) { SetStatus(Lang.T("status_no_canvas")); return; }
-            if (_lastSavePath == null) { SaveAs_Click(sender, e); return; }
-            DoExport(_lastSavePath);
+            string? preset = CanvasPresets.Match(_project.CanvasWidth, _project.CanvasHeight);
+            string size = $"{_project.CanvasWidth} × {_project.CanvasHeight} px" + (preset != null ? $" ({preset})" : "");
+            TxtImageInfo.Text = _project.OriginalPath != null
+                ? $"{Path.GetFileName(_project.OriginalPath)} — {size}"
+                : string.Format(Lang.T("canvas_info_blank"), size);
+            if (_project.PageCount > 1) TxtImageInfo.Text += " — " + PageInfo();
+            var peer = UIElementAutomationPeer.FromElement(TxtImageInfo) ?? UIElementAutomationPeer.CreatePeerForElement(TxtImageInfo);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
-        private void SaveAs_Click(object sender, RoutedEventArgs e)
+        private void SetAiResult(string text)
         {
-            if (!_project.HasCanvasContent) { SetStatus(Lang.T("status_no_canvas")); return; }
-            var dlg = new SaveFileDialog
-            {
-                Filter = "PNG|*.png|JPEG|*.jpg|BMP|*.bmp|TIFF|*.tiff",
-                FileName = (_project.HasImage ? Path.GetFileNameWithoutExtension(_project.OriginalPath) : "design") + "_edited.png"
-            };
-            if (dlg.ShowDialog() != true) return;
-            _lastSavePath = dlg.FileName;
-            DoExport(dlg.FileName);
+            TxtAiResult.Text = text;
+            TxtAiResult.SetValue(AutomationProperties.NameProperty, text);
+            var peer = UIElementAutomationPeer.FromElement(TxtAiResult) ?? UIElementAutomationPeer.CreatePeerForElement(TxtAiResult);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
-        private void DoExport(string path)
+        private void SetStatus(string text)
         {
-            try
-            {
-                CanvasEngine.Export(_project, path);
-                SetStatus(string.Format(Lang.T("img_saved"), path));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            TxtStatusMessage.Text = text;
+            var peer = UIElementAutomationPeer.FromElement(TxtStatusMessage) ?? UIElementAutomationPeer.CreatePeerForElement(TxtStatusMessage);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
-        private void Reset_Click(object sender, RoutedEventArgs e)
+        private void ShowError(Exception ex)
         {
-            if (!_project.HasImage) return;
-            _project.ResetAdjustments();
-            RefreshList();
-            RefreshPreview();
-        }
-
-        private void Exit_Click(object sender, RoutedEventArgs e) => Close();
-
-        private void ShowAbout_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show(this, Lang.T("about_text"), Lang.T("about_title"),
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            DebugLog.Write("GREŠKA: " + ex);
+            SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
+            MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message), Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         // ════════════════════════════════════════════════════════════════
-        // PREVIEW
+        // PREGLED — u pozadini, sa odlaganjem (slajder ne čeka render)
         // ════════════════════════════════════════════════════════════════
         private void RefreshPreview()
         {
+            _previewTimer.Stop();
+            _previewTimer.Start();
+        }
+
+        private async Task RenderPreviewAsync()
+        {
             if (!_project.HasCanvasContent)
             {
-                DebugLog.Write("RefreshPreview: HasCanvasContent=false, prikazujem 'no image' poruku.");
-                TxtNoImage.Visibility = Visibility.Visible; ImgPreview.Source = null; return;
+                TxtNoImage.Visibility = Visibility.Visible;
+                ImgPreview.Source = null;
+                return;
             }
-
+            if (_busy) { RefreshPreview(); return; } // projekat se upravo menja u pozadini — probaj malo kasnije
+            int gen = ++_previewGen;
+            var snap = ProjectJson.Clone(_project);
             try
             {
-                DebugLog.Write($"RefreshPreview: renderujem preview za OriginalPath={_project.OriginalPath}...");
-                var bytes = CanvasEngine.RenderPreviewJpeg(_project);
+                var bytes = await Task.Run(() => CanvasEngine.RenderPreviewJpeg(snap, 1600));
+                if (gen != _previewGen) return; // u međuvremenu je stigla novija izmena
                 var bmp = new BitmapImage();
                 using (var ms = new MemoryStream(bytes))
                 {
@@ -852,270 +621,181 @@ namespace UltraStudio
                 bmp.Freeze();
                 ImgPreview.Source = bmp;
                 TxtNoImage.Visibility = Visibility.Collapsed;
-                DebugLog.Write($"RefreshPreview: gotovo, {bytes.Length} bajtova prikazano.");
             }
             catch (Exception ex)
             {
-                DebugLog.Write($"RefreshPreview: GREŠKA — {ex}");
-                SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
+                DebugLog.Write($"RenderPreview: GREŠKA — {ex}");
+                if (gen == _previewGen) SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
             }
         }
 
-        private void UpdateImageInfo()
-        {
-            DebugLog.Write($"UpdateImageInfo: HasImage={_project.HasImage}, OriginalPath={_project.OriginalPath}");
-            TxtImageInfo.Text = _project.HasImage
-                ? $"{Path.GetFileName(_project.OriginalPath)} — {_project.OriginalWidth}x{_project.OriginalHeight}px"
-                : string.Format(Lang.T("canvas_info_blank"), _project.CanvasWidth, _project.CanvasHeight);
+        // ════════════════════════════════════════════════════════════════
+        // MIŠ NA PREGLEDU (za korisnike koji vide): klik bira sloj i vuče ga;
+        // prevlačenje po praznom delu fotografije pravi pravougaonu selekciju.
+        // ════════════════════════════════════════════════════════════════
+        private Layer? _dragLayer;
+        private Point _dragStartCanvas;
+        private double _dragLayerX, _dragLayerY;
+        private bool _dragSelecting;
 
-            // AutomationProperties.LiveSetting u XAML-u SAM ne najavljuje ništa —
-            // on samo OBELEŽAVA element kao live region; automatsko najavljivanje
-            // se dešava tek kad se eksplicitno podigne LiveRegionChanged event
-            // (isti obrazac kao SetStatus/ShowModeToast). Bez ovoga, otvaranje
-            // novoizdvojene slike menja tekst tiho — JAWS korisnik nema NIKAKVU
-            // potvrdu da se slika promenila, što je tačno ono što je prijavljeno.
-            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.FromElement(TxtImageInfo)
-                       ?? System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(TxtImageInfo);
-            peer?.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
+        private Point ToCanvas(MouseEventArgs e)
+        {
+            var pos = e.GetPosition(ImgPreview);
+            double sx = _project.CanvasWidth / Math.Max(1, ImgPreview.ActualWidth);
+            double sy = _project.CanvasHeight / Math.Max(1, ImgPreview.ActualHeight);
+            return new Point(pos.X * sx, pos.Y * sy);
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // AI OPIS SLIKE + IZVRŠIVI PREDLOZI (dva ODVOJENA poziva — vidi
-        // OllamaVisionClient: forsiranje JSON-a na opis ga je osiromašilo).
-        // Svaki predlog ide kroz NATIVE MessageBox (Da/Ne) — pouzdanije za
-        // JAWS nego custom panel koji smo probali (nedostajao mu je
-        // AutomationProperties.Name + live region, isti bag klasa koju smo
-        // lovili celo veče kod Audio Editora).
-        // ════════════════════════════════════════════════════════════════
-        private async void BtnDescribe_Click(object sender, RoutedEventArgs e)
+        private void Preview_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
-            // NAMERNO se ne koristi BtnDescribe.IsEnabled=false ovde: onesposobljavanje
-            // dugmeta koje TRENUTNO ima fokus tera WPF da SAM premesti fokus na sledeći
-            // element po redu — a to programsko premeštanje umelo je da uđe u
-            // WindowsFormsHost (adjustments/layers lista) na način koji ostavlja Tab
-            // zarobljenim posle toga (prijavljeno: pre Describe-a Shift+Tab normalno
-            // vodi kroz mod-dugmad, posle Describe-a upada u listu i zaglavi). Obična
-            // bool zastavica daje isti "spreči duplo pokretanje" efekat bez ikakvog
-            // dodirivanja fokusa.
-            if (_describeBusy) return;
-            _describeBusy = true;
-
-            SetAiResult(Lang.T("ai_describing"));
-
-            try
+            if (_busy || !_project.HasCanvasContent) return;
+            var p = ToCanvas(e);
+            _dragStartCanvas = p;
+            _dragLayer = _project.Layers.LastOrDefault(l => l.Visible && l is not GradientLayer && p.X >= l.X && p.X <= l.X + l.Width && p.Y >= l.Y && p.Y <= l.Y + l.Height);
+            if (_dragLayer != null)
             {
-                // Šalje se TRENUTNI preview (sa primenjenim podešavanjima), ne
-                // originalni fajl — AI opisuje ono što korisnik stvarno vidi/pravi.
-                var bytes = ImageEngine.RenderPreviewJpeg(_project.OriginalPath!, _project, maxDimension: 1024);
-                string base64 = Convert.ToBase64String(bytes);
-
-                string description = await _ai.DescribeImageAsync(base64);
-                SetAiResult(description);
-                DebugLog.Write($"BtnDescribe: opis dobijen ({description.Length} znakova).");
-                _describeBusy = false; // ponovo dostupno odmah — predlozi mogu potrajati
-
-                var suggestions = await _ai.SuggestEditsAsync(base64);
-                DebugLog.Write($"BtnDescribe: {suggestions.Count} predloga vraćeno.");
-                foreach (var sug in suggestions)
-                {
-                    var result = MessageBox.Show(
-                        this,
-                        string.Format(Lang.T("ai_apply_suggestion"),
-                            $"{sug.Action} {sug.Value:+0.#;-0.#}", sug.Reason),
-                        Lang.T("ai_panel_header"), MessageBoxButton.YesNo, MessageBoxImage.Question);
-                    if (result == MessageBoxResult.Yes)
-                        ApplySuggestion(sug);
-                }
-
-                if (suggestions.Count > 0)
-                {
-                    // Posle niza modalnih MessageBox dijaloga, Windows-ova aktivacija/
-                    // fokus mogu ostati u nepredvidivom stanju za WindowsFormsHost
-                    // kontrole (dokumentovana zamka: native modalni dijalog + hostovana
-                    // WinForms kontrola koja je PRE toga imala fokus). Umesto da se
-                    // oslonimo na to gde je Windows "ostavio" fokus, eksplicitno ga
-                    // vraćamo na poznat, siguran WPF element — isto dugme koje je
-                    // pokrenulo Describe. Bez ovoga, sledeći ulazak u nativnu listu
-                    // (Tab) je taj koji se zaglavljivao.
-                    DebugLog.Write("BtnDescribe: eksplicitno vraćam fokus na BtnDescribe posle dijaloga predloga.");
-                    this.Activate();
-                    Keyboard.Focus(BtnDescribe);
-                }
+                _selectedLayer = _dragLayer;
+                _dragLayerX = _dragLayer.X; _dragLayerY = _dragLayer.Y;
+                Checkpoint(string.Format(Lang.T("hist_move"), _dragLayer.Name));
+                RefreshLayerList(); HighlightSelectedVisualRow();
             }
-            catch (Exception ex)
+            else if (_project.HasImage)
             {
-                SetAiResult(string.Format(Lang.T("ai_error"), ex.Message));
+                _dragSelecting = true;
+                Checkpoint(Lang.T("hist_select"));
             }
-            finally
+            ImgPreview.CaptureMouse();
+        }
+
+        private void Preview_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+            var p = ToCanvas(e);
+            if (_dragLayer != null)
             {
-                _describeBusy = false;
+                _dragLayer.X = Math.Round(_dragLayerX + p.X - _dragStartCanvas.X);
+                _dragLayer.Y = Math.Round(_dragLayerY + p.Y - _dragStartCanvas.Y);
+                RefreshPreview();
+            }
+            else if (_dragSelecting)
+            {
+                double x0 = Math.Clamp(Math.Min(p.X, _dragStartCanvas.X), 0, _project.CanvasWidth);
+                double y0 = Math.Clamp(Math.Min(p.Y, _dragStartCanvas.Y), 0, _project.CanvasHeight);
+                double x1 = Math.Clamp(Math.Max(p.X, _dragStartCanvas.X), 0, _project.CanvasWidth);
+                double y1 = Math.Clamp(Math.Max(p.Y, _dragStartCanvas.Y), 0, _project.CanvasHeight);
+                _project.Selection = new Selection { Kind = SelectionKind.Rectangle, X = Math.Round(x0), Y = Math.Round(y0), Width = Math.Round(x1 - x0), Height = Math.Round(y1 - y0) };
+                RefreshPreview();
             }
         }
 
-        // Mapira AI-jev predlog ("contrast", +15) na POSTOJEĆE kontrole u listi —
-        // primenjuje se preko iste ImageProject/AdjustmentRow mašinerije kao ručna
-        // izmena, ništa posebno se ne gradi samo za AI put.
-        private void ApplySuggestion(ImageSuggestion sug)
+        private void Preview_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            var row = _rows.FirstOrDefault(r => r.Key == "adj_" + sug.Action);
-            if (row == null) return;
-
-            if (row.IsBoolean) row.SetBool(_project, true);
-            else row.SetNum(_project, Math.Clamp(sug.Value, row.Min, row.Max));
-
-            DebugLog.Write($"ApplySuggestion: {row.Key} = {(row.IsBoolean ? "true" : row.GetNum(_project).ToString())}, pozivam RefreshList/RefreshPreview...");
-            RefreshList();
-            RefreshPreview();
-            DebugLog.Write($"ApplySuggestion: {row.Key} gotovo.");
-            SetStatus(string.Format(Lang.T("ai_suggestion_applied"), Lang.T(row.Key)));
+            ImgPreview.ReleaseMouseCapture();
+            if (_dragLayer != null)
+            {
+                if (Math.Abs(_dragLayer.X - _dragLayerX) < 0.5 && Math.Abs(_dragLayer.Y - _dragLayerY) < 0.5) _undo.Rollback(_project);
+                RefreshLayersUi();
+                SetStatus(Describe.Layer(_dragLayer, _project));
+            }
+            else if (_dragSelecting)
+            {
+                if (_project.Selection.Width < 3 || _project.Selection.Height < 3) _project.Selection = new Selection();
+                RefreshPreview();
+                SetStatus(EditOps.DescribeSelection(_project));
+            }
+            _dragLayer = null; _dragSelecting = false;
         }
 
         // ════════════════════════════════════════════════════════════════
-        // SAM — IZDVAJANJE OBJEKTA IZ SLIKE
+        // TASTATURA — iste prečice stižu i iz WinForms lista (Gate sprečava duplo izvršavanje)
         // ════════════════════════════════════════════════════════════════
-        private async void ExtractObject_Click(object sender, RoutedEventArgs e)
+        private readonly Dictionary<string, DateTime> _gate = new();
+
+        private bool Gate(string id, int ms = 250)
         {
-            if (!_project.HasImage) { SetStatus(Lang.T("ai_no_image")); return; }
+            var now = DateTime.UtcNow;
+            if (_gate.TryGetValue(id, out var last) && (now - last).TotalMilliseconds < ms) return false;
+            _gate[id] = now;
+            return true;
+        }
 
-            if (!SamSegmenter.ModelsAvailable)
+        // Isti taster stigne dvaput u par milisekundi (WinForms lista + WPF prozor); pomeranje sloja
+        // držanjem strelice mora da prođe brzo, pa za njega kraći razmak.
+        private static int GateMs(string id) => id.StartsWith("nudge") ? 30 : 250;
+
+        /// <summary>Prečica -> id komande. null = nije naša prečica.</summary>
+        private string? ShortcutFor(Key key, ModifierKeys mods)
+        {
+            bool ctrl = mods == ModifierKeys.Control, ctrlShift = mods == (ModifierKeys.Control | ModifierKeys.Shift);
+            bool alt = mods == ModifierKeys.Alt, altShift = mods == (ModifierKeys.Alt | ModifierKeys.Shift), none = mods == ModifierKeys.None;
+            if (ctrl) switch (key)
             {
-                MessageBox.Show(
-                    this,
-                    string.Format(Lang.T("sam_models_missing"), SamSegmenter.EncoderPath, SamSegmenter.DecoderPath),
-                    Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                case Key.N: return "new"; case Key.O: return "open"; case Key.S: return "save"; case Key.E: return "export";
+                case Key.Z: return "undo"; case Key.Y: return "redo"; case Key.H: return "history";
+                case Key.J: return "copylayer"; case Key.D: return "deselect"; case Key.L: return "looks"; case Key.F: return "refilter";
+                case Key.A: return "selall"; case Key.G: return "pagelist";
+                case Key.PageDown: return "pagenext"; case Key.PageUp: return "pageprev";
             }
-
-            var dlg = new SetValueDialog(Lang.T("extract_prompt_title"), Lang.T("extract_prompt"), "", "") { Owner = this };
-            if (dlg.ShowDialog() != true || string.IsNullOrWhiteSpace(dlg.ResultValue)) return;
-            string description = dlg.ResultValue.Trim();
-
-            // Non-modalni progress dijalog — bez ovoga, spor korak (AI lociranje
-            // + SAM enkodiranje/dekodiranje na CPU-u) delovao je kao da se app
-            // zamrzao, jer status traka sama po sebi nije dovoljno upadljiva.
-            // Svaki korak se ISTOVREMENO piše i u DebugLog fajl na disku — ako
-            // dođe do native pada unutar ONNX Runtime-a (koji zaobilazi ovaj
-            // try/catch potpuno), poslednji red u tom fajlu pokazuje tačno gde.
-            var progress = new ProgressDialog(Lang.T("extract_prompt_title"), this);
-            progress.Show();
-
-            try
+            if (ctrlShift) switch (key)
             {
-                progress.SetStage(Lang.T("extract_locating"));
-                SetStatus(Lang.T("extract_locating"));
-                DebugLog.Write($"ExtractObject: lociram \"{description}\"...");
-                var bytes = ImageEngine.RenderPreviewJpeg(_project.OriginalPath!, _project, maxDimension: 1280);
-                string base64 = Convert.ToBase64String(bytes);
-                var point = await _ai.FindPointForDescriptionAsync(
-                    base64, _project.OriginalWidth, _project.OriginalHeight, description);
-
-                if (point == null)
+                case Key.S: return "saveas"; case Key.Z: return "redo"; case Key.J: return "cutlayer";
+                case Key.I: return "selinvert"; case Key.L: return "log"; case Key.E: return "exportpdf";
+            }
+            if (none) switch (key) { case Key.F1: return "shortcuts"; case Key.F6: return "status"; case Key.F7: return "designcheck"; }
+            if (alt && key == Key.W) return "togglemode";
+            if (alt || altShift)
+            {
+                string step = altShift ? "1" : "10";
+                switch (key)
                 {
-                    progress.Close();
-                    SetStatus(string.Format(Lang.T("extract_not_found"), description));
-                    MessageBox.Show(this, string.Format(Lang.T("extract_not_found"), description),
-                        Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                progress.SetStage(Lang.T("extract_segmenting"));
-                SetStatus(Lang.T("extract_segmenting"));
-                DebugLog.Write($"ExtractObject: tačka ({point.Value.x},{point.Value.y}) pronađena, pokrećem SAM...");
-                using var sam = new SamSegmenter();
-                await sam.EnsureEmbeddingAsync(_project.OriginalPath!);
-                var (mask, maskScale) = await sam.SegmentFromPointAsync(point.Value.x, point.Value.y);
-
-                string outPath = Path.Combine(
-                    Path.GetDirectoryName(_project.OriginalPath!)!,
-                    Path.GetFileNameWithoutExtension(_project.OriginalPath!) + $"_{description.Replace(' ', '_')}_cutout.png");
-                SamSegmenter.ExportCutout(_project.OriginalPath!, mask, maskScale, outPath);
-                DebugLog.Write("ExtractObject: gotovo, bez grešaka.");
-
-                progress.Close();
-
-                var open = MessageBox.Show(this, string.Format(Lang.T("extract_done"), outPath),
-                    Lang.T("done_title"), MessageBoxButton.YesNo, MessageBoxImage.Information);
-                DebugLog.Write($"ExtractObject: korisnik izabrao '{open}' na 'otvori novu sliku?' dijalogu.");
-                if (open == MessageBoxResult.Yes)
-                {
-                    var (w, h) = ImageEngine.GetDimensions(outPath);
-                    DebugLog.Write($"ExtractObject: menjam _project.OriginalPath na {outPath} ({w}x{h}).");
-                    _project.OriginalPath = outPath;
-                    _project.OriginalWidth = w;
-                    _project.OriginalHeight = h;
-                    _project.ResetAdjustments();
-                    _lastSavePath = null;
-                    UpdateImageInfo();
-                    RefreshPreview();
-                    RefreshList();
-                    DebugLog.Write("ExtractObject: UpdateImageInfo/RefreshPreview/RefreshList pozvani.");
+                    case Key.Left: return "nudge:-" + step + ":0";
+                    case Key.Right: return "nudge:" + step + ":0";
+                    case Key.Up: return "nudge:0:-" + step;
+                    case Key.Down: return "nudge:0:" + step;
                 }
             }
-            catch (Exception ex)
-            {
-                DebugLog.Write($"ExtractObject: GREŠKA — {ex}");
-                SetStatus(string.Format(Lang.T("error_prefix"), ex.Message));
-                // MessageBox pored SetStatus — status traka je lako previdljiva
-                // (ili, u ivičnim slučajevima, JAWS ne stigne da je pokupi ako
-                // je fokus negde drugde); modalni dijalog garantovano zaustavi
-                // korisnika i JAWS ga garantovano pročita.
-                MessageBox.Show(this, string.Format(Lang.T("error_prefix"), ex.Message),
-                    Lang.T("error_title"), MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                if (progress.IsVisible) progress.Close();
-            }
+            return null;
         }
 
-        private void SetAiResult(string text)
+        private bool HandleWinFormsShortcut(WF.KeyEventArgs e)
         {
-            TxtAiResult.Text = text;
-            // Isti popravljen obrazac kao u Audio Editoru: Name mora da prati
-            // STVARNI sadržaj, ne fiksnu etiketu, inače JAWS ponavlja isto.
-            TxtAiResult.SetValue(AutomationProperties.NameProperty, text);
-            var peer = UIElementAutomationPeer.FromElement(TxtAiResult) ?? UIElementAutomationPeer.CreatePeerForElement(TxtAiResult);
-            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
-        }
-
-        // ════════════════════════════════════════════════════════════════
-        // STATUS + PRECICE
-        // ════════════════════════════════════════════════════════════════
-        private void SetStatus(string text)
-        {
-            TxtStatusMessage.Text = text;
-            var peer = UIElementAutomationPeer.FromElement(TxtStatusMessage) ?? UIElementAutomationPeer.CreatePeerForElement(TxtStatusMessage);
-            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            var key = KeyInterop.KeyFromVirtualKey((int)e.KeyCode);
+            var mods = ModifierKeys.None;
+            if (e.Control) mods |= ModifierKeys.Control;
+            if (e.Shift) mods |= ModifierKeys.Shift;
+            if (e.Alt) mods |= ModifierKeys.Alt;
+            var id = ShortcutFor(key, mods);
+            if (id == null) return false;
+            e.Handled = e.SuppressKeyPress = true;
+            if (Gate(id, GateMs(id))) Dispatcher.BeginInvoke(new Action(() => Execute(id)));
+            return true;
         }
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Namerno PRVI red u handleru, pre svega ostalog — ako se app ikad
-            // ponovo zamrzne na Tab-u, ovo je test da li taster UOPŠTE stiže do
-            // WPF-a: ako se ovaj red ne pojavi u logu pre zamrzavanja, znači da
-            // je zaglavljivanje na nižem, Windows/interop nivou (van našeg C#
-            // koda), a ne u WPF-ovoj obradi tastature.
-            DebugLog.Write($"Window_PreviewKeyDown: Key={e.Key}, Modifiers={Keyboard.Modifiers}");
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            var id = ShortcutFor(key, Keyboard.Modifiers);
+            if (id == null) return;
+            // U poljima za tekst Ctrl+A/Z/Y/strelice pripadaju tom polju
+            if (Keyboard.FocusedElement is TextBox && (id is "selall" or "undo" or "redo" || id.StartsWith("nudge"))) return;
+            e.Handled = true;
+            if (Gate(id, GateMs(id))) Execute(id);
+        }
 
-            bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
-            bool ctrlShift = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
-            bool alt = Keyboard.Modifiers == ModifierKeys.Alt;
+        private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (!ConfirmDiscard()) { e.Cancel = true; return; }
+            try { _sam?.Dispose(); } catch { }
+        }
 
-            if (ctrl && e.Key == Key.O) { OpenImage_Click(sender, e); e.Handled = true; }
-            else if (ctrlShift && e.Key == Key.S) { SaveAs_Click(sender, e); e.Handled = true; }
-            else if (ctrl && e.Key == Key.S) { Save_Click(sender, e); e.Handled = true; }
-            else if (ctrlShift && e.Key == Key.L)
-            {
-                DebugLog.Write("MainWindow: otvaram LogWindow (Ctrl+Shift+L).");
-                new Views.LogWindow(this).Show();
-                e.Handled = true;
-            }
-            else if (alt && e.Key == Key.W)
-            {
-                if (_isVisualMode) SetJawsMode(); else SetVisualMode();
-                e.Handled = true;
-            }
+        /// <summary>Pita za čuvanje ako ima nesačuvanih izmena. false = korisnik je otkazao.</summary>
+        private bool ConfirmDiscard()
+        {
+            if (!_undo.Dirty || !_project.HasCanvasContent) return true;
+            var r = MessageBox.Show(this, Lang.T("confirm_save_changes"), Lang.T("app_name"), MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (r == MessageBoxResult.Cancel) return false;
+            if (r == MessageBoxResult.Yes) return SaveProject(false);
+            return true;
         }
     }
 }

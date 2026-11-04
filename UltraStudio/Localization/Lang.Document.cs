@@ -1,0 +1,128 @@
+using System.Collections.Generic;
+
+namespace UltraStudio.Localization
+{
+    // Paket 2 — dokument (strane, okviri, PDF) i srpska tipografija.
+    public static partial class Lang
+    {
+        private static readonly Dictionary<string, (string en, string sr)> Doc = new()
+        {
+            // ===== Meni Dokument =====
+            ["menu_document"] = ("_Document", "Doku_ment"),
+            ["menu_page_new"] = ("_New page", "_Nova strana"),
+            ["menu_page_new_size"] = ("New page of another _size...", "Nova strana druge _veličine..."),
+            ["menu_page_duplicate"] = ("_Duplicate page", "_Dupliraj stranu"),
+            ["menu_page_delete"] = ("De_lete page", "O_briši stranu"),
+            ["menu_page_prev"] = ("_Previous page", "_Prethodna strana"),
+            ["menu_page_next"] = ("Ne_xt page", "_Sledeća strana"),
+            ["menu_page_list"] = ("_Go to page (list of pages)...", "_Idi na stranu (lista strana)..."),
+            ["menu_page_up"] = ("Move page _earlier", "Pomeri stranu _unapred"),
+            ["menu_page_down"] = ("Move page _later", "Pomeri stranu _unazad"),
+            ["menu_flow_text"] = ("Place long _text across pages...", "Rasporedi dugačak _tekst po stranama..."),
+            ["menu_add_frame"] = ("Add text _frame...", "Dodaj tekstualni _okvir..."),
+            ["menu_page_numbers"] = ("Page _numbers...", "_Brojevi strana..."),
+            ["menu_doc_dpi"] = ("Print _resolution (DPI)...", "_Rezolucija za štampu (DPI)..."),
+            ["menu_export_pdf"] = ("Export _PDF...", "Izvezi _PDF..."),
+            ["menu_export_pages"] = ("Export all pages as _images...", "Izvezi sve strane kao _slike..."),
+
+            ["page_of"] = ("page {0} of {1}", "strana {0} od {1}"),
+            ["page_summary"] = ("Page {0} of {1}: {2} layers, {3}", "Strana {0} od {1}: slojeva {2}, {3}"),
+            ["page_empty"] = ("empty", "prazna"),
+            ["page_has_photo"] = ("photo", "fotografija"),
+            ["page_single"] = ("The document has only one page.", "Dokument ima samo jednu stranu."),
+            ["page_last"] = ("The only page cannot be deleted.", "Jedina strana ne može da se obriše."),
+            ["page_already_first"] = ("Already on the first page.", "Već si na prvoj strani."),
+            ["page_already_last"] = ("Already on the last page.", "Već si na poslednjoj strani."),
+            ["page_moved"] = ("The page is now {0} of {1}.", "Strana je sada {0} od {1}."),
+            ["page_delete_confirm"] = ("Delete page {0} with everything on it? (Ctrl+Z brings it back.)", "Obrisati stranu {0} sa svim što je na njoj? (Ctrl+Z je vraća.)"),
+            ["page_list_prompt"] = ("Pages — Enter goes to the chosen page:", "Strane — Enter vodi na izabranu stranu:"),
+
+            // Tekst kroz strane i okviri
+            ["flow_hint"] = ("The text is laid out in frames on as many pages as it needs. If the current page is empty, it starts there.", "Tekst se slaže u okvire na onoliko strana koliko treba. Ako je trenutna strana prazna, počinje na njoj."),
+            ["flow_source"] = ("Where is the text?", "Odakle je tekst?"),
+            ["flow_source_file"] = ("Open a file (Word, PDF, TXT, EPUB...)", "Otvori fajl (Word, PDF, TXT, EPUB...)"),
+            ["flow_source_typed"] = ("Typed or pasted below", "Upisan ili nalepljen ispod"),
+            ["flow_text"] = ("Text (only for typed or pasted)", "Tekst (samo za upisan ili nalepljen)"),
+            ["flow_size_pt"] = ("Font size in points (pt)", "Veličina slova u tačkama (pt)"),
+            ["flow_margin_mm"] = ("Margins in millimeters", "Margine u milimetrima"),
+            ["flow_page_numbers"] = ("Add page numbers", "Dodaj brojeve strana"),
+            ["flow_typography"] = ("Fix Serbian typography first (quotes, dashes, spaces)", "Prvo sredi srpsku tipografiju (navodnici, crte, razmaci)"),
+            ["flow_empty"] = ("There is no text to place.", "Nema teksta za raspoređivanje."),
+            ["flow_done"] = ("Text placed on {0} pages. The document now has {1} pages. Ctrl+PageDown goes to the next one.", "Tekst je raspoređen na {0} strana. Dokument sada ima {1} strana. Ctrl+PageDown vodi na sledeću."),
+            ["frame_name"] = ("Text frame", "Tekstualni okvir"),
+            ["frame_hint"] = ("A text frame fills the page inside the margins; lines break at its width. You can change its size in the layer properties.", "Tekstualni okvir popunjava stranu unutar margina; redovi se lome po njegovoj širini. Veličinu menjaš u svojstvima sloja."),
+            ["frame_overflow"] = ("{0} lines don't fit in the frame — make it taller, the text smaller, or use Place long text across pages.", "{0} redova ne staje u okvir — povećaj okvir, smanji slova ili koristi raspoređivanje teksta po stranama."),
+            ["layer_field_wrap"] = ("Text frame (lines break at the box width, fixed height)", "Tekstualni okvir (redovi se lome po širini okvira, fiksna visina)"),
+            ["align_justify"] = ("Justified (both edges)", "Obostrano"),
+            ["dc_frame"] = ("text frame", "tekstualni okvir"),
+            ["dc_warn_overflow"] = ("{0}: {1} lines don't fit in the frame and are hidden.", "{0}: {1} redova ne staje u okvir i ne vide se."),
+
+            // Brojevi strana i DPI
+            ["page_numbers_hint"] = ("Numbers are added to every page; old numbers are replaced.", "Brojevi se dodaju na svaku stranu; stari se zamenjuju."),
+            ["page_numbers_format"] = ("Format", "Oblik"),
+            ["page_numbers_remove"] = ("Remove page numbers", "Ukloni brojeve strana"),
+            ["page_number_word"] = ("Page {0}", "Strana {0}"),
+            ["page_number_layer"] = ("Page number", "Broj strane"),
+            ["pn_bottom_center"] = ("Bottom center", "Dole u sredini"),
+            ["pn_bottom_right"] = ("Bottom right", "Dole desno"),
+            ["pn_bottom_outer"] = ("Bottom outside (book style: right on odd pages, left on even)", "Dole spolja (kao u knjizi: desno na neparnim, levo na parnim)"),
+            ["pn_top_right"] = ("Top right", "Gore desno"),
+            ["doc_dpi_prompt"] = ("Dots per inch for print and PDF. At the current value the page is {0} × {1} mm.", "Tačaka po inču za štampu i PDF. Na trenutnoj vrednosti strana je {0} × {1} mm."),
+            ["doc_dpi_set"] = ("Resolution {0} dpi — a page is {1} × {2} mm when printed.", "Rezolucija {0} dpi — strana je {1} × {2} mm u štampi."),
+
+            // PDF
+            ["pdf_hint"] = ("All {0} pages go into one PDF. Plain text becomes real text: it can be selected, searched and read by screen readers.", "Svih {0} strana ide u jedan PDF. Običan tekst postaje pravi tekst: može da se označi, pretražuje i čita čitačem ekrana."),
+            ["pdf_title"] = ("Document title", "Naslov dokumenta"),
+            ["pdf_real_text"] = ("Text as real, selectable text (recommended)", "Tekst kao pravi tekst koji se može označiti (preporučeno)"),
+            ["pdf_quality"] = ("Image quality", "Kvalitet slika"),
+            ["pdf_q_print"] = ("Print (300 dpi)", "Štampa (300 dpi)"),
+            ["pdf_q_standard"] = ("Standard (200 dpi)", "Standardno (200 dpi)"),
+            ["pdf_q_small"] = ("Small file for e-mail (150 dpi)", "Mali fajl za mejl (150 dpi)"),
+            ["pdf_open_after"] = ("Open the PDF when done", "Otvori PDF kad bude gotov"),
+            ["pdf_progress"] = ("PDF: page {0} of {1}...", "PDF: strana {0} od {1}..."),
+            ["pdf_done"] = ("PDF saved: {0} pages, {1} KB — {2}", "PDF sačuvan: {0} strana, {1} KB — {2}"),
+            ["pdf_raster_note"] = ("{0} text layers went in as images (they have a style, rotation, transparency, or a font without a .ttf file).", "{0} tekst-slojeva je ušlo kao slika (imaju stil, rotaciju, providnost ili font bez .ttf fajla)."),
+            ["pages_exported"] = ("{0} pages exported as {1} to {2}", "{0} strana izvezeno kao {1} u {2}"),
+
+            // ===== Tipografija, pismo, lektura =====
+            ["menu_typography"] = ("Serbian _typography (quotes, dashes, spaces)...", "Srpska _tipografija (navodnici, crte, razmaci)..."),
+            ["menu_to_cyrillic"] = ("Convert to _Cyrillic", "Preslovi na _ćirilicu"),
+            ["menu_to_latin"] = ("Convert to _Latin", "Preslovi na _latinicu"),
+            ["menu_typography_file"] = ("Typography and script of a document _file...", "Tipografija i pismo _fajla sa tekstom..."),
+            ["menu_proofread_all"] = ("Proofread _all text in the design (AI)...", "Lekturiši _sav tekst u dizajnu (AI)..."),
+            ["scope_label"] = ("Apply to", "Primeni na"),
+            ["scope_selected"] = ("The selected text layer", "Izabrani tekst-sloj"),
+            ["scope_page"] = ("All text on this page", "Sav tekst na ovoj strani"),
+            ["scope_document"] = ("All text in the whole document", "Sav tekst u celom dokumentu"),
+            ["need_text_layer"] = ("Select a text layer first.", "Prvo izaberi tekst-sloj."),
+            ["typo_hint"] = ("Rules of Serbian typesetting, applied instantly and without AI. Ctrl+Z undoes everything at once.", "Pravila srpskog sloga, primenjena odmah i bez AI-ja. Ctrl+Z poništava sve odjednom."),
+            ["typo_quotes"] = ("Quotes „like this“ and apostrophes ’", "Navodnici „ovako“ i apostrof ’"),
+            ["typo_english_quotes"] = ("English quotes “like this” instead (for English text)", "Umesto toga engleski navodnici “ovako” (za engleski tekst)"),
+            ["typo_dashes"] = ("Dashes: – between words, — in dialogue, 10–20 for ranges", "Crte: – između reči, — u dijalogu, 10–20 za raspon"),
+            ["typo_spaces"] = ("Spaces: double spaces, spaces before punctuation, missing space after comma", "Razmaci: dupli, razmak pre interpunkcije, nedostaje razmak posle zareza"),
+            ["typo_ellipsis"] = ("Three dots ... to an ellipsis …", "Tri tačke ... u znak …"),
+            ["typo_nbsp"] = ("Keep one-letter words (i, u, a, s...) and units (10 km) on the same line", "Jednoslovne reči (i, u, a, s...) i jedinice (10 km) ne ostaju same na kraju reda"),
+            ["typo_result"] = ("Typography: {0} fixes in {1} text layers.", "Tipografija: {0} ispravki u {1} tekst-slojeva."),
+            ["typo_done"] = ("Typography applied: {0} fixes.", "Tipografija primenjena: {0} ispravki."),
+            ["typo_all_rules"] = ("Serbian typography (quotes, dashes, spaces, ellipsis)", "Srpska tipografija (navodnici, crte, razmaci, tri tačke)"),
+            ["typo_script"] = ("Script", "Pismo"),
+            ["script_keep"] = ("Keep as it is", "Ostavi kako jeste"),
+            ["script_done_cyr"] = ("Converted to Cyrillic: {0} text layers. Links, e-mails, abbreviations and words with q, w, x, y stay in Latin.", "Preslovljeno na ćirilicu: {0} tekst-slojeva. Linkovi, mejlovi, skraćenice i reči sa q, w, x, y ostaju latinicom."),
+            ["script_done_lat"] = ("Converted to Latin: {0} text layers.", "Preslovljeno na latinicu: {0} tekst-slojeva."),
+            ["script_font_warning"] = ("Check these fonts — they may not have Cyrillic letters: {0}.", "Proveri ove fontove — možda nemaju ćirilična slova: {0}."),
+            ["typo_file_done"] = ("Done: {0} typography fixes, {1} letters converted. Saved to {2}", "Gotovo: {0} tipografskih ispravki, preslovljeno {1} slova. Sačuvano u {2}"),
+            ["proof_typography_btn"] = ("Serbian typography", "Srpska tipografija"),
+            ["proof_type_punctuation"] = ("Punctuation", "Interpunkcija"),
+            ["proof_type_typography"] = ("Typography", "Tipografija"),
+            ["proof_all_title"] = ("Proofreading {0} of {1}: {2} (page {3})", "Lektura {0} od {1}: {2} (strana {3})"),
+            ["proof_all_stop"] = ("Stop proofreading the remaining text layers?", "Prekinuti lekturu preostalih tekst-slojeva?"),
+            ["proof_all_none"] = ("No changes were made.", "Nema izmena."),
+            ["proof_all_done"] = ("Proofreading applied to {0} text layers. Ctrl+Z undoes it.", "Lektura primenjena na {0} tekst-slojeva. Ctrl+Z je poništava."),
+
+            // Veličine za knjige
+            ["cp_a5_300"] = ("A5 booklet, 300 dpi", "A5 brošura, 300 dpi"),
+            ["cp_b5_300"] = ("B5 book, 300 dpi", "B5 knjiga, 300 dpi"),
+            ["cp_book_300"] = ("Book 15 × 22 cm, 300 dpi", "Knjiga 15 × 22 cm, 300 dpi"),
+        };
+    }
+}

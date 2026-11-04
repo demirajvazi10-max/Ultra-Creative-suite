@@ -1,176 +1,224 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using UltraStudio.Localization;
 using UltraStudio.Models;
+using UltraStudio.Services;
 
 namespace UltraStudio.Views
 {
     /// <summary>
-    /// Jedan dijalog za SVE tipove slojeva — polja zajednička za sve (ime,
-    /// pozicija, veličina, providnost, vidljivost) plus polja specifična za
-    /// tip (tekst/oblik) grade se dinamički u konstruktoru, isti "grade se u
-    /// kodu, ne u XAML-u" obrazac kao SetValueDialog, radi konzistentnosti.
+    /// Svojstva sloja — jedan dijalog za sve tipove. Polja se grade u kodu,
+    /// svako ima ime za čitač ekrana; Tab ide redom kroz sve. Stilovi sloja
+    /// (senka, kontura, sjaj), režim stapanja i rotacija važe za sve tipove.
     /// </summary>
     public partial class LayerPropertiesDialog : Window
     {
         private readonly Layer _layer;
-        private readonly TextBox _name, _x, _y, _w, _h, _opacity;
-        private readonly CheckBox _visible;
-
-        // Tekst
-        private TextBox? _text, _fontFamily, _fontSize, _colorHex;
-        private CheckBox? _bold, _italic;
-
-        // Oblik
-        private TextBox? _fillColorHex, _strokeColorHex, _strokeWidth;
-        private CheckBox? _fillEnabled, _strokeEnabled;
+        private readonly StackPanel _stack = new() { Margin = new Thickness(18) };
+        private readonly List<Action> _apply = new();
+        private readonly TextBlock _error;
 
         public LayerPropertiesDialog(Layer layer)
         {
             _layer = layer;
-            Title = string.Format(Lang.T("layer_props_title"), layer.Name);
-            Width = 380; Height = 560;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            ResizeMode = ResizeMode.NoResize;
-            Background = (System.Windows.Media.Brush)Application.Current.Resources["BrBgDark"];
+            Ui.Prepare(this, string.Format(Lang.T("layer_props_title"), layer.Name), 440, 720);
+            ResizeMode = ResizeMode.CanResize;
 
-            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var stack = new StackPanel { Margin = new Thickness(18) };
-            scroll.Content = stack;
-
-            _name = AddField(stack, Lang.T("layer_field_name"), layer.Name);
-            _x = AddField(stack, Lang.T("layer_field_x"), layer.X.ToString("0.#"));
-            _y = AddField(stack, Lang.T("layer_field_y"), layer.Y.ToString("0.#"));
-            _w = AddField(stack, Lang.T("layer_field_width"), layer.Width.ToString("0.#"));
-            _h = AddField(stack, Lang.T("layer_field_height"), layer.Height.ToString("0.#"));
-            _opacity = AddField(stack, Lang.T("layer_field_opacity"), layer.Opacity.ToString("0.#"));
-
-            _visible = new CheckBox
-            {
-                Content = Lang.T("layer_field_visible"),
-                IsChecked = layer.Visible,
-                Margin = new Thickness(0, 4, 0, 14),
-                Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"]
-            };
-            stack.Children.Add(_visible);
+            // ── Opšte ──
+            Section("layer_section_general");
+            Text("layer_field_name", layer.Name, v => { if (!string.IsNullOrWhiteSpace(v)) layer.Name = v.Trim(); });
 
             if (layer is TextLayer t)
             {
-                AddSectionLabel(stack, Lang.T("layer_section_text"));
-                _text = AddField(stack, Lang.T("layer_field_text"), t.Text);
-                _fontFamily = AddField(stack, Lang.T("layer_field_font"), t.FontFamily);
-                _fontSize = AddField(stack, Lang.T("layer_field_font_size"), t.FontSize.ToString("0.#"));
-                _colorHex = AddField(stack, Lang.T("layer_field_color"), t.ColorHex);
-                _bold = new CheckBox { Content = Lang.T("layer_field_bold"), IsChecked = t.Bold, Margin = new Thickness(0, 0, 0, 6),
-                    Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
-                _italic = new CheckBox { Content = Lang.T("layer_field_italic"), IsChecked = t.Italic, Margin = new Thickness(0, 0, 0, 14),
-                    Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
-                stack.Children.Add(_bold);
-                stack.Children.Add(_italic);
+                Section("layer_section_text");
+                var textBox = Text("layer_field_text", t.Text, v => t.Text = v, multiline: true);
+                FontCombo(t);
+                Num("layer_field_font_size", t.FontSize, v => t.FontSize = v, 1, 2000);
+                Text("layer_field_color", t.ColorHex, v => t.ColorHex = v.Trim());
+                Check("layer_field_bold", t.Bold, v => t.Bold = v);
+                Check("layer_field_italic", t.Italic, v => t.Italic = v);
+                Choice("layer_field_align", new[] { "align_left", "align_center", "align_right", "align_justify" }, (int)t.Align, i => t.Align = (TextAlign)i);
+                Check("layer_field_wrap", t.Wrap, v => t.Wrap = v);
+                Num("layer_field_line_spacing", t.LineSpacing, v => t.LineSpacing = v, 0.5, 4);
+                Check("layer_field_autosize", t.AutoSize, v => t.AutoSize = v);
 
-                var proofBtn = new Button
+                var proof = Ui.Button(Lang.T("menu_layer_proofread"), () => { }, primary: true);
+                proof.HorizontalAlignment = HorizontalAlignment.Left;
+                proof.Margin = new Thickness(0, 0, 0, 12);
+                proof.Click += (_, __) =>
                 {
-                    Content = Lang.T("menu_layer_proofread"), Style = (Style)Application.Current.Resources["AIButton"],
-                    HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 14)
+                    var pdlg = new ProofreadingDialog(textBox.Text, Lang.T("proof_title_layer")) { Owner = this };
+                    if (pdlg.ShowDialog() == true) textBox.Text = pdlg.ResultText;
                 };
-                proofBtn.Click += (_, __) =>
-                {
-                    var pdlg = new ProofreadingDialog(_text!.Text, Lang.T("proof_title_layer")) { Owner = this };
-                    if (pdlg.ShowDialog() == true) _text!.Text = pdlg.ResultText;
-                };
-                stack.Children.Add(proofBtn);
+                _stack.Children.Add(proof);
             }
             else if (layer is ShapeLayer s)
             {
-                AddSectionLabel(stack, Lang.T("layer_section_shape"));
-                _fillEnabled = new CheckBox { Content = Lang.T("layer_field_fill_enabled"), IsChecked = s.FillEnabled, Margin = new Thickness(0, 0, 0, 6),
-                    Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
-                stack.Children.Add(_fillEnabled);
-                _fillColorHex = AddField(stack, Lang.T("layer_field_fill_color"), s.FillColorHex);
-                _strokeEnabled = new CheckBox { Content = Lang.T("layer_field_stroke_enabled"), IsChecked = s.StrokeEnabled, Margin = new Thickness(0, 0, 0, 6),
-                    Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
-                stack.Children.Add(_strokeEnabled);
-                _strokeColorHex = AddField(stack, Lang.T("layer_field_stroke_color"), s.StrokeColorHex);
-                _strokeWidth = AddField(stack, Lang.T("layer_field_stroke_width"), s.StrokeWidth.ToString("0.#"));
+                Section("layer_section_shape");
+                Check("layer_field_fill_enabled", s.FillEnabled, v => s.FillEnabled = v);
+                Text("layer_field_fill_color", s.FillColorHex, v => s.FillColorHex = v.Trim());
+                Check("layer_field_stroke_enabled", s.StrokeEnabled, v => s.StrokeEnabled = v);
+                Text("layer_field_stroke_color", s.StrokeColorHex, v => s.StrokeColorHex = v.Trim());
+                Num("layer_field_stroke_width", s.StrokeWidth, v => s.StrokeWidth = v, 0, 500);
+                if (s.ShapeKind == ShapeKind.Rectangle)
+                    Num("layer_field_corner_radius", s.CornerRadius, v => s.CornerRadius = v, 0, 5000);
+            }
+            else if (layer is GradientLayer g)
+            {
+                Section("layer_section_gradient");
+                Choice("gradient_kind", new[] { "gradient_linear", "gradient_radial" }, (int)g.Kind, i => g.Kind = (GradientKind)i);
+                Text("gradient_start", g.StartColorHex, v => g.StartColorHex = v.Trim());
+                Num("gradient_start_opacity", g.StartOpacity, v => g.StartOpacity = v, 0, 100);
+                Text("gradient_end", g.EndColorHex, v => g.EndColorHex = v.Trim());
+                Num("gradient_end_opacity", g.EndOpacity, v => g.EndOpacity = v, 0, 100);
+                Num("gradient_angle", g.Angle, v => g.Angle = v, -360, 360);
             }
             else if (layer is ImageLayer il)
             {
-                AddSectionLabel(stack, Lang.T("layer_section_image"));
-                var pathLbl = new TextBlock
+                Section("layer_section_image");
+                var path = Ui.TextBox(Lang.T("layer_section_image"), il.SourcePath);
+                path.IsReadOnly = true;
+                _stack.Children.Add(path);
+                var replace = Ui.Button(Lang.T("layer_replace_image"), () =>
                 {
-                    Text = il.SourcePath, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14),
-                    Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrTextMuted"], FontSize = 11
-                };
-                stack.Children.Add(pathLbl);
+                    var d = new Microsoft.Win32.OpenFileDialog { Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.webp|All files|*.*" };
+                    if (d.ShowDialog(this) == true) path.Text = d.FileName;
+                });
+                replace.HorizontalAlignment = HorizontalAlignment.Left;
+                replace.Margin = new Thickness(0, 0, 0, 12);
+                _stack.Children.Add(replace);
+                _apply.Add(() => il.SourcePath = path.Text);
             }
 
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-            var ok = new Button { Content = Lang.T("btn_apply"), Width = 90, Height = 30, Margin = new Thickness(0, 0, 8, 0),
-                Style = (Style)Application.Current.Resources["AIButton"], IsDefault = true };
-            var cancel = new Button { Content = Lang.T("btn_cancel"), Width = 90, Height = 30,
-                Style = (Style)Application.Current.Resources["StdButton"], IsCancel = true };
-            ok.Click += Ok_Click;
-            btnPanel.Children.Add(ok); btnPanel.Children.Add(cancel);
-            stack.Children.Add(btnPanel);
+            // ── Položaj ──
+            Section("layer_section_position");
+            Num("layer_field_x", layer.X, v => layer.X = v);
+            Num("layer_field_y", layer.Y, v => layer.Y = v);
+            Num("layer_field_width", layer.Width, v => layer.Width = v, 1, 100000);
+            Num("layer_field_height", layer.Height, v => layer.Height = v, 1, 100000);
+            Num("layer_field_rotation", layer.Rotation, v => layer.Rotation = ((v % 360) + 360) % 360, -3600, 3600);
 
-            Content = scroll;
-        }
+            // ── Izgled ──
+            Section("layer_section_look");
+            Num("layer_field_opacity", layer.Opacity, v => layer.Opacity = v, 0, 100);
+            Check("layer_field_visible", layer.Visible, v => layer.Visible = v);
+            Choice("layer_field_blend", Enum.GetNames(typeof(BlendMode)).Select(n => "blend_" + n).ToArray(), (int)layer.Blend, i => layer.Blend = (BlendMode)i);
 
-        private void AddSectionLabel(StackPanel stack, string text)
-        {
-            stack.Children.Add(new TextBlock
+            // ── Stilovi ──
+            Section("layer_section_styles");
+            Check("style_shadow", layer.ShadowEnabled, v => layer.ShadowEnabled = v);
+            Text("style_shadow_color", layer.ShadowColorHex, v => layer.ShadowColorHex = v.Trim());
+            Num("style_shadow_x", layer.ShadowOffsetX, v => layer.ShadowOffsetX = v, -2000, 2000);
+            Num("style_shadow_y", layer.ShadowOffsetY, v => layer.ShadowOffsetY = v, -2000, 2000);
+            Num("style_shadow_blur", layer.ShadowBlur, v => layer.ShadowBlur = v, 0, 500);
+            Num("style_shadow_opacity", layer.ShadowOpacity, v => layer.ShadowOpacity = v, 0, 100);
+            Check("style_outline", layer.OutlineEnabled, v => layer.OutlineEnabled = v);
+            Text("style_outline_color", layer.OutlineColorHex, v => layer.OutlineColorHex = v.Trim());
+            Num("style_outline_width", layer.OutlineWidth, v => layer.OutlineWidth = v, 0, 500);
+            Check("style_glow", layer.GlowEnabled, v => layer.GlowEnabled = v);
+            Text("style_glow_color", layer.GlowColorHex, v => layer.GlowColorHex = v.Trim());
+            Num("style_glow_size", layer.GlowSize, v => layer.GlowSize = v, 0, 500);
+
+            _error = new TextBlock { Foreground = Ui.Res("BrDanger"), TextWrapping = TextWrapping.Wrap };
+            _error.SetValue(AutomationProperties.LiveSettingProperty, AutomationLiveSetting.Assertive);
+            _stack.Children.Add(_error);
+            _stack.Children.Add(Ui.Row(
+                Ui.Button(Lang.T("btn_apply"), Ok, primary: true, isDefault: true),
+                Ui.Button(Lang.T("btn_cancel"), () => DialogResult = false, isCancel: true)));
+
+            Content = new ScrollViewer { Content = _stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            Loaded += (_, __) =>
             {
-                Text = text, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 4, 0, 8),
-                Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrAccentAI"]
-            });
+                var first = _stack.Children.OfType<TextBox>().FirstOrDefault();
+                first?.Focus(); first?.SelectAll();
+            };
         }
 
-        private TextBox AddField(StackPanel stack, string label, string value)
+        // ── graditelji polja ──
+        private void Section(string key) => _stack.Children.Add(new TextBlock
         {
-            var lbl = new TextBlock { Text = label, Margin = new Thickness(0, 0, 0, 4),
-                Foreground = (System.Windows.Media.Brush)Application.Current.Resources["BrText"] };
-            var box = new TextBox { Text = value, Height = 28, Margin = new Thickness(0, 0, 0, 12) };
-            box.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, label);
-            stack.Children.Add(lbl);
-            stack.Children.Add(box);
+            Text = Lang.T(key), FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 8),
+            Foreground = Ui.Res("BrAccentAI")
+        });
+
+        private TextBox Text(string key, string value, Action<string> set, bool multiline = false)
+        {
+            _stack.Children.Add(Ui.Label(Lang.T(key)));
+            var box = Ui.TextBox(Lang.T(key), value, multiline);
+            _stack.Children.Add(box);
+            _apply.Add(() => set(box.Text));
             return box;
         }
 
-        private static double ParseD(string s, double fallback)
+        private readonly List<(TextBox box, string label, double min, double max)> _numbers = new();
+
+        private void Num(string key, double value, Action<double> set, double min = -100000, double max = 100000)
         {
-            return double.TryParse(s.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out double v) ? v : fallback;
+            _stack.Children.Add(Ui.Label(Lang.T(key)));
+            var box = Ui.TextBox(Lang.T(key), value.ToString("0.##", CultureInfo.InvariantCulture));
+            _stack.Children.Add(box);
+            _numbers.Add((box, Lang.T(key), min, max));
+            _apply.Add(() => { if (Ui.TryNum(box.Text, out double v)) set(Math.Clamp(v, min, max)); });
         }
 
-        private void Ok_Click(object sender, RoutedEventArgs e)
+        private void Check(string key, bool value, Action<bool> set)
         {
-            _layer.Name = string.IsNullOrWhiteSpace(_name.Text) ? _layer.Name : _name.Text.Trim();
-            _layer.X = ParseD(_x.Text, _layer.X);
-            _layer.Y = ParseD(_y.Text, _layer.Y);
-            _layer.Width = ParseD(_w.Text, _layer.Width);
-            _layer.Height = ParseD(_h.Text, _layer.Height);
-            _layer.Opacity = Math.Clamp(ParseD(_opacity.Text, _layer.Opacity), 0, 100);
-            _layer.Visible = _visible.IsChecked == true;
+            var c = Ui.Check(Lang.T(key), value);
+            _stack.Children.Add(c);
+            _apply.Add(() => set(c.IsChecked == true));
+        }
 
-            if (_layer is TextLayer t)
-            {
-                t.Text = _text!.Text;
-                t.FontFamily = string.IsNullOrWhiteSpace(_fontFamily!.Text) ? t.FontFamily : _fontFamily.Text.Trim();
-                t.FontSize = Math.Max(1, ParseD(_fontSize!.Text, t.FontSize));
-                t.ColorHex = _colorHex!.Text.Trim();
-                t.Bold = _bold!.IsChecked == true;
-                t.Italic = _italic!.IsChecked == true;
-            }
-            else if (_layer is ShapeLayer s)
-            {
-                s.FillEnabled = _fillEnabled!.IsChecked == true;
-                s.FillColorHex = _fillColorHex!.Text.Trim();
-                s.StrokeEnabled = _strokeEnabled!.IsChecked == true;
-                s.StrokeColorHex = _strokeColorHex!.Text.Trim();
-                s.StrokeWidth = Math.Max(0, ParseD(_strokeWidth!.Text, s.StrokeWidth));
-            }
+        private void Choice(string key, string[] optionKeys, int selected, Action<int> set)
+        {
+            _stack.Children.Add(Ui.Label(Lang.T(key)));
+            var c = Ui.Combo(Lang.T(key), optionKeys.Select(Lang.T), selected);
+            _stack.Children.Add(c);
+            _apply.Add(() => { if (c.SelectedIndex >= 0) set(c.SelectedIndex); });
+        }
 
+        private void FontCombo(TextLayer t)
+        {
+            _stack.Children.Add(Ui.Label(Lang.T("layer_field_font")));
+            var c = new ComboBox { IsEditable = true, FontSize = 13, Height = 30, Margin = new Thickness(0, 0, 0, 10), IsTextSearchEnabled = true };
+            c.SetValue(AutomationProperties.NameProperty, Lang.T("layer_field_font"));
+            try
+            {
+                foreach (var f in System.Windows.Media.Fonts.SystemFontFamilies.Select(f => f.Source).OrderBy(n => n))
+                    c.Items.Add(f);
+            }
+            catch { }
+            c.Text = t.FontFamily;
+            _stack.Children.Add(c);
+            _apply.Add(() => { if (!string.IsNullOrWhiteSpace(c.Text)) t.FontFamily = c.Text.Trim(); });
+        }
+
+        private void Ok()
+        {
+            foreach (var (box, label, min, max) in _numbers)
+            {
+                if (!Ui.TryNum(box.Text, out double v) || v < min || v > max)
+                {
+                    _error.Text = string.Format(Lang.T("form_bad_number"), label) +
+                                  string.Format(Lang.T("form_range"), min.ToString("0.##", CultureInfo.InvariantCulture), max.ToString("0.##", CultureInfo.InvariantCulture));
+                    Ui.Announce(_error, _error.Text);
+                    box.Focus(); box.SelectAll();
+                    return;
+                }
+            }
+            foreach (var a in _apply) a();
+            if (_layer is TextLayer t && t.AutoSize && !t.Wrap)
+            {
+                var (w, h) = CanvasEngine.MeasureText(t);
+                double oldCx = t.CenterX;
+                t.Width = w; t.Height = h;
+                // Centrirani/desno poravnati tekst zadržava svoje sidro pri promeni dužine
+                if (t.Align == TextAlign.Center) t.X = oldCx - w / 2;
+            }
             DialogResult = true;
         }
     }

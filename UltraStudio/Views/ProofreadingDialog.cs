@@ -100,7 +100,14 @@ namespace UltraStudio.Views
             _btnApplySelected.Click += (_, __) => ApplyIssue(SelectedIssue());
             _btnApplyAll.Click += (_, __) => { foreach (var i in _issueList.Items) ApplyIssueItem((WF.ListViewItem)i); RefreshIssueList(keepText: true); };
             _btnUseRewrite.Click += (_, __) => { if (_lastResult != null) _textBox.Text = _lastResult.Rewritten; };
-            applyRow.Children.Add(_btnApplySelected); applyRow.Children.Add(_btnApplyAll); applyRow.Children.Add(_btnUseRewrite);
+            // Srpska tipografija bez AI-ja: navodnici „ “, crte, razmaci, tri tačke — trenutno, nad tekstom iznad
+            var btnTypo = new Button { Content = Lang.T("proof_typography_btn"), Height = 28, Padding = new Thickness(10, 0, 10, 0), Margin = new Thickness(6, 0, 0, 0), Style = (Style)Application.Current.Resources["StdButton"] };
+            btnTypo.Click += (_, __) =>
+            {
+                _textBox.Text = UltraStudio.Services.Typography.Fix(_textBox.Text, new UltraStudio.Services.Typography.Options(), out var rep);
+                SetStatusLive(string.Format(Lang.T("typo_done"), rep.Total));
+            };
+            applyRow.Children.Add(_btnApplySelected); applyRow.Children.Add(_btnApplyAll); applyRow.Children.Add(_btnUseRewrite); applyRow.Children.Add(btnTypo);
             Grid.SetRow(applyRow, 5);
             root.Children.Add(applyRow);
 
@@ -188,7 +195,7 @@ namespace UltraStudio.Views
             {
                 var lvi = new WF.ListViewItem(new[]
                 {
-                    Lang.T(issue.Type switch { "grammar" => "proof_type_grammar", "style" => "proof_type_style", _ => "proof_type_spelling" }),
+                    Lang.T(issue.Type switch { "grammar" => "proof_type_grammar", "style" => "proof_type_style", "punctuation" => "proof_type_punctuation", "typography" => "proof_type_typography", _ => "proof_type_spelling" }),
                     issue.Original, issue.Suggestion, issue.Explanation
                 })
                 { Tag = issue };

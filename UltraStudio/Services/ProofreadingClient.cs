@@ -104,12 +104,24 @@ namespace UltraStudio.Services
 
         private async Task<ProofreadingResult> ProofreadChunkAsync(string chunkText, CancellationToken ct)
         {
+            bool cyr = Typography.IsMostlyCyrillic(chunkText);
             string prompt =
-                "You are a professional Serbian-language proofreader/copy editor (lektor). Proofread the text below. " +
-                "Check spelling, grammar (cases/padeži, agreement), AND style (repeated words, overly long or " +
+                "You are a professional Serbian-language proofreader/copy editor (lektor) who follows the current " +
+                "Pravopis srpskoga jezika (Matica srpska). Proofread the text below. " +
+                "Check spelling, grammar (cases/padeži, agreement), punctuation, AND style (repeated words, overly long or " +
                 "awkward sentences) — and suggest a better phrasing where it genuinely helps. " +
+                "Pay special attention to the typical Serbian mistakes: č/ć and dž/đ confusion; ije/je (and keep the text's " +
+                "own dialect — ekavian stays ekavian, ijekavian stays ijekavian; flag a MIX of the two); \"ne\" with verbs " +
+                "written separately (ne znam) but neću, nisam, nemoj, nemam together; \"da li\" instead of \"dal\"; " +
+                "capital letters in names of institutions, holidays and geographic names; commas before a, ali, nego, već, " +
+                "and NO comma before \"da\" and \"što\" introducing an object clause; enclitic order (je, se, li); " +
+                "foreign words and names adapted per Pravopis; numbers and dates (1. januar, 21. vek). " +
+                "Use type \"punctuation\" for commas/periods and \"typography\" for quotes and dashes (Serbian quotes are „ “, " +
+                "a spaced dash – between clauses). " +
+                (cyr ? "The text is in CYRILLIC script — keep every suggestion and the rewrite in Cyrillic. "
+                     : "The text is in LATIN script — keep every suggestion and the rewrite in Latin script, never switch to Cyrillic. ") +
                 "Respond with ONLY a JSON object, nothing else, no markdown fences:\n" +
-                "{\"issues\": [{\"type\": \"spelling|grammar|style\", \"original\": \"exact short phrase from the text\", " +
+                "{\"issues\": [{\"type\": \"spelling|grammar|punctuation|typography|style\", \"original\": \"exact short phrase from the text\", " +
                 "\"suggestion\": \"corrected phrase\", \"explanation\": \"short reason, under 15 words, in Serbian\"}], " +
                 "\"rewritten\": \"the full text, lightly polished, same length and meaning\"}\n" +
                 "Keep \"original\" short and EXACT (a few words, copy-pasted verbatim from the text below) so it can " +

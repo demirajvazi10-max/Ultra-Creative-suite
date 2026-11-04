@@ -6,7 +6,8 @@
         Title="{DynamicResource L_app_title}" Height="720" Width="1200"
         Background="{StaticResource BrBgDark}"
         WindowStartupLocation="CenterScreen"
-        PreviewKeyDown="Window_PreviewKeyDown">
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Closing="Window_Closing">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -16,43 +17,191 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- MENI -->
+        <!-- MENI — svaka stavka ima Tag = id komande (MainWindow.Commands.cs) -->
         <Menu Grid.Row="0" Background="{StaticResource BrBgPanel}" Foreground="{StaticResource BrText}">
             <MenuItem Header="{DynamicResource L_menu_file}">
-                <MenuItem Header="{DynamicResource L_menu_open_image}" Click="OpenImage_Click"/>
-                <MenuItem Header="{DynamicResource L_menu_save}" Click="Save_Click"/>
-                <MenuItem Header="{DynamicResource L_menu_save_as}" Click="SaveAs_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_new_canvas}" Tag="new" Click="Menu_Click" InputGestureText="Ctrl+N"/>
+                <MenuItem Header="{DynamicResource L_menu_open}" Tag="open" Click="Menu_Click" InputGestureText="Ctrl+O"/>
                 <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_exit}" Click="Exit_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_save_project}" Tag="save" Click="Menu_Click" InputGestureText="Ctrl+S"/>
+                <MenuItem Header="{DynamicResource L_menu_save_project_as}" Tag="saveas" Click="Menu_Click" InputGestureText="Ctrl+Shift+S"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_export}" Tag="export" Click="Menu_Click" InputGestureText="Ctrl+E"/>
+                <MenuItem Header="{DynamicResource L_menu_batch}" Tag="batch" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_exit}" Tag="exit" Click="Menu_Click" InputGestureText="Alt+F4"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_edit}">
-                <MenuItem Header="{DynamicResource L_menu_reset}" Click="Reset_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_undo}" Tag="undo" Click="Menu_Click" InputGestureText="Ctrl+Z"/>
+                <MenuItem Header="{DynamicResource L_menu_redo}" Tag="redo" Click="Menu_Click" InputGestureText="Ctrl+Y"/>
+                <MenuItem Header="{DynamicResource L_menu_history}" Tag="history" Click="Menu_Click" InputGestureText="Ctrl+H"/>
                 <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_extract_object}" Click="ExtractObject_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_copy_to_layer}" Tag="copylayer" Click="Menu_Click" InputGestureText="Ctrl+J"/>
+                <MenuItem Header="{DynamicResource L_menu_cut_to_layer}" Tag="cutlayer" Click="Menu_Click" InputGestureText="Ctrl+Shift+J"/>
+                <MenuItem Header="{DynamicResource L_menu_fill_selection}" Tag="fill" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_delete_selection}" Tag="clear" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_design_check}" Tag="designcheck" Click="Menu_Click" InputGestureText="F7"/>
+                <MenuItem Header="{DynamicResource L_menu_quick_status}" Tag="status" Click="Menu_Click" InputGestureText="F6"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_language}" Tag="language" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_select}">
+                <MenuItem Header="{DynamicResource L_menu_select_all}" Tag="selall" Click="Menu_Click" InputGestureText="Ctrl+A"/>
+                <MenuItem Header="{DynamicResource L_menu_deselect}" Tag="deselect" Click="Menu_Click" InputGestureText="Ctrl+D"/>
+                <MenuItem Header="{DynamicResource L_menu_invert_selection}" Tag="selinvert" Click="Menu_Click" InputGestureText="Ctrl+Shift+I"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_select_rect}" Tag="selrect" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_select_ellipse}" Tag="selellipse" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_select_preset}" Tag="selpreset" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_select_subject}" Tag="selsubject" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_select_describe}" Tag="seldescribe" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_color_range}" Tag="colorrange" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_feather}" Tag="feather" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_selection_info}" Tag="selinfo" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_whats_in_selection}" Tag="selwhat" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_image}">
+                <MenuItem Header="{DynamicResource L_menu_crop_selection}" Tag="cropsel" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_crop_ratio}" Tag="cropratio" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_crop_numbers}" Tag="cropnum" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_image_size}" Tag="imagesize" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_canvas_size}" Tag="canvassize" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_rotate_cw}" Tag="rot90" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_rotate_ccw}" Tag="rot270" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_rotate_180}" Tag="rot180" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_rotate_any}" Tag="rotany" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_flip_h}" Tag="fliph" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_flip_v}" Tag="flipv" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_flatten}" Tag="flatten" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_adjust}">
+                <MenuItem Header="{DynamicResource L_menu_looks}" Tag="looks" Click="Menu_Click" InputGestureText="Ctrl+L"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_auto_tone}" Tag="autotone" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_auto_contrast}" Tag="autocontrast" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_auto_color}" Tag="autocolor" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_ai_suggest}" Tag="aisuggest" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_bake}" Tag="bake" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_reset}" Tag="reset" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_filter}">
+                <MenuItem Header="{DynamicResource L_menu_repeat_filter}" Tag="refilter" Click="Menu_Click" InputGestureText="Ctrl+F"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_flt_GaussianBlur}" Tag="filter:GaussianBlur" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_MotionBlur}" Tag="filter:MotionBlur" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_SpinBlur}" Tag="filter:SpinBlur" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_UnsharpMask}" Tag="filter:UnsharpMask" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_AddNoise}" Tag="filter:AddNoise" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_ReduceNoise}" Tag="filter:ReduceNoise" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_flt_Emboss}" Tag="filter:Emboss" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_FindEdges}" Tag="filter:FindEdges" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_OilPaint}" Tag="filter:OilPaint" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Sketch}" Tag="filter:Sketch" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Charcoal}" Tag="filter:Charcoal" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Pixelate}" Tag="filter:Pixelate" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Solarize}" Tag="filter:Solarize" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_flt_Swirl}" Tag="filter:Swirl" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Wave}" Tag="filter:Wave" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_flt_Pinch}" Tag="filter:Pinch" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_retouch}">
+                <MenuItem Header="{DynamicResource L_menu_remove_object}" Tag="removeobj" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_remove_selected}" Tag="removesel" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_spot_heal}" Tag="spot" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_redeye_ai}" Tag="redeyeai" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_redeye_sel}" Tag="redeyesel" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_ai}">
+                <MenuItem Header="{DynamicResource L_ai_describe_btn}" Tag="describe" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_describe_look}" Tag="describelook" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_whats_in_selection}" Tag="selwhat" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_remove_bg}" Tag="removebg" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_replace_bg_color}" Tag="bgcolor" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_replace_bg_image}" Tag="bgimage" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_blur_bg}" Tag="bgblur" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_extract_object}" Tag="extract" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_select_subject}" Tag="selsubject" Click="Menu_Click"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_layers}">
-                <MenuItem Header="{DynamicResource L_menu_new_canvas}" Click="NewCanvas_Click"/>
-                <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_add_text_layer}" Click="AddTextLayer_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_add_text_layer}" Tag="addtext" Click="Menu_Click"/>
                 <MenuItem Header="{DynamicResource L_menu_add_shape_layer}">
-                    <MenuItem Header="{DynamicResource L_shape_rectangle}" Click="AddRectangleLayer_Click"/>
-                    <MenuItem Header="{DynamicResource L_shape_ellipse}" Click="AddEllipseLayer_Click"/>
-                    <MenuItem Header="{DynamicResource L_shape_line}" Click="AddLineLayer_Click"/>
+                    <MenuItem Header="{DynamicResource L_shape_rectangle}" Tag="addrect" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_shape_ellipse}" Tag="addellipse" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_shape_line}" Tag="addline" Click="Menu_Click"/>
                 </MenuItem>
-                <MenuItem Header="{DynamicResource L_menu_add_image_layer}" Click="AddImageLayer_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_add_image_layer}" Tag="addimage" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_add_gradient_layer}" Tag="addgradient" Click="Menu_Click"/>
                 <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_layer_properties}" Click="LayerProperties_Click"/>
-                <MenuItem Header="{DynamicResource L_menu_duplicate_layer}" Click="DuplicateLayer_Click"/>
-                <MenuItem Header="{DynamicResource L_menu_delete_layer}" Click="DeleteLayer_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_layer_properties}" Tag="layerprops" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_duplicate_layer}" Tag="duplayer" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_delete_layer}" Tag="dellayer" Click="Menu_Click"/>
                 <Separator/>
-                <MenuItem Header="{DynamicResource L_menu_move_layer_up}" Click="MoveLayerUp_Click"/>
-                <MenuItem Header="{DynamicResource L_menu_move_layer_down}" Click="MoveLayerDown_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_move_layer_up}" Tag="layerup" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_move_layer_down}" Tag="layerdown" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_arrange}">
+                    <MenuItem Header="{DynamicResource L_arr_center_h}" Tag="arr:ch" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_center_v}" Tag="arr:cv" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_center}" Tag="arr:c" Click="Menu_Click"/>
+                    <Separator/>
+                    <MenuItem Header="{DynamicResource L_arr_left}" Tag="arr:l" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_right}" Tag="arr:r" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_top}" Tag="arr:t" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_bottom}" Tag="arr:b" Click="Menu_Click"/>
+                    <Separator/>
+                    <MenuItem Header="{DynamicResource L_arr_fill}" Tag="arr:fill" Click="Menu_Click"/>
+                    <MenuItem Header="{DynamicResource L_arr_where}" Tag="arr:where" Click="Menu_Click"/>
+                </MenuItem>
+                <MenuItem Header="{DynamicResource L_menu_layer_where}" Tag="arr:where" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_flatten}" Tag="flatten" Click="Menu_Click"/>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource L_menu_document}">
+                <MenuItem Header="{DynamicResource L_menu_page_new}" Tag="pagenew" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_page_new_size}" Tag="pagenewsize" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_page_duplicate}" Tag="pagedup" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_page_delete}" Tag="pagedel" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_page_prev}" Tag="pageprev" Click="Menu_Click" InputGestureText="Ctrl+PageUp"/>
+                <MenuItem Header="{DynamicResource L_menu_page_next}" Tag="pagenext" Click="Menu_Click" InputGestureText="Ctrl+PageDown"/>
+                <MenuItem Header="{DynamicResource L_menu_page_list}" Tag="pagelist" Click="Menu_Click" InputGestureText="Ctrl+G"/>
+                <MenuItem Header="{DynamicResource L_menu_page_up}" Tag="pageup" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_page_down}" Tag="pagedown" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_flow_text}" Tag="flowtext" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_add_frame}" Tag="addframe" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_page_numbers}" Tag="pagenumbers" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_doc_dpi}" Tag="docdpi" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_export_pdf}" Tag="exportpdf" Click="Menu_Click" InputGestureText="Ctrl+Shift+E"/>
+                <MenuItem Header="{DynamicResource L_menu_export_pages}" Tag="exportpages" Click="Menu_Click"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_proofread}">
-                <MenuItem Header="{DynamicResource L_menu_proofread_document}" Click="ProofreadDocument_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_proofread_document}" Tag="proofdoc" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_proofread_all}" Tag="proofall" Click="Menu_Click"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_typography}" Tag="typo" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_to_cyrillic}" Tag="tocyr" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_to_latin}" Tag="tolat" Click="Menu_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_typography_file}" Tag="typodoc" Click="Menu_Click"/>
             </MenuItem>
             <MenuItem Header="{DynamicResource L_menu_help}">
-                <MenuItem Header="{DynamicResource L_menu_about}" Click="ShowAbout_Click"/>
+                <MenuItem Header="{DynamicResource L_menu_shortcuts}" Tag="shortcuts" Click="Menu_Click" InputGestureText="F1"/>
+                <MenuItem Header="{DynamicResource L_menu_log}" Tag="log" Click="Menu_Click" InputGestureText="Ctrl+Shift+L"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_about}" Tag="about" Click="Menu_Click"/>
             </MenuItem>
         </Menu>
 
@@ -170,8 +319,11 @@
                 <Border Grid.Row="0" Background="#0F0F1A" Margin="8">
                     <Grid>
                         <Image x:Name="ImgPreview" Stretch="Uniform"
-                               AutomationProperties.Name="Image preview"/>
-                        <TextBlock x:Name="TxtNoImage" Text="No image open — Ctrl+O to open one"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               MouseLeftButtonDown="Preview_MouseDown" MouseMove="Preview_MouseMove"
+                               MouseLeftButtonUp="Preview_MouseUp"
+                               AutomationProperties.Name="{DynamicResource L_acc_preview}"/>
+                        <TextBlock x:Name="TxtNoImage" Text="{DynamicResource L_no_image_hint}"
                                    Foreground="{StaticResource BrTextMuted}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
