@@ -10,6 +10,8 @@
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivstevents.h"
+#include "pluginterfaces/vst/ivsteditcontroller.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/base/funknown.h"
 
 #include <mutex>
@@ -64,7 +66,7 @@ struct VstHost::Impl
     IPtr<IAudioProcessor> audioProcessor;
 
     HostProcessData processData;
-    EventList inputEvents{64};
+    EventList inputEvents{256};
     EventList outputEvents{64};
     ParameterChanges inputParamChanges{0};
     ParameterChanges outputParamChanges{0};
@@ -78,10 +80,17 @@ struct VstHost::Impl
     std::vector<PendingNote> pending;
     std::vector<PendingNote> pendingScratch; // reused every block, never (re)allocates
 
+    // Performance controllers (see VstHost::SetPitchBend)
+    ParamID pitchBendParam = kNoParamId;
+    ParamID modWheelParam = kNoParamId;
+    float bend = 0.0f, sentBend = 0.0f;
+    float mod = 0.0f, sentMod = 0.0f;
+
     Impl()
     {
-        pending.reserve(64);
-        pendingScratch.reserve(64);
+        pending.reserve(256);
+        pendingScratch.reserve(256);
+        inputParamChanges.setMaxParameters(4);
     }
 
     void ResetAll()
@@ -102,6 +111,9 @@ struct VstHost::Impl
         module.reset();   // unloads the .vst3 module
 
         eventInBusIndex = -1;
+        pitchBendParam = kNoParamId;
+        modWheelParam = kNoParamId;
+        sentBend = sentMod = 0.0f;
         outputChannelCount = 0;
         maxBlockSize = 0;
         loaded = false;
@@ -245,6 +257,28 @@ bool VstHost::LoadInstrument(const std::string& modulePath, double sampleRate, i
     impl_->outputChannelCount = outputChannelCount;
     impl_->maxBlockSize = maxBlockSize;
     impl_->pluginName = chosen.name();
+
+    // Which parameters do the pitch wheel and the modulation wheel drive?
+    if (impl_->controller && eventInBusIndex >= 0)
+    {
+        FUnknownPtr<IMidiMapping> mapping(impl_->controller);
+        if (mapping)
+        {
+            ParamID id = kNoParamId;
+            if (mapping->getMidiControllerAssignment(eventInBusIndex, 0, kPitchBend, id) == kResultTrue)
+            {
+                impl_->pitchBendParam = id;
+            }
+            id = kNoParamId;
+            if (mapping->getMidiControllerAssignment(eventInBusIndex, 0, kCtrlModWheel, id) == kResultTrue)
+            {
+                impl_->modWheelParam = id;
+            }
+        }
+    }
+    // Force the first block to send the current positions.
+    impl_->sentBend = impl_->bend + 1.0f;
+    impl_->sentMod = impl_->mod + 1.0f;
     impl_->loaded = true;
 
     return true;
@@ -284,6 +318,27 @@ void VstHost::NoteOff(int midiNote)
     {
         impl_->pending.push_back({midiNote, 0.0f, false});
     }
+}
+
+void VstHost::AllNotesOff()
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    for (int note = 0; note < 128 && impl_->pending.size() < impl_->pending.capacity(); ++note)
+    {
+        impl_->pending.push_back({note, 0.0f, false});
+    }
+}
+
+void VstHost::SetPitchBend(float bend)
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    impl_->bend = bend < -1.0f ? -1.0f : (bend > 1.0f ? 1.0f : bend);
+}
+
+void VstHost::SetModWheel(float amount)
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    impl_->mod = amount < 0.0f ? 0.0f : (amount > 1.0f ? 1.0f : amount);
 }
 
 void VstHost::RenderAdditive(float* interleavedStereoOut, int frames)

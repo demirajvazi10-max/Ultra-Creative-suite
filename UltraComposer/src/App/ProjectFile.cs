@@ -237,5 +237,8 @@ public static class ProjectFile
 
         /// <summary>Shared split point for the Layer/Split feature (see AudioEngineInterop.SetPerformanceSplitPoint) - independent of Accompaniment.SplitPoint. Defaults to c4 (60).</summary>
         public int PerformanceSplitPoint { get; set; } = 60;
+
+        /// <summary>Ultra Composer 2.0 "Zvuk i efekti": every saved sound setting (Ultra FM, performance controls, arpeggiator, effects) by its native SoundParam id (see SoundParameters.cs / SoundParams.h). Missing in projects from before 2.0 - those load with the starting values.</summary>
+        public Dictionary<string, float> SoundSettings { get; set; } = new();
     }
 }

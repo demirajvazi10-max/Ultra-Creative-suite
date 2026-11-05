@@ -29,7 +29,7 @@
          "-beta" suffix entirely for the first full release, matching Ultra Video Editor's
          "first full (non-beta) release is v1.0.0" convention - i.e. this stays 1.0.0-beta
          until it's ready, then becomes plain 1.0.0. -->
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -77,7 +77,7 @@
 
   <!-- Copies the bundled default SoundFont bank (see
        src/AudioEngine/thirdparty/soundfonts) next to the built exe, so the
-       "ZvuÄna banka" section has something to load with zero setup.
+       "Zvučna banka" section has something to load with zero setup.
        SkipUnchangedFiles avoids re-copying this ~30MB file on every build,
        only the first time or if it actually changes. -->
   <Target Name="CopyBundledSoundFont" AfterTargets="Build">

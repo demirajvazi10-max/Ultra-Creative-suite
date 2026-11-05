@@ -5,7 +5,7 @@
 #include <string>
 
 #include "SoundFontHost.h"
-#include "Synth.h"
+#include "FmSynth.h"
 #include "VstHost.h"
 
 // How a performance layer picks its instrument - same 3-way idea already
@@ -107,8 +107,15 @@ public:
     // performance split point (see AudioEngine::SetPerformanceSplitPoint) -
     // passed in rather than owned here so the main layer (Sloj 1, not part
     // of this class) can be range-gated against the exact same value.
-    void DispatchNoteOn(int midiNote, float velocity, int splitPoint);
-    void DispatchNoteOff(int midiNote, int splitPoint);
+    // 'targets' (PerformanceController::Target bits): 1 = Ultra FM + SoundFont,
+    // 2 = VST. Legato sends VST notes separately from the pitched ones.
+    void DispatchNoteOn(int midiNote, float velocity, int splitPoint, int targets = 3);
+    void DispatchNoteOff(int midiNote, int splitPoint, int targets = 3);
+
+    // Ultra Composer 2.0 performance state, pushed by AudioEngine every block.
+    void SetFmPatch(const FmPatch& patch);
+    void SetPerformance(float pitchOffset, bool polyGlide, float glideSeconds, float bend, float modWheel);
+    void AllNotesOff();
 
     // Audio thread only. Adds every enabled layer's output on top of
     // whatever is already in 'interleavedStereoOut'. A disabled layer, or
@@ -128,7 +135,7 @@ private:
         std::atomic<float> volume{1.0f};
         std::atomic<int> octaveOffset{0};
         std::atomic<int> range{0};         // PerformanceLayerRange, packed as int
-        Synth synth;
+        FmSynth synth;   // "built-in synth" mode = Ultra FM (shares Sloj 1's patch)
         SoundFontHost soundFont;
         VstHost vst;
         float scratchMono[kMaxScratchFrames]{};

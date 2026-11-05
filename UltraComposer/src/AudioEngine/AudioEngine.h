@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -15,7 +16,10 @@
 #include "Scale.h"
 #include "Sequencer.h"
 #include "SoundFontHost.h"
-#include "Synth.h"
+#include "FmSynth.h"
+#include "KeyboardFx.h"
+#include "PerformanceController.h"
+#include "SoundParams.h"
 #include "VstHost.h"
 
 // Owns the PortAudio stream, the Synth, MIDI hardware input, and an
@@ -63,6 +67,17 @@ public:
     // note name into a sequencer/multi-track note list. Arming clears any
     // notes already mid-press and any not-yet-collected pending capture, so
     // it always starts from a clean slate.
+    // --- Ultra Composer 2.0: sound settings of the performance keyboard ---
+    // Every performance control (pitch bend, modulation, sustain, portamento,
+    // Poly/Mono/Legato, transpose, arpeggiator), every Ultra FM setting and
+    // every effect of the effects rack, by SoundParam id (see SoundParams.h).
+    void SetSoundParam(int id, float value);
+    float GetSoundParam(int id) const;
+    static float GetSoundParamDefault(int id);
+    // Stops every note the performance keyboard is playing and centres the
+    // pitch bend / modulation wheel / sustain pedal ("panic").
+    void PerformancePanic();
+
     void SetChordCaptureArmed(bool armed);
     bool IsChordCaptureArmed() const;
     // Returns false if nothing is pending yet; otherwise fills notesOut/
@@ -346,6 +361,12 @@ public:
     bool SelectAccompanimentDrumSoundFontPreset(int presetIndex);
     int GetSelectedAccompanimentDrumSoundFontPresetIndex() const;
 
+    // Audio thread, once per block: arpeggiator, glide, bend and vibrato,
+    // pushed to every performance instrument (see PaCallback).
+    void UpdatePerformance(int frames);
+    // The effects rack, applied to the performance keyboard's sound only.
+    void ProcessKeyboardFx(float* interleavedStereo, int frames) { keyboardFx_.Process(interleavedStereo, frames); }
+
 private:
     // Applies mainLayerEnabled_/mainLayerRange_/mainLayerOctaveOffset_ (see
     // SetMainLayerVolume and friends above) around the "Sloj 1" dispatch to
@@ -353,10 +374,21 @@ private:
     // extraLayers_ for "Sloj 2/3/4" - the single place both NoteOn and
     // NoteOff (main note and, when active, the auto-third harmony note)
     // route performance-layer notes through, so they can't drift apart.
-    void DispatchPerformanceNoteOn(int midiNote, float velocity);
-    void DispatchPerformanceNoteOff(int midiNote);
+    // 'targets': PerformanceController::Target bits (1 = Ultra FM + SoundFont, 2 = VST).
+    void DispatchPerformanceNoteOn(int midiNote, float velocity, int targets = PerformanceController::kAll);
+    void DispatchPerformanceNoteOff(int midiNote, int targets = PerformanceController::kAll);
+    // Note from the PerformanceController: auto-third + layers, no chord detection.
+    void NoteOnTargets(int midiNote, float velocity, int targets);
+    void NoteOffTargets(int midiNote, int targets);
+    void HandleMidiControl(int kind, int number, int value);
 
-    Synth synth_;
+    FmSynth synth_;                             // Sloj 1 built-in instrument: Ultra FM
+    PerformanceController perf_;                // live playing: bend, mod, sustain, mono/legato, portamento, arp
+    KeyboardFx keyboardFx_;                     // effects rack of the performance keyboard
+    std::atomic<int> fmPresetIndex_{0};
+    std::mutex liveMapMutex_;
+    std::array<int, 128> liveNoteMap_{};        // physical key -> note actually started (transpose)
+    std::array<bool, 128> liveToAccompaniment_{}; // key went to chord detection, not to the instruments
     MidiInput midiInput_;
     VstHost vstHost_;
     Sequencer sequencer_;

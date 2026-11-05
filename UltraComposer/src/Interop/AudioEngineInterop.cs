@@ -1201,4 +1201,26 @@ public static class AudioEngineInterop
     [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_RemoveCustomStyle")]
     [return: MarshalAs(UnmanagedType.I1)]
     public static extern bool AccompanimentRemoveCustomStyle(int index);
+
+    // --- Ultra Composer 2.0: sound settings of the performance keyboard ---
+    // Pitch bend, modulation, sustain, portamento, Poly/Mono/Legato,
+    // transpose, arpeggiator, Ultra FM and the effects rack - all by one
+    // numeric id (src/AudioEngine/SoundParams.h, mirrored in the app's
+    // SoundParameters.cs).
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_SetSoundParam")]
+    public static extern void SetSoundParam(int id, float value);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_GetSoundParam")]
+    public static extern float GetSoundParam(int id);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_GetSoundParamDefault")]
+    public static extern float GetSoundParamDefault(int id);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_GetFmPresetCount")]
+    public static extern int GetFmPresetCount();
+
+    /// <summary>Stops every note of the performance keyboard and centres pitch bend, modulation and sustain.</summary>
+    [DllImport(NativeLibrary, EntryPoint = "UC_PerformancePanic")]
+    public static extern void PerformancePanic();
 }

@@ -37,8 +37,8 @@ public static class HelpContent
     {
         new Topic(
             "Osnove i navigacija",
-            "Ultra Composer ima pet glavnih prikaza, dostupnih iz menija \"Prikaz\": Banka " +
-            "instrumenata, Sekvenser, Aranžer, Multi-trake i mikser, i Auto-pratnja. U datom " +
+            "Ultra Composer ima šest glavnih prikaza, dostupnih iz menija \"Prikaz\": Banka " +
+            "instrumenata, Sekvenser, Aranžer, Multi-trake i mikser, Auto-pratnja i Zvuk i efekti. U datom " +
             "trenutku vidljiv je samo jedan, ali stanje koje deluju - učitani instrument u " +
             "\"Banci instrumenata\", povezani MIDI uređaj i slično - deljeno je između svih " +
             "prikaza.\n\n" +
@@ -59,12 +59,55 @@ public static class HelpContent
             "- Donji red (jedna oktava): Z S X D C V G B H N J M ,\n" +
             "- Gornji red (sledeća oktava naviše): Q 2 W 3 E R 5 T 6 Y 7 U I\n" +
             "- Page Up / Page Down: pomera osnovnu oktavu naviše/naniže\n" +
-            "- Strelica gore/dole: menja instrument u učitanoj SoundFont banci (samo ako je " +
-            "banka učitana)\n\n" +
+            "- Strelica gore/dole: menja instrument u učitanoj SoundFont banci, a kad banka nije " +
+            "učitana, zvuk Ultra FM sintisajzera\n" +
+            "- Strelice levo/desno: pitch bend - dok držiš, ton klizi naniže/naviše, a kad pustiš, vraća se\n" +
+            "- Razmak: sustain pedala (dok ga držiš, tonovi zvone i kad pustiš tastere)\n" +
+            "- F2/F3: modulacioni točkić (vibrato) manje/više, F4/F5: transpozicija pola stepena dole/gore\n" +
+            "- F6: arpeđator, F7: portamento, F8: poli/mono/legato, F9: svi efekti, Home: zaustavi sve tonove\n\n" +
             "Za pravi MIDI instrument (npr. Yamaha P-125 ili bilo koji drugi USB-MIDI uređaj): " +
             "izaberi uređaj iz padajuće liste \"MIDI uređaj\", klikni \"Osveži uređaje\" ako se ne " +
             "vidi odmah, pa \"Poveži\". Kad je povezan, sviranje sa te tastature radi potpuno " +
             "isto kao i sa računarske tastature."),
+
+        new Topic(
+            "Zvuk i efekti: Ultra FM, pitch bend, portamento, legato, arpeđator",
+            "Novo u verziji 2.0. Meni \"Prikaz\", \"Zvuk i efekti\". Ovde podešavaš zvuk klavijature za " +
+            "sviranje, kao na pravim klavijaturama. Ekran ima dve liste: \"Odeljci\" (Alt+O) i \"Podešavanja\" " +
+            "(Alt+P). U listi odeljaka strelicama biraš odeljak, a razmak uključuje ili isključuje efekat ili " +
+            "arpeđator. Tab ili Enter vodi u podešavanja tog odeljka. Tamo:\n" +
+            "- strelice gore/dole: sledeće podešavanje\n" +
+            "- strelice levo/desno: menja vrednost (JAWS odmah izgovori novu vrednost)\n" +
+            "- Page Up / Page Down: menja u većim koracima\n" +
+            "- Home / End: najmanja / najveća vrednost\n" +
+            "- razmak ili Enter: uključi/isključi, ili sledeći izbor\n" +
+            "- Delete: početna vrednost, Escape: nazad na odeljke\n\n" +
+            "ULTRA FM SINTISAJZER (kao FM8): šest operatora (sinusnih oscilatora). Algoritam određuje koji " +
+            "se operatori čuju (nosioci), a koji menjaju boju tona drugima (modulatori) - naziv odeljka svakog " +
+            "operatora to kaže. Svaki operator ima jačinu, odnos frekvencije, fino štimovanje, ADSR omotač " +
+            "(napad, opadanje, zadržavanje, otpuštanje) i osetljivost na jačinu udara. Šesnaest gotovih " +
+            "zvukova: električni klavir, zvono, FM bas, duvači, orgulje, pad, solo, gudači, marimba, klavinet, " +
+            "flauta, staklo, trzani bas, hor, steel drum i čist ton. \"Sjaj\" jednim potezom posvetli ili " +
+            "potamni ceo zvuk. Ultra FM se čuje kad u Sloju 1 nije učitana SoundFont banka ni VST (dugme " +
+            "\"Isključi banku\" u Banci instrumenata); u slojevima 2-4 ga biraš kao \"ugrađeni sintisajzer\".\n\n" +
+            "IZVOĐENJE: pitch bend (opseg do 24 polutona), modulacioni točkić za vibrato (dubina i brzina), " +
+            "portamento (klizanje sa tona na ton, sa podesivim vremenom), način sviranja poli / mono / legato " +
+            "(legato: novi ton se veže na prethodni bez novog napada, a kad pustiš gornji, vraća se na onaj koji " +
+            "još držiš), transpozicija i sustain pedala. Sve ovo radi i sa MIDI klavijature (pitch bend i " +
+            "modulacioni točkić, sustain pedala, CC 5 i 65 za portamento). Sa SoundFont bankom pitch bend, " +
+            "vibrato, mono i legato rade direktno; portamento radi u mono i legato načinu. VST instrument dobija " +
+            "pitch bend i modulacioni točkić, a vibrato i klizanje podešavaš u samom VST-u.\n\n" +
+            "ARPEĐATOR: drži akord, a arpeđator ga svira ton po ton - naviše, naniže, naviše pa naniže, " +
+            "nasumično, redom kako sviraš ili ceo akord u ritmu. Biraš brzinu (od četvrtina do tridesetdvojki), " +
+            "opseg u oktavama, dužinu tona, tempo i \"zadrži\" (latch: svira i kad pustiš tastere, dok ne " +
+            "odsviraš novi akord).\n\n" +
+            "EFEKTI (redom kojim zvuk prolazi): distorzija, filter i vau-vau, ekvilajzer, kompresor, korus, " +
+            "flanger, fejzer, tremolo, auto-pan, rotacioni (Lesli) zvučnik, eho i reverb. \"Brzo podešavanje\" " +
+            "u odeljku Efekti odmah postavlja gotovu kombinaciju (koncertna sala, orgulje sa Leslijem, rok solo, " +
+            "svemirski pad, vau-vau, stari radio...). Efekti deluju na sve što sviraš na klavijaturi (slojevi " +
+            "1-4, bilo koji instrument), a ne na multi-trake i auto-pratnju.\n\n" +
+            "Sva ova podešavanja se čuvaju u projektu. Dugme \"Zaustavi sve tonove\" (ili Home na klavijaturi) " +
+            "prekida sve tonove i vraća pitch bend i modulaciju na nulu."),
 
         new Topic(
             "SoundFont i VST3 instrumenti",
@@ -192,8 +235,8 @@ public static class HelpContent
     {
         new Topic(
             "Getting Started & Navigation",
-            "Ultra Composer has five main views, reachable from the \"View\" menu: Instrument " +
-            "Bank, Sequencer, Arranger, Multi-track & Mixer, and Auto-accompaniment. Only one is " +
+            "Ultra Composer has six main views, reachable from the \"View\" menu: Instrument " +
+            "Bank, Sequencer, Arranger, Multi-track & Mixer, Auto-accompaniment, and Sound and effects. Only one is " +
             "visible at a time, but shared state - the loaded instrument in \"Instrument Bank\", " +
             "the connected MIDI device, and so on - carries across every view.\n\n" +
             "You move through the whole app with the normal Tab/Shift+Tab order, like any Windows " +
@@ -213,12 +256,57 @@ public static class HelpContent
             "- Lower row (one octave): Z S X D C V G B H N J M ,\n" +
             "- Upper row (next octave up): Q 2 W 3 E R 5 T 6 Y 7 U I\n" +
             "- Page Up / Page Down: shift the base octave up/down\n" +
-            "- Up/Down arrow: cycle the instrument in the loaded SoundFont bank (only if one is " +
-            "loaded)\n\n" +
+            "- Up/Down arrow: cycle the instrument in the loaded SoundFont bank, or the Ultra FM " +
+            "synthesizer sound when no bank is loaded\n" +
+            "- Left/Right arrows: pitch bend - the note slides down/up while you hold, and comes back when you let go\n" +
+            "- Space: sustain pedal (while held, notes keep ringing after you release the keys)\n" +
+            "- F2/F3: modulation wheel (vibrato) less/more, F4/F5: transpose a semitone down/up\n" +
+            "- F6: arpeggiator, F7: portamento, F8: poly/mono/legato, F9: all effects, Home: stop all notes\n\n" +
             "For a real MIDI instrument (e.g. a Yamaha P-125 or any other class-compliant USB-MIDI " +
             "device): pick it from the \"MIDI device\" dropdown, click \"Refresh devices\" if it " +
             "doesn't show up right away, then \"Connect\". Once connected, playing from it works " +
             "exactly like the computer keyboard."),
+
+        new Topic(
+            "Sound and effects: Ultra FM, pitch bend, portamento, legato, arpeggiator",
+            "New in version 2.0. Menu \"View\", \"Sound and effects\". This is where you shape the sound of " +
+            "the performance keyboard, like on a real keyboard. The screen has two lists: \"Sections\" (Alt+S) " +
+            "and \"Settings\" (Alt+T). In the section list the arrows pick a section and Space switches an " +
+            "effect or the arpeggiator on or off. Tab or Enter takes you to that section's settings. There:\n" +
+            "- Up/Down arrows: next setting\n" +
+            "- Left/Right arrows: change the value (JAWS says the new value right away)\n" +
+            "- Page Up / Page Down: bigger steps\n" +
+            "- Home / End: lowest / highest value\n" +
+            "- Space or Enter: switch on/off, or the next choice\n" +
+            "- Delete: starting value, Escape: back to the sections\n\n" +
+            "ULTRA FM SYNTHESIZER (like FM8): six operators (sine oscillators). The algorithm decides which " +
+            "operators are heard (carriers) and which ones shape the tone of others (modulators) - each " +
+            "operator's section name tells you. Every operator has a level, frequency ratio, fine detune, an " +
+            "ADSR envelope (attack, decay, sustain, release) and velocity sensitivity. Sixteen ready sounds: " +
+            "electric piano, bell, FM bass, brass, organ, pad, lead, strings, marimba, clavinet, flute, glass, " +
+            "pluck bass, choir, steel drum and pure sine. \"Brightness\" makes the whole sound brighter or " +
+            "darker in one move. Ultra FM is heard when no SoundFont bank or VST is loaded in Layer 1 (the " +
+            "\"Unload bank\" button in the Instrument Bank); in layers 2-4 pick it as \"built-in synth\".\n\n" +
+            "PERFORMANCE: pitch bend (range up to 24 semitones), modulation wheel for vibrato (depth and " +
+            "speed), portamento (gliding from note to note, adjustable time), poly / mono / legato voice mode " +
+            "(legato: a new note connects to the previous one without a new attack, and when you release the " +
+            "upper one it goes back to the one you still hold), transpose and the sustain pedal. All of this " +
+            "also works from a MIDI keyboard (pitch bend and modulation wheels, sustain pedal, CC 5 and 65 for " +
+            "portamento). With a SoundFont bank, pitch bend, vibrato, mono and legato work directly; portamento " +
+            "works in mono and legato mode. A VST instrument gets the pitch bend and modulation wheels, and you " +
+            "set its vibrato and glide in the VST itself.\n\n" +
+            "ARPEGGIATOR: hold a chord and the arpeggiator plays it note by note - up, down, up and down, " +
+            "random, as played, or the whole chord in rhythm. You choose the rate (quarter notes to " +
+            "thirty-second notes), the range in octaves, the note length, the tempo and latch (keeps playing " +
+            "after you release the keys, until you play a new chord).\n\n" +
+            "EFFECTS (in the order the sound goes through them): overdrive, filter and auto-wah, equalizer, " +
+            "compressor, chorus, flanger, phaser, tremolo, auto-pan, rotary (Leslie) speaker, echo and reverb. " +
+            "\"Quick preset\" in the Effects section sets a ready combination at once (concert hall, organ " +
+            "with rotary speaker, rock solo, space pad, auto-wah, old radio...). The effects work on everything " +
+            "you play on the keyboard (layers 1-4, any instrument), not on the multi-track and the " +
+            "auto-accompaniment.\n\n" +
+            "All of these settings are saved in the project. The \"Stop all notes\" button (or Home on the " +
+            "keyboard) stops every note and centres pitch bend and modulation."),
 
         new Topic(
             "SoundFont & VST3 Instruments",

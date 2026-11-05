@@ -125,10 +125,14 @@
     <ClInclude Include="Arranger.h" />
     <ClInclude Include="Chord.h" />
     <ClInclude Include="DrumSynth.h" />
+    <ClInclude Include="FmSynth.h" />
+    <ClInclude Include="KeyboardFx.h" />
     <ClInclude Include="MidiInput.h" />
     <ClInclude Include="MultiTrackSequencer.h" />
+    <ClInclude Include="PerformanceController.h" />
     <ClInclude Include="PerformanceLayers.h" />
     <ClInclude Include="Sequencer.h" />
+    <ClInclude Include="SoundParams.h" />
     <ClInclude Include="SoundFontHost.h" />
     <ClInclude Include="Style.h" />
     <ClInclude Include="Synth.h" />
@@ -147,8 +151,11 @@
     <ClCompile Include="AudioEngineApi.cpp" />
     <ClCompile Include="Arranger.cpp" />
     <ClCompile Include="DrumSynth.cpp" />
+    <ClCompile Include="FmSynth.cpp" />
+    <ClCompile Include="KeyboardFx.cpp" />
     <ClCompile Include="MidiInput.cpp" />
     <ClCompile Include="MultiTrackSequencer.cpp" />
+    <ClCompile Include="PerformanceController.cpp" />
     <ClCompile Include="PerformanceLayers.cpp" />
     <ClCompile Include="Sequencer.cpp" />
     <ClCompile Include="SoundFontHost.cpp" />

@@ -17,11 +17,22 @@ FIRST STEPS
 5. Have a MIDI keyboard? Pick it from the "MIDI device" list, click
    "Refresh devices" if needed, then "Connect".
 
+NEW IN 2.0: PLAY IT LIKE A REAL KEYBOARD
+
+On the performance keyboard: hold Left/Right arrow for pitch bend, hold
+Space for the sustain pedal, F2/F3 for modulation (vibrato), F4/F5 to
+transpose, F6 arpeggiator, F7 portamento, F8 poly/mono/legato, F9 effects,
+Home stops everything. Without a SoundFont bank or VST loaded you hear
+Ultra FM, a six-operator FM synthesizer - Up/Down arrow switches its
+sounds. Shape everything (FM operators, arpeggiator, overdrive, filter,
+EQ, compressor, chorus, flanger, phaser, tremolo, auto-pan, rotary
+speaker, echo, reverb) in View -> Sound and effects.
+
 WHERE TO GO NEXT
 
-Ultra Composer has five main views, reachable from the "View" menu:
-Instrument Bank, Sequencer, Arranger, Multi-track & Mixer, and
-Auto-accompaniment. Every one of them is fully operable and announced
+Ultra Composer has six main views, reachable from the "View" menu:
+Instrument Bank, Sequencer, Arranger, Multi-track & Mixer,
+Auto-accompaniment, and Sound and effects. Every one of them is fully operable and announced
 through a screen reader (JAWS was used throughout development).
 
 For detailed, step-by-step instructions on every feature - what each

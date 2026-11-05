@@ -45,6 +45,14 @@ public:
 
     void NoteOn(int midiNote, float velocity);
     void NoteOff(int midiNote);
+    void AllNotesOff();
+
+    // Performance controllers. VST3 has no MIDI pitch-bend/CC events: a
+    // plug-in says which of its parameters a MIDI controller drives
+    // (IMidiMapping), and we send the value to that parameter. Plug-ins
+    // without such a mapping simply ignore these.
+    void SetPitchBend(float bend);     // -1..1, the plug-in's own bend range applies
+    void SetModWheel(float amount);    // 0..1
 
     // Audio thread only. Adds the plug-in's output on top of whatever is
     // already in 'interleavedStereoOut' (so it mixes with the built-in

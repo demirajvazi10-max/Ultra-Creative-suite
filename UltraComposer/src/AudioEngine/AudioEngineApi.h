@@ -692,3 +692,18 @@ UC_API int32_t UC_Accompaniment_SetCustomStyle(
 // not one of the built-in ones - see UC_Accompaniment_SetCustomStyle).
 // Returns false if 'index' isn't a valid custom style index.
 UC_API bool UC_Accompaniment_RemoveCustomStyle(int32_t index);
+
+// --- Ultra Composer 2.0: sound settings of the performance keyboard ---
+// Pitch bend, modulation wheel, sustain pedal, portamento, Poly/Mono/Legato,
+// transpose, arpeggiator, the Ultra FM synthesizer and the effects rack, all
+// by one numeric id - see SoundParams.h for the list and value ranges.
+// Setting an unknown id does nothing; getting one returns 0.
+UC_API void UC_SetSoundParam(int32_t id, float value);
+UC_API float UC_GetSoundParam(int32_t id);
+// The value a setting has in a fresh program (Ultra FM: the first preset).
+UC_API float UC_GetSoundParamDefault(int32_t id);
+// Number of Ultra FM presets (SoundParam::FmPreset goes 0 .. count-1).
+UC_API int32_t UC_GetFmPresetCount();
+// Stops every note of the performance keyboard and centres pitch bend,
+// modulation wheel and sustain pedal.
+UC_API void UC_PerformancePanic();

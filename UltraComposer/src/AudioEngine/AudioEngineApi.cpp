@@ -1399,3 +1399,28 @@ bool UC_Accompaniment_RemoveCustomStyle(int32_t index)
 {
     return GetEngine().RemoveAccompanimentCustomStyle(index);
 }
+
+void UC_SetSoundParam(int32_t id, float value)
+{
+    GetEngine().SetSoundParam(id, value);
+}
+
+float UC_GetSoundParam(int32_t id)
+{
+    return GetEngine().GetSoundParam(id);
+}
+
+float UC_GetSoundParamDefault(int32_t id)
+{
+    return AudioEngine::GetSoundParamDefault(id);
+}
+
+int32_t UC_GetFmPresetCount()
+{
+    return FmSynth::PresetCount();
+}
+
+void UC_PerformancePanic()
+{
+    GetEngine().PerformancePanic();
+}

@@ -101,6 +101,11 @@ void MidiInput::SetNoteCallback(NoteCallback callback)
     callback_ = std::move(callback);
 }
 
+void MidiInput::SetControlCallback(ControlCallback callback)
+{
+    controlCallback_ = std::move(callback);
+}
+
 void MidiInput::RtMidiCallback(double /*timeStamp*/, std::vector<unsigned char>* message, void* userData)
 {
     auto* self = static_cast<MidiInput*>(userData);
@@ -112,13 +117,34 @@ void MidiInput::RtMidiCallback(double /*timeStamp*/, std::vector<unsigned char>*
 
 void MidiInput::HandleMessage(const std::vector<unsigned char>& message)
 {
-    if (message.size() < 3 || !callback_)
+    if (message.size() < 3)
     {
         return;
     }
 
     const unsigned char status = message[0];
     const unsigned char type = status & 0xF0;
+
+    if (type == 0xB0 || type == 0xE0)
+    {
+        if (controlCallback_)
+        {
+            if (type == 0xB0) // Control Change: modulation wheel, sustain pedal, portamento...
+            {
+                controlCallback_(0, message[1] & 0x7F, message[2] & 0x7F);
+            }
+            else // Pitch Bend: 14-bit, LSB first
+            {
+                controlCallback_(1, 0, (message[1] & 0x7F) | ((message[2] & 0x7F) << 7));
+            }
+        }
+        return;
+    }
+
+    if (!callback_)
+    {
+        return;
+    }
     const int note = message[1];
     const int velocity = message[2];
 

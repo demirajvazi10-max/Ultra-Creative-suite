@@ -27,7 +27,7 @@ namespace
     struct CallbackContext
     {
         AudioEngine* engine;
-        Synth* synth;
+        FmSynth* synth;
         VstHost* vstHost;
         Sequencer* sequencer;
         SoundFontHost* soundFontHost;
@@ -97,6 +97,10 @@ namespace
         // private instruments and never touches theirs).
         context->accompaniment->Advance(static_cast<int>(frames), kSampleRate);
 
+        // Ultra Composer 2.0: arpeggiator steps, glide, pitch bend and
+        // vibrato for this block, before any performance instrument renders.
+        context->engine->UpdatePerformance(static_cast<int>(frames));
+
         // "Sloj 1" (the pre-existing single main instrument) into its own
         // scratch buffer first, so SetMainLayerVolume can scale just this
         // layer's contribution before anything else joins the mix - same
@@ -138,12 +142,19 @@ namespace
             out[i] = mainLayerStereo[i] * mainLayerVolume;
         }
 
-        context->multiTrack->RenderAdditive(out, static_cast<int>(frames));
-        context->accompaniment->RenderAdditive(out, static_cast<int>(frames));
         // "Sloj 2/3/4" (see PerformanceLayers.h) - does nothing for any layer
         // left disabled, i.e. exactly nothing changes for a project that
         // never touches this feature.
         context->extraLayers->RenderAdditive(out, static_cast<int>(frames));
+
+        // Ultra Composer 2.0: everything the performance keyboard plays
+        // (Sloj 1 + Sloj 2/3/4) goes through the keyboard effects rack
+        // together. The multi-track mixer and the accompaniment are added
+        // after it, so they keep their own sound.
+        context->engine->ProcessKeyboardFx(out, static_cast<int>(frames));
+
+        context->multiTrack->RenderAdditive(out, static_cast<int>(frames));
+        context->accompaniment->RenderAdditive(out, static_cast<int>(frames));
 
         // Soft-clip the final mix. Several notes at once (a chord) - or
         // even one note, if a SoundFont instrument layers several sample
@@ -174,8 +185,17 @@ bool AudioEngine::Init()
         return false;
     }
     synth_.Prepare(kSampleRate);
+    perf_.Prepare(kSampleRate);
+    keyboardFx_.Prepare(kSampleRate);
+    liveNoteMap_.fill(-1);
+    liveToAccompaniment_.fill(false);
+    perf_.SetCallbacks(
+        [this](int note, float velocity, int targets) { NoteOnTargets(note, velocity, targets); },
+        [this](int note, int targets) { NoteOffTargets(note, targets); });
+    midiInput_.SetControlCallback([this](int kind, int number, int value) { HandleMidiControl(kind, number, value); });
     accompaniment_.Prepare(kSampleRate);
     extraLayers_.Prepare(kSampleRate);
+    extraLayers_.SetFmPatch(synth_.GetPatch());
 
     // Route MIDI note on/off through the same single dispatch point
     // (NoteOnLive/NoteOffLive, which call straight through to NoteOn/NoteOff
@@ -344,7 +364,7 @@ void AudioEngine::NoteOn(int midiNote, float velocity)
     }
 }
 
-void AudioEngine::DispatchPerformanceNoteOn(int midiNote, float velocity)
+void AudioEngine::DispatchPerformanceNoteOn(int midiNote, float velocity, int targets)
 {
     int splitPoint = performanceSplitPoint_.load();
 
@@ -363,14 +383,26 @@ void AudioEngine::DispatchPerformanceNoteOn(int midiNote, float velocity)
             int outNote = midiNote + mainLayerOctaveOffset_.load() * 12;
             if (outNote >= 0 && outNote <= 127)
             {
-                synth_.NoteOn(outNote, velocity);
-                vstHost_.NoteOn(outNote, velocity);
-                soundFontHost_.NoteOn(outNote, velocity);
+                if (targets & PerformanceController::kPitched)
+                {
+                    // Ultra FM only plays while no SoundFont/VST is loaded
+                    // (it isn't rendered then, see PaCallback), so it isn't
+                    // fed notes it would never finish.
+                    if (!vstHost_.IsLoaded() && !soundFontHost_.IsLoaded())
+                    {
+                        synth_.NoteOn(outNote, velocity);
+                    }
+                    soundFontHost_.NoteOn(outNote, velocity);
+                }
+                if (targets & PerformanceController::kVst)
+                {
+                    vstHost_.NoteOn(outNote, velocity);
+                }
             }
         }
     }
 
-    extraLayers_.DispatchNoteOn(midiNote, velocity, splitPoint);
+    extraLayers_.DispatchNoteOn(midiNote, velocity, splitPoint, targets);
 }
 
 void AudioEngine::NoteOff(int midiNote)
@@ -393,7 +425,7 @@ void AudioEngine::NoteOff(int midiNote)
     }
 }
 
-void AudioEngine::DispatchPerformanceNoteOff(int midiNote)
+void AudioEngine::DispatchPerformanceNoteOff(int midiNote, int targets)
 {
     int splitPoint = performanceSplitPoint_.load();
 
@@ -412,14 +444,48 @@ void AudioEngine::DispatchPerformanceNoteOff(int midiNote)
             int outNote = midiNote + mainLayerOctaveOffset_.load() * 12;
             if (outNote >= 0 && outNote <= 127)
             {
-                synth_.NoteOff(outNote);
-                vstHost_.NoteOff(outNote);
-                soundFontHost_.NoteOff(outNote);
+                if (targets & PerformanceController::kPitched)
+                {
+                    synth_.NoteOff(outNote);
+                    soundFontHost_.NoteOff(outNote);
+                }
+                if (targets & PerformanceController::kVst)
+                {
+                    vstHost_.NoteOff(outNote);
+                }
             }
         }
     }
 
-    extraLayers_.DispatchNoteOff(midiNote, splitPoint);
+    extraLayers_.DispatchNoteOff(midiNote, splitPoint, targets);
+}
+
+void AudioEngine::NoteOnTargets(int midiNote, float velocity, int targets)
+{
+    DispatchPerformanceNoteOn(midiNote, velocity, targets);
+
+    if (autoThirdEnabled_.load())
+    {
+        int harmonyNote = DiatonicThirdNote(midiNote, autoThirdScaleRoot_.load(), static_cast<ScaleType>(autoThirdScaleType_.load()), autoThirdUpper_.load());
+        if (harmonyNote >= 0 && harmonyNote <= 127)
+        {
+            DispatchPerformanceNoteOn(harmonyNote, velocity, targets);
+        }
+    }
+}
+
+void AudioEngine::NoteOffTargets(int midiNote, int targets)
+{
+    DispatchPerformanceNoteOff(midiNote, targets);
+
+    if (autoThirdEnabled_.load())
+    {
+        int harmonyNote = DiatonicThirdNote(midiNote, autoThirdScaleRoot_.load(), static_cast<ScaleType>(autoThirdScaleType_.load()), autoThirdUpper_.load());
+        if (harmonyNote >= 0 && harmonyNote <= 127)
+        {
+            DispatchPerformanceNoteOff(harmonyNote, targets);
+        }
+    }
 }
 
 void AudioEngine::NoteOnLive(int midiNote, float velocity)
@@ -446,7 +512,25 @@ void AudioEngine::NoteOnLive(int midiNote, float velocity)
         }
     }
 
-    NoteOn(midiNote, velocity);
+    // Ultra Composer 2.0: transpose, then either the accompaniment's chord
+    // detection (left of its split point, as before) or the performance
+    // controller (sustain pedal, Poly/Mono/Legato, portamento, arpeggiator).
+    int note = std::clamp(midiNote + perf_.GetTranspose(), 0, 127);
+    bool toAccompaniment = accompaniment_.IsChordInputAutoFromKeyboard() && note < accompaniment_.GetSplitPoint();
+    if (midiNote >= 0 && midiNote <= 127)
+    {
+        std::lock_guard<std::mutex> lock(liveMapMutex_);
+        liveNoteMap_[static_cast<size_t>(midiNote)] = note;
+        liveToAccompaniment_[static_cast<size_t>(midiNote)] = toAccompaniment;
+    }
+    if (toAccompaniment)
+    {
+        accompaniment_.NoteHeldForChordDetection(note, true);
+    }
+    else
+    {
+        perf_.KeyDown(note, velocity);
+    }
 }
 
 void AudioEngine::NoteOffLive(int midiNote)
@@ -469,7 +553,181 @@ void AudioEngine::NoteOffLive(int midiNote)
         }
     }
 
-    NoteOff(midiNote);
+    // Same note that NoteOnLive started for this key, even if the
+    // transpose changed while the key was held.
+    int note = std::clamp(midiNote + perf_.GetTranspose(), 0, 127);
+    bool toAccompaniment = accompaniment_.IsChordInputAutoFromKeyboard() && note < accompaniment_.GetSplitPoint();
+    if (midiNote >= 0 && midiNote <= 127)
+    {
+        std::lock_guard<std::mutex> lock(liveMapMutex_);
+        if (liveNoteMap_[static_cast<size_t>(midiNote)] >= 0)
+        {
+            note = liveNoteMap_[static_cast<size_t>(midiNote)];
+            toAccompaniment = liveToAccompaniment_[static_cast<size_t>(midiNote)];
+        }
+        liveNoteMap_[static_cast<size_t>(midiNote)] = -1;
+        liveToAccompaniment_[static_cast<size_t>(midiNote)] = false;
+    }
+    if (toAccompaniment)
+    {
+        accompaniment_.NoteHeldForChordDetection(note, false);
+    }
+    else
+    {
+        perf_.KeyUp(note);
+    }
+}
+
+void AudioEngine::UpdatePerformance(int frames)
+{
+    perf_.Advance(frames);
+
+    float offset = perf_.GetPitchOffset();
+    bool polyGlide = perf_.PolyGlideActive();
+    float glideSeconds = perf_.PortamentoSeconds();
+    float bend = perf_.GetBend();
+    float mod = perf_.GetModWheel();
+
+    synth_.SetPitchOffset(offset);
+    synth_.SetGlide(polyGlide, glideSeconds);
+    soundFontHost_.SetPitchOffset(offset);
+    vstHost_.SetPitchBend(bend);
+    vstHost_.SetModWheel(mod);
+    extraLayers_.SetPerformance(offset, polyGlide, glideSeconds, bend, mod);
+}
+
+void AudioEngine::HandleMidiControl(int kind, int number, int value)
+{
+    if (kind == 1)
+    {
+        SetSoundParam(SoundParam::PitchBend, std::clamp((value - 8192) / 8192.0f, -1.0f, 1.0f));
+        return;
+    }
+    switch (number)
+    {
+    case 1: SetSoundParam(SoundParam::ModWheel, value / 127.0f); break;              // modulation wheel
+    case 5: SetSoundParam(SoundParam::PortamentoTime, 0.01f + (value / 127.0f) * (value / 127.0f) * 1.99f); break;
+    case 64: SetSoundParam(SoundParam::Sustain, value >= 64 ? 1.0f : 0.0f); break;   // sustain pedal
+    case 65: SetSoundParam(SoundParam::PortamentoOn, value >= 64 ? 1.0f : 0.0f); break;
+    case 120:                                                                         // all sound off
+    case 123: PerformancePanic(); break;                                              // all notes off
+    default: break;
+    }
+}
+
+void AudioEngine::PerformancePanic()
+{
+    perf_.AllNotesOff();
+    perf_.SetParam(SoundParam::PitchBendKeys, 0.0f);
+    perf_.SetParam(SoundParam::PitchBend, 0.0f); // last: jumps to centre at once
+    perf_.SetParam(SoundParam::ModWheel, 0.0f);
+    synth_.AllNotesOff();
+    soundFontHost_.AllNotesOff();
+    vstHost_.AllNotesOff();
+    extraLayers_.AllNotesOff();
+}
+
+namespace
+{
+    // Reads/writes one Ultra FM setting (ids 51-119) in a patch.
+    float* FmField(FmPatch& patch, int id)
+    {
+        using namespace SoundParam;
+        switch (id)
+        {
+        case FmFeedback: return &patch.feedback;
+        case FmVolume: return &patch.volume;
+        case FmBrightness: return &patch.brightness;
+        default: break;
+        }
+        if (id < FmOpBase || id > FmLast) return nullptr;
+        int op = (id - FmOpBase) / FmOpStride;
+        FmOperator& o = patch.ops[static_cast<size_t>(op)];
+        switch ((id - FmOpBase) % FmOpStride)
+        {
+        case FmOpLevel: return &o.level;
+        case FmOpRatio: return &o.ratio;
+        case FmOpDetune: return &o.detune;
+        case FmOpAttack: return &o.attack;
+        case FmOpDecay: return &o.decay;
+        case FmOpSustain: return &o.sustain;
+        case FmOpRelease: return &o.release;
+        case FmOpVelocity: return &o.velocity;
+        default: return nullptr;
+        }
+    }
+}
+
+void AudioEngine::SetSoundParam(int id, float value)
+{
+    if (!std::isfinite(value)) return;
+    if (PerformanceController::IsPerformanceParam(id))
+    {
+        perf_.SetParam(id, value);
+        return;
+    }
+    if (id == SoundParam::FmPreset)
+    {
+        int index = std::clamp(static_cast<int>(std::lround(value)), 0, FmSynth::PresetCount() - 1);
+        fmPresetIndex_.store(index);
+        FmPatch patch = FmSynth::Preset(index);
+        synth_.SetPatch(patch);
+        extraLayers_.SetFmPatch(patch);
+        return;
+    }
+    if (id == SoundParam::FmAlgorithm || (id > SoundParam::FmPreset && id <= SoundParam::FmLast))
+    {
+        FmPatch patch = synth_.GetPatch();
+        if (id == SoundParam::FmAlgorithm)
+        {
+            patch.algorithm = std::clamp(static_cast<int>(std::lround(value)), 0, FmSynth::kAlgorithmCount - 1);
+        }
+        else if (float* field = FmField(patch, id))
+        {
+            *field = value;
+        }
+        else
+        {
+            return;
+        }
+        synth_.SetPatch(patch);
+        extraLayers_.SetFmPatch(patch);
+        return;
+    }
+    if (KeyboardFx::IsFxParam(id))
+    {
+        keyboardFx_.SetParam(id, value);
+    }
+}
+
+float AudioEngine::GetSoundParam(int id) const
+{
+    if (PerformanceController::IsPerformanceParam(id)) return perf_.GetParam(id);
+    if (id == SoundParam::FmPreset) return static_cast<float>(fmPresetIndex_.load());
+    if (id == SoundParam::FmAlgorithm) return static_cast<float>(synth_.GetPatch().algorithm);
+    if (id > SoundParam::FmPreset && id <= SoundParam::FmLast)
+    {
+        FmPatch patch = synth_.GetPatch();
+        float* field = FmField(patch, id);
+        return field ? *field : 0.0f;
+    }
+    if (KeyboardFx::IsFxParam(id)) return keyboardFx_.GetParam(id);
+    return 0.0f;
+}
+
+float AudioEngine::GetSoundParamDefault(int id)
+{
+    if (PerformanceController::IsPerformanceParam(id)) return PerformanceController::DefaultValue(id);
+    if (id == SoundParam::FmPreset) return 0.0f;
+    if (id == SoundParam::FmAlgorithm) return static_cast<float>(FmSynth::Preset(0).algorithm);
+    if (id > SoundParam::FmPreset && id <= SoundParam::FmLast)
+    {
+        FmPatch patch = FmSynth::Preset(0);
+        float* field = FmField(patch, id);
+        return field ? *field : 0.0f;
+    }
+    if (KeyboardFx::IsFxParam(id)) return KeyboardFx::DefaultValue(id);
+    return 0.0f;
 }
 
 void AudioEngine::SetChordCaptureArmed(bool armed)

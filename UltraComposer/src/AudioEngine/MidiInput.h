@@ -38,10 +38,17 @@ public:
     using NoteCallback = std::function<void(int midiNote, float velocity, bool isNoteOn)>;
     void SetNoteCallback(NoteCallback callback);
 
+    // Performance controllers from the hardware: kind 0 = control change
+    // (number 0-127, value 0-127), kind 1 = pitch bend (value 0-16383,
+    // 8192 = centre).
+    using ControlCallback = std::function<void(int kind, int number, int value)>;
+    void SetControlCallback(ControlCallback callback);
+
 private:
     struct Impl;
     Impl* impl_;
     NoteCallback callback_;
+    ControlCallback controlCallback_;
     bool isOpen_ = false;
 
     static void RtMidiCallback(double timeStamp, std::vector<unsigned char>* message, void* userData);

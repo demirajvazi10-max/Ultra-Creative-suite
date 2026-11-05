@@ -175,6 +175,7 @@ public partial class MainWindow : Window
             PopulateAutoThirdScaleCombo();
             PopulateCustomRhythmCombos();
             PopulatePerfLayerCombo();
+            PopulateSoundSections();
             _accompanimentStatusTimer.Start();
         }
     }
@@ -477,6 +478,7 @@ public partial class MainWindow : Window
             data.ExtraPerformanceLayers.Add(layerData);
         }
 
+        GatherSoundSettings(data); // Ultra Composer 2.0: Ultra FM, performance controls, effects
         return data;
     }
 
@@ -762,6 +764,9 @@ public partial class MainWindow : Window
         {
             PopulatePerfLayerCombo();
         }
+
+        // --- Zvuk i efekti (Ultra Composer 2.0) ---
+        ApplySoundSettings(data);
     }
 
     private void ApplyPerfLayerData(ProjectFile.PerformanceLayerData layerData, int layerIndex)
@@ -913,6 +918,7 @@ public partial class MainWindow : Window
         Arranger,
         MultiTrack,
         Accompaniment,
+        Sound, // Ultra Composer 2.0: "Zvuk i efekti" (MainWindow.Sound.cs)
     }
 
     /// <summary>
@@ -928,12 +934,14 @@ public partial class MainWindow : Window
         ArrangerView.Visibility = view == AppView.Arranger ? Visibility.Visible : Visibility.Collapsed;
         MultiTrackView.Visibility = view == AppView.MultiTrack ? Visibility.Visible : Visibility.Collapsed;
         AccompanimentView.Visibility = view == AppView.Accompaniment ? Visibility.Visible : Visibility.Collapsed;
+        SoundView.Visibility = view == AppView.Sound ? Visibility.Visible : Visibility.Collapsed;
 
         ShowInstrumentsMenuItem.IsChecked = view == AppView.Instruments;
         ShowSequencerMenuItem.IsChecked = view == AppView.Sequencer;
         ShowArrangerMenuItem.IsChecked = view == AppView.Arranger;
         ShowMultiTrackMenuItem.IsChecked = view == AppView.MultiTrack;
         ShowAccompanimentMenuItem.IsChecked = view == AppView.Accompaniment;
+        ShowSoundMenuItem.IsChecked = view == AppView.Sound;
 
         if (view == AppView.Arranger)
         {
@@ -951,6 +959,10 @@ public partial class MainWindow : Window
         else if (view == AppView.Accompaniment)
         {
             RefreshAccompanimentCurrentChordText();
+        }
+        else if (view == AppView.Sound)
+        {
+            OnSoundViewShown();
         }
     }
 
@@ -1238,6 +1250,7 @@ public partial class MainWindow : Window
 
         // --- Auto-pratnja ---
         ShowAccompanimentMenuItem.Header = T("Menu.View.Accompaniment");
+        ApplySoundViewLanguage(); // Ultra Composer 2.0 "Zvuk i efekti" view (MainWindow.Sound.cs)
         AccTitleText.Text = T("Acc.Title");
         AccStyleLabelText.Text = T("Acc.StyleLabel");
         AutomationProperties.SetName(AccStyleComboBox, T("Acc.StyleAutomationName"));
@@ -2494,6 +2507,7 @@ public partial class MainWindow : Window
             }
         }
         _heldKeys.Clear();
+        ReleasePerformanceControls();
 
         StatusText.Text = _engineRunning ? Localization.T("Status.EngineRunning") : Localization.T("Status.EngineNotRunning");
     }
@@ -2501,6 +2515,12 @@ public partial class MainWindow : Window
     private void PerformanceKeyboard_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (!_engineRunning)
+        {
+            return;
+        }
+
+        // Ultra Composer 2.0: pitch bend, sustain, modulation, transpose, arpeggiator... (MainWindow.Sound.cs)
+        if (HandlePerformanceControlKeyDown(e))
         {
             return;
         }
@@ -2523,7 +2543,15 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Up || e.Key == Key.Down)
         {
-            CycleSoundFontPreset(e.Key == Key.Up ? 1 : -1);
+            // No SoundFont or VST in Layer 1 means Ultra FM is playing: switch its preset instead.
+            if (!AudioEngineInterop.IsSoundFontBankLoaded() && !AudioEngineInterop.IsVstInstrumentLoaded())
+            {
+                CycleFmPreset(e.Key == Key.Up ? 1 : -1);
+            }
+            else
+            {
+                CycleSoundFontPreset(e.Key == Key.Up ? 1 : -1);
+            }
             e.Handled = true;
             return;
         }
@@ -2546,6 +2574,11 @@ public partial class MainWindow : Window
     private void PerformanceKeyboard_PreviewKeyUp(object sender, KeyEventArgs e)
     {
         if (!_engineRunning)
+        {
+            return;
+        }
+
+        if (HandlePerformanceControlKeyUp(e))
         {
             return;
         }

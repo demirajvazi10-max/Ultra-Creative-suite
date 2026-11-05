@@ -25,6 +25,7 @@ struct SoundFontHost::Impl
 
     tsf* font = nullptr;
     int presetIndex = 0;
+    float pitchOffset = 0.0f;
     std::string bankFileName;
     bool loaded = false;
 };
@@ -94,6 +95,9 @@ bool SoundFontHost::LoadBank(const std::string& sf2Path, double sampleRate, std:
         oldFont = impl_->font;
         impl_->font = font;
         impl_->presetIndex = startPreset;
+        // Notes are played through channel 0 so the channel's tuning can bend them.
+        tsf_channel_set_presetindex(font, 0, startPreset);
+        tsf_channel_set_tuning(font, 0, impl_->pitchOffset);
         impl_->bankFileName = fileName;
         impl_->loaded = true;
     }
@@ -166,6 +170,7 @@ bool SoundFontHost::SelectPreset(int presetIndex)
     // instrument-switch button makes in most simple DAWs.
     tsf_note_off_all(impl_->font);
     impl_->presetIndex = presetIndex;
+    tsf_channel_set_presetindex(impl_->font, 0, presetIndex);
     return true;
 }
 
@@ -184,6 +189,7 @@ bool SoundFontHost::SelectPresetByBankProgram(int bank, int program)
     // Same note-cutting tradeoff as SelectPreset() above.
     tsf_note_off_all(impl_->font);
     impl_->presetIndex = index;
+    tsf_channel_set_presetindex(impl_->font, 0, index);
     return true;
 }
 
@@ -198,7 +204,7 @@ void SoundFontHost::NoteOn(int midiNote, float velocity)
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->loaded)
     {
-        tsf_note_on(impl_->font, impl_->presetIndex, midiNote, velocity);
+        tsf_channel_note_on(impl_->font, 0, midiNote, velocity);
     }
 }
 
@@ -207,7 +213,30 @@ void SoundFontHost::NoteOff(int midiNote)
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->loaded)
     {
-        tsf_note_off(impl_->font, impl_->presetIndex, midiNote);
+        tsf_channel_note_off(impl_->font, 0, midiNote);
+    }
+}
+
+void SoundFontHost::AllNotesOff()
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (impl_->loaded)
+    {
+        tsf_note_off_all(impl_->font);
+    }
+}
+
+void SoundFontHost::SetPitchOffset(float semitones)
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (semitones == impl_->pitchOffset)
+    {
+        return;
+    }
+    impl_->pitchOffset = semitones;
+    if (impl_->loaded)
+    {
+        tsf_channel_set_tuning(impl_->font, 0, semitones);
     }
 }
 

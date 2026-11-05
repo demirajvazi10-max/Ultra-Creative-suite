@@ -28,6 +28,8 @@
                           Click="ShowMultiTrackMenuItem_Click" />
                 <MenuItem x:Name="ShowAccompanimentMenuItem" Header="_Auto-pratnja" IsCheckable="True"
                           Click="ShowAccompanimentMenuItem_Click" />
+                <MenuItem x:Name="ShowSoundMenuItem" Header="_Zvuk i efekti" IsCheckable="True"
+                          Click="ShowSoundMenuItem_Click" />
             </MenuItem>
             <MenuItem x:Name="LanguageMenuItem" Header="_Jezik">
                 <MenuItem x:Name="LanguageSerbianMenuItem" Header="Srpski" IsCheckable="True"
@@ -712,6 +714,27 @@
 
                 <TextBlock x:Name="CustomRhythmTipText" Margin="0,8,0,0" TextWrapping="Wrap"
                            Text="Savet: napravi prvi takt, dodaj mu bubnjeve i note, pa „Dodaj kao novi takt”. Ako hoćeš varijaciju, napravi još jedan takt na isti način - svi taktovi će se odsvirati redom, u petlji." />
+            </StackPanel>
+
+            <!-- ==================== Zvuk i efekti (Ultra Composer 2.0): Ultra FM, izvođenje, arpeđator, efekti ==================== -->
+            <!-- Texts are set in MainWindow.Sound.cs (ApplySoundViewLanguage); the ones here are only the Serbian defaults. -->
+            <StackPanel Grid.Row="2" x:Name="SoundView" Visibility="Collapsed">
+                <TextBlock x:Name="SoundTitleText" Text="Zvuk i efekti (Ultra Composer 2.0)" FontSize="16" FontWeight="Bold" Margin="0,0,0,6" />
+                <TextBlock x:Name="SoundIntroText" TextWrapping="Wrap" Margin="0,0,0,8" />
+                <Label x:Name="SoundSectionsLabel" Content="_Odeljci:" Padding="0" Target="{Binding ElementName=SoundSectionsListBox}" />
+                <ListBox x:Name="SoundSectionsListBox" Height="180" Margin="0,4,0,8"
+                         SelectionChanged="SoundSectionsListBox_SelectionChanged"
+                         PreviewKeyDown="SoundSectionsListBox_PreviewKeyDown" />
+                <Label x:Name="SoundParamsLabel" Content="_Podešavanja:" Padding="0" Target="{Binding ElementName=SoundParamsListBox}" />
+                <ListBox x:Name="SoundParamsListBox" Height="220" Margin="0,4,0,8"
+                         PreviewKeyDown="SoundParamsListBox_PreviewKeyDown"
+                         GotKeyboardFocus="SoundParamsListBox_GotKeyboardFocus" />
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="SoundResetSectionButton" Content="_Vrati odeljak na početne vrednosti" Click="SoundResetSectionButton_Click" />
+                    <Button x:Name="SoundPanicButton" Content="_Zaustavi sve tonove (panic)" Margin="8,0,0,0" Click="SoundPanicButton_Click" />
+                </StackPanel>
+                <TextBlock x:Name="SoundStatusText" AutomationProperties.LiveSetting="Assertive" Margin="0,8,0,0" TextWrapping="Wrap" />
+                <TextBlock x:Name="SoundKeysHelpText" TextWrapping="Wrap" Margin="0,8,0,0" />
             </StackPanel>
         </Grid>
     </Grid>

@@ -62,6 +62,12 @@ public:
 
     void NoteOn(int midiNote, float velocity);
     void NoteOff(int midiNote);
+    void AllNotesOff();
+
+    // Live pitch offset in semitones for every sounding note (pitch bend,
+    // vibrato and mono/legato glide from PerformanceController). Notes play
+    // on TinySoundFont channel 0, whose tuning follows this value.
+    void SetPitchOffset(float semitones);
 
     // Audio thread only. Adds the selected instrument's output on top of
     // whatever is already in 'interleavedStereoOut' (so it mixes with the

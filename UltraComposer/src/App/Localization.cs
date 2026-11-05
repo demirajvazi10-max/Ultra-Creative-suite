@@ -66,6 +66,7 @@ public static class Localization
         ["Menu.View.Arranger"] = "_Aranžer",
         ["Menu.View.MultiTrack"] = "_Multi-trake i mikser",
         ["Menu.View.Accompaniment"] = "_Auto-pratnja",
+        ["Menu.View.Sound"] = "_Zvuk i efekti",
         ["Menu.Language"] = "_Jezik",
         ["Menu.Language.Serbian"] = "Srpski",
         ["Menu.Language.English"] = "Engleski",
@@ -110,11 +111,11 @@ public static class Localization
         ["Vst.BrowseDialogTitle"] = "Izaberi VST3 instrument",
         ["Vst.LoadButton"] = "Učitaj instrument",
         ["Vst.UnloadButton"] = "Isključi instrument",
-        ["Vst.StatusNoneLoaded"] = "Nijedan VST3 instrument nije učitan - svira samo ugrađeni sintisajzer.",
+        ["Vst.StatusNoneLoaded"] = "Nijedan VST3 instrument nije učitan - svira samo ugrađeni Ultra FM sintisajzer.",
         ["Vst.StatusEmptyPath"] = "Prvo unesi putanju do .vst3 fajla ili fascikle.",
-        ["Vst.StatusLoaded"] = "Učitano: {0}. Sada sviraš i njega, zajedno sa ugrađenim sintisajzerom.",
+        ["Vst.StatusLoaded"] = "Učitano: {0}. Sada sviraš njega (Ultra FM sintisajzer u Sloju 1 ćuti dok je VST učitan).",
         ["Vst.StatusLoadFailed"] = "Nije uspelo učitavanje: {0}",
-        ["Vst.StatusUnloaded"] = "VST3 instrument je isključen - svira samo ugrađeni sintisajzer.",
+        ["Vst.StatusUnloaded"] = "VST3 instrument je isključen - svira samo ugrađeni Ultra FM sintisajzer.",
         ["Vst.DefaultInstrumentName"] = "instrument",
 
         // --- SoundFont ---
@@ -125,11 +126,11 @@ public static class Localization
         ["Sf.UnloadButton"] = "Isključi banku",
         ["Sf.InstrumentLabel"] = "Instrument:",
         ["Sf.ComboAutomationName"] = "Instrument iz ucitane SoundFont banke",
-        ["Sf.StatusNoneLoaded"] = "Nijedna SoundFont banka nije učitana - svira samo ugrađeni sintisajzer.",
+        ["Sf.StatusNoneLoaded"] = "Nijedna SoundFont banka nije učitana - svira samo ugrađeni Ultra FM sintisajzer.",
         ["Sf.StatusEmptyPath"] = "Prvo unesi putanju do .sf2 fajla.",
         ["Sf.StatusLoadFailed"] = "Nije uspelo učitavanje: {0}",
-        ["Sf.StatusLoaded"] = "Učitano: {0} ({1} instrumenata). Trenutni instrument: {2}. Svira zajedno sa ugrađenim sintisajzerom i VST-om, ako su učitani.",
-        ["Sf.StatusUnloaded"] = "SoundFont banka je isključena - svira samo ugrađeni sintisajzer (i VST, ako je učitan).",
+        ["Sf.StatusLoaded"] = "Učitano: {0} ({1} instrumenata). Trenutni instrument: {2}. Svira zajedno sa VST-om, ako je učitan (Ultra FM sintisajzer u Sloju 1 ćuti dok je banka učitana).",
+        ["Sf.StatusUnloaded"] = "SoundFont banka je isključena - svira samo ugrađeni Ultra FM sintisajzer (i VST, ako je učitan).",
         ["Sf.StatusPresetChanged"] = "Instrument promenjen na: {0}.",
         ["Sf.StatusNoneLoadedForCycle"] = "Nijedna SoundFont banka nije učitana - nema šta da se menja.",
         ["Sf.DefaultInstrumentName"] = "Instrument {0}",
@@ -188,7 +189,7 @@ public static class Localization
         // --- Klavijatura za sviranje ---
         ["Keyboard.AutomationName"] = "Klavijatura za sviranje. Fokusiraj ovo polje pa sviraj koriscenjem tastature.",
         ["Keyboard.AutomationHelp"] = "Donji red tastera Z do M svira jednu oktavu, gornji red Q do U svira oktavu iznad. Page Up i Page Down menjaju osnovnu oktavu. Strelica gore/dole menja instrument iz ucitane SoundFont banke, ako je neka ucitana.",
-        ["Keyboard.Intro"] = "Fokusiraj ovo polje (Tab) da bi tasteri Z-M i Q-U svirali note. Page Up / Page Down menjaju oktavu. Strelica gore/dole menja instrument iz učitane SoundFont banke.",
+        ["Keyboard.Intro"] = "Fokusiraj ovo polje (Tab) da bi tasteri Z-M i Q-U svirali note. Page Up / Page Down menjaju oktavu. Strelica gore/dole menja instrument iz učitane SoundFont banke, a bez banke zvuk Ultra FM sintisajzera. Strelice levo/desno = pitch bend dok ih držiš, razmak = sustain pedala, F2/F3 = modulacija (vibrato), F4/F5 = transpozicija, F6 = arpeđator, F7 = portamento, F8 = poli/mono/legato, F9 = efekti, Home = zaustavi sve. Sve ostalo je u meniju Prikaz, Zvuk i efekti.",
         ["Keyboard.Octave"] = "Trenutna oktava: {0}",
 
         // --- Sekvenser ---
@@ -548,6 +549,7 @@ public static class Localization
         ["Menu.View.Arranger"] = "_Arranger",
         ["Menu.View.MultiTrack"] = "_Multi-track & Mixer",
         ["Menu.View.Accompaniment"] = "_Auto-accompaniment",
+        ["Menu.View.Sound"] = "_Sound and effects",
         ["Menu.Language"] = "_Language",
         ["Menu.Language.Serbian"] = "Serbian",
         ["Menu.Language.English"] = "English",
@@ -592,11 +594,11 @@ public static class Localization
         ["Vst.BrowseDialogTitle"] = "Choose a VST3 instrument",
         ["Vst.LoadButton"] = "Load instrument",
         ["Vst.UnloadButton"] = "Unload instrument",
-        ["Vst.StatusNoneLoaded"] = "No VST3 instrument loaded - only the built-in synth is playing.",
+        ["Vst.StatusNoneLoaded"] = "No VST3 instrument loaded - only the built-in Ultra FM synth is playing.",
         ["Vst.StatusEmptyPath"] = "Enter a path to a .vst3 file or folder first.",
-        ["Vst.StatusLoaded"] = "Loaded: {0}. You now hear it too, together with the built-in synth.",
+        ["Vst.StatusLoaded"] = "Loaded: {0}. You now hear it (the Ultra FM synth in Layer 1 is silent while a VST is loaded).",
         ["Vst.StatusLoadFailed"] = "Loading failed: {0}",
-        ["Vst.StatusUnloaded"] = "VST3 instrument unloaded - only the built-in synth is playing.",
+        ["Vst.StatusUnloaded"] = "VST3 instrument unloaded - only the built-in Ultra FM synth is playing.",
         ["Vst.DefaultInstrumentName"] = "instrument",
 
         // --- SoundFont ---
@@ -607,11 +609,11 @@ public static class Localization
         ["Sf.UnloadButton"] = "Unload bank",
         ["Sf.InstrumentLabel"] = "Instrument:",
         ["Sf.ComboAutomationName"] = "Instrument from the loaded SoundFont bank",
-        ["Sf.StatusNoneLoaded"] = "No SoundFont bank loaded - only the built-in synth is playing.",
+        ["Sf.StatusNoneLoaded"] = "No SoundFont bank loaded - only the built-in Ultra FM synth is playing.",
         ["Sf.StatusEmptyPath"] = "Enter a path to a .sf2 file first.",
         ["Sf.StatusLoadFailed"] = "Loading failed: {0}",
-        ["Sf.StatusLoaded"] = "Loaded: {0} ({1} instruments). Current instrument: {2}. Plays together with the built-in synth and VST, if loaded.",
-        ["Sf.StatusUnloaded"] = "SoundFont bank unloaded - only the built-in synth is playing (and VST, if loaded).",
+        ["Sf.StatusLoaded"] = "Loaded: {0} ({1} instruments). Current instrument: {2}. Plays together with the VST, if loaded (the Ultra FM synth in Layer 1 is silent while a bank is loaded).",
+        ["Sf.StatusUnloaded"] = "SoundFont bank unloaded - only the built-in Ultra FM synth is playing (and VST, if loaded).",
         ["Sf.StatusPresetChanged"] = "Instrument changed to: {0}.",
         ["Sf.StatusNoneLoadedForCycle"] = "No SoundFont bank loaded - nothing to change.",
         ["Sf.DefaultInstrumentName"] = "Instrument {0}",
@@ -670,7 +672,7 @@ public static class Localization
         // --- Performance keyboard ---
         ["Keyboard.AutomationName"] = "Performance keyboard. Focus this field, then play using the keyboard.",
         ["Keyboard.AutomationHelp"] = "The bottom row of keys, Z to M, plays one octave; the top row, Q to U, plays the octave above. Page Up and Page Down shift the base octave. Up/Down arrow switches the instrument in the loaded SoundFont bank, if one is loaded.",
-        ["Keyboard.Intro"] = "Focus this field (Tab) so keys Z-M and Q-U play notes. Page Up / Page Down shift the octave. Up/Down arrow switches the instrument in the loaded SoundFont bank.",
+        ["Keyboard.Intro"] = "Focus this field (Tab) so keys Z-M and Q-U play notes. Page Up / Page Down shift the octave. Up/Down arrow switches the instrument in the loaded SoundFont bank, or the Ultra FM synthesizer sound when no bank is loaded. Left/Right arrows = pitch bend while held, Space = sustain pedal, F2/F3 = modulation (vibrato), F4/F5 = transpose, F6 = arpeggiator, F7 = portamento, F8 = poly/mono/legato, F9 = effects, Home = stop everything. Everything else is in View, Sound and effects.",
         ["Keyboard.Octave"] = "Current octave: {0}",
 
         // --- Sequencer ---

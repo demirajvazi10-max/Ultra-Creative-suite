@@ -184,7 +184,7 @@ std::string PerformanceLayers::GetVstInstrumentName(int layerIndex) const
     return layers_[layerIndex].vst.GetLoadedPluginName();
 }
 
-void PerformanceLayers::DispatchNoteOn(int midiNote, float velocity, int splitPoint)
+void PerformanceLayers::DispatchNoteOn(int midiNote, float velocity, int splitPoint, int targets)
 {
     for (auto& layer : layers_)
     {
@@ -196,14 +196,14 @@ void PerformanceLayers::DispatchNoteOn(int midiNote, float velocity, int splitPo
 
         switch (static_cast<PerformanceLayerMode>(layer.mode.load()))
         {
-        case PerformanceLayerMode::SoundFont: layer.soundFont.NoteOn(outNote, velocity); break;
-        case PerformanceLayerMode::Vst: layer.vst.NoteOn(outNote, velocity); break;
-        default: layer.synth.NoteOn(outNote, velocity); break;
+        case PerformanceLayerMode::SoundFont: if (targets & 1) layer.soundFont.NoteOn(outNote, velocity); break;
+        case PerformanceLayerMode::Vst: if (targets & 2) layer.vst.NoteOn(outNote, velocity); break;
+        default: if (targets & 1) layer.synth.NoteOn(outNote, velocity); break;
         }
     }
 }
 
-void PerformanceLayers::DispatchNoteOff(int midiNote, int splitPoint)
+void PerformanceLayers::DispatchNoteOff(int midiNote, int splitPoint, int targets)
 {
     for (auto& layer : layers_)
     {
@@ -215,10 +215,42 @@ void PerformanceLayers::DispatchNoteOff(int midiNote, int splitPoint)
 
         switch (static_cast<PerformanceLayerMode>(layer.mode.load()))
         {
-        case PerformanceLayerMode::SoundFont: layer.soundFont.NoteOff(outNote); break;
-        case PerformanceLayerMode::Vst: layer.vst.NoteOff(outNote); break;
-        default: layer.synth.NoteOff(outNote); break;
+        case PerformanceLayerMode::SoundFont: if (targets & 1) layer.soundFont.NoteOff(outNote); break;
+        case PerformanceLayerMode::Vst: if (targets & 2) layer.vst.NoteOff(outNote); break;
+        default: if (targets & 1) layer.synth.NoteOff(outNote); break;
         }
+    }
+}
+
+void PerformanceLayers::SetFmPatch(const FmPatch& patch)
+{
+    for (auto& layer : layers_)
+    {
+        layer.synth.SetPatch(patch);
+    }
+}
+
+void PerformanceLayers::SetPerformance(float pitchOffset, bool polyGlide, float glideSeconds, float bend, float modWheel)
+{
+    for (auto& layer : layers_)
+    {
+        if (!layer.enabled.load()) continue;
+        switch (static_cast<PerformanceLayerMode>(layer.mode.load()))
+        {
+        case PerformanceLayerMode::SoundFont: layer.soundFont.SetPitchOffset(pitchOffset); break;
+        case PerformanceLayerMode::Vst: layer.vst.SetPitchBend(bend); layer.vst.SetModWheel(modWheel); break;
+        default: layer.synth.SetPitchOffset(pitchOffset); layer.synth.SetGlide(polyGlide, glideSeconds); break;
+        }
+    }
+}
+
+void PerformanceLayers::AllNotesOff()
+{
+    for (auto& layer : layers_)
+    {
+        layer.synth.AllNotesOff();
+        layer.soundFont.AllNotesOff();
+        layer.vst.AllNotesOff();
     }
 }
 

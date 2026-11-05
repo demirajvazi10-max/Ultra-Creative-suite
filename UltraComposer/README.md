@@ -8,6 +8,34 @@ a simplified prototype.
 
 Demir Ajvazi
 
+## What's new in 2.0
+
+Version 2.0 turns the performance keyboard into a real keyboard
+instrument, in the spirit of Native Instruments FM8 and modern
+workstation keyboards - see "Sound and effects (2.0)" below for the
+details:
+
+- **Ultra FM** - a six-operator FM synthesizer replaces the old sine
+  synth: 8 algorithms, operator feedback, per-operator ratio, detune,
+  level, ADSR envelope and velocity sensitivity, a "brightness" macro,
+  and 16 ready sounds (electric piano, bell, FM bass, brass, organ, pad,
+  lead, strings, marimba, clavinet, flute, glass, pluck bass, choir,
+  steel drum, pure sine)
+- **Performance controls** - pitch bend (up to 24 semitones), modulation
+  wheel vibrato, portamento, poly / mono / legato voice modes, transpose
+  and a sustain pedal, from the computer keyboard and from MIDI hardware
+  (pitch bend, CC 1, 5, 64, 65, 120, 123)
+- **Arpeggiator** - up, down, up-down, random, as played and chord
+  patterns, 1/4 to 1/32 note rates (with triplets), 1-4 octaves, gate,
+  tempo and latch
+- **Effects rack** - overdrive, filter with LFO and auto-wah, 3-band EQ,
+  compressor, chorus, flanger, phaser, tremolo, auto-pan, rotary
+  (Leslie) speaker, echo with ping-pong, and reverb, plus 12 quick
+  presets
+- A new **Prikaz → Zvuk i efekti / View → Sound and effects** view to
+  set all of it, built for the keyboard and screen readers first, and
+  everything is saved in the project
+
 ## Status
 
 Proof that the real architecture works end to end, with the bigger DAW
@@ -21,9 +49,9 @@ What it does right now:
 - Lets you **play notes from a MIDI keyboard** (e.g. a Yamaha P-125 or any
   other class-compliant USB-MIDI device), via RtMidi - see "MIDI hardware
   input" below
-- Plays a simple polyphonic synth voice (sine wave with a short attack/release
-  envelope) so you can hear what you play, up to 32 notes at once, from
-  either input at the same time
+- Plays **Ultra FM**, a six-operator FM synthesizer with 16 ready sounds
+  (version 2.0, see "Sound and effects (2.0)" below), up to 16 notes at
+  once per layer, from either input at the same time
 - **Hosts a VST3 instrument plug-in** alongside the built-in synth, using
   Steinberg's own VST3 SDK hosting classes - see "VST3 instrument hosting"
   below
@@ -247,11 +275,12 @@ TinySoundFont, a small, well-tested SoundFont synthesizer.
 
 ## Built-in synth vs. real instruments
 
-The built-in sine synth is only meant as a fallback so something is
-audible before any real instrument is loaded - it's automatically muted
-the moment a VST3 instrument or a SoundFont bank is loaded (loading both
-at once mixes the two real instruments together, still without the
-built-in synth). Unloading everything brings the built-in synth back.
+The built-in synth (Ultra FM since version 2.0) plays whenever no real
+instrument is loaded in Layer 1 - it's automatically muted the moment a
+VST3 instrument or a SoundFont bank is loaded (loading both at once mixes
+the two real instruments together, still without the built-in synth).
+Unloading everything brings the built-in synth back. Extra layers 2-4 set
+to "built-in synth" play Ultra FM with the same patch as Layer 1.
 
 Whatever is currently playing also passes through a soft limiter (a
 `tanh()` curve on the final mixed output) before reaching the audio
@@ -260,6 +289,118 @@ one note, if a SoundFont instrument layers several sample regions per
 key/velocity - that would otherwise add up past full volume gets bent
 back smoothly instead of harshly clipping (heard as crackling/distortion
 before this was added).
+
+## Sound and effects (2.0)
+
+**Prikaz → Zvuk i efekti** (View → Sound and effects) holds every sound
+setting of the performance keyboard. The screen is two lists: the
+sections (Alt+O in Serbian, Alt+S in English) and the settings of the
+chosen section (Alt+P / Alt+T). In the section list, Space switches an
+effect or the arpeggiator on or off, and Tab or Enter goes to its
+settings. In the settings list:
+
+| Key | Action |
+| --- | --- |
+| Up / Down | next / previous setting |
+| Left / Right (also - and +) | change the value by one step |
+| Page Up / Page Down | change the value in big steps |
+| Home / End | lowest / highest value |
+| Space / Enter | switch on/off, or go to the next choice |
+| Delete | back to the starting value |
+| Escape | back to the section list |
+
+Every change is spoken by the screen reader right away (a UI Automation
+notification, like a slider), so you hear "45 %" or "legato" without
+leaving the list. Sections:
+
+- **Izvođenje / Performance** - voice mode (poly, mono, legato),
+  portamento on/off and time, pitch bend range (1-24 semitones),
+  modulation wheel, vibrato depth and speed, transpose (±12), sustain
+  pedal
+- **Arpeđator / Arpeggiator** - on/off, pattern (up, down, up and down,
+  random, as played, whole chord), rate (1/4, 1/8, 1/8T, 1/16, 1/16T,
+  1/32), range (1-4 octaves), gate, latch, tempo
+- **Ultra FM synthesizer** - preset, algorithm, volume, brightness,
+  operator 6 feedback; then one section per operator (1-6), whose name
+  says whether that operator is heard (carrier) or shapes the tone
+  (modulator) in the current algorithm: level, frequency ratio (0.5-16),
+  fine detune (±50 cents), attack, decay, sustain, release, velocity
+  sensitivity. Edits apply live, also to notes already sounding.
+- **Efekti / Effects** - master switch and 12 quick presets (no effects,
+  small room, concert hall, electric piano auto-pan and chorus, organ
+  with rotary speaker, rock solo, space pad, auto-wah, ping-pong echo,
+  old radio, guitar flanger, vibraphone tremolo)
+- one section per effect, in signal order: overdrive, filter (low-pass,
+  high-pass, band-pass, with LFO and envelope follower = auto-wah),
+  3-band EQ, compressor, chorus, flanger, phaser, tremolo, auto-pan,
+  rotary speaker (slow/fast with realistic speed-up and slow-down), echo
+  (time, repeats, level, ping-pong, high-cut) and reverb (Freeverb: room
+  size, damping, amount, width)
+
+The effects process everything the performance keyboard plays (Layer 1
+and Layers 2-4, whatever the instrument), but not the multi-track mixer
+or the auto-accompaniment, which keep their own sound. A fresh program
+starts with a little reverb on, like a hardware keyboard.
+
+**Performance keyboard shortcuts** (while the "Klavijatura za sviranje"
+field has focus):
+
+| Key | Action |
+| --- | --- |
+| Left / Right (held) | pitch bend down / up; springs back when released |
+| Space (held) | sustain pedal |
+| F2 / F3 | modulation wheel (vibrato) -10% / +10% |
+| F4 / F5 | transpose a semitone down / up |
+| F6 | arpeggiator on/off |
+| F7 | portamento on/off |
+| F8 | poly → mono → legato |
+| F9 | all effects on/off |
+| Home | stop all notes, centre pitch bend and modulation |
+| Up / Down | next / previous sound: SoundFont preset, or Ultra FM preset when no bank or VST is loaded |
+
+**How the instruments follow the controls:**
+
+- **Ultra FM**: everything - pitch bend, vibrato, portamento in every
+  voice mode (in poly mode each new note glides from the previous one),
+  mono and legato.
+- **SoundFont**: pitch bend, vibrato, mono and legato (TinySoundFont
+  channel tuning); portamento in mono and legato mode.
+- **VST3**: the plug-in receives pitch bend and the modulation wheel
+  through its own MIDI mapping (`IMidiMapping`), so its own bend range
+  and vibrato apply; in legato mode it gets overlapping notes, so a mono
+  plug-in with legato/glide plays them connected.
+- The sustain pedal, transpose, mono/legato note logic and the
+  arpeggiator work the same for every instrument.
+
+**MIDI hardware**: pitch bend wheel, modulation wheel (CC 1), sustain
+pedal (CC 64), portamento on/off (CC 65) and portamento time (CC 5) are
+followed; All Sound Off / All Notes Off (CC 120/123) stop everything.
+
+**In the engine** (all new files in `src/AudioEngine`):
+
+- `SoundParams.h` - one numbered list of every setting; the C API is
+  just `UC_SetSoundParam(id, value)` / `UC_GetSoundParam(id)` (plus
+  `UC_GetSoundParamDefault`, `UC_GetFmPresetCount`,
+  `UC_PerformancePanic`), so new settings never need new exports. The
+  numbers are part of the project file format - never renumber.
+- `FmSynth.h/.cpp` - Ultra FM (table-based sine operators, per-voice
+  glide, live pitch offset smoothed across each block).
+- `PerformanceController.h/.cpp` - transpose, sustain, poly/mono/legato
+  note stack, arpeggiator, pitch bend smoothing, vibrato, glide; only
+  live playing goes through it (the sequencer, arranger, multi-track and
+  accompaniment play their notes unchanged).
+- `KeyboardFx.h/.cpp` - the effects rack (lock-free parameters, read
+  once per audio block).
+- `SoundFontHost` now plays on TinySoundFont channel 0 so its tuning can
+  follow bend/vibrato/glide; `VstHost` sends pitch bend and modulation as
+  parameter changes; `MidiInput` also parses control change and pitch
+  bend messages.
+
+The WPF side is `SoundParameters.cs` (the catalog: names in both
+languages, ranges, steps, how values are read out, effect presets) and
+`MainWindow.Sound.cs` (the view, the keyboard shortcuts and project
+save/load). Projects store the settings in a new `SoundSettings` map;
+projects from before 2.0 load with the starting values.
 
 ## Instrument layers (Layer and Split)
 
@@ -594,6 +735,8 @@ page. **Prikaz** switches which view is showing:
   notes, volume and pan, plus WAV export - see "Multi-track & mixer" above.
 - **Auto-pratnja** - rhythm/style picker, layer toggles, and chord input -
   see "Auto-accompaniment" above.
+- **Zvuk i efekti** - Ultra FM, performance controls, arpeggiator and the
+  effects rack - see "Sound and effects (2.0)" above.
 
 Only one view's controls are visible/reachable by Tab at a time, which
 keeps each screen short and focused instead of one long page to navigate
@@ -666,6 +809,9 @@ reopens one, restoring everything exactly as it was left:
 - The auto-third setting (on/off, upper/lower, scale).
 - The shared instrument loaded in "Banka instrumenata" for live
   keyboard/MIDI playing (SoundFont bank/preset or VST3).
+- Everything in "Zvuk i efekti" (2.0): the Ultra FM patch, performance
+  controls, arpeggiator and every effect setting (the sustain pedal and
+  pitch bend are not saved - they're "in your hands").
 
 Nothing persists between runs on its own outside of a saved `.adem` file -
 closing the app without saving loses whatever changed since the last
@@ -819,6 +965,10 @@ window/About dialog's version display and the installer's filename both
 derive from it (either from that property directly, in the local
 Visual Studio build, or from the tag name, in the CI build - the two are
 meant to be kept in sync by hand when you bump one).
+
+The text of the GitHub Release comes from `RELEASE-NOTES.md` in this
+folder (the workflow's `body_path`) - update it before each release so
+the release page says what's new.
 
 Betas are marked with a standard SemVer prerelease suffix, e.g.
 `1.0.0-beta` (tag: `composer-v1.0.0-beta`) - the workflow detects the `-`
