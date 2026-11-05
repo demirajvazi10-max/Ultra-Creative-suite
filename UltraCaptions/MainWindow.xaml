@@ -48,11 +48,14 @@
                     Click="DeleteLineButton_Click"
                     Margin="0,0,20,0" Padding="8,4"/>
             <theming:ThemeSwitcher/>
+            <Button x:Name="LanguageButton"
+                    Click="LanguageButton_Click"
+                    Margin="20,0,0,0" Padding="8,4"/>
             <Button x:Name="AboutButton"
                     Content="About"
                     AutomationProperties.Name="About Ultra Captions"
                     Click="AboutButton_Click"
-                    Margin="20,0,0,0" Padding="8,4"/>
+                    Margin="6,0,0,0" Padding="8,4"/>
         </StackPanel>
 
         <!-- Captions list + details panel -->

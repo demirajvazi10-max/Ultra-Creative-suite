@@ -51,6 +51,15 @@ public:
     bool SelectPreset(int presetIndex);
     int GetSelectedPresetIndex() const;
 
+    // Selects whichever preset matches this exact General MIDI bank+program
+    // combination (e.g. bank 128, program 0 for a standard GM drum kit),
+    // if the loaded bank has one - lets a caller land on a specific kind of
+    // instrument right away (see AccompanimentEngine::LoadDrumSoundFontBank)
+    // instead of always starting from LoadBank's own generic default.
+    // Leaves the current selection untouched and returns false if nothing
+    // is loaded or no preset matches that exact bank+program.
+    bool SelectPresetByBankProgram(int bank, int program);
+
     void NoteOn(int midiNote, float velocity);
     void NoteOff(int midiNote);
 

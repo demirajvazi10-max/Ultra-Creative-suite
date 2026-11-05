@@ -25,7 +25,7 @@ namespace UltraCaptions.ViewModels
             set => SetField(ref _mediaPath, value);
         }
 
-        private string _statusMessage = "Ready.";
+        private string _statusMessage = L.T("Ready.");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -74,7 +74,7 @@ namespace UltraCaptions.ViewModels
             if (string.IsNullOrEmpty(MediaPath)) return;
 
             IsBusy = true;
-            StatusMessage = "Transcribing with Whisper — this can take a while for longer files...";
+            StatusMessage = L.T("Transcribing with Whisper — this can take a while for longer files...");
             try
             {
                 var lines = await AITranscription.TranscribeAsync(MediaPath);
@@ -82,11 +82,11 @@ namespace UltraCaptions.ViewModels
                 foreach (var line in lines)
                     Captions.Add(line);
 
-                StatusMessage = $"Transcription complete: {Captions.Count} lines. Review and adjust timing as needed.";
+                StatusMessage = L.F("Transcription complete: {0} lines. Review and adjust timing as needed.", Captions.Count);
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Transcription failed: {ex.Message}";
+                StatusMessage = L.F("Transcription failed: {0}", ex.Message);
             }
             finally
             {
@@ -99,13 +99,13 @@ namespace UltraCaptions.ViewModels
             Captions.Clear();
             foreach (var line in SrtService.Import(path))
                 Captions.Add(line);
-            StatusMessage = $"Imported {Captions.Count} lines from {System.IO.Path.GetFileName(path)}.";
+            StatusMessage = L.F("Imported {0} lines from {1}.", Captions.Count, System.IO.Path.GetFileName(path));
         }
 
         public void ExportSrt(string path)
         {
             SrtService.Export(path, Captions);
-            StatusMessage = $"Exported {Captions.Count} lines to {System.IO.Path.GetFileName(path)}.";
+            StatusMessage = L.F("Exported {0} lines to {1}.", Captions.Count, System.IO.Path.GetFileName(path));
         }
     }
 }

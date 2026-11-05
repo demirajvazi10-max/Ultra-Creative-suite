@@ -13,3 +13,6 @@ UltraVideoEditor/TEMPLATE.iskraprovider
 
 # Installer build output
 installer/Output/
+
+# Adobe sound library - licence forbids sharing it as a standalone package; users download it via the app.
+UltraVideoEditor/Assets/

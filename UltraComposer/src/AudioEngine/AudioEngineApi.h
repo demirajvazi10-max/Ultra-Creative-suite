@@ -168,6 +168,81 @@ UC_API bool UC_SelectSoundFontPreset(int presetIndex);
 // Index of the currently selected instrument in the loaded bank.
 UC_API int UC_GetSelectedSoundFontPresetIndex();
 
+// --- Performance layers ("Sloj 1/2/3/4" in Banka instrumenata) ---
+// Two real-keyboard features built on one mechanism (see PerformanceLayers.h's
+// class comment for how UC_PerformanceLayerRange unifies them): "Layer/Dual"
+// (two or more instruments sounding together on the same keys) and "Split"
+// (different instruments in different keyboard zones). "Sloj 1" is the
+// pre-existing single main instrument (UC_LoadSoundFontBank/UC_LoadVstInstrument
+// above) - it gets the same enabled/volume/octave/range knobs below as
+// "Sloj 2/3/4", but all default to reproducing its old, only behavior
+// exactly, so a project that never touches this feature sees no change.
+// Covers every note source that already shares UC_NoteOn/UC_NoteOff (live
+// keyboard/MIDI, the plain sequencer, and the arranger).
+
+enum UC_PerformanceLayerMode
+{
+    UC_PerformanceLayerMode_BuiltInSynth = 0,
+    UC_PerformanceLayerMode_SoundFont = 1,
+    UC_PerformanceLayerMode_Vst = 2,
+};
+
+enum UC_PerformanceLayerRange
+{
+    UC_PerformanceLayerRange_Whole = 0, // "Layer": sounds across the whole keyboard
+    UC_PerformanceLayerRange_Lower = 1, // "Split": only below the split point
+    UC_PerformanceLayerRange_Upper = 2, // "Split": only at/above the split point
+};
+
+// "Sloj 1" (the pre-existing single main instrument above).
+UC_API void UC_MainLayer_SetEnabled(bool enabled);
+UC_API bool UC_MainLayer_IsEnabled();
+UC_API void UC_MainLayer_SetVolume(float volume);
+UC_API float UC_MainLayer_GetVolume();
+UC_API void UC_MainLayer_SetOctaveOffset(int32_t octaves);
+UC_API int32_t UC_MainLayer_GetOctaveOffset();
+UC_API void UC_MainLayer_SetRange(int32_t range /* UC_PerformanceLayerRange */);
+UC_API int32_t UC_MainLayer_GetRange(); // UC_PerformanceLayerRange
+
+// Shared by every layer's (including Sloj 1's) Lower/Upper range check -
+// independent of UC_Accompaniment_SetSplitPoint (that one decides
+// chord-input vs. melody; this one decides which layer's instrument a note
+// sounds through). Defaults to c4 (60), same as the accompaniment one.
+UC_API void UC_SetPerformanceSplitPoint(int32_t midiNote);
+UC_API int32_t UC_GetPerformanceSplitPoint();
+
+// "Sloj 2/3/4" - layerIndex is 0-based (0="Sloj 2", 1="Sloj 3", 2="Sloj 4"),
+// must be < 3 (see PerformanceLayers::kLayerCount).
+UC_API void UC_ExtraLayer_SetEnabled(int32_t layerIndex, bool enabled);
+UC_API bool UC_ExtraLayer_IsEnabled(int32_t layerIndex);
+UC_API void UC_ExtraLayer_SetMode(int32_t layerIndex, int32_t mode /* UC_PerformanceLayerMode */);
+UC_API int32_t UC_ExtraLayer_GetMode(int32_t layerIndex); // UC_PerformanceLayerMode
+UC_API void UC_ExtraLayer_SetVolume(int32_t layerIndex, float volume);
+UC_API float UC_ExtraLayer_GetVolume(int32_t layerIndex);
+UC_API void UC_ExtraLayer_SetOctaveOffset(int32_t layerIndex, int32_t octaves);
+UC_API int32_t UC_ExtraLayer_GetOctaveOffset(int32_t layerIndex);
+UC_API void UC_ExtraLayer_SetRange(int32_t layerIndex, int32_t range /* UC_PerformanceLayerRange */);
+UC_API int32_t UC_ExtraLayer_GetRange(int32_t layerIndex); // UC_PerformanceLayerRange
+
+UC_API bool UC_ExtraLayer_LoadSoundFontBank(int32_t layerIndex, const char* sf2Path,
+                                             char* errorBuffer, int32_t errorBufferSize);
+UC_API void UC_ExtraLayer_UnloadSoundFontBank(int32_t layerIndex);
+UC_API bool UC_ExtraLayer_IsSoundFontBankLoaded(int32_t layerIndex);
+UC_API bool UC_ExtraLayer_GetSoundFontBankName(int32_t layerIndex, char* buffer, int32_t bufferSize);
+UC_API int32_t UC_ExtraLayer_GetSoundFontPresetCount(int32_t layerIndex);
+UC_API bool UC_ExtraLayer_GetSoundFontPresetName(int32_t layerIndex, int32_t presetIndex,
+                                                  char* buffer, int32_t bufferSize);
+UC_API bool UC_ExtraLayer_SelectSoundFontPreset(int32_t layerIndex, int32_t presetIndex);
+UC_API int32_t UC_ExtraLayer_GetSelectedSoundFontPresetIndex(int32_t layerIndex);
+
+// Same idea as the SoundFont functions above, but a VST3 plug-in instead -
+// each layer's plug-in is its own independent instance.
+UC_API bool UC_ExtraLayer_LoadVstInstrument(int32_t layerIndex, const char* modulePath,
+                                             char* errorBuffer, int32_t errorBufferSize);
+UC_API void UC_ExtraLayer_UnloadVstInstrument(int32_t layerIndex);
+UC_API bool UC_ExtraLayer_IsVstInstrumentLoaded(int32_t layerIndex);
+UC_API bool UC_ExtraLayer_GetVstInstrumentName(int32_t layerIndex, char* buffer, int32_t bufferSize);
+
 // --- Auto-third harmonization ---
 // While enabled, every note played anywhere (computer keyboard, MIDI
 // hardware, the sequencer, and the arranger) also triggers a second note
@@ -520,6 +595,28 @@ enum UC_ChordVoicing : int32_t
 };
 UC_API void UC_Accompaniment_SetChordVoicing(int32_t voicing /* UC_ChordVoicing */);
 UC_API int32_t UC_Accompaniment_GetChordVoicing(); // UC_ChordVoicing
+
+// Drum kit source - Procedural (the fixed, always-available built-in
+// percussion, and the default) or SoundFont (a loaded bank's own drum kit;
+// see AccompanimentEngine.h's DrumSourceMode doc comment for why the
+// oriental dumbek strokes always stay Procedural even in SoundFont mode).
+// Loading a bank immediately switches to SoundFont mode, same convention as
+// UC_Accompaniment_LoadLayerSoundFontBank above.
+enum UC_AccompanimentDrumSourceMode : int32_t
+{
+    UC_AccompanimentDrumSourceMode_Procedural = 0,
+    UC_AccompanimentDrumSourceMode_SoundFont = 1,
+};
+UC_API void UC_Accompaniment_SetDrumSourceMode(int32_t mode /* UC_AccompanimentDrumSourceMode */);
+UC_API int32_t UC_Accompaniment_GetDrumSourceMode(); // UC_AccompanimentDrumSourceMode
+UC_API bool UC_Accompaniment_LoadDrumSoundFontBank(const char* sf2Path, char* errorBuffer, int32_t errorBufferSize);
+UC_API void UC_Accompaniment_UnloadDrumSoundFontBank();
+UC_API bool UC_Accompaniment_IsDrumSoundFontBankLoaded();
+UC_API bool UC_Accompaniment_GetDrumSoundFontBankName(char* buffer, int32_t bufferSize);
+UC_API int32_t UC_Accompaniment_GetDrumSoundFontPresetCount();
+UC_API bool UC_Accompaniment_GetDrumSoundFontPresetName(int32_t presetIndex, char* buffer, int32_t bufferSize);
+UC_API bool UC_Accompaniment_SelectDrumSoundFontPreset(int32_t presetIndex);
+UC_API int32_t UC_Accompaniment_GetSelectedDrumSoundFontPresetIndex();
 
 // --- Custom rhythm/style ("Sopstveni ritam") ---
 // Lets the person build their own accompaniment style in the UI instead of

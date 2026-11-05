@@ -201,6 +201,7 @@
                 <MenuItem Header="{DynamicResource L_menu_shortcuts}" Tag="shortcuts" Click="Menu_Click" InputGestureText="F1"/>
                 <MenuItem Header="{DynamicResource L_menu_log}" Tag="log" Click="Menu_Click" InputGestureText="Ctrl+Shift+L"/>
                 <Separator/>
+                <MenuItem Header="{DynamicResource L_menu_support}" Tag="support" Click="Menu_Click"/>
                 <MenuItem Header="{DynamicResource L_menu_about}" Tag="about" Click="Menu_Click"/>
             </MenuItem>
         </Menu>

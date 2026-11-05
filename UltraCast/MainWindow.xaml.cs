@@ -15,6 +15,9 @@ namespace UltraCast
             InitializeComponent();
             DataContext = _vm;
 
+            L.UpdateLanguageButton(LanguageButton);
+            L.Changed += UpdateOutputFolderText;
+
             _vm.PropertyChanged += (_, e) =>
             {
                 switch (e.PropertyName)
@@ -23,12 +26,10 @@ namespace UltraCast
                         StatusText.Text = _vm.StatusMessage;
                         break;
                     case nameof(MainViewModel.OutputFolder):
-                        OutputFolderText.Text = string.IsNullOrWhiteSpace(_vm.OutputFolder)
-                            ? "No output folder chosen"
-                            : $"Output: {_vm.OutputFolder}";
+                        UpdateOutputFolderText();
                         break;
                     case nameof(MainViewModel.IsPaused):
-                        PauseButton.Content = _vm.IsPaused ? "Resume" : "Pause";
+                        PauseButton.Content = _vm.IsPaused ? L.T("Resume") : L.T("Pause");
                         break;
                 }
             };
@@ -46,6 +47,11 @@ namespace UltraCast
                 LogTextBox.ScrollToEnd();
             });
         }
+
+        private void UpdateOutputFolderText() =>
+            OutputFolderText.Text = string.IsNullOrWhiteSpace(_vm.OutputFolder)
+                ? L.T("No output folder chosen")
+                : L.F("Output: {0}", _vm.OutputFolder);
 
         private void ChooseFolderButton_Click(object sender, RoutedEventArgs e)
         {
@@ -74,7 +80,7 @@ namespace UltraCast
             if (_vm.StartCommand.CanExecute(null))
                 _vm.StartCommand.Execute(null);
             else if (string.IsNullOrWhiteSpace(_vm.OutputFolder))
-                StatusText.Text = "Choose an output folder before starting.";
+                StatusText.Text = L.T("Choose an output folder before starting.");
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
@@ -88,6 +94,8 @@ namespace UltraCast
             if (_vm.PauseCommand.CanExecute(null))
                 _vm.PauseCommand.Execute(null);
         }
+
+        private void LanguageButton_Click(object sender, RoutedEventArgs e) => L.Toggle(LanguageButton);
 
         private void AboutButton_Click(object sender, RoutedEventArgs e)
         {

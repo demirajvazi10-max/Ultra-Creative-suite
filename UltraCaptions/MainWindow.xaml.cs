@@ -25,6 +25,8 @@ namespace UltraCaptions
             _positionTimer.Tick += PositionTimer_Tick;
             _positionTimer.Start();
 
+            L.UpdateLanguageButton(LanguageButton);
+
             _vm.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(MainViewModel.StatusMessage))
@@ -38,7 +40,7 @@ namespace UltraCaptions
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "Media files (*.mp4;*.mkv;*.mov;*.mp3;*.wav;*.m4a)|*.mp4;*.mkv;*.mov;*.mp3;*.wav;*.m4a|All files (*.*)|*.*"
+                Filter = L.T("Media files (*.mp4;*.mkv;*.mov;*.mp3;*.wav;*.m4a)|*.mp4;*.mkv;*.mov;*.mp3;*.wav;*.m4a|All files (*.*)|*.*")
             };
 
             if (dialog.ShowDialog() == true)
@@ -47,7 +49,7 @@ namespace UltraCaptions
                 Player.Source = new Uri(dialog.FileName);
                 Player.Play();
                 Player.Pause(); // load the media without starting playback
-                StatusText.Text = $"Loaded: {System.IO.Path.GetFileName(dialog.FileName)}";
+                StatusText.Text = L.F("Loaded: {0}", System.IO.Path.GetFileName(dialog.FileName));
             }
         }
 
@@ -60,14 +62,14 @@ namespace UltraCaptions
 
         private void ImportSrtButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new OpenFileDialog { Filter = "SubRip subtitle (*.srt)|*.srt" };
+            var dialog = new OpenFileDialog { Filter = L.T("SubRip subtitle (*.srt)|*.srt") };
             if (dialog.ShowDialog() == true)
                 _vm.ImportSrt(dialog.FileName);
         }
 
         private void ExportSrtButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new SaveFileDialog { Filter = "SubRip subtitle (*.srt)|*.srt", FileName = "captions.srt" };
+            var dialog = new SaveFileDialog { Filter = L.T("SubRip subtitle (*.srt)|*.srt"), FileName = "captions.srt" };
             if (dialog.ShowDialog() == true)
                 _vm.ExportSrt(dialog.FileName);
         }
@@ -79,6 +81,8 @@ namespace UltraCaptions
             if (_vm.DeleteCaptionCommand.CanExecute(null))
                 _vm.DeleteCaptionCommand.Execute(null);
         }
+
+        private void LanguageButton_Click(object sender, RoutedEventArgs e) => L.Toggle(LanguageButton);
 
         private void AboutButton_Click(object sender, RoutedEventArgs e)
         {
@@ -118,7 +122,7 @@ namespace UltraCaptions
             var target = _vm.SelectedCaption ?? CreateAndSelectNewLine();
             target.Start = Player.Position;
             RefreshDetailPanel();
-            StatusText.Text = $"Start marked at {Format(Player.Position)}.";
+            StatusText.Text = L.F("Start marked at {0}.", Format(Player.Position));
         }
 
         private void MarkEnd()
@@ -126,7 +130,7 @@ namespace UltraCaptions
             var target = _vm.SelectedCaption ?? CreateAndSelectNewLine();
             target.End = Player.Position;
             RefreshDetailPanel();
-            StatusText.Text = $"End marked at {Format(Player.Position)}.";
+            StatusText.Text = L.F("End marked at {0}.", Format(Player.Position));
         }
 
         private CaptionEntry CreateAndSelectNewLine()

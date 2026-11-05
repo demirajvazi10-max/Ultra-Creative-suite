@@ -37,6 +37,7 @@
             </MenuItem>
             <MenuItem x:Name="HelpMenuItem" Header="_Pomoć">
                 <MenuItem x:Name="UserGuideMenuItem" Header="_Uputstvo za upotrebu" Click="UserGuideMenuItem_Click" />
+                <MenuItem x:Name="SupportMenuItem" Header="Kako podržati p_rojekat" Click="SupportMenuItem_Click" />
                 <MenuItem x:Name="AboutMenuItem" Header="_O programu" Click="AboutMenuItem_Click" />
             </MenuItem>
         </Menu>
@@ -145,6 +146,67 @@
                                      VerticalAlignment="Center" Margin="8,0,0,0"
                                      Click="AutoThirdScale_Changed" />
                     </StackPanel>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock x:Name="PerfLayersTitleText" FontWeight="Bold" TextWrapping="Wrap"
+                               Text="Slojevi instrumenata (Layer i Split, kao na pravim klavijaturama):" />
+                    <TextBlock x:Name="PerfLayersExplainText" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Text="Sloj 1 je glavni instrument (VST3/zvučna banka gore). 'Ceo opseg' znači da sloj svira preko cele tastature zajedno sa ostalim uključenim slojevima (Layer); 'Donji deo'/'Gornji deo' dele tastaturu na dve zone na granici podele ispod (Split) - kombinuj kako želiš, čak i sva tri odjednom." />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock x:Name="PerfLayerSelectLabelText" Text="Sloj:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <ComboBox x:Name="PerfLayerComboBox" Width="100" VerticalAlignment="Center"
+                                  SelectionChanged="PerfLayerComboBox_SelectionChanged" />
+                        <CheckBox x:Name="PerfLayerEnabledCheckBox" Content="Uključen" VerticalAlignment="Center" Margin="16,0,0,0"
+                                  Click="PerfLayerEnabledCheckBox_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <RadioButton x:Name="PerfLayerSynthRadio" Content="Ugrađeni sintisajzer" GroupName="PerfLayerInstrumentMode"
+                                     VerticalAlignment="Center" IsChecked="True" Click="PerfLayerInstrumentMode_Click" />
+                        <RadioButton x:Name="PerfLayerSoundFontRadio" Content="Zvučna banka (posebna za ovaj sloj)" GroupName="PerfLayerInstrumentMode"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" Click="PerfLayerInstrumentMode_Click" />
+                        <RadioButton x:Name="PerfLayerVstRadio" Content="VST3 (poseban za ovaj sloj)" GroupName="PerfLayerInstrumentMode"
+                                     VerticalAlignment="Center" Margin="16,0,0,0" Click="PerfLayerInstrumentMode_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="PerfLayerSfPathLabelText" Text="Putanja do .sf2:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PerfLayerSoundFontPathTextBox" Width="260" />
+                        <Button x:Name="PerfBrowseLayerSoundFontButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="PerfBrowseLayerSoundFontButton_Click" />
+                        <Button x:Name="PerfLoadLayerSoundFontButton" Content="Učitaj banku za ovaj sloj" Margin="8,0,0,0"
+                                Click="PerfLoadLayerSoundFontButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="PerfLayerPresetLabelText" Text="Instrument u banci:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <ComboBox x:Name="PerfLayerSoundFontPresetComboBox" Width="220" VerticalAlignment="Center"
+                                  IsEnabled="False" SelectionChanged="PerfLayerSoundFontPresetComboBox_SelectionChanged" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="PerfLayerVstPathLabelText" Text="Putanja do .vst3:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PerfLayerVstPathTextBox" Width="260" />
+                        <Button x:Name="PerfBrowseLayerVstButton" Content="Pretraži..." Margin="8,0,0,0"
+                                Click="PerfBrowseLayerVstButton_Click" />
+                        <Button x:Name="PerfLoadLayerVstButton" Content="Učitaj VST za ovaj sloj" Margin="8,0,0,0"
+                                Click="PerfLoadLayerVstButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock x:Name="PerfLayerVolumeLabelText" Text="Jačina (0-150%):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PerfLayerVolumeTextBox" Width="45" Text="100" />
+                        <TextBlock x:Name="PerfLayerOctaveLabelText" Text="Pomeraj oktave (-2..2):" VerticalAlignment="Center" Margin="16,0,4,0" />
+                        <TextBox x:Name="PerfLayerOctaveTextBox" Width="45" Text="0" />
+                        <TextBlock x:Name="PerfLayerRangeLabelText" Text="Opseg:" VerticalAlignment="Center" Margin="16,0,4,0" />
+                        <ComboBox x:Name="PerfLayerRangeComboBox" Width="120" VerticalAlignment="Center" />
+                        <Button x:Name="ApplyPerfLayerSettingsButton" Content="Primeni" Margin="8,0,0,0" Click="ApplyPerfLayerSettingsButton_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock x:Name="PerfSplitLabelText" Text="Granica podele za slojeve (nota, npr. c4):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PerfSplitPointTextBox" Width="70" Text="c4" />
+                        <Button x:Name="ApplyPerfSplitPointButton" Content="Primeni" Margin="8,0,0,0" Click="ApplyPerfSplitPointButton_Click" />
+                    </StackPanel>
+                    <TextBlock x:Name="PerfLayerStatusText"
+                               AutomationProperties.LiveSetting="Polite"
+                               Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Sloj 1: uključen, ceo opseg, jačina 100%." />
                 </StackPanel>
 
                 <Border x:Name="PerformanceKeyboardBorder"
@@ -507,6 +569,34 @@
                            AutomationProperties.LiveSetting="Polite"
                            Margin="0,4,0,0" TextWrapping="Wrap"
                            Text="Bas: svira ugrađeni sintisajzer." />
+
+                <TextBlock x:Name="AccDrumSourceTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
+                           Text="Bubnjevi (izvor zvuka):" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <RadioButton x:Name="AccDrumSourceProceduralRadio" Content="Ugrađeni (fiksni)" GroupName="AccDrumSourceMode"
+                                 VerticalAlignment="Center" IsChecked="True" Click="AccDrumSourceMode_Click" />
+                    <RadioButton x:Name="AccDrumSourceSoundFontRadio" Content="Zvučna banka" GroupName="AccDrumSourceMode"
+                                 VerticalAlignment="Center" Margin="16,0,0,0" Click="AccDrumSourceMode_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccDrumSfPathLabelText" Text="Putanja do .sf2:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBox x:Name="AccDrumSoundFontPathTextBox" Width="260" />
+                    <Button x:Name="AccBrowseDrumSoundFontButton" Content="Pretraži..." Margin="8,0,0,0"
+                            Click="AccBrowseDrumSoundFontButton_Click" />
+                    <Button x:Name="AccLoadDrumSoundFontButton" Content="Učitaj banku za bubnjeve" Margin="8,0,0,0"
+                            Click="AccLoadDrumSoundFontButton_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock x:Name="AccDrumPresetLabelText" Text="Bubanj-set u banci:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <ComboBox x:Name="AccDrumSoundFontPresetComboBox" Width="220" VerticalAlignment="Center"
+                              IsEnabled="False" SelectionChanged="AccDrumSoundFontPresetComboBox_SelectionChanged" />
+                </StackPanel>
+                <TextBlock x:Name="AccDrumSourceExplainText" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Kad se ucita banka, kik/doboš/čin/pljesak/činela/tom sviraju iz nje (standardne GM note bubnjeva); dumbek udarci orijentalnog ritma uvek ostaju na ugrađenom zvuku, jer ih standardne banke nemaju." />
+                <TextBlock x:Name="AccDrumInstrumentStatusText"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Bubnjevi: ugrađeni (fiksni) zvuk." />
 
                 <TextBlock x:Name="AccChordVoicingTitleText" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"
                            Text="Gustina akorda (kontra i harmonija):" />

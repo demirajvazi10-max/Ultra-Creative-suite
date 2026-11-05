@@ -75,7 +75,7 @@ namespace UltraCaptions.Services
             string? whisperExe = FindWhisperExecutable();
             if (whisperExe == null)
                 throw new InvalidOperationException(
-                    "Whisper not found. Install it with: pip install openai-whisper (requires Python + ffmpeg).");
+                    L.T("Whisper not found. Install it with: pip install openai-whisper (requires Python + ffmpeg)."));
 
             string tempDir = Path.Combine(Path.GetTempPath(), "UltraCaptions_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
@@ -94,12 +94,12 @@ namespace UltraCaptions.Services
                 };
 
                 using var process = Process.Start(psi)
-                    ?? throw new InvalidOperationException("Failed to start Whisper process.");
+                    ?? throw new InvalidOperationException(L.T("Failed to start Whisper process."));
                 await process.WaitForExitAsync();
 
                 string srtPath = Path.Combine(tempDir, Path.GetFileNameWithoutExtension(mediaPath) + ".srt");
                 if (!File.Exists(srtPath))
-                    throw new InvalidOperationException("Whisper finished but produced no .srt file.");
+                    throw new InvalidOperationException(L.T("Whisper finished but produced no .srt file."));
 
                 return SrtService.Import(srtPath);
             }

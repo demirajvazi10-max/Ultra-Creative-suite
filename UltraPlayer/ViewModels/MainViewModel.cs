@@ -15,7 +15,7 @@ namespace UltraPlayer.ViewModels
             set => SetField(ref _selectedTrack, value);
         }
 
-        private string _statusMessage = "Add files to build a playlist.";
+        private string _statusMessage = L.T("Add files to build a playlist.");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -29,7 +29,7 @@ namespace UltraPlayer.ViewModels
             set => SetField(ref _currentSpeed, value);
         }
 
-        private string _sleepTimerLabel = "Sleep timer: off";
+        private string _sleepTimerLabel = L.T("Sleep timer: off");
         public string SleepTimerLabel
         {
             get => _sleepTimerLabel;

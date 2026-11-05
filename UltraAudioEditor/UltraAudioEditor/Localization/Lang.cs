@@ -86,6 +86,7 @@ namespace UltraAudioEditor.Localization
             ["menu_help"] = ("_Help", "_Pomoć"),
             ["menu_shortcuts"] = ("_Keyboard shortcuts", "_Tastaturne prečice"),
             ["menu_about"] = ("_About", "_O programu"),
+            ["menu_support"] = ("How to support this _project", "Kako podržati p_rojekat"),
 
             // ===== Toolbar tooltips =====
             ["tt_new_project"] = ("New project (Ctrl+N)", "Novi projekat (Ctrl+N)"),
@@ -358,6 +359,7 @@ namespace UltraAudioEditor.Localization
             ["acc_normalize_track"] = ("Normalize the volume of the selected track", "Normalizuj glasnoću odabrane trake"),
             ["acc_new_project"] = ("New project", "Novi projekat"),
             ["acc_about"] = ("About Ultra Audio Editor", "O Ultra Audio Editor programu"),
+            ["acc_support"] = ("How to support this project — payment card, no PayPal needed", "Kako podržati projekat — platnom karticom, PayPal ne treba"),
             ["acc_delete_clip"] = ("Delete the selected clip", "Obriši odabrani klip"),
             ["acc_delete_track"] = ("Delete the selected track", "Obriši odabranu traku"),
             ["acc_lang_select"] = ("Language selection", "Odabir jezika"),

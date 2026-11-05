@@ -1806,6 +1806,10 @@ namespace UltraVideoEditor
             }
         }
 
+        /// <summary>Help → How to support this project: step-by-step guide (payment card, no PayPal needed).</summary>
+        private void ShowSupport_Click(object sender, RoutedEventArgs e)
+            => UltraSupport.SupportInfo.Show(this, "Ultra Video Editor", _LangCode == "sr");
+
         private void ShowAbout_Click(object sender, RoutedEventArgs e)
         {
             var links = new (string Key, string Url)[]
@@ -1843,6 +1847,19 @@ namespace UltraVideoEditor
             info.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimary");
             AutomationProperties.SetName(info, L("about_title"));
             panel.Children.Add(info);
+
+            // The step-by-step guide first: many people don't know GitHub Sponsors takes an ordinary card.
+            var guide = new System.Windows.Controls.Button
+            {
+                Content = UltraSupport.SupportInfo.ButtonText(_LangCode == "sr"),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            guide.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "PanelBg");
+            guide.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimary");
+            guide.Click += (s, a) => UltraSupport.SupportInfo.Show(win, "Ultra Video Editor", _LangCode == "sr");
+            panel.Children.Add(guide);
 
             foreach (var (key, url) in links)
             {

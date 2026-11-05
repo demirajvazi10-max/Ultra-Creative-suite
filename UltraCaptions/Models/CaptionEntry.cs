@@ -53,7 +53,7 @@ namespace UltraCaptions.Models
         /// nothing requires moving focus between separate columns to get the
         /// full picture of a line.
         /// </summary>
-        public string DisplayLabel => $"{Format(Start)} to {Format(End)}: {Text}";
+        public string DisplayLabel => L.F("{0} to {1}: {2}", Format(Start), Format(End), Text);
 
         // Separate formatted strings for the grid columns, so XAML can bind
         // directly without relying on fragile inline TimeSpan format strings.

@@ -6,13 +6,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>UltraAudioEditor</AssemblyName>
     <RootNamespace>UltraAudioEditor</RootNamespace>
-    <!-- JEDINO mesto za broj verzije: naslov prozora, statusna traka i About ga čitaju
-         odavde. GitHub Actions pri izdanju (tag audio-vX.Y.Z) prepiše ga verzijom iz taga. -->
-    <Version>2.0.0</Version>
+    <!-- JEDINO mesto za broj verzije: naslov prozora, statusna traka i About ga Äitaju
+         odavde. GitHub Actions pri izdanju (tag audio-vX.Y.Z) prepiÅ¡e ga verzijom iz taga. -->
+    <Version>2.0.1</Version>
     <Product>Ultra Audio Editor</Product>
     <Company>Demir Ajvazi</Company>
     <Authors>Demir Ajvazi</Authors>
-    <Copyright>© 2026 Demir Ajvazi</Copyright>
+    <Copyright>Â© 2026 Demir Ajvazi</Copyright>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -20,9 +20,9 @@
   <ItemGroup>
     <!-- UseWindowsForms + UseWPF zajedno navode SDK da automatski doda GLOBALNI
          "using System.Windows.Forms;" u SVAKI fajl projekta (jer je ImplicitUsings
-         enable), što se sudara sa WPF-ovim sopstvenim globalnim using-ima
+         enable), Å¡to se sudara sa WPF-ovim sopstvenim globalnim using-ima
          (Color, Application, UserControl, KeyEventArgs, TextBox, CheckBox...).
-         Uklanjamo TAJ globalni using — AccessibleTrackList.xaml.cs i dalje ima
+         Uklanjamo TAJ globalni using â€” AccessibleTrackList.xaml.cs i dalje ima
          pristup WinForms tipovima preko sopstvenog "using WF = System.Windows.Forms;"
          alias-a na vrhu fajla, pa mu ovo ne smeta. -->
     <Using Remove="System.Windows.Forms" />

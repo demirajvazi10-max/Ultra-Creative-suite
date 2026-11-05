@@ -57,6 +57,15 @@ struct DrumHitVoice
     // callback block boundary.
     float noiseFilterPrevIn = 0.0f;
     float noiseFilterPrevOut = 0.0f;
+    // Second, one-pole low-pass stage applied after the highpass above, so
+    // the noise-based voices are properly band-limited ("bandpass") instead
+    // of just bright/thin - see DrumProfile::lowpass in DrumSynth.cpp.
+    float lowpassPrevOut = 0.0f;
+    // Phase accumulators for the six-oscillator "metallic" noise substitute
+    // used by the cymbal-family voices (hats/crash) - see
+    // DrumProfile::metallic in DrumSynth.cpp for why plain white noise
+    // alone reads as a dull hiss rather than a bright metallic ring.
+    double metallicPhase[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // (Re)starts this voice playing the given percussion sound. There is
     // deliberately no NoteOff - real percussion doesn't sustain on a

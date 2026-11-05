@@ -34,7 +34,7 @@ namespace UltraRecord.ViewModels
             set => SetField(ref _outputFolder, value);
         }
 
-        private string _statusMessage = "Ready. Add at least one track and choose an output folder to begin.";
+        private string _statusMessage = L.T("Ready. Add at least one track and choose an output folder to begin.");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -63,7 +63,7 @@ namespace UltraRecord.ViewModels
 
         public void AddTrack()
         {
-            var track = new RecordingTrack { Name = $"Track {Tracks.Count + 1}" };
+            var track = new RecordingTrack { Name = L.F("Track {0}", Tracks.Count + 1) };
             Tracks.Add(track);
             SelectedTrack = track;
         }
@@ -81,7 +81,7 @@ namespace UltraRecord.ViewModels
                 track.StartRecording(OutputFolder);
 
             IsRecording = true;
-            StatusMessage = "Recording all armed tracks...";
+            StatusMessage = L.T("Recording all selected tracks...");
         }
 
         private void StopAll()
@@ -90,7 +90,7 @@ namespace UltraRecord.ViewModels
                 track.StopRecording();
 
             IsRecording = false;
-            StatusMessage = $"Stopped. Files saved to: {OutputFolder}";
+            StatusMessage = L.F("Stopped. Files saved to: {0}", OutputFolder);
         }
     }
 }

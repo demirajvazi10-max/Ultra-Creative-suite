@@ -734,13 +734,15 @@ Created by **Demir Ajvazi**.
 
 ## Support this project
 
-Ultra Video Editor is free and open source, built by a blind developer so that blind and sighted people can edit video equally. If it helps you, you can support further development:
+Ultra Video Editor is free and will stay free. If you'd like to support its development:
 
-- [GitHub Sponsors](https://github.com/sponsors/demirajvazi10-max)
-- [Ko-fi](https://ko-fi.com/ultracreativesuite)
-- [PayPal](https://paypal.me/demirajvazi10)
+- **By card on [Ko-fi](https://ko-fi.com/ultracreativesuite)** — no account needed: type an amount, press *Donate* and pay with a Visa or Mastercard (credit or debit) or PayPal. The easiest way from abroad.
+- **[GitHub Sponsors](https://github.com/sponsors/demirajvazi10-max)** — monthly or one-time, paid with an ordinary payment card (no PayPal needed); needs a free GitHub account.
+- **Bank transfer from Serbia** — recipient Demir Ajvazi, account `265-0000006185877-28`, Raiffeisen banka, purpose *Donacija za Ultra programe*. Meant for domestic transfers; from abroad, Ko-fi costs far less in fees.
 
-The same links are in the program under *Help → About*.
+The same guide is inside the app: **Help → How to support this project**, in English and Serbian, with buttons to open Ko-fi or GitHub Sponsors and to copy the account number.
+
+Ko-fi, PayPal and GitHub Sponsors links are also under *Help → About*.
 
 ## License
 

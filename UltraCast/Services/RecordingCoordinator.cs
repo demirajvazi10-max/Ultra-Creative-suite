@@ -44,7 +44,7 @@ namespace UltraCast.Services
         {
             if (IsRecording) return;
             if (string.IsNullOrWhiteSpace(options.OutputFolder))
-                throw new InvalidOperationException("No output folder chosen.");
+                throw new InvalidOperationException(L.T("No output folder chosen."));
 
             Directory.CreateDirectory(options.OutputFolder);
 
@@ -55,8 +55,8 @@ namespace UltraCast.Services
 
             AppLogger.Log($"RecordingCoordinator: starting session. temp video={_tempVideoPath}, temp audio={_tempAudioPath}, final={_finalPath}");
 
-            _video.CaptureError += msg => Error?.Invoke("Video: " + msg);
-            _audio.CaptureError += msg => Error?.Invoke("Audio: " + msg);
+            _video.CaptureError += msg => Error?.Invoke(L.F("Video: {0}", msg));
+            _audio.CaptureError += msg => Error?.Invoke(L.F("Audio: {0}", msg));
 
             _video.Start(_tempVideoPath, options.FrameRate);
             _audio.Start(_tempAudioPath, options.CaptureSystemAudio, options.CaptureMicrophone);
@@ -69,7 +69,7 @@ namespace UltraCast.Services
         public async Task<string> StopAsync()
         {
             if (!IsRecording || _finalPath == null || _tempVideoPath == null || _tempAudioPath == null)
-                throw new InvalidOperationException("Not currently recording.");
+                throw new InvalidOperationException(L.T("Not currently recording."));
 
             IsRecording = false;
             IsPaused = false;
@@ -117,7 +117,7 @@ namespace UltraCast.Services
             AppLogger.Log("RecordingCoordinator: muxing video+audio -> " + outPath);
 
             using var proc = Process.Start(psi)
-                ?? throw new InvalidOperationException("Could not start ffmpeg.exe to combine video and audio.");
+                ?? throw new InvalidOperationException(L.T("Could not start ffmpeg.exe to combine video and audio."));
 
             // IMPORTANT: must drain stderr WHILE the process runs, not after
             // WaitForExitAsync(). ffmpeg writes a lot to stderr (progress,
@@ -140,7 +140,7 @@ namespace UltraCast.Services
 
             if (proc.ExitCode != 0 || !File.Exists(outPath))
             {
-                throw new InvalidOperationException("Combining video and audio failed: " + stderrLines);
+                throw new InvalidOperationException(L.F("Combining video and audio failed: {0}", stderrLines));
             }
         }
 

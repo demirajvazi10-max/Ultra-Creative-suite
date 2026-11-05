@@ -34,6 +34,7 @@ namespace
         Arranger* arranger;
         MultiTrackSequencer* multiTrack;
         AccompanimentEngine* accompaniment;
+        PerformanceLayers* extraLayers; // "Sloj 2/3/4" - see PerformanceLayers.h
     };
 
     int PaCallback(const void* /*input*/,
@@ -47,8 +48,12 @@ namespace
         auto* out = static_cast<float*>(output);
 
         // Render mono on the stack (no heap allocation on the audio thread),
-        // then duplicate to stereo.
+        // then duplicate to stereo. mainLayerStereo is "Sloj 1"'s own scratch
+        // buffer (see the Performance layers comment below) - separate from
+        // 'out' so its volume can be applied before anything else is mixed
+        // in on top of it.
         float monoBuffer[kMaxCallbackFrames];
+        float mainLayerStereo[kMaxCallbackFrames * 2];
         unsigned long frames = frameCount < static_cast<unsigned long>(kMaxCallbackFrames)
                                     ? frameCount
                                     : static_cast<unsigned long>(kMaxCallbackFrames);
@@ -92,35 +97,53 @@ namespace
         // private instruments and never touches theirs).
         context->accompaniment->Advance(static_cast<int>(frames), kSampleRate);
 
-        // The built-in synth is only meant as a fallback so something is
-        // audible before any real instrument is loaded. Once a VST3
-        // instrument or a SoundFont bank is active, let it be the only
-        // voice instead of always layering the plain sine synth underneath
-        // too (reported as "hearing two sounds at once" once a SoundFont
-        // bank was loaded).
-        bool hasExternalInstrument = context->vstHost->IsLoaded() || context->soundFontHost->IsLoaded();
-        if (hasExternalInstrument)
+        // "Sloj 1" (the pre-existing single main instrument) into its own
+        // scratch buffer first, so SetMainLayerVolume can scale just this
+        // layer's contribution before anything else joins the mix - same
+        // idea as every other performance layer (see PerformanceLayers::
+        // RenderAdditive), just kept inline here since synth_/vstHost_/
+        // soundFontHost_ already lived directly on AudioEngine before this
+        // feature existed. Disabling "Sloj 1" (SetMainLayerEnabled(false))
+        // silences it completely, same as any other layer.
+        std::memset(mainLayerStereo, 0, sizeof(float) * frames * 2);
+        if (context->engine->IsMainLayerEnabled())
         {
-            std::memset(monoBuffer, 0, sizeof(float) * frames);
-        }
-        else
-        {
-            context->synth->Render(monoBuffer, static_cast<int>(frames));
+            // The built-in synth is only meant as a fallback so something is
+            // audible before any real instrument is loaded. Once a VST3
+            // instrument or a SoundFont bank is active, let it be the only
+            // voice instead of always layering the plain sine synth
+            // underneath too (reported as "hearing two sounds at once" once
+            // a SoundFont bank was loaded).
+            bool hasExternalInstrument = context->vstHost->IsLoaded() || context->soundFontHost->IsLoaded();
+            if (!hasExternalInstrument)
+            {
+                context->synth->Render(monoBuffer, static_cast<int>(frames));
+                for (unsigned long i = 0; i < frames; ++i)
+                {
+                    mainLayerStereo[i * 2] = monoBuffer[i];
+                    mainLayerStereo[i * 2 + 1] = monoBuffer[i];
+                }
+            }
+
+            // Adds a loaded VST3 instrument's output, and a loaded SoundFont
+            // bank's output, on top of whatever's already there - each does
+            // nothing if nothing is loaded.
+            context->vstHost->RenderAdditive(mainLayerStereo, static_cast<int>(frames));
+            context->soundFontHost->RenderAdditive(mainLayerStereo, static_cast<int>(frames));
         }
 
-        for (unsigned long i = 0; i < frames; ++i)
+        float mainLayerVolume = context->engine->GetMainLayerVolume();
+        for (unsigned long i = 0; i < frames * 2; ++i)
         {
-            out[i * 2] = monoBuffer[i];
-            out[i * 2 + 1] = monoBuffer[i];
+            out[i] = mainLayerStereo[i] * mainLayerVolume;
         }
 
-        // Adds a loaded VST3 instrument's output, and a loaded SoundFont
-        // bank's output, on top of whatever's already there - each does
-        // nothing if nothing is loaded.
-        context->vstHost->RenderAdditive(out, static_cast<int>(frames));
-        context->soundFontHost->RenderAdditive(out, static_cast<int>(frames));
         context->multiTrack->RenderAdditive(out, static_cast<int>(frames));
         context->accompaniment->RenderAdditive(out, static_cast<int>(frames));
+        // "Sloj 2/3/4" (see PerformanceLayers.h) - does nothing for any layer
+        // left disabled, i.e. exactly nothing changes for a project that
+        // never touches this feature.
+        context->extraLayers->RenderAdditive(out, static_cast<int>(frames));
 
         // Soft-clip the final mix. Several notes at once (a chord) - or
         // even one note, if a SoundFont instrument layers several sample
@@ -152,6 +175,7 @@ bool AudioEngine::Init()
     }
     synth_.Prepare(kSampleRate);
     accompaniment_.Prepare(kSampleRate);
+    extraLayers_.Prepare(kSampleRate);
 
     // Route MIDI note on/off through the same single dispatch point
     // (NoteOnLive/NoteOffLive, which call straight through to NoteOn/NoteOff
@@ -176,7 +200,7 @@ bool AudioEngine::Init()
         }
     });
 
-    callbackContext_ = new CallbackContext{this, &synth_, &vstHost_, &sequencer_, &soundFontHost_, &arranger_, &multiTrack_, &accompaniment_};
+    callbackContext_ = new CallbackContext{this, &synth_, &vstHost_, &sequencer_, &soundFontHost_, &arranger_, &multiTrack_, &accompaniment_, &extraLayers_};
 
     return true;
 }
@@ -308,20 +332,45 @@ void AudioEngine::NoteOn(int midiNote, float velocity)
         return;
     }
 
-    synth_.NoteOn(midiNote, velocity);
-    vstHost_.NoteOn(midiNote, velocity);
-    soundFontHost_.NoteOn(midiNote, velocity);
+    DispatchPerformanceNoteOn(midiNote, velocity);
 
     if (autoThirdEnabled_.load())
     {
         int harmonyNote = DiatonicThirdNote(midiNote, autoThirdScaleRoot_.load(), static_cast<ScaleType>(autoThirdScaleType_.load()), autoThirdUpper_.load());
         if (harmonyNote >= 0 && harmonyNote <= 127)
         {
-            synth_.NoteOn(harmonyNote, velocity);
-            vstHost_.NoteOn(harmonyNote, velocity);
-            soundFontHost_.NoteOn(harmonyNote, velocity);
+            DispatchPerformanceNoteOn(harmonyNote, velocity);
         }
     }
+}
+
+void AudioEngine::DispatchPerformanceNoteOn(int midiNote, float velocity)
+{
+    int splitPoint = performanceSplitPoint_.load();
+
+    if (mainLayerEnabled_.load())
+    {
+        bool inRange = true;
+        switch (static_cast<PerformanceLayerRange>(mainLayerRange_.load()))
+        {
+        case PerformanceLayerRange::Lower: inRange = midiNote < splitPoint; break;
+        case PerformanceLayerRange::Upper: inRange = midiNote >= splitPoint; break;
+        default: inRange = true; break; // Whole
+        }
+
+        if (inRange)
+        {
+            int outNote = midiNote + mainLayerOctaveOffset_.load() * 12;
+            if (outNote >= 0 && outNote <= 127)
+            {
+                synth_.NoteOn(outNote, velocity);
+                vstHost_.NoteOn(outNote, velocity);
+                soundFontHost_.NoteOn(outNote, velocity);
+            }
+        }
+    }
+
+    extraLayers_.DispatchNoteOn(midiNote, velocity, splitPoint);
 }
 
 void AudioEngine::NoteOff(int midiNote)
@@ -332,20 +381,45 @@ void AudioEngine::NoteOff(int midiNote)
         return;
     }
 
-    synth_.NoteOff(midiNote);
-    vstHost_.NoteOff(midiNote);
-    soundFontHost_.NoteOff(midiNote);
+    DispatchPerformanceNoteOff(midiNote);
 
     if (autoThirdEnabled_.load())
     {
         int harmonyNote = DiatonicThirdNote(midiNote, autoThirdScaleRoot_.load(), static_cast<ScaleType>(autoThirdScaleType_.load()), autoThirdUpper_.load());
         if (harmonyNote >= 0 && harmonyNote <= 127)
         {
-            synth_.NoteOff(harmonyNote);
-            vstHost_.NoteOff(harmonyNote);
-            soundFontHost_.NoteOff(harmonyNote);
+            DispatchPerformanceNoteOff(harmonyNote);
         }
     }
+}
+
+void AudioEngine::DispatchPerformanceNoteOff(int midiNote)
+{
+    int splitPoint = performanceSplitPoint_.load();
+
+    if (mainLayerEnabled_.load())
+    {
+        bool inRange = true;
+        switch (static_cast<PerformanceLayerRange>(mainLayerRange_.load()))
+        {
+        case PerformanceLayerRange::Lower: inRange = midiNote < splitPoint; break;
+        case PerformanceLayerRange::Upper: inRange = midiNote >= splitPoint; break;
+        default: inRange = true; break; // Whole
+        }
+
+        if (inRange)
+        {
+            int outNote = midiNote + mainLayerOctaveOffset_.load() * 12;
+            if (outNote >= 0 && outNote <= 127)
+            {
+                synth_.NoteOff(outNote);
+                vstHost_.NoteOff(outNote);
+                soundFontHost_.NoteOff(outNote);
+            }
+        }
+    }
+
+    extraLayers_.DispatchNoteOff(midiNote, splitPoint);
 }
 
 void AudioEngine::NoteOnLive(int midiNote, float velocity)
@@ -585,6 +659,172 @@ bool AudioEngine::SelectSoundFontPreset(int presetIndex)
 int AudioEngine::GetSelectedSoundFontPresetIndex() const
 {
     return soundFontHost_.GetSelectedPresetIndex();
+}
+
+// --- Performance layers ("Sloj 1/2/3/4") - see PerformanceLayers.h ---
+
+void AudioEngine::SetMainLayerEnabled(bool enabled)
+{
+    mainLayerEnabled_.store(enabled);
+}
+
+bool AudioEngine::IsMainLayerEnabled() const
+{
+    return mainLayerEnabled_.load();
+}
+
+void AudioEngine::SetMainLayerVolume(float volume)
+{
+    if (volume < 0.0f) volume = 0.0f;
+    if (volume > 1.5f) volume = 1.5f;
+    mainLayerVolume_.store(volume);
+}
+
+float AudioEngine::GetMainLayerVolume() const
+{
+    return mainLayerVolume_.load();
+}
+
+void AudioEngine::SetMainLayerOctaveOffset(int octaves)
+{
+    if (octaves < -2) octaves = -2;
+    if (octaves > 2) octaves = 2;
+    mainLayerOctaveOffset_.store(octaves);
+}
+
+int AudioEngine::GetMainLayerOctaveOffset() const
+{
+    return mainLayerOctaveOffset_.load();
+}
+
+void AudioEngine::SetMainLayerRange(PerformanceLayerRange range)
+{
+    mainLayerRange_.store(static_cast<int>(range));
+}
+
+PerformanceLayerRange AudioEngine::GetMainLayerRange() const
+{
+    return static_cast<PerformanceLayerRange>(mainLayerRange_.load());
+}
+
+void AudioEngine::SetPerformanceSplitPoint(int midiNote)
+{
+    performanceSplitPoint_.store(midiNote);
+}
+
+int AudioEngine::GetPerformanceSplitPoint() const
+{
+    return performanceSplitPoint_.load();
+}
+
+void AudioEngine::SetExtraLayerEnabled(int layerIndex, bool enabled)
+{
+    extraLayers_.SetEnabled(layerIndex, enabled);
+}
+
+bool AudioEngine::IsExtraLayerEnabled(int layerIndex) const
+{
+    return extraLayers_.IsEnabled(layerIndex);
+}
+
+void AudioEngine::SetExtraLayerMode(int layerIndex, PerformanceLayerMode mode)
+{
+    extraLayers_.SetMode(layerIndex, mode);
+}
+
+PerformanceLayerMode AudioEngine::GetExtraLayerMode(int layerIndex) const
+{
+    return extraLayers_.GetMode(layerIndex);
+}
+
+void AudioEngine::SetExtraLayerVolume(int layerIndex, float volume)
+{
+    extraLayers_.SetVolume(layerIndex, volume);
+}
+
+float AudioEngine::GetExtraLayerVolume(int layerIndex) const
+{
+    return extraLayers_.GetVolume(layerIndex);
+}
+
+void AudioEngine::SetExtraLayerOctaveOffset(int layerIndex, int octaves)
+{
+    extraLayers_.SetOctaveOffset(layerIndex, octaves);
+}
+
+int AudioEngine::GetExtraLayerOctaveOffset(int layerIndex) const
+{
+    return extraLayers_.GetOctaveOffset(layerIndex);
+}
+
+void AudioEngine::SetExtraLayerRange(int layerIndex, PerformanceLayerRange range)
+{
+    extraLayers_.SetRange(layerIndex, range);
+}
+
+PerformanceLayerRange AudioEngine::GetExtraLayerRange(int layerIndex) const
+{
+    return extraLayers_.GetRange(layerIndex);
+}
+
+bool AudioEngine::LoadExtraLayerSoundFontBank(int layerIndex, const std::string& sf2Path, std::string& outError)
+{
+    return extraLayers_.LoadSoundFontBank(layerIndex, sf2Path, kSampleRate, outError);
+}
+
+void AudioEngine::UnloadExtraLayerSoundFontBank(int layerIndex)
+{
+    extraLayers_.UnloadSoundFontBank(layerIndex);
+}
+
+bool AudioEngine::IsExtraLayerSoundFontBankLoaded(int layerIndex) const
+{
+    return extraLayers_.IsSoundFontBankLoaded(layerIndex);
+}
+
+std::string AudioEngine::GetExtraLayerSoundFontBankName(int layerIndex) const
+{
+    return extraLayers_.GetSoundFontBankName(layerIndex);
+}
+
+int AudioEngine::GetExtraLayerSoundFontPresetCount(int layerIndex) const
+{
+    return extraLayers_.GetSoundFontPresetCount(layerIndex);
+}
+
+std::string AudioEngine::GetExtraLayerSoundFontPresetName(int layerIndex, int presetIndex) const
+{
+    return extraLayers_.GetSoundFontPresetName(layerIndex, presetIndex);
+}
+
+bool AudioEngine::SelectExtraLayerSoundFontPreset(int layerIndex, int presetIndex)
+{
+    return extraLayers_.SelectSoundFontPreset(layerIndex, presetIndex);
+}
+
+int AudioEngine::GetSelectedExtraLayerSoundFontPresetIndex(int layerIndex) const
+{
+    return extraLayers_.GetSelectedSoundFontPresetIndex(layerIndex);
+}
+
+bool AudioEngine::LoadExtraLayerVstInstrument(int layerIndex, const std::string& modulePath, std::string& outError)
+{
+    return extraLayers_.LoadVstInstrument(layerIndex, modulePath, kSampleRate, kMaxCallbackFrames, outError);
+}
+
+void AudioEngine::UnloadExtraLayerVstInstrument(int layerIndex)
+{
+    extraLayers_.UnloadVstInstrument(layerIndex);
+}
+
+bool AudioEngine::IsExtraLayerVstInstrumentLoaded(int layerIndex) const
+{
+    return extraLayers_.IsVstInstrumentLoaded(layerIndex);
+}
+
+std::string AudioEngine::GetExtraLayerVstInstrumentName(int layerIndex) const
+{
+    return extraLayers_.GetVstInstrumentName(layerIndex);
 }
 
 int AudioEngine::AddArrangerPattern(const std::string& name, double lengthBeats, const SequencedNote* notes, int count)
@@ -1144,4 +1384,54 @@ void AudioEngine::SetAccompanimentChordVoicing(ChordVoicing voicing)
 ChordVoicing AudioEngine::GetAccompanimentChordVoicing() const
 {
     return accompaniment_.GetChordVoicing();
+}
+
+void AudioEngine::SetAccompanimentDrumSourceMode(AccompanimentEngine::DrumSourceMode mode)
+{
+    accompaniment_.SetDrumSourceMode(mode);
+}
+
+AccompanimentEngine::DrumSourceMode AudioEngine::GetAccompanimentDrumSourceMode() const
+{
+    return accompaniment_.GetDrumSourceMode();
+}
+
+bool AudioEngine::LoadAccompanimentDrumSoundFontBank(const std::string& sf2Path, std::string& outError)
+{
+    return accompaniment_.LoadDrumSoundFontBank(sf2Path, outError);
+}
+
+void AudioEngine::UnloadAccompanimentDrumSoundFontBank()
+{
+    accompaniment_.UnloadDrumSoundFontBank();
+}
+
+bool AudioEngine::IsAccompanimentDrumSoundFontBankLoaded() const
+{
+    return accompaniment_.IsDrumSoundFontBankLoaded();
+}
+
+std::string AudioEngine::GetAccompanimentDrumSoundFontBankName() const
+{
+    return accompaniment_.GetDrumSoundFontBankName();
+}
+
+int AudioEngine::GetAccompanimentDrumSoundFontPresetCount() const
+{
+    return accompaniment_.GetDrumSoundFontPresetCount();
+}
+
+std::string AudioEngine::GetAccompanimentDrumSoundFontPresetName(int presetIndex) const
+{
+    return accompaniment_.GetDrumSoundFontPresetName(presetIndex);
+}
+
+bool AudioEngine::SelectAccompanimentDrumSoundFontPreset(int presetIndex)
+{
+    return accompaniment_.SelectDrumSoundFontPreset(presetIndex);
+}
+
+int AudioEngine::GetSelectedAccompanimentDrumSoundFontPresetIndex() const
+{
+    return accompaniment_.GetSelectedDrumSoundFontPresetIndex();
 }

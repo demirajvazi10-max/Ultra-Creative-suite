@@ -336,6 +336,7 @@ UltraAudioEditor/
 │   │   └── AccessibleTrackList — JAWS mode: track list + file list + playhead
 │   ├── EffectDialog.cs         — accessible per-effect parameter dialogs (with Play / Pause)
 │   ├── AboutWindow.cs          — About, version, GitHub Sponsors link
+│   ├── SupportWindow.cs        — "How to support this project" guide (shared by all Ultra apps)
 │   ├── LogWindow.cs            — diagnostic log viewer (Ctrl+Shift+L)
 │   ├── ProDialogs.cs           — choice dialog, envelope, effect order, tags, transcript, batch convert
 │   ├── SetClipPositionDialog   — clip position input (seconds or MM:SS)
@@ -375,6 +376,18 @@ If you are from NLnet or NGI0, welcome. Feel free to open an issue or contact us
 ## Versioning
 
 The version shown in the title bar, status bar and About window comes from one place: `<Version>` in `UltraAudioEditor.csproj`. Bump it before tagging a release (`audio-vX.Y.Z`).
+
+---
+
+## Supporting the project
+
+Ultra Audio Editor is free and will stay free. If you'd like to support its development:
+
+- **By card on [Ko-fi](https://ko-fi.com/ultracreativesuite)** — no account needed: type an amount, press *Donate* and pay with a Visa or Mastercard (credit or debit) or PayPal. The easiest way from abroad.
+- **[GitHub Sponsors](https://github.com/sponsors/demirajvazi10-max)** — monthly or one-time, paid with an ordinary payment card (no PayPal needed); needs a free GitHub account.
+- **Bank transfer from Serbia** — recipient Demir Ajvazi, account `265-0000006185877-28`, Raiffeisen banka, purpose *Donacija za Ultra programe*. Meant for domestic transfers; from abroad, Ko-fi costs far less in fees.
+
+The same guide is inside the app: **Help > How to support this project**, in English and Serbian, with buttons to open Ko-fi or GitHub Sponsors and to copy the account number.
 
 ---
 

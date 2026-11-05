@@ -254,6 +254,7 @@
                 <Separator/>
                 <MenuItem x:Name="mnuDownloadSounds" Tag="mnu_download_sounds" Click="DownloadAdobeSounds_Click"/>
                 <MenuItem x:Name="mnuThirdParty" Tag="mnu_third_party" Click="ShowThirdPartyNotices_Click"/>
+                <MenuItem x:Name="mnuSupport" Tag="mw_support" Click="ShowSupport_Click"/>
                 <MenuItem x:Name="mnuAbout" Tag="mw_about" Click="ShowAbout_Click"/>
             </MenuItem>
         </Menu>

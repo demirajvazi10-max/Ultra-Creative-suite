@@ -11,6 +11,7 @@
 #include "Chord.h"
 #include "MidiInput.h"
 #include "MultiTrackSequencer.h"
+#include "PerformanceLayers.h"
 #include "Scale.h"
 #include "Sequencer.h"
 #include "SoundFontHost.h"
@@ -124,6 +125,60 @@ public:
     std::string GetSoundFontPresetName(int presetIndex) const;
     bool SelectSoundFontPreset(int presetIndex);
     int GetSelectedSoundFontPresetIndex() const;
+
+    // Performance layers ("Sloj 1/2/3/4" in Banka instrumenata) - two real-
+    // keyboard features Demir asked for together, both built on the same
+    // mechanism (see PerformanceLayers.h's class comment for how Range
+    // unifies them): "Layer/Dual" (two or more instruments sounding
+    // together on the same keys) and "Split" (different instruments in
+    // different keyboard zones). "Sloj 1" is the pre-existing single main
+    // instrument above (synth_/vstHost_/soundFontHost_) - it now has the
+    // same enabled/volume/octave/range knobs as "Sloj 2/3/4" below (see
+    // PerformanceLayers) so it can take part in a Layer/Split setup too, but
+    // all four default to reproducing its old, only behavior exactly
+    // (enabled, full volume, no transpose, whole keyboard) - an existing
+    // project, or anyone who never touches this feature, sees no change.
+    // Covers every note source that already shares AudioEngine::NoteOn/
+    // NoteOff (live keyboard/MIDI, the plain sequencer, and the arranger).
+    void SetMainLayerEnabled(bool enabled);
+    bool IsMainLayerEnabled() const;
+    void SetMainLayerVolume(float volume);
+    float GetMainLayerVolume() const;
+    void SetMainLayerOctaveOffset(int octaves);
+    int GetMainLayerOctaveOffset() const;
+    void SetMainLayerRange(PerformanceLayerRange range);
+    PerformanceLayerRange GetMainLayerRange() const;
+
+    // Shared by every layer's (including Sloj 1's) Lower/Upper range check -
+    // independent of AccompanimentEngine's own, differently-purposed split
+    // point (that one decides chord-input vs. melody; this one decides
+    // which layer's instrument a note sounds through).
+    void SetPerformanceSplitPoint(int midiNote);
+    int GetPerformanceSplitPoint() const;
+
+    // "Sloj 2/3/4" - see PerformanceLayers.h. layerIndex is 0-based (0="Sloj 2", 1="Sloj 3", 2="Sloj 4").
+    void SetExtraLayerEnabled(int layerIndex, bool enabled);
+    bool IsExtraLayerEnabled(int layerIndex) const;
+    void SetExtraLayerMode(int layerIndex, PerformanceLayerMode mode);
+    PerformanceLayerMode GetExtraLayerMode(int layerIndex) const;
+    void SetExtraLayerVolume(int layerIndex, float volume);
+    float GetExtraLayerVolume(int layerIndex) const;
+    void SetExtraLayerOctaveOffset(int layerIndex, int octaves);
+    int GetExtraLayerOctaveOffset(int layerIndex) const;
+    void SetExtraLayerRange(int layerIndex, PerformanceLayerRange range);
+    PerformanceLayerRange GetExtraLayerRange(int layerIndex) const;
+    bool LoadExtraLayerSoundFontBank(int layerIndex, const std::string& sf2Path, std::string& outError);
+    void UnloadExtraLayerSoundFontBank(int layerIndex);
+    bool IsExtraLayerSoundFontBankLoaded(int layerIndex) const;
+    std::string GetExtraLayerSoundFontBankName(int layerIndex) const;
+    int GetExtraLayerSoundFontPresetCount(int layerIndex) const;
+    std::string GetExtraLayerSoundFontPresetName(int layerIndex, int presetIndex) const;
+    bool SelectExtraLayerSoundFontPreset(int layerIndex, int presetIndex);
+    int GetSelectedExtraLayerSoundFontPresetIndex(int layerIndex) const;
+    bool LoadExtraLayerVstInstrument(int layerIndex, const std::string& modulePath, std::string& outError);
+    void UnloadExtraLayerVstInstrument(int layerIndex);
+    bool IsExtraLayerVstInstrumentLoaded(int layerIndex) const;
+    std::string GetExtraLayerVstInstrumentName(int layerIndex) const;
 
     // Arranger: chains multiple named patterns (see Arranger.h) into one
     // ordered playback sequence, looping the whole arrangement once it
@@ -277,7 +332,30 @@ public:
     void SetAccompanimentChordVoicing(ChordVoicing voicing);
     ChordVoicing GetAccompanimentChordVoicing() const;
 
+    // Drum kit source (see AccompanimentEngine::DrumSourceMode) - lets the
+    // accompaniment's drums play through a loaded SoundFont bank's own kit
+    // instead of the fixed procedural DrumSynth.
+    void SetAccompanimentDrumSourceMode(AccompanimentEngine::DrumSourceMode mode);
+    AccompanimentEngine::DrumSourceMode GetAccompanimentDrumSourceMode() const;
+    bool LoadAccompanimentDrumSoundFontBank(const std::string& sf2Path, std::string& outError);
+    void UnloadAccompanimentDrumSoundFontBank();
+    bool IsAccompanimentDrumSoundFontBankLoaded() const;
+    std::string GetAccompanimentDrumSoundFontBankName() const;
+    int GetAccompanimentDrumSoundFontPresetCount() const;
+    std::string GetAccompanimentDrumSoundFontPresetName(int presetIndex) const;
+    bool SelectAccompanimentDrumSoundFontPreset(int presetIndex);
+    int GetSelectedAccompanimentDrumSoundFontPresetIndex() const;
+
 private:
+    // Applies mainLayerEnabled_/mainLayerRange_/mainLayerOctaveOffset_ (see
+    // SetMainLayerVolume and friends above) around the "Sloj 1" dispatch to
+    // synth_/vstHost_/soundFontHost_, then hands the same note to
+    // extraLayers_ for "Sloj 2/3/4" - the single place both NoteOn and
+    // NoteOff (main note and, when active, the auto-third harmony note)
+    // route performance-layer notes through, so they can't drift apart.
+    void DispatchPerformanceNoteOn(int midiNote, float velocity);
+    void DispatchPerformanceNoteOff(int midiNote);
+
     Synth synth_;
     MidiInput midiInput_;
     VstHost vstHost_;
@@ -286,6 +364,12 @@ private:
     Arranger arranger_;
     MultiTrackSequencer multiTrack_;
     AccompanimentEngine accompaniment_;
+    PerformanceLayers extraLayers_;             // "Sloj 2/3/4"
+    std::atomic<bool> mainLayerEnabled_{true};  // "Sloj 1" (see PerformanceLayers.h's class comment for the Layer/Split model)
+    std::atomic<float> mainLayerVolume_{1.0f};
+    std::atomic<int> mainLayerOctaveOffset_{0};
+    std::atomic<int> mainLayerRange_{0};        // PerformanceLayerRange, packed as int; default Whole
+    std::atomic<int> performanceSplitPoint_{60}; // C4, same default as AccompanimentEngine's own (unrelated) split point
     std::atomic<bool> autoThirdEnabled_{false};
     std::atomic<bool> autoThirdUpper_{true};
     std::atomic<int> autoThirdScaleRoot_{0};    // pitch class 0-11, default C

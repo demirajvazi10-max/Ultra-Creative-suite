@@ -64,7 +64,8 @@ namespace UltraAudioEditor.Views
 
             var txt = new TextBox
             {
-                Text = string.Format(Lang.T("about_text"), AppInfo.Version, AppInfo.SponsorsUrl),
+                Text = string.Format(Lang.T("about_text"), AppInfo.Version, AppInfo.SponsorsUrl)
+                       + "\n\n" + UltraSupport.SupportInfo.AboutLine(Lang.Current == "sr"),
                 IsReadOnly = true, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Background = (Brush)Application.Current.Resources["BrBgMid"],
@@ -95,6 +96,8 @@ namespace UltraAudioEditor.Views
                 return b;
             }
             Make(Lang.T("about_btn_sponsors"), "AIButton", () => AppInfo.OpenUrl(AppInfo.SponsorsUrl));
+            Make(UltraSupport.SupportInfo.ButtonText(Lang.Current == "sr"), "StdButton",
+                 () => UltraSupport.SupportInfo.Show(this, "Ultra Audio Editor", Lang.Current == "sr"));
             Make(Lang.T("about_btn_repo"), "StdButton", () => AppInfo.OpenUrl(AppInfo.RepoUrl));
             Make(Lang.T("btn_close"), "StdButton", Close, isCancel: true);
             Grid.SetRow(buttons, 1);

@@ -55,6 +55,7 @@ namespace UltraStudio.Localization
             // ===== Menu: Help =====
             ["menu_help"] = ("_Help", "_Pomoć"),
             ["menu_about"] = ("_About", "_O programu"),
+            ["menu_support"] = ("How to support this _project", "Kako podržati p_rojekat"),
             ["about_title"] = ("About Ultra Studio", "O Ultra Studio programu"),
             ["about_text"] = ("Ultra Studio v0.1\n\nAccessible photo editor\nMade for all users\n\nCreated by Demir Ajvazi\n© 2026",
                                "Ultra Studio v0.1\n\nPristupačni photo editor\nNapravljen za sve korisnike\n\nAutor: Demir Ajvazi\n© 2026"),

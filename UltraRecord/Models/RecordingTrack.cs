@@ -50,7 +50,7 @@ namespace UltraRecord.Models
             set => SetField(ref _isClipping, value);
         }
 
-        private string _statusText = "Ready";
+        private string _statusText = L.T("Ready");
         public string StatusText
         {
             get => _statusText;
@@ -78,7 +78,7 @@ namespace UltraRecord.Models
             _waveIn.RecordingStopped += OnRecordingStopped;
 
             _waveIn.StartRecording();
-            StatusText = "Recording";
+            StatusText = L.T("Recording");
             IsClipping = false;
         }
 
@@ -96,7 +96,7 @@ namespace UltraRecord.Models
 
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
-                StatusText = e.Exception != null ? $"Error: {e.Exception.Message}" : "Stopped";
+                StatusText = e.Exception != null ? L.F("Error: {0}", e.Exception.Message) : L.T("Stopped");
                 IsClipping = false;
             });
         }
@@ -120,7 +120,7 @@ namespace UltraRecord.Models
                 if (clipping != IsClipping)
                 {
                     IsClipping = clipping;
-                    StatusText = clipping ? "Clipping!" : "Recording";
+                    StatusText = clipping ? L.T("Clipping!") : L.T("Recording");
                 }
             });
 

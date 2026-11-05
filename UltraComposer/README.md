@@ -261,6 +261,31 @@ key/velocity - that would otherwise add up past full volume gets bent
 back smoothly instead of harshly clipping (heard as crackling/distortion
 before this was added).
 
+## Instrument layers (Layer and Split)
+
+Two features found on real workstation keyboards, built on one shared
+mechanism in "Banka instrumenata": up to 4 "layers" can each independently
+be enabled, given their own instrument (built-in synth, or their own
+SoundFont bank/preset, or their own VST3 plug-in - "Layer 1" is the
+pre-existing single main instrument above, which keeps its own
+VST3/SoundFont controls since, unlike layers 2-4, both can be loaded into
+it at once), volume (0-150%), octave shift (-2..+2), and a range:
+
+- **Whole range** - the layer sounds across the entire keyboard, together
+  with any other enabled whole-range layers. Two or more layers set this
+  way is a classic "Layer/Dual" patch (e.g. piano + strings on every key).
+- **Lower part / Upper part** - the layer only sounds below, or at/above,
+  a shared split point (default c4, independent of the auto-accompaniment's
+  own, differently-purposed split point). One layer set to each is a
+  classic "Split" (e.g. bass in the left hand, piano in the right).
+
+The two combine freely - e.g. a whole-range pad layered underneath a
+lower/upper split of two other layers. Every note source that already
+plays through the main instrument (live keyboard, MIDI hardware, the
+plain sequencer, and the arranger) is covered automatically, since they
+all share one dispatch point in the native engine. All settings round-trip
+through project save/load (see "Project save/load" below).
+
 ## Auto-third harmonization
 
 A quick way to get two-part harmony without a second hand, a second MIDI
@@ -430,10 +455,26 @@ whatever chord is currently active, so you only have to play the melody
    bass/kontra/harmonija note for a whole bar, so without this a chord
    change could otherwise go unheard for a few seconds.
 - Every percussion sound (kick, snare, closed/open hi-hat, clap, crash) is
-  synthesized procedurally (a pitched sine sweep for the kick's thump,
-  filtered noise for everything else) rather than sampled - deliberately
-  dependency-free, and it means the drums always sound regardless of which
-  SoundFont bank (if any) happens to be loaded elsewhere in the app.
+  synthesized procedurally by default (a pitched sine sweep plus a short
+  click transient for the kick's thump, filtered/metallic noise for
+  hi-hats and cymbals, a multi-tap envelope for the clap) rather than
+  sampled - deliberately dependency-free, and it means the drums always
+  sound regardless of which SoundFont bank (if any) happens to be loaded
+  elsewhere in the app.
+- **Drums (izvor zvuka)**: right below the instrument-per-layer controls,
+  choose whether drums use that built-in procedural kit ("Ugrađeni
+  (fiksni)", the default) or a loaded SoundFont's own drum kit ("Zvučna
+  banka") - the same idea as a real arranger keyboard, where changing the
+  sound bank changes the drum sound too. Browse to a `.sf2` file and click
+  "Učitaj banku za bubnjeve"; it looks for that bank's GM-standard drum kit
+  (bank 128) automatically, and "Bubanj-set u banci" lists every instrument
+  in the bank in case a different one sounds better. Once a bank is
+  loaded, kick/snare/hi-hat/clap/crash/tom are triggered by their standard
+  GM percussion note numbers (36/38/42-46/39/49/45) so the bank's kit
+  sounds each one correctly; the oriental rhythm's dumbek "Dum"/"Tek"
+  strokes always stay on the built-in procedural sound regardless of this
+  setting, since standard drum kits have no dumbek sample to draw on. This
+  choice is saved per project, alongside which preset was picked.
 - **Instrument per layer**: under "Instrumenti pratnje", pick which of
   bass/kontra/harmonija to edit from the "Sloj" list, then either load a
   .sf2 file just for that layer and pick one of its instruments, load a
@@ -616,7 +657,8 @@ reopens one, restoring everything exactly as it was left:
   a custom rhythm, if one was active), tempo, which of the four layers
   (bubanj/bas/kontra/harmonija) are enabled, manual vs. keyboard-follow
   chord input and the manually picked chord, chord voicing, the split
-  point, and each layer's own loaded SoundFont/VST3 instrument. Every
+  point, each layer's own loaded SoundFont/VST3 instrument, and the drum
+  kit's sound source (built-in or a loaded SoundFont bank/preset). Every
   custom rhythm saved in "Sopstveni ritam" is saved bar by bar, still
   editable after reopening - not just as the flattened result installed
   into the engine (whatever's still unsaved in the bar editor itself is
@@ -779,11 +821,14 @@ Visual Studio build, or from the tag name, in the CI build - the two are
 meant to be kept in sync by hand when you bump one).
 
 Betas are marked with a standard SemVer prerelease suffix, e.g.
-`1.0.0-beta.1` (tag: `composer-v1.0.0-beta.1`) - the workflow detects the
-`-` and automatically flags the GitHub Release as a "Pre-release" rather
-than the repo's latest/stable release. Drop the `-beta.N` suffix entirely
-for the actual first full release (plain `1.0.0`), matching Ultra Video
-Editor's "first full (non-beta) release is v1.0.0" convention.
+`1.0.0-beta` (tag: `composer-v1.0.0-beta`) - the workflow detects the `-`
+and automatically flags the GitHub Release as a "Pre-release" rather than
+the repo's latest/stable release. If a second beta build is ever needed
+before the full release, bump it to something like `1.0.0-beta2` rather
+than reusing the same tag - any suffix containing `-` still reads as a
+prerelease. Drop the `-beta` suffix entirely for the actual first full
+release (plain `1.0.0`), matching Ultra Video Editor's "first full
+(non-beta) release is v1.0.0" convention.
 
 The installer targets 64-bit Windows only (matching the native
 AudioEngine, which is x64-only) and is framework-dependent rather than
@@ -799,6 +844,16 @@ checkbox - the same "readme with a checkbox" pattern many installers use.
 That file is a short first-run orientation, and points back to the fuller
 in-app "Pomoć → Uputstvo za upotrebu" / "Help → User Guide" (see "User
 Guide" above) for the real detail.
+
+## Supporting the project
+
+Ultra Composer is free and will stay free. If you'd like to support its development:
+
+- **By card on [Ko-fi](https://ko-fi.com/ultracreativesuite)** — no account needed: type an amount, press *Donate* and pay with a Visa or Mastercard (credit or debit) or PayPal. The easiest way from abroad.
+- **[GitHub Sponsors](https://github.com/sponsors/demirajvazi10-max)** — monthly or one-time, paid with an ordinary payment card (no PayPal needed); needs a free GitHub account.
+- **Bank transfer from Serbia** — recipient Demir Ajvazi, account `265-0000006185877-28`, Raiffeisen banka, purpose *Donacija za Ultra programe*. Meant for domestic transfers; from abroad, Ko-fi costs far less in fees.
+
+The same guide is inside the app: **Pomoć → Kako podržati projekat / Help → How to support this project**, in English and Serbian, with buttons to open Ko-fi or GitHub Sponsors and to copy the account number.
 
 ## Licensing
 
@@ -827,5 +882,6 @@ other apps. Third-party pieces used here:
   details; loading your own `.sf2` file instead is always an option and
   isn't bound by this license.
 
-GPL-3.0 — see the repository's [LICENSE](../LICENSE) file. This tool shares
-its license with the rest of the Ultra Creative Suite repository.
+A `LICENSE` file with the full GPL-3.0 text isn't included in this drop —
+grab the canonical text from https://www.gnu.org/licenses/gpl-3.0.txt and
+drop it in the repo root, same as the other Ultra apps.

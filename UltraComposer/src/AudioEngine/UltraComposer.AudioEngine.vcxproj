@@ -127,6 +127,7 @@
     <ClInclude Include="DrumSynth.h" />
     <ClInclude Include="MidiInput.h" />
     <ClInclude Include="MultiTrackSequencer.h" />
+    <ClInclude Include="PerformanceLayers.h" />
     <ClInclude Include="Sequencer.h" />
     <ClInclude Include="SoundFontHost.h" />
     <ClInclude Include="Style.h" />
@@ -148,6 +149,7 @@
     <ClCompile Include="DrumSynth.cpp" />
     <ClCompile Include="MidiInput.cpp" />
     <ClCompile Include="MultiTrackSequencer.cpp" />
+    <ClCompile Include="PerformanceLayers.cpp" />
     <ClCompile Include="Sequencer.cpp" />
     <ClCompile Include="SoundFontHost.cpp" />
     <ClCompile Include="Style.cpp" />

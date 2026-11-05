@@ -14,6 +14,13 @@ namespace UltraRecord
             DataContext = _vm;
             TracksListBox.ItemsSource = _vm.Tracks;
 
+            L.UpdateLanguageButton(LanguageButton);
+            L.Changed += () =>
+            {
+                UpdateOutputFolderText();
+                TracksListBox.Items.Refresh();   // re-creates the track rows in the new language
+            };
+
             _vm.PropertyChanged += (_, e) =>
             {
                 switch (e.PropertyName)
@@ -22,13 +29,16 @@ namespace UltraRecord
                         StatusText.Text = _vm.StatusMessage;
                         break;
                     case nameof(MainViewModel.OutputFolder):
-                        OutputFolderText.Text = string.IsNullOrWhiteSpace(_vm.OutputFolder)
-                            ? "No output folder chosen"
-                            : $"Output: {_vm.OutputFolder}";
+                        UpdateOutputFolderText();
                         break;
                 }
             };
         }
+
+        private void UpdateOutputFolderText() =>
+            OutputFolderText.Text = string.IsNullOrWhiteSpace(_vm.OutputFolder)
+                ? L.T("No output folder chosen")
+                : L.F("Output: {0}", _vm.OutputFolder);
 
         private void AddTrackButton_Click(object sender, RoutedEventArgs e)
         {
@@ -54,7 +64,7 @@ namespace UltraRecord
             if (_vm.StartCommand.CanExecute(null))
                 _vm.StartCommand.Execute(null);
             else if (string.IsNullOrWhiteSpace(_vm.OutputFolder))
-                StatusText.Text = "Choose an output folder before starting.";
+                StatusText.Text = L.T("Choose an output folder before starting.");
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
@@ -67,6 +77,8 @@ namespace UltraRecord
         {
             _vm.SelectedTrack = TracksListBox.SelectedItem as Models.RecordingTrack;
         }
+
+        private void LanguageButton_Click(object sender, RoutedEventArgs e) => L.Toggle(LanguageButton);
 
         private void AboutButton_Click(object sender, RoutedEventArgs e)
         {

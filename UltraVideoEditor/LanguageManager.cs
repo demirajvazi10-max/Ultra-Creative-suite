@@ -2222,6 +2222,7 @@ namespace UltraVideoEditor
             sr["mw_updates"] = "_Ažuriranja";
             sr["mw_open_logs"] = "Otvori folder sa _log fajlovima";
             sr["mw_about"] = "_O programu";
+            sr["mw_support"] = "Kako podržati p_rojekat";
             sr["mw_video_menu"] = "_Video";
             sr["mw_edit_menu"] = "_Uređivanje";
             sr["mw_view_menu"] = "_Prikaz";
@@ -4743,6 +4744,7 @@ namespace UltraVideoEditor
             en["mw_updates"] = "_Updates";
             en["mw_open_logs"] = "Open the _log folder";
             en["mw_about"] = "_About";
+            en["mw_support"] = "How to support this _project";
             en["mw_video_menu"] = "_Video";
             en["mw_edit_menu"] = "_Edit";
             en["mw_view_menu"] = "_View";

@@ -42,7 +42,7 @@ namespace UltraStudio
         private void Execute(string id)
         {
             DebugLog.Write($"Execute: {id}");
-            if (_busy && id is not ("status" or "shortcuts" or "log" or "about"))
+            if (_busy && id is not ("status" or "shortcuts" or "log" or "about" or "support"))
             {
                 SetStatus(Lang.T("status_busy"));
                 return;
@@ -169,6 +169,7 @@ namespace UltraStudio
             _commands["shortcuts"] = () => new ReportWindow(this, Lang.T("menu_shortcuts"), Lang.T("shortcuts_text")).ShowDialog();
             _commands["log"] = () => new LogWindow(this).Show();
             _commands["about"] = () => new AboutWindow(this).ShowDialog();
+            _commands["support"] = () => UltraSupport.SupportInfo.Show(this, "Ultra Studio", Lang.Current == "sr");
         }
 
         // ════════════════════════════════════════════════════════════════

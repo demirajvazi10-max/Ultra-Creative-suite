@@ -296,6 +296,233 @@ int UC_GetSelectedSoundFontPresetIndex()
     return GetEngine().GetSelectedSoundFontPresetIndex();
 }
 
+// --- Performance layers ("Sloj 1/2/3/4") ---
+
+namespace
+{
+    PerformanceLayerRange ToPerformanceLayerRange(int32_t range)
+    {
+        switch (range)
+        {
+        case UC_PerformanceLayerRange_Lower: return PerformanceLayerRange::Lower;
+        case UC_PerformanceLayerRange_Upper: return PerformanceLayerRange::Upper;
+        default: return PerformanceLayerRange::Whole;
+        }
+    }
+
+    PerformanceLayerMode ToPerformanceLayerMode(int32_t mode)
+    {
+        switch (mode)
+        {
+        case UC_PerformanceLayerMode_SoundFont: return PerformanceLayerMode::SoundFont;
+        case UC_PerformanceLayerMode_Vst: return PerformanceLayerMode::Vst;
+        default: return PerformanceLayerMode::BuiltInSynth;
+        }
+    }
+}
+
+void UC_MainLayer_SetEnabled(bool enabled)
+{
+    GetEngine().SetMainLayerEnabled(enabled);
+}
+
+bool UC_MainLayer_IsEnabled()
+{
+    return GetEngine().IsMainLayerEnabled();
+}
+
+void UC_MainLayer_SetVolume(float volume)
+{
+    GetEngine().SetMainLayerVolume(volume);
+}
+
+float UC_MainLayer_GetVolume()
+{
+    return GetEngine().GetMainLayerVolume();
+}
+
+void UC_MainLayer_SetOctaveOffset(int32_t octaves)
+{
+    GetEngine().SetMainLayerOctaveOffset(octaves);
+}
+
+int32_t UC_MainLayer_GetOctaveOffset()
+{
+    return static_cast<int32_t>(GetEngine().GetMainLayerOctaveOffset());
+}
+
+void UC_MainLayer_SetRange(int32_t range)
+{
+    GetEngine().SetMainLayerRange(ToPerformanceLayerRange(range));
+}
+
+int32_t UC_MainLayer_GetRange()
+{
+    return static_cast<int32_t>(GetEngine().GetMainLayerRange());
+}
+
+void UC_SetPerformanceSplitPoint(int32_t midiNote)
+{
+    GetEngine().SetPerformanceSplitPoint(midiNote);
+}
+
+int32_t UC_GetPerformanceSplitPoint()
+{
+    return static_cast<int32_t>(GetEngine().GetPerformanceSplitPoint());
+}
+
+void UC_ExtraLayer_SetEnabled(int32_t layerIndex, bool enabled)
+{
+    GetEngine().SetExtraLayerEnabled(layerIndex, enabled);
+}
+
+bool UC_ExtraLayer_IsEnabled(int32_t layerIndex)
+{
+    return GetEngine().IsExtraLayerEnabled(layerIndex);
+}
+
+void UC_ExtraLayer_SetMode(int32_t layerIndex, int32_t mode)
+{
+    GetEngine().SetExtraLayerMode(layerIndex, ToPerformanceLayerMode(mode));
+}
+
+int32_t UC_ExtraLayer_GetMode(int32_t layerIndex)
+{
+    return static_cast<int32_t>(GetEngine().GetExtraLayerMode(layerIndex));
+}
+
+void UC_ExtraLayer_SetVolume(int32_t layerIndex, float volume)
+{
+    GetEngine().SetExtraLayerVolume(layerIndex, volume);
+}
+
+float UC_ExtraLayer_GetVolume(int32_t layerIndex)
+{
+    return GetEngine().GetExtraLayerVolume(layerIndex);
+}
+
+void UC_ExtraLayer_SetOctaveOffset(int32_t layerIndex, int32_t octaves)
+{
+    GetEngine().SetExtraLayerOctaveOffset(layerIndex, octaves);
+}
+
+int32_t UC_ExtraLayer_GetOctaveOffset(int32_t layerIndex)
+{
+    return static_cast<int32_t>(GetEngine().GetExtraLayerOctaveOffset(layerIndex));
+}
+
+void UC_ExtraLayer_SetRange(int32_t layerIndex, int32_t range)
+{
+    GetEngine().SetExtraLayerRange(layerIndex, ToPerformanceLayerRange(range));
+}
+
+int32_t UC_ExtraLayer_GetRange(int32_t layerIndex)
+{
+    return static_cast<int32_t>(GetEngine().GetExtraLayerRange(layerIndex));
+}
+
+bool UC_ExtraLayer_LoadSoundFontBank(int32_t layerIndex, const char* sf2Path, char* errorBuffer, int32_t errorBufferSize)
+{
+    if (sf2Path == nullptr)
+    {
+        CopyToBuffer("Nije prosledjena putanja do .sf2 fajla.", errorBuffer, errorBufferSize);
+        return false;
+    }
+
+    std::string error;
+    bool ok = GetEngine().LoadExtraLayerSoundFontBank(layerIndex, sf2Path, error);
+    if (!ok)
+    {
+        CopyToBuffer(error, errorBuffer, errorBufferSize);
+    }
+    return ok;
+}
+
+void UC_ExtraLayer_UnloadSoundFontBank(int32_t layerIndex)
+{
+    GetEngine().UnloadExtraLayerSoundFontBank(layerIndex);
+}
+
+bool UC_ExtraLayer_IsSoundFontBankLoaded(int32_t layerIndex)
+{
+    return GetEngine().IsExtraLayerSoundFontBankLoaded(layerIndex);
+}
+
+bool UC_ExtraLayer_GetSoundFontBankName(int32_t layerIndex, char* buffer, int32_t bufferSize)
+{
+    std::string name = GetEngine().GetExtraLayerSoundFontBankName(layerIndex);
+    if (name.empty())
+    {
+        return false;
+    }
+    CopyToBuffer(name, buffer, bufferSize);
+    return true;
+}
+
+int32_t UC_ExtraLayer_GetSoundFontPresetCount(int32_t layerIndex)
+{
+    return static_cast<int32_t>(GetEngine().GetExtraLayerSoundFontPresetCount(layerIndex));
+}
+
+bool UC_ExtraLayer_GetSoundFontPresetName(int32_t layerIndex, int32_t presetIndex, char* buffer, int32_t bufferSize)
+{
+    std::string name = GetEngine().GetExtraLayerSoundFontPresetName(layerIndex, presetIndex);
+    if (name.empty())
+    {
+        return false;
+    }
+    CopyToBuffer(name, buffer, bufferSize);
+    return true;
+}
+
+bool UC_ExtraLayer_SelectSoundFontPreset(int32_t layerIndex, int32_t presetIndex)
+{
+    return GetEngine().SelectExtraLayerSoundFontPreset(layerIndex, presetIndex);
+}
+
+int32_t UC_ExtraLayer_GetSelectedSoundFontPresetIndex(int32_t layerIndex)
+{
+    return static_cast<int32_t>(GetEngine().GetSelectedExtraLayerSoundFontPresetIndex(layerIndex));
+}
+
+bool UC_ExtraLayer_LoadVstInstrument(int32_t layerIndex, const char* modulePath, char* errorBuffer, int32_t errorBufferSize)
+{
+    if (modulePath == nullptr)
+    {
+        CopyToBuffer("Nije prosledjena putanja do .vst3 fajla.", errorBuffer, errorBufferSize);
+        return false;
+    }
+
+    std::string error;
+    bool ok = GetEngine().LoadExtraLayerVstInstrument(layerIndex, modulePath, error);
+    if (!ok)
+    {
+        CopyToBuffer(error, errorBuffer, errorBufferSize);
+    }
+    return ok;
+}
+
+void UC_ExtraLayer_UnloadVstInstrument(int32_t layerIndex)
+{
+    GetEngine().UnloadExtraLayerVstInstrument(layerIndex);
+}
+
+bool UC_ExtraLayer_IsVstInstrumentLoaded(int32_t layerIndex)
+{
+    return GetEngine().IsExtraLayerVstInstrumentLoaded(layerIndex);
+}
+
+bool UC_ExtraLayer_GetVstInstrumentName(int32_t layerIndex, char* buffer, int32_t bufferSize)
+{
+    std::string name = GetEngine().GetExtraLayerVstInstrumentName(layerIndex);
+    if (name.empty())
+    {
+        return false;
+    }
+    CopyToBuffer(name, buffer, bufferSize);
+    return true;
+}
+
 void UC_SetAutoThirdEnabled(bool enabled)
 {
     GetEngine().SetAutoThirdEnabled(enabled);
@@ -1016,6 +1243,80 @@ void UC_Accompaniment_SetChordVoicing(int32_t voicing)
 int32_t UC_Accompaniment_GetChordVoicing()
 {
     return static_cast<int32_t>(GetEngine().GetAccompanimentChordVoicing());
+}
+
+void UC_Accompaniment_SetDrumSourceMode(int32_t mode)
+{
+    GetEngine().SetAccompanimentDrumSourceMode(static_cast<AccompanimentEngine::DrumSourceMode>(mode));
+}
+
+int32_t UC_Accompaniment_GetDrumSourceMode()
+{
+    return static_cast<int32_t>(GetEngine().GetAccompanimentDrumSourceMode());
+}
+
+bool UC_Accompaniment_LoadDrumSoundFontBank(const char* sf2Path, char* errorBuffer, int32_t errorBufferSize)
+{
+    if (sf2Path == nullptr)
+    {
+        CopyToBuffer("Nije prosledjena putanja do .sf2 fajla.", errorBuffer, errorBufferSize);
+        return false;
+    }
+
+    std::string error;
+    bool ok = GetEngine().LoadAccompanimentDrumSoundFontBank(sf2Path, error);
+    if (!ok)
+    {
+        CopyToBuffer(error, errorBuffer, errorBufferSize);
+    }
+    return ok;
+}
+
+void UC_Accompaniment_UnloadDrumSoundFontBank()
+{
+    GetEngine().UnloadAccompanimentDrumSoundFontBank();
+}
+
+bool UC_Accompaniment_IsDrumSoundFontBankLoaded()
+{
+    return GetEngine().IsAccompanimentDrumSoundFontBankLoaded();
+}
+
+bool UC_Accompaniment_GetDrumSoundFontBankName(char* buffer, int32_t bufferSize)
+{
+    std::string name = GetEngine().GetAccompanimentDrumSoundFontBankName();
+    if (name.empty())
+    {
+        return false;
+    }
+    CopyToBuffer(name, buffer, bufferSize);
+    return true;
+}
+
+int32_t UC_Accompaniment_GetDrumSoundFontPresetCount()
+{
+    return static_cast<int32_t>(GetEngine().GetAccompanimentDrumSoundFontPresetCount());
+}
+
+bool UC_Accompaniment_GetDrumSoundFontPresetName(int32_t presetIndex, char* buffer, int32_t bufferSize)
+{
+    std::string name = GetEngine().GetAccompanimentDrumSoundFontPresetName(presetIndex);
+    if (name.empty())
+    {
+        return false;
+    }
+    CopyToBuffer(name, buffer, bufferSize);
+    return true;
+}
+
+bool UC_Accompaniment_SelectDrumSoundFontPreset(int32_t presetIndex)
+{
+    return GetEngine().SelectAccompanimentDrumSoundFontPreset(presetIndex);
+}
+
+int32_t UC_Accompaniment_GetSelectedDrumSoundFontPresetIndex()
+{
+    return static_cast<int32_t>(GetEngine().GetSelectedAccompanimentDrumSoundFontPresetIndex());
 }
 
 namespace

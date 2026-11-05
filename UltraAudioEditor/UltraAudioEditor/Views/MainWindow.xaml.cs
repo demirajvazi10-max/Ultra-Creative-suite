@@ -294,6 +294,9 @@ namespace UltraAudioEditor.Views
         {
             new AboutWindow(this).ShowDialog();
         }
+
+        private void ShowSupport_Click(object sender, RoutedEventArgs e)
+            => UltraSupport.SupportInfo.Show(this, "Ultra Audio Editor", Lang.Current == "sr");
         // ─── Odabir jezika ────────────────────────────────────────────────
         private void LangEn_Click(object sender, RoutedEventArgs e) => SwitchLanguage("en");
         private void LangSr_Click(object sender, RoutedEventArgs e) => SwitchLanguage("sr");

@@ -14,6 +14,10 @@ namespace UltraCast
         {
             Bootstrap.Initialize();
 
+            // Every window (main, About, support guide) is translated to the chosen language as it opens.
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                new RoutedEventHandler((s, _) => L.Apply((DependencyObject)s)));
+
             // Without these hooks, an unhandled exception on a background
             // thread (the screen-capture loop, the audio pump, an NAudio
             // callback) kills the whole process silently - no dialog, no
@@ -36,9 +40,9 @@ namespace UltraCast
             {
                 AppLogger.Log("Unhandled UI-thread exception: " + e.Exception);
                 MessageBox.Show(
-                    "Ultra Cast ran into a problem and had to recover:\n\n" + e.Exception.Message +
-                    $"\n\nDetails were written to:\n{AppLogger.LogFilePath}",
-                    "Ultra Cast - Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    L.F("Ultra Cast ran into a problem and had to recover:\n\n{0}\n\nDetails were written to:\n{1}",
+                        e.Exception.Message, AppLogger.LogFilePath),
+                    L.T("Ultra Cast - Error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 // Handled = true keeps the app running instead of crashing outright.
                 e.Handled = true;
             };

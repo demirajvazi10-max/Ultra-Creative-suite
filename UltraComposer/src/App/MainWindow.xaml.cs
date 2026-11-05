@@ -74,6 +74,16 @@ public partial class MainWindow : Window
     private readonly List<string?> _trackSoundFontPaths = new();
     private readonly List<string?> _trackVstPaths = new();
 
+    /// <summary>Same path-bookkeeping need as above, for "Sloj 2/3/4" (see PerformanceLayers.h) - indexed 0-based (0="Sloj 2", 1="Sloj 3", 2="Sloj 4").</summary>
+    private readonly string?[] _perfExtraLayerSoundFontPaths = new string?[3];
+    private readonly string?[] _perfExtraLayerVstPaths = new string?[3];
+    private bool _isPopulatingPerfLayerCombo;
+    private bool _isPopulatingPerfLayerPresets;
+
+    /// <summary>Same path-bookkeeping need as _accLayerSoundFontPaths above, for the drum kit's own optional SoundFont bank.</summary>
+    private string? _drumSoundFontPath;
+    private bool _isPopulatingDrumSoundFontPresets;
+
     /// <summary>Path last saved to or opened from via the Fajl menu - "Sačuvaj projekat" reuses it, "Sačuvaj kao..." always asks again.</summary>
     private string? _currentProjectPath;
 
@@ -161,8 +171,10 @@ public partial class MainWindow : Window
             PopulateAccompanimentManualChordCombos();
             PopulateAccInstrumentLayerCombo();
             PopulateAccChordVoicingCombo();
+            LoadDrumSourceIntoPanel();
             PopulateAutoThirdScaleCombo();
             PopulateCustomRhythmCombos();
+            PopulatePerfLayerCombo();
             _accompanimentStatusTimer.Start();
         }
     }
@@ -395,6 +407,13 @@ public partial class MainWindow : Window
         acc.ManualChordQuality = AccManualQualityComboBox.SelectedIndex >= 0 ? AccManualQualityComboBox.SelectedIndex : 0;
         acc.ChordVoicing = (int)AudioEngineInterop.AccompanimentGetChordVoicing();
 
+        acc.DrumSourceMode = (int)AudioEngineInterop.AccompanimentGetDrumSourceMode();
+        if (acc.DrumSourceMode == (int)AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont)
+        {
+            acc.DrumSoundFontPath = _drumSoundFontPath;
+            acc.DrumSoundFontPresetIndex = AudioEngineInterop.AccompanimentGetSelectedDrumSoundFontPresetIndex();
+        }
+
         FillLayerInstrumentData(acc.Bass, AudioEngineInterop.AccompanimentMelodicLayer.Bass);
         FillLayerInstrumentData(acc.Kontra, AudioEngineInterop.AccompanimentMelodicLayer.Kontra);
         FillLayerInstrumentData(acc.Harmonija, AudioEngineInterop.AccompanimentMelodicLayer.Harmonija);
@@ -428,6 +447,34 @@ public partial class MainWindow : Window
         if (AudioEngineInterop.IsVstInstrumentLoaded())
         {
             data.MainBank.VstPath = VstPathTextBox.Text?.Trim();
+        }
+
+        // --- Slojevi izvođenja (Layer/Split), "Sloj 1" (glavni) i "Sloj 2/3/4" ---
+        data.MainBank.Enabled = AudioEngineInterop.MainLayerIsEnabled();
+        data.MainBank.Volume = AudioEngineInterop.MainLayerGetVolume();
+        data.MainBank.OctaveOffset = AudioEngineInterop.MainLayerGetOctaveOffset();
+        data.MainBank.Range = (int)AudioEngineInterop.MainLayerGetRange();
+        data.PerformanceSplitPoint = AudioEngineInterop.GetPerformanceSplitPoint();
+        for (int i = 0; i < 3; i++)
+        {
+            var layerData = new ProjectFile.PerformanceLayerData
+            {
+                Enabled = AudioEngineInterop.ExtraLayerIsEnabled(i),
+                Mode = (int)AudioEngineInterop.ExtraLayerGetMode(i),
+                Volume = AudioEngineInterop.ExtraLayerGetVolume(i),
+                OctaveOffset = AudioEngineInterop.ExtraLayerGetOctaveOffset(i),
+                Range = (int)AudioEngineInterop.ExtraLayerGetRange(i),
+            };
+            if (layerData.Mode == (int)AudioEngineInterop.PerformanceLayerMode.SoundFont)
+            {
+                layerData.SoundFontPath = _perfExtraLayerSoundFontPaths[i];
+                layerData.SoundFontPresetIndex = AudioEngineInterop.ExtraLayerGetSelectedSoundFontPresetIndex(i);
+            }
+            else if (layerData.Mode == (int)AudioEngineInterop.PerformanceLayerMode.Vst)
+            {
+                layerData.VstPath = _perfExtraLayerVstPaths[i];
+            }
+            data.ExtraPerformanceLayers.Add(layerData);
         }
 
         return data;
@@ -609,6 +656,22 @@ public partial class MainWindow : Window
 
         AudioEngineInterop.AccompanimentSetChordVoicing((AudioEngineInterop.AccompanimentChordVoicing)acc.ChordVoicing);
 
+        var drumMode = (AudioEngineInterop.AccompanimentDrumSourceMode)acc.DrumSourceMode;
+        if (drumMode == AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont && !string.IsNullOrEmpty(acc.DrumSoundFontPath))
+        {
+            AudioEngineInterop.AccompanimentLoadDrumSoundFontBank(acc.DrumSoundFontPath);
+            if (acc.DrumSoundFontPresetIndex >= 0)
+            {
+                AudioEngineInterop.AccompanimentSelectDrumSoundFontPreset(acc.DrumSoundFontPresetIndex);
+            }
+            _drumSoundFontPath = acc.DrumSoundFontPath;
+        }
+        else
+        {
+            AudioEngineInterop.AccompanimentSetDrumSourceMode(AudioEngineInterop.AccompanimentDrumSourceMode.Procedural);
+            _drumSoundFontPath = null;
+        }
+
         ApplyLayerInstrumentData(acc.Bass, AudioEngineInterop.AccompanimentMelodicLayer.Bass);
         ApplyLayerInstrumentData(acc.Kontra, AudioEngineInterop.AccompanimentMelodicLayer.Kontra);
         ApplyLayerInstrumentData(acc.Harmonija, AudioEngineInterop.AccompanimentMelodicLayer.Harmonija);
@@ -652,6 +715,7 @@ public partial class MainWindow : Window
         PopulateAccompanimentManualChordCombos();
         PopulateAccInstrumentLayerCombo();
         PopulateAccChordVoicingCombo();
+        LoadDrumSourceIntoPanel();
         RefreshAccompanimentCurrentChordText();
         AccStatusText.Text = Localization.T("Acc.StatusStopped");
 
@@ -683,6 +747,49 @@ public partial class MainWindow : Window
             VstPathTextBox.Text = data.MainBank.VstPath;
             LoadVstButton_Click(this, new RoutedEventArgs());
         }
+
+        // --- Slojevi izvođenja (Layer/Split) ---
+        AudioEngineInterop.MainLayerSetVolume(data.MainBank.Volume);
+        AudioEngineInterop.MainLayerSetOctaveOffset(data.MainBank.OctaveOffset);
+        AudioEngineInterop.MainLayerSetRange((AudioEngineInterop.PerformanceLayerRange)data.MainBank.Range);
+        AudioEngineInterop.MainLayerSetEnabled(data.MainBank.Enabled);
+        AudioEngineInterop.SetPerformanceSplitPoint(data.PerformanceSplitPoint);
+        for (int i = 0; i < data.ExtraPerformanceLayers.Count && i < 3; i++)
+        {
+            ApplyPerfLayerData(data.ExtraPerformanceLayers[i], i);
+        }
+        if (_engineRunning)
+        {
+            PopulatePerfLayerCombo();
+        }
+    }
+
+    private void ApplyPerfLayerData(ProjectFile.PerformanceLayerData layerData, int layerIndex)
+    {
+        var mode = (AudioEngineInterop.PerformanceLayerMode)layerData.Mode;
+        if (mode == AudioEngineInterop.PerformanceLayerMode.SoundFont && !string.IsNullOrEmpty(layerData.SoundFontPath))
+        {
+            AudioEngineInterop.ExtraLayerLoadSoundFontBank(layerIndex, layerData.SoundFontPath);
+            if (layerData.SoundFontPresetIndex >= 0)
+            {
+                AudioEngineInterop.ExtraLayerSelectSoundFontPreset(layerIndex, layerData.SoundFontPresetIndex);
+            }
+            _perfExtraLayerSoundFontPaths[layerIndex] = layerData.SoundFontPath;
+        }
+        else if (mode == AudioEngineInterop.PerformanceLayerMode.Vst && !string.IsNullOrEmpty(layerData.VstPath))
+        {
+            AudioEngineInterop.ExtraLayerLoadVstInstrument(layerIndex, layerData.VstPath);
+            _perfExtraLayerVstPaths[layerIndex] = layerData.VstPath;
+        }
+        else
+        {
+            AudioEngineInterop.ExtraLayerSetMode(layerIndex, AudioEngineInterop.PerformanceLayerMode.BuiltInSynth);
+        }
+
+        AudioEngineInterop.ExtraLayerSetVolume(layerIndex, layerData.Volume);
+        AudioEngineInterop.ExtraLayerSetOctaveOffset(layerIndex, layerData.OctaveOffset);
+        AudioEngineInterop.ExtraLayerSetRange(layerIndex, (AudioEngineInterop.PerformanceLayerRange)layerData.Range);
+        AudioEngineInterop.ExtraLayerSetEnabled(layerIndex, layerData.Enabled);
     }
 
     private void ApplyLayerInstrumentData(ProjectFile.LayerInstrumentData layerData, AudioEngineInterop.AccompanimentMelodicLayer layer)
@@ -730,11 +837,16 @@ public partial class MainWindow : Window
         _helpWindow.Show();
     }
 
+    /// <summary>Help → How to support this project: step-by-step guide (payment card, no PayPal needed).</summary>
+    private void SupportMenuItem_Click(object sender, RoutedEventArgs e)
+        => UltraSupport.SupportInfo.Show(this, "Ultra Composer", Localization.Current == AppLanguage.Serbian);
+
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(
             this,
-            string.Format(Localization.T("About.Text"), GetAppVersion()),
+            string.Format(Localization.T("About.Text"), GetAppVersion())
+                + "\n\n" + UltraSupport.SupportInfo.AboutLine(Localization.Current == AppLanguage.Serbian),
             Localization.T("About.Title"),
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -877,6 +989,7 @@ public partial class MainWindow : Window
 
         HelpMenuItem.Header = T("Menu.Help");
         UserGuideMenuItem.Header = T("Menu.Help.UserGuide");
+        SupportMenuItem.Header = T("Menu.Help.Support");
         AboutMenuItem.Header = T("Menu.Help.About");
 
         // --- MIDI ---
@@ -936,6 +1049,44 @@ public partial class MainWindow : Window
             // Pitch-class names are language-dependent, so the combo
             // contents need rebuilding, not just re-reading.
             PopulateAutoThirdScaleCombo();
+        }
+
+        // --- Slojevi instrumenata (Layer/Split) ---
+        PerfLayersTitleText.Text = T("Perf.Title");
+        PerfLayersExplainText.Text = T("Perf.Explain");
+        PerfLayerSelectLabelText.Text = T("Perf.LayerSelectLabel");
+        AutomationProperties.SetName(PerfLayerComboBox, T("Perf.LayerSelectAutomationName"));
+        PerfLayerEnabledCheckBox.Content = T("Perf.EnabledCheckbox");
+        PerfLayerSynthRadio.Content = T("Acc.LayerSynthRadio");
+        PerfLayerSoundFontRadio.Content = T("Perf.LayerSoundFontRadio");
+        PerfLayerVstRadio.Content = T("Perf.LayerVstRadio");
+        PerfLayerSfPathLabelText.Text = T("Acc.LayerSfPathLabel");
+        AutomationProperties.SetName(PerfLayerSoundFontPathTextBox, T("Perf.LayerSfPathAutomationName"));
+        PerfBrowseLayerSoundFontButton.Content = T("Common.Browse");
+        PerfLoadLayerSoundFontButton.Content = T("Perf.LoadLayerSoundFontButton");
+        PerfLayerPresetLabelText.Text = T("Acc.LayerPresetLabel");
+        AutomationProperties.SetName(PerfLayerSoundFontPresetComboBox, T("Perf.LayerPresetAutomationName"));
+        PerfLayerVstPathLabelText.Text = T("Acc.LayerVstPathLabel");
+        AutomationProperties.SetName(PerfLayerVstPathTextBox, T("Perf.LayerVstPathAutomationName"));
+        PerfBrowseLayerVstButton.Content = T("Common.Browse");
+        PerfLoadLayerVstButton.Content = T("Perf.LoadLayerVstButton");
+        PerfLayerVolumeLabelText.Text = T("Perf.VolumeLabel");
+        AutomationProperties.SetName(PerfLayerVolumeTextBox, T("Perf.VolumeAutomationName"));
+        PerfLayerOctaveLabelText.Text = T("Perf.OctaveLabel");
+        AutomationProperties.SetName(PerfLayerOctaveTextBox, T("Perf.OctaveAutomationName"));
+        PerfLayerRangeLabelText.Text = T("Perf.RangeLabel");
+        AutomationProperties.SetName(PerfLayerRangeComboBox, T("Perf.RangeAutomationName"));
+        ApplyPerfLayerSettingsButton.Content = T("Acc.ApplyButton");
+        PerfSplitLabelText.Text = T("Perf.SplitLabel");
+        AutomationProperties.SetName(PerfSplitPointTextBox, T("Perf.SplitAutomationName"));
+        ApplyPerfSplitPointButton.Content = T("Acc.ApplyButton");
+        if (_engineRunning)
+        {
+            // Layer names ("Sloj 1/2/3/4") and range option names are
+            // language-dependent, so the combo contents themselves need
+            // rebuilding, not just re-reading - preserve whichever
+            // selection/native state is already active.
+            PopulatePerfLayerCombo();
         }
 
         // --- Klavijatura za sviranje ---
@@ -1128,6 +1279,15 @@ public partial class MainWindow : Window
         AutomationProperties.SetName(AccLayerVstPathTextBox, T("Acc.LayerVstPathAutomationName"));
         AccBrowseLayerVstButton.Content = T("Common.Browse");
         AccLoadLayerVstButton.Content = T("Acc.LoadLayerVstButton");
+        AccDrumSourceTitleText.Text = T("Acc.DrumSourceTitle");
+        AccDrumSourceProceduralRadio.Content = T("Acc.DrumSourceProceduralRadio");
+        AccDrumSourceSoundFontRadio.Content = T("Acc.DrumSourceSoundFontRadio");
+        AccDrumSfPathLabelText.Text = T("Acc.LayerSfPathLabel");
+        AutomationProperties.SetName(AccDrumSoundFontPathTextBox, T("Acc.DrumSfPathAutomationName"));
+        AccBrowseDrumSoundFontButton.Content = T("Common.Browse");
+        AccLoadDrumSoundFontButton.Content = T("Acc.LoadDrumSoundFontButton");
+        AccDrumPresetLabelText.Text = T("Acc.DrumPresetLabel");
+        AccDrumSourceExplainText.Text = T("Acc.DrumSourceExplain");
         AccChordVoicingTitleText.Text = T("Acc.ChordVoicingTitle");
         AccChordVoicingLabelText.Text = T("Acc.ChordVoicingLabel");
         AutomationProperties.SetName(AccChordVoicingComboBox, T("Acc.ChordVoicingAutomationName"));
@@ -1150,6 +1310,7 @@ public partial class MainWindow : Window
             PopulateAccInstrumentLayerCombo();
             // Chord-voicing option names are language-dependent too.
             PopulateAccChordVoicingCombo();
+            LoadDrumSourceIntoPanel();
         }
 
         // --- Sopstveni ritam (custom rhythm/style builder) ---
@@ -1800,6 +1961,366 @@ public partial class MainWindow : Window
         if (AutoThirdScaleHijazRadio.IsChecked == true) return AudioEngineInterop.ScaleType.Hijaz;
         if (AutoThirdScaleHijazKarRadio.IsChecked == true) return AudioEngineInterop.ScaleType.HijazKar;
         return AudioEngineInterop.ScaleType.Major;
+    }
+
+    // --- Slojevi instrumenata u Banci instrumenata (Layer i Split) ---
+    // PerfLayerComboBox: index 0 = "Sloj 1" (the pre-existing main
+    // instrument, VstPathTextBox/SoundFontPathTextBox above), 1..3 = "Sloj
+    // 2/3/4" (AudioEngineInterop.ExtraLayer* calls, 0-based index = combo
+    // index - 1). Mirrors LoadSelectedAccLayerIntoPanel's role for the
+    // auto-pratnja per-layer panel.
+
+    private bool IsMainPerfLayerSelected() => PerfLayerComboBox.SelectedIndex <= 0;
+
+    private int GetSelectedExtraLayerIndex() => Math.Max(0, PerfLayerComboBox.SelectedIndex - 1);
+
+    /// <summary>
+    /// Fills the "Sloj" combo with "Sloj 1/2/3/4" (language-dependent),
+    /// keeping whichever one was already selected, then rebuilds the range
+    /// combo and loads that selection's current settings into the panel.
+    /// </summary>
+    private void PopulatePerfLayerCombo()
+    {
+        int previousIndex = PerfLayerComboBox.SelectedIndex;
+
+        _isPopulatingPerfLayerCombo = true;
+        PerfLayerComboBox.Items.Clear();
+        for (int i = 1; i <= 4; i++)
+        {
+            PerfLayerComboBox.Items.Add(Localization.F("Perf.LayerOption", i));
+        }
+        PerfLayerComboBox.SelectedIndex = previousIndex >= 0 && previousIndex < 4 ? previousIndex : 0;
+        _isPopulatingPerfLayerCombo = false;
+
+        PopulatePerfLayerRangeCombo();
+        LoadSelectedPerfLayerIntoPanel();
+    }
+
+    /// <summary>Fills the "Opseg" combo with the three (language-dependent) range options, keeping whichever was already selected.</summary>
+    private void PopulatePerfLayerRangeCombo()
+    {
+        int previousIndex = PerfLayerRangeComboBox.SelectedIndex;
+        PerfLayerRangeComboBox.Items.Clear();
+        PerfLayerRangeComboBox.Items.Add(Localization.T("Perf.RangeWhole"));
+        PerfLayerRangeComboBox.Items.Add(Localization.T("Perf.RangeLower"));
+        PerfLayerRangeComboBox.Items.Add(Localization.T("Perf.RangeUpper"));
+        PerfLayerRangeComboBox.SelectedIndex = previousIndex >= 0 && previousIndex < 3 ? previousIndex : 0;
+    }
+
+    private static string FormatVolumePercent(float volume) => ((int)Math.Round(volume * 100.0f)).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Fills every control below the "Sloj" combo from the native engine's
+    /// current state for whichever layer is currently selected. "Sloj 1"
+    /// has no single exclusive instrument mode (unlike "Sloj 2/3/4") - it
+    /// keeps its own VST3/SoundFont controls above this panel, both loadable
+    /// at once as always - so the mode radios and SoundFont/VST3 load
+    /// controls here are disabled and cleared while it's selected, leaving
+    /// just enabled/volume/octave/range.
+    /// </summary>
+    private void LoadSelectedPerfLayerIntoPanel()
+    {
+        bool isMain = IsMainPerfLayerSelected();
+        int extraIndex = GetSelectedExtraLayerIndex();
+
+        bool enabled = isMain ? AudioEngineInterop.MainLayerIsEnabled() : AudioEngineInterop.ExtraLayerIsEnabled(extraIndex);
+        PerfLayerEnabledCheckBox.IsChecked = enabled;
+
+        _isPopulatingPerfLayerPresets = true;
+
+        if (isMain)
+        {
+            PerfLayerSynthRadio.IsEnabled = false;
+            PerfLayerSoundFontRadio.IsEnabled = false;
+            PerfLayerVstRadio.IsEnabled = false;
+            PerfLayerSynthRadio.IsChecked = false;
+            PerfLayerSoundFontRadio.IsChecked = false;
+            PerfLayerVstRadio.IsChecked = false;
+
+            PerfLayerSoundFontPathTextBox.Text = string.Empty;
+            PerfLayerSoundFontPathTextBox.IsEnabled = false;
+            PerfBrowseLayerSoundFontButton.IsEnabled = false;
+            PerfLoadLayerSoundFontButton.IsEnabled = false;
+            PerfLayerSoundFontPresetComboBox.Items.Clear();
+            PerfLayerSoundFontPresetComboBox.IsEnabled = false;
+
+            PerfLayerVstPathTextBox.Text = string.Empty;
+            PerfLayerVstPathTextBox.IsEnabled = false;
+            PerfBrowseLayerVstButton.IsEnabled = false;
+            PerfLoadLayerVstButton.IsEnabled = false;
+
+            PerfLayerVolumeTextBox.Text = FormatVolumePercent(AudioEngineInterop.MainLayerGetVolume());
+            PerfLayerOctaveTextBox.Text = AudioEngineInterop.MainLayerGetOctaveOffset().ToString(CultureInfo.InvariantCulture);
+            PerfLayerRangeComboBox.SelectedIndex = (int)AudioEngineInterop.MainLayerGetRange();
+        }
+        else
+        {
+            PerfLayerSynthRadio.IsEnabled = true;
+            PerfLayerSoundFontRadio.IsEnabled = true;
+            PerfLayerVstRadio.IsEnabled = true;
+            PerfLayerSoundFontPathTextBox.IsEnabled = true;
+            PerfBrowseLayerSoundFontButton.IsEnabled = true;
+            PerfLoadLayerSoundFontButton.IsEnabled = true;
+            PerfLayerVstPathTextBox.IsEnabled = true;
+            PerfBrowseLayerVstButton.IsEnabled = true;
+            PerfLoadLayerVstButton.IsEnabled = true;
+
+            var mode = AudioEngineInterop.ExtraLayerGetMode(extraIndex);
+            PerfLayerSynthRadio.IsChecked = mode == AudioEngineInterop.PerformanceLayerMode.BuiltInSynth;
+            PerfLayerSoundFontRadio.IsChecked = mode == AudioEngineInterop.PerformanceLayerMode.SoundFont;
+            PerfLayerVstRadio.IsChecked = mode == AudioEngineInterop.PerformanceLayerMode.Vst;
+
+            bool bankLoaded = AudioEngineInterop.ExtraLayerIsSoundFontBankLoaded(extraIndex);
+            PerfLayerSoundFontPathTextBox.Text = bankLoaded
+                ? (AudioEngineInterop.ExtraLayerGetSoundFontBankName(extraIndex) ?? string.Empty)
+                : string.Empty;
+            PerfLayerSoundFontPresetComboBox.Items.Clear();
+            if (bankLoaded)
+            {
+                int presetCount = AudioEngineInterop.ExtraLayerGetSoundFontPresetCount(extraIndex);
+                int selectedPreset = AudioEngineInterop.ExtraLayerGetSelectedSoundFontPresetIndex(extraIndex);
+                for (int i = 0; i < presetCount; i++)
+                {
+                    PerfLayerSoundFontPresetComboBox.Items.Add(
+                        AudioEngineInterop.ExtraLayerGetSoundFontPresetName(extraIndex, i) ?? Localization.F("Sf.DefaultInstrumentName", i));
+                }
+                PerfLayerSoundFontPresetComboBox.SelectedIndex = selectedPreset >= 0 && selectedPreset < presetCount ? selectedPreset : -1;
+                PerfLayerSoundFontPresetComboBox.IsEnabled = true;
+            }
+            else
+            {
+                PerfLayerSoundFontPresetComboBox.IsEnabled = false;
+            }
+
+            bool vstLoaded = AudioEngineInterop.ExtraLayerIsVstInstrumentLoaded(extraIndex);
+            PerfLayerVstPathTextBox.Text = vstLoaded
+                ? (AudioEngineInterop.ExtraLayerGetVstInstrumentName(extraIndex) ?? string.Empty)
+                : string.Empty;
+
+            PerfLayerVolumeTextBox.Text = FormatVolumePercent(AudioEngineInterop.ExtraLayerGetVolume(extraIndex));
+            PerfLayerOctaveTextBox.Text = AudioEngineInterop.ExtraLayerGetOctaveOffset(extraIndex).ToString(CultureInfo.InvariantCulture);
+            PerfLayerRangeComboBox.SelectedIndex = (int)AudioEngineInterop.ExtraLayerGetRange(extraIndex);
+        }
+
+        _isPopulatingPerfLayerPresets = false;
+
+        UpdatePerfLayerStatusText();
+    }
+
+    private void UpdatePerfLayerStatusText()
+    {
+        bool isMain = IsMainPerfLayerSelected();
+        int extraIndex = GetSelectedExtraLayerIndex();
+        string layerName = Localization.F("Perf.LayerOption", isMain ? 1 : extraIndex + 2);
+        bool enabled = isMain ? AudioEngineInterop.MainLayerIsEnabled() : AudioEngineInterop.ExtraLayerIsEnabled(extraIndex);
+        string enabledText = Localization.T(enabled ? "Perf.StatusEnabled" : "Perf.StatusDisabled");
+        string rangeText = Localization.T(PerfLayerRangeComboBox.SelectedIndex switch
+        {
+            1 => "Perf.RangeLower",
+            2 => "Perf.RangeUpper",
+            _ => "Perf.RangeWhole",
+        });
+        int volumePercent = isMain
+            ? (int)Math.Round(AudioEngineInterop.MainLayerGetVolume() * 100.0f)
+            : (int)Math.Round(AudioEngineInterop.ExtraLayerGetVolume(extraIndex) * 100.0f);
+        PerfLayerStatusText.Text = Localization.F("Perf.StatusLine", layerName, enabledText, rangeText, volumePercent);
+    }
+
+    private void PerfLayerComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isPopulatingPerfLayerCombo || PerfLayerComboBox.SelectedIndex < 0)
+        {
+            return;
+        }
+        LoadSelectedPerfLayerIntoPanel();
+    }
+
+    private void PerfLayerEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool enabled = PerfLayerEnabledCheckBox.IsChecked == true;
+        if (IsMainPerfLayerSelected())
+        {
+            AudioEngineInterop.MainLayerSetEnabled(enabled);
+        }
+        else
+        {
+            AudioEngineInterop.ExtraLayerSetEnabled(GetSelectedExtraLayerIndex(), enabled);
+        }
+        UpdatePerfLayerStatusText();
+    }
+
+    private void PerfLayerInstrumentMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsMainPerfLayerSelected())
+        {
+            // Disabled while "Sloj 1" is selected (see
+            // LoadSelectedPerfLayerIntoPanel) - it has no single exclusive
+            // mode, so this shouldn't normally fire, but guard anyway.
+            return;
+        }
+
+        int layerIndex = GetSelectedExtraLayerIndex();
+        AudioEngineInterop.PerformanceLayerMode mode;
+        if (PerfLayerSoundFontRadio.IsChecked == true)
+        {
+            mode = AudioEngineInterop.PerformanceLayerMode.SoundFont;
+        }
+        else if (PerfLayerVstRadio.IsChecked == true)
+        {
+            mode = AudioEngineInterop.PerformanceLayerMode.Vst;
+        }
+        else
+        {
+            mode = AudioEngineInterop.PerformanceLayerMode.BuiltInSynth;
+        }
+        AudioEngineInterop.ExtraLayerSetMode(layerIndex, mode);
+    }
+
+    private void PerfBrowseLayerSoundFontButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Localization.T("Sf.BrowseDialogTitle"),
+            Filter = $"SoundFont (*.sf2)|*.sf2|{Localization.T("Common.AllFiles")}|*.*",
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            PerfLayerSoundFontPathTextBox.Text = dialog.FileName;
+        }
+    }
+
+    private void PerfLoadLayerSoundFontButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsMainPerfLayerSelected())
+        {
+            return; // Disabled here for "Sloj 1" - it has its own controls above.
+        }
+
+        string path = PerfLayerSoundFontPathTextBox.Text?.Trim() ?? string.Empty;
+        if (path.Length == 0)
+        {
+            PerfLayerStatusText.Text = Localization.T("Sf.StatusEmptyPath");
+            return;
+        }
+
+        int layerIndex = GetSelectedExtraLayerIndex();
+        string? error = AudioEngineInterop.ExtraLayerLoadSoundFontBank(layerIndex, path);
+        if (error != null)
+        {
+            PerfLayerStatusText.Text = Localization.F("Sf.StatusLoadFailed", error);
+            return;
+        }
+
+        _perfExtraLayerSoundFontPaths[layerIndex] = path;
+        LoadSelectedPerfLayerIntoPanel();
+    }
+
+    private void PerfLayerSoundFontPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isPopulatingPerfLayerPresets || IsMainPerfLayerSelected())
+        {
+            return;
+        }
+        int index = PerfLayerSoundFontPresetComboBox.SelectedIndex;
+        if (index < 0)
+        {
+            return;
+        }
+        AudioEngineInterop.ExtraLayerSelectSoundFontPreset(GetSelectedExtraLayerIndex(), index);
+    }
+
+    private void PerfBrowseLayerVstButton_Click(object sender, RoutedEventArgs e)
+    {
+        // CheckFileExists off for the same reason as the main "Banka
+        // instrumenata" VST browse dialog - a VST3 is often a bundle
+        // folder, not a single file.
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Localization.T("Vst.BrowseDialogTitle"),
+            Filter = $"VST3 (*.vst3)|*.vst3|{Localization.T("Common.AllFiles")}|*.*",
+            CheckFileExists = false,
+            CheckPathExists = true,
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            PerfLayerVstPathTextBox.Text = dialog.FileName;
+        }
+    }
+
+    private void PerfLoadLayerVstButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsMainPerfLayerSelected())
+        {
+            return;
+        }
+
+        string path = PerfLayerVstPathTextBox.Text?.Trim() ?? string.Empty;
+        if (path.Length == 0)
+        {
+            PerfLayerStatusText.Text = Localization.T("Vst.StatusEmptyPath");
+            return;
+        }
+
+        int layerIndex = GetSelectedExtraLayerIndex();
+        string? error = AudioEngineInterop.ExtraLayerLoadVstInstrument(layerIndex, path);
+        if (error != null)
+        {
+            PerfLayerStatusText.Text = Localization.F("Vst.StatusLoadFailed", error);
+            return;
+        }
+
+        _perfExtraLayerVstPaths[layerIndex] = path;
+        LoadSelectedPerfLayerIntoPanel();
+    }
+
+    private void ApplyPerfLayerSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!int.TryParse(PerfLayerVolumeTextBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int volumePercent) || volumePercent < 0 || volumePercent > 150)
+        {
+            PerfLayerStatusText.Text = Localization.T("Perf.StatusInvalidVolume");
+            return;
+        }
+        if (!int.TryParse(PerfLayerOctaveTextBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int octaves) || octaves < -2 || octaves > 2)
+        {
+            PerfLayerStatusText.Text = Localization.T("Perf.StatusInvalidOctave");
+            return;
+        }
+        if (PerfLayerRangeComboBox.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        float volume = volumePercent / 100.0f;
+        var range = (AudioEngineInterop.PerformanceLayerRange)PerfLayerRangeComboBox.SelectedIndex;
+
+        if (IsMainPerfLayerSelected())
+        {
+            AudioEngineInterop.MainLayerSetVolume(volume);
+            AudioEngineInterop.MainLayerSetOctaveOffset(octaves);
+            AudioEngineInterop.MainLayerSetRange(range);
+        }
+        else
+        {
+            int layerIndex = GetSelectedExtraLayerIndex();
+            AudioEngineInterop.ExtraLayerSetVolume(layerIndex, volume);
+            AudioEngineInterop.ExtraLayerSetOctaveOffset(layerIndex, octaves);
+            AudioEngineInterop.ExtraLayerSetRange(layerIndex, range);
+        }
+
+        UpdatePerfLayerStatusText();
+    }
+
+    private void ApplyPerfSplitPointButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SequencerNoteRow.TryParsePitch(PerfSplitPointTextBox.Text, out int splitPoint))
+        {
+            PerfLayerStatusText.Text = Localization.T("Perf.StatusInvalidSplitPoint");
+            return;
+        }
+        AudioEngineInterop.SetPerformanceSplitPoint(splitPoint);
+        PerfLayerStatusText.Text = Localization.T("Perf.StatusSplitApplied");
     }
 
     // --- Piano roll (vizuelni prikaz sekvensera, dodatak spisku) ---
@@ -3326,6 +3847,118 @@ public partial class MainWindow : Window
         {
             AccLayerInstrumentStatusText.Text = Localization.F("Acc.StatusLayerPresetChanged",
                 LayerDisplayName(layer), AccLayerSoundFontPresetComboBox.SelectedItem);
+        }
+    }
+
+    // --- Auto-pratnja: bubnjevi (ugrađeni ili iz zvučne banke) ---
+
+    /// <summary>
+    /// Fills the drum-source radio/path/preset controls from the native
+    /// engine's current state - same role as LoadSelectedAccLayerIntoPanel,
+    /// just for the single drum kit rather than a combo of three layers.
+    /// </summary>
+    private void LoadDrumSourceIntoPanel()
+    {
+        var mode = AudioEngineInterop.AccompanimentGetDrumSourceMode();
+        AccDrumSourceProceduralRadio.IsChecked = mode == AudioEngineInterop.AccompanimentDrumSourceMode.Procedural;
+        AccDrumSourceSoundFontRadio.IsChecked = mode == AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont;
+
+        _isPopulatingDrumSoundFontPresets = true;
+        AccDrumSoundFontPresetComboBox.Items.Clear();
+        bool bankLoaded = AudioEngineInterop.AccompanimentIsDrumSoundFontBankLoaded();
+        AccDrumSoundFontPathTextBox.Text = bankLoaded
+            ? (AudioEngineInterop.AccompanimentGetDrumSoundFontBankName() ?? string.Empty)
+            : string.Empty;
+        if (bankLoaded)
+        {
+            int presetCount = AudioEngineInterop.AccompanimentGetDrumSoundFontPresetCount();
+            int selectedPreset = AudioEngineInterop.AccompanimentGetSelectedDrumSoundFontPresetIndex();
+            for (int i = 0; i < presetCount; i++)
+            {
+                AccDrumSoundFontPresetComboBox.Items.Add(
+                    AudioEngineInterop.AccompanimentGetDrumSoundFontPresetName(i) ?? Localization.F("Sf.DefaultInstrumentName", i));
+            }
+            AccDrumSoundFontPresetComboBox.SelectedIndex = selectedPreset >= 0 && selectedPreset < presetCount ? selectedPreset : -1;
+            AccDrumSoundFontPresetComboBox.IsEnabled = true;
+        }
+        else
+        {
+            AccDrumSoundFontPresetComboBox.IsEnabled = false;
+        }
+        _isPopulatingDrumSoundFontPresets = false;
+
+        AccDrumInstrumentStatusText.Text = mode == AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont
+            ? Localization.T("Acc.DrumStatusSoundFont")
+            : Localization.T("Acc.DrumStatusProcedural");
+    }
+
+    private void AccDrumSourceMode_Click(object sender, RoutedEventArgs e)
+    {
+        var mode = AccDrumSourceSoundFontRadio.IsChecked == true
+            ? AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont
+            : AudioEngineInterop.AccompanimentDrumSourceMode.Procedural;
+        AudioEngineInterop.AccompanimentSetDrumSourceMode(mode);
+        AccDrumInstrumentStatusText.Text = mode == AudioEngineInterop.AccompanimentDrumSourceMode.SoundFont
+            ? Localization.T("Acc.DrumStatusSoundFont")
+            : Localization.T("Acc.DrumStatusProcedural");
+    }
+
+    private void AccBrowseDrumSoundFontButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Localization.T("Sf.BrowseDialogTitle"),
+            Filter = $"SoundFont (*.sf2)|*.sf2|{Localization.T("Common.AllFiles")}|*.*",
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            AccDrumSoundFontPathTextBox.Text = dialog.FileName;
+        }
+    }
+
+    private void AccLoadDrumSoundFontButton_Click(object sender, RoutedEventArgs e)
+    {
+        string path = AccDrumSoundFontPathTextBox.Text?.Trim() ?? string.Empty;
+        if (path.Length == 0)
+        {
+            AccDrumInstrumentStatusText.Text = Localization.T("Sf.StatusEmptyPath");
+            return;
+        }
+
+        string? error = AudioEngineInterop.AccompanimentLoadDrumSoundFontBank(path);
+        if (error != null)
+        {
+            AccDrumInstrumentStatusText.Text = Localization.F("Sf.StatusLoadFailed", error);
+            return;
+        }
+
+        // Loading a bank auto-switches drums to SoundFont mode (see
+        // AccompanimentEngine::LoadDrumSoundFontBank) - reflect that in the
+        // radio buttons too.
+        _drumSoundFontPath = path;
+        AccDrumSourceSoundFontRadio.IsChecked = true;
+        LoadDrumSourceIntoPanel();
+        AccDrumInstrumentStatusText.Text = Localization.F("Acc.StatusDrumBankLoaded",
+            AudioEngineInterop.AccompanimentGetDrumSoundFontBankName() ?? Localization.T("Sf.DefaultBankName"));
+    }
+
+    private void AccDrumSoundFontPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isPopulatingDrumSoundFontPresets)
+        {
+            return;
+        }
+
+        int index = AccDrumSoundFontPresetComboBox.SelectedIndex;
+        if (index < 0)
+        {
+            return;
+        }
+
+        if (AudioEngineInterop.AccompanimentSelectDrumSoundFontPreset(index))
+        {
+            AccDrumInstrumentStatusText.Text = Localization.F("Acc.StatusDrumPresetChanged", AccDrumSoundFontPresetComboBox.SelectedItem);
         }
     }
 

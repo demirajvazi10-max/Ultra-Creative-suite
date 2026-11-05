@@ -10,6 +10,10 @@ namespace UltraCaptions
         {
             // Auto-fills any missing screen-reader labels across every window.
             Bootstrap.Initialize();
+
+            // Every window (main, About, support guide) is translated to the chosen language as it opens.
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                new RoutedEventHandler((s, _) => L.Apply((DependencyObject)s)));
         }
 
         protected override void OnStartup(StartupEventArgs e)

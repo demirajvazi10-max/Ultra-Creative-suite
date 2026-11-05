@@ -39,6 +39,8 @@ namespace UltraPlayer
 
             _sleepTimer.Tick += SleepTimer_Tick;
 
+            L.UpdateLanguageButton(LanguageButton);
+
             _vm.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(MainViewModel.StatusMessage))
@@ -53,7 +55,7 @@ namespace UltraPlayer
             var dialog = new OpenFileDialog
             {
                 Multiselect = true,
-                Filter = "Audio files (*.mp3;*.wav;*.m4a;*.wma;*.aac)|*.mp3;*.wav;*.m4a;*.wma;*.aac|All files (*.*)|*.*"
+                Filter = L.T("Audio files (*.mp3;*.wav;*.m4a;*.wma;*.aac)|*.mp3;*.wav;*.m4a;*.wma;*.aac|All files (*.*)|*.*")
             };
 
             if (dialog.ShowDialog() == true)
@@ -61,7 +63,7 @@ namespace UltraPlayer
                 foreach (var file in dialog.FileNames)
                     _vm.AddTrack(file);
 
-                _vm.StatusMessage = $"{dialog.FileNames.Length} file(s) added. Playlist has {_vm.Playlist.Count} track(s).";
+                _vm.StatusMessage = L.F("{0} file(s) added. Playlist has {1} track(s).", dialog.FileNames.Length, _vm.Playlist.Count);
             }
         }
 
@@ -89,7 +91,7 @@ namespace UltraPlayer
             var track = _vm.SelectedTrack ?? (_vm.Playlist.Count > 0 ? _vm.Playlist[0] : null);
             if (track == null)
             {
-                _vm.StatusMessage = "Playlist is empty. Add files first.";
+                _vm.StatusMessage = L.T("Playlist is empty. Add files first.");
                 return;
             }
 
@@ -103,8 +105,8 @@ namespace UltraPlayer
             _clock.Controller?.Begin();
 
             _isPlaying = true;
-            PlayPauseButton.Content = "Pause (Space)";
-            _vm.StatusMessage = $"Playing: {track.Title}";
+            PlayPauseButton.Content = L.T("Pause (Space)");
+            _vm.StatusMessage = L.F("Playing: {0}", track.Title);
         }
 
         private void TogglePlayPause()
@@ -119,15 +121,15 @@ namespace UltraPlayer
             {
                 _clock.Controller?.Pause();
                 _isPlaying = false;
-                PlayPauseButton.Content = "Play (Space)";
-                _vm.StatusMessage = "Paused.";
+                PlayPauseButton.Content = L.T("Play (Space)");
+                _vm.StatusMessage = L.T("Paused.");
             }
             else
             {
                 _clock.Controller?.Resume();
                 _isPlaying = true;
-                PlayPauseButton.Content = "Pause (Space)";
-                _vm.StatusMessage = "Playing.";
+                PlayPauseButton.Content = L.T("Pause (Space)");
+                _vm.StatusMessage = L.T("Playing.");
             }
         }
 
@@ -137,9 +139,9 @@ namespace UltraPlayer
             _clock = null;
             _timeline = null;
             _isPlaying = false;
-            PlayPauseButton.Content = "Play (Space)";
+            PlayPauseButton.Content = L.T("Play (Space)");
             PositionSlider.Value = 0;
-            _vm.StatusMessage = "Stopped.";
+            _vm.StatusMessage = L.T("Stopped.");
         }
 
         private void PlayPauseButton_Click(object sender, RoutedEventArgs e) => TogglePlayPause();
@@ -173,7 +175,7 @@ namespace UltraPlayer
             {
                 Stop();
                 ResetSleepTimerUi();
-                _vm.StatusMessage = "Sleep timer: stopped at end of track.";
+                _vm.StatusMessage = L.T("Sleep timer: stopped at end of track.");
                 return;
             }
 
@@ -263,25 +265,25 @@ namespace UltraPlayer
         private void SleepTimerComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (SleepTimerComboBox.SelectedItem is not ComboBoxItem item) return;
-            string label = item.Content as string ?? "Off";
+            string label = item.Tag as string ?? "off";   // Tag, not the visible text: the text is translated
 
             _sleepTimer.Stop();
             _sleepAtEndOfTrack = false;
 
             switch (label)
             {
-                case "Off":
+                case "off":
                     _sleepSecondsRemaining = -1;
-                    _vm.SleepTimerLabel = "Sleep timer: off";
+                    _vm.SleepTimerLabel = L.T("Sleep timer: off");
                     break;
-                case "End of track":
+                case "end":
                     _sleepAtEndOfTrack = true;
-                    _vm.SleepTimerLabel = "Sleep timer: end of current track";
+                    _vm.SleepTimerLabel = L.T("Sleep timer: end of current track");
                     break;
                 default:
-                    int minutes = int.Parse(label.Split(' ')[0]);
+                    int minutes = int.Parse(label);
                     _sleepSecondsRemaining = minutes * 60;
-                    _vm.SleepTimerLabel = $"Sleep timer: {minutes} minutes remaining";
+                    _vm.SleepTimerLabel = L.F("Sleep timer: {0} minutes remaining", minutes);
                     _sleepTimer.Start();
                     break;
             }
@@ -294,13 +296,13 @@ namespace UltraPlayer
                 _sleepTimer.Stop();
                 Stop();
                 ResetSleepTimerUi();
-                _vm.StatusMessage = "Sleep timer: playback paused.";
+                _vm.StatusMessage = L.T("Sleep timer: playback paused.");
                 return;
             }
 
             _sleepSecondsRemaining--;
             int minutesLeft = (_sleepSecondsRemaining + 59) / 60;
-            _vm.SleepTimerLabel = $"Sleep timer: {minutesLeft} minute(s) remaining";
+            _vm.SleepTimerLabel = L.F("Sleep timer: {0} minute(s) remaining", minutesLeft);
         }
 
         private void ResetSleepTimerUi()
@@ -309,10 +311,12 @@ namespace UltraPlayer
             _sleepSecondsRemaining = -1;
             _sleepAtEndOfTrack = false;
             SleepTimerComboBox.SelectedIndex = 0; // "Off"
-            _vm.SleepTimerLabel = "Sleep timer: off";
+            _vm.SleepTimerLabel = L.T("Sleep timer: off");
         }
 
         // ── About ────────────────────────────────────────────────────────
+
+        private void LanguageButton_Click(object sender, RoutedEventArgs e) => L.Toggle(LanguageButton);
 
         private void AboutButton_Click(object sender, RoutedEventArgs e)
         {

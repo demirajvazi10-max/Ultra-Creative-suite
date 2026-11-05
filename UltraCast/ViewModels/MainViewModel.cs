@@ -55,7 +55,7 @@ namespace UltraCast.ViewModels
         }
 
         private string _statusMessage =
-            "Ready. Choose an output folder, then start recording (Ctrl+Alt+R works from any window).";
+            L.T("Ready. Choose an output folder, then start recording (Ctrl+Alt+R works from any window).");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -85,7 +85,7 @@ namespace UltraCast.ViewModels
             _coordinator.Error += msg => RunOnUi(() =>
             {
                 AppLogger.Log("MainViewModel: coordinator reported error - " + msg);
-                StatusMessage = "Problem: " + msg;
+                StatusMessage = L.F("Problem: {0}", msg);
                 SystemSounds.Hand.Play();
             });
         }
@@ -115,7 +115,7 @@ namespace UltraCast.ViewModels
                 _coordinator.Start(options);
                 IsRecording = true;
                 IsPaused = false;
-                StatusMessage = "Recording. Press Ctrl+Alt+R from anywhere to stop, Ctrl+Alt+P to pause.";
+                StatusMessage = L.T("Recording. Press Ctrl+Alt+R from anywhere to stop, Ctrl+Alt+P to pause.");
 
                 // Two short beeps mean "recording started" - a non-visual
                 // confirmation, since the whole point is that the user may
@@ -125,7 +125,7 @@ namespace UltraCast.ViewModels
             catch (Exception ex)
             {
                 AppLogger.Log("MainViewModel: StartAsync failed - " + ex);
-                StatusMessage = "Could not start recording: " + ex.Message + $"  (see log: {AppLogger.LogFilePath})";
+                StatusMessage = L.F("Could not start recording: {0}  (see log: {1})", ex.Message, AppLogger.LogFilePath);
                 SystemSounds.Hand.Play();
             }
         }
@@ -134,19 +134,19 @@ namespace UltraCast.ViewModels
         {
             try
             {
-                StatusMessage = "Finishing up - combining video and audio...";
+                StatusMessage = L.T("Finishing up - combining video and audio...");
                 var finalPath = await _coordinator.StopAsync();
                 IsRecording = false;
                 IsPaused = false;
                 LastSavedFile = finalPath;
-                StatusMessage = $"Saved: {finalPath}";
+                StatusMessage = L.F("Saved: {0}", finalPath);
                 SystemSounds.Asterisk.Play();
             }
             catch (Exception ex)
             {
                 AppLogger.Log("MainViewModel: StopAsync failed - " + ex);
                 IsRecording = false;
-                StatusMessage = "Recording stopped, but there was a problem saving it: " + ex.Message + $"  (see log: {AppLogger.LogFilePath})";
+                StatusMessage = L.F("Recording stopped, but there was a problem saving it: {0}  (see log: {1})", ex.Message, AppLogger.LogFilePath);
                 SystemSounds.Hand.Play();
             }
         }
@@ -155,7 +155,7 @@ namespace UltraCast.ViewModels
         {
             _coordinator.TogglePause();
             IsPaused = _coordinator.IsPaused;
-            StatusMessage = IsPaused ? "Paused. Press Ctrl+Alt+P to resume." : "Recording resumed.";
+            StatusMessage = IsPaused ? L.T("Paused. Press Ctrl+Alt+P to resume.") : L.T("Recording resumed.");
             SystemSounds.Beep.Play();
         }
 

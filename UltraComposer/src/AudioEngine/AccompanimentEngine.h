@@ -76,13 +76,32 @@ class AccompanimentEngine
 {
 public:
     // Which of the three melodic layers a Load/Select/Get*SoundFont* or
-    // Set/GetLayerInstrumentMode call refers to (drums are always
-    // procedural - see DrumSynth - so they aren't part of this).
+    // Set/GetLayerInstrumentMode call refers to (drums have their own,
+    // simpler DrumSourceMode/*DrumSoundFont* methods below instead, since
+    // there's only one drum kit, not three interchangeable layers).
     enum class MelodicLayer
     {
         Bass = 0,
         Kontra = 1,
         Harmonija = 2,
+    };
+
+    // Whether the drum kit plays through DrumSynth's fixed, procedural
+    // percussion (the default, and the only option before this - always
+    // available no matter what's loaded elsewhere) or through a loaded
+    // SoundFont bank's own drum kit, exactly like the "banka" option
+    // already offered per melodic layer above. Deliberately simpler than
+    // LayerInstrumentMode: no VST3 option here (a drum kit is many
+    // different one-shot sounds triggered by fixed note numbers, not one
+    // sustained instrument - loading a VST for that would need its own,
+    // separate design), and DumbekDum/DumbekTek (the oriental hand-drum
+    // strokes - see DrumSynth.h) always stay on DrumSynth even in
+    // SoundFont mode, since standard GM-style banks don't have a real
+    // dumbek sound to map them to.
+    enum class DrumSourceMode
+    {
+        Procedural = 0,
+        SoundFont = 1,
     };
 
     // Whether a melodic layer sounds through its own private built-in
@@ -163,10 +182,18 @@ public:
     void SetSplitPoint(int midiNote);
     int GetSplitPoint() const;
     // Called by AudioEngine::NoteOn/NoteOff for every note below the split
-    // point while auto mode is active - re-detects the current chord from
-    // whichever notes in the zone are currently held. Releasing every held
-    // note keeps the last-detected chord sounding rather than silencing
-    // the accompaniment, matching real keyboards.
+    // point while auto mode is active. Only a note being PRESSED
+    // (isOn=true) ever re-detects the current chord, from whatever is held
+    // at that instant; a note being RELEASED (isOn=false) only updates the
+    // held-notes bookkeeping and never touches the current chord - not even
+    // when the last held note goes up. This is deliberate: real hands don't
+    // lift every finger in perfect unison, so if release also re-detected,
+    // the chord would visibly "wobble" through wrong transient chords while
+    // fingers lift at slightly different times, and whichever reading was
+    // current at the very last note-up would wrongly stick as the new
+    // chord instead of the one that was actually played. Keeping the
+    // last-pressed chord sounding through and after a release matches real
+    // keyboards.
     void NoteHeldForChordDetection(int midiNote, bool isOn);
     // Sets the chord directly (Manual mode's UI picker); also usable at
     // any time regardless of mode.
@@ -206,6 +233,24 @@ public:
     // uses (see Advance()), whatever is currently sustaining.
     void SetChordVoicing(ChordVoicing voicing);
     ChordVoicing GetChordVoicing() const;
+
+    // Drum kit source (see DrumSourceMode above). Loading a bank is itself
+    // the action that commits drums to SoundFont mode, same convention as
+    // the per-layer SoundFont loads above; it also tries to land the
+    // selection on an actual GM drum kit (bank 128) right away rather than
+    // whatever preset 0 happens to be, though the usual preset list/picker
+    // below still works too in case a specific bank needs a different
+    // preset picked by hand (e.g. a bank with more than one kit).
+    void SetDrumSourceMode(DrumSourceMode mode);
+    DrumSourceMode GetDrumSourceMode() const;
+    bool LoadDrumSoundFontBank(const std::string& sf2Path, std::string& outError);
+    void UnloadDrumSoundFontBank();
+    bool IsDrumSoundFontBankLoaded() const;
+    std::string GetDrumSoundFontBankName() const;
+    int GetDrumSoundFontPresetCount() const;
+    std::string GetDrumSoundFontPresetName(int presetIndex) const;
+    bool SelectDrumSoundFontPreset(int presetIndex);
+    int GetSelectedDrumSoundFontPresetIndex() const;
 
     // Real-time thread.
     void Advance(int frames, double sampleRate);
@@ -269,6 +314,12 @@ private:
     Synth kontraSynth_;
     Synth harmonijaSynth_;
     DrumSynth drumSynth_;
+    // Drum kit's own optional SoundFont bank (see DrumSourceMode) -
+    // separate from bass/kontra/harmonija's per-layer banks below, and from
+    // AudioEngine's shared main one, so loading a kit here never disturbs
+    // any of those.
+    SoundFontHost drumSoundFont_;
+    std::atomic<int> drumSourceMode_{0}; // DrumSourceMode, packed as int
 
     // Independent per-layer SoundFont banks (see LayerInstrumentMode) - each
     // is its own SoundFontHost instance, separate from AudioEngine's shared
@@ -298,6 +349,21 @@ private:
     float kontraScratch_[kMaxScratchFrames]{};
     float harmonijaScratch_[kMaxScratchFrames]{};
     float drumScratch_[kMaxScratchFrames]{};
+
+    // Stereo scratch buffers for whichever melodic layer is currently
+    // routed through its own SoundFont bank or VST3 instrument (see
+    // LayerInstrumentMode) - those sources render genuine stereo output,
+    // unlike the built-in Synth's plain mono oscillator, so RenderAdditive
+    // needs a stereo home of its own to apply that layer's pan/balance
+    // gains to (see AccompanimentEngine.cpp's kBassPan/kKontraPan/
+    // kHarmonijaPan) before adding it into the final mix.
+    float bassScratchStereo_[kMaxScratchFrames * 2]{};
+    float kontraScratchStereo_[kMaxScratchFrames * 2]{};
+    float harmonijaScratchStereo_[kMaxScratchFrames * 2]{};
+    // Same idea, for the drum kit's own optional SoundFont bank (see
+    // DrumSourceMode) - added in flat/unpanned (like DrumSynth's procedural
+    // output already is), just needs a stereo home of its own.
+    float drumScratchStereo_[kMaxScratchFrames * 2]{};
 
     static Chord DetectChordFromHeldNotes(const std::vector<int>& heldNotes);
 

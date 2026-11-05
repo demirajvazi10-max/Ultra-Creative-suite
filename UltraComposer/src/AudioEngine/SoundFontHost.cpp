@@ -169,6 +169,24 @@ bool SoundFontHost::SelectPreset(int presetIndex)
     return true;
 }
 
+bool SoundFontHost::SelectPresetByBankProgram(int bank, int program)
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (!impl_->loaded)
+    {
+        return false;
+    }
+    int index = tsf_get_presetindex(impl_->font, bank, program);
+    if (index < 0)
+    {
+        return false;
+    }
+    // Same note-cutting tradeoff as SelectPreset() above.
+    tsf_note_off_all(impl_->font);
+    impl_->presetIndex = index;
+    return true;
+}
+
 int SoundFontHost::GetSelectedPresetIndex() const
 {
     std::lock_guard<std::mutex> lock(impl_->mutex);

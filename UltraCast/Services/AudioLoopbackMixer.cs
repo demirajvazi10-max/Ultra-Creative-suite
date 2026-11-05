@@ -62,7 +62,7 @@ namespace UltraCast.Services
                         _loopbackBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
                     _loopback.RecordingStopped += (_, e) =>
                     {
-                        if (e.Exception != null) CaptureError?.Invoke("System audio capture stopped: " + e.Exception.Message);
+                        if (e.Exception != null) CaptureError?.Invoke(L.F("System audio capture stopped: {0}", e.Exception.Message));
                     };
                 }
                 catch (Exception ex)
@@ -87,7 +87,7 @@ namespace UltraCast.Services
                         _micBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
                     _mic.RecordingStopped += (_, e) =>
                     {
-                        if (e.Exception != null) CaptureError?.Invoke("Microphone capture stopped: " + e.Exception.Message);
+                        if (e.Exception != null) CaptureError?.Invoke(L.F("Microphone capture stopped: {0}", e.Exception.Message));
                     };
                 }
                 catch (Exception ex)
@@ -188,7 +188,7 @@ namespace UltraCast.Services
             catch (Exception ex)
             {
                 AppLogger.Log("AudioLoopbackMixer: pump failed - " + ex);
-                CaptureError?.Invoke("Audio mixing failed: " + ex.Message);
+                CaptureError?.Invoke(L.F("Audio mixing failed: {0}", ex.Message));
             }
         }
 

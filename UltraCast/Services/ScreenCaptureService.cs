@@ -106,7 +106,7 @@ namespace UltraCast.Services
             AppLogger.Log($"ScreenCaptureService: starting ffmpeg, native {_bounds.Width}x{_bounds.Height} -> output {_outputSize.Width}x{_outputSize.Height} @ {frameRate}fps -> {outputPath}");
 
             _ffmpeg = Process.Start(psi)
-                ?? throw new InvalidOperationException("Could not start ffmpeg.exe for screen capture.");
+                ?? throw new InvalidOperationException(L.T("Could not start ffmpeg.exe for screen capture."));
             _ffmpegStdin = _ffmpeg.StandardInput.BaseStream;
 
             _isCapturing = true;

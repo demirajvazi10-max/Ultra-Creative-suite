@@ -34,7 +34,21 @@ Keeping video and audio as two separate pipelines (instead of one shared FFmpeg 
 
 ## Status
 
-Built and tested end to end (recording, system/mic audio mixing, and the final mux all confirmed working on a clean test run) — pushed to GitHub as the v0.1 skeleton. Known v1 limitations: primary monitor only (no monitor picker or window-specific capture yet), no live preview while recording.
+Early skeleton — has not yet been built/tested locally. Build in Visual Studio and verify before relying on it for anything important. Known v1 limitations: primary monitor only (no monitor picker or window-specific capture yet), no live preview while recording.
+
+## Language
+
+The app is available in **English** and **Serbian** (Latin script). The **Srpski / English** button at the top, next to About, switches the whole interface instantly, no restart needed, and the choice is remembered (`%LOCALAPPDATA%\UltraCast\language.txt`). Until you choose, the app follows the Windows display language: Serbian on a Serbian Windows, English otherwise. The "How to support" guide follows the same choice.
+
+## Supporting the project
+
+Ultra Cast is free and will stay free. If you'd like to support its development:
+
+- **By card on [Ko-fi](https://ko-fi.com/ultracreativesuite)** — no account needed: type an amount, press *Donate* and pay with a Visa or Mastercard (credit or debit) or PayPal. The easiest way from abroad.
+- **[GitHub Sponsors](https://github.com/sponsors/demirajvazi10-max)** — monthly or one-time, paid with an ordinary payment card (no PayPal needed); needs a free GitHub account.
+- **Bank transfer from Serbia** — recipient Demir Ajvazi, account `265-0000006185877-28`, Raiffeisen banka, purpose *Donacija za Ultra programe*. Meant for domestic transfers; from abroad, Ko-fi costs far less in fees.
+
+The same guide is inside the app: **About > How to support**, in English and Serbian, with buttons to open Ko-fi or GitHub Sponsors and to copy the account number.
 
 ## Author
 

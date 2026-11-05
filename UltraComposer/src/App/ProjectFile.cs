@@ -154,6 +154,11 @@ public static class ProjectFile
         public LayerInstrumentData Kontra { get; set; } = new();
         public LayerInstrumentData Harmonija { get; set; } = new();
 
+        /// <summary>Matches AudioEngineInterop.AccompanimentDrumSourceMode (0=Procedural, 1=SoundFont). An older .adem file that predates this defaults to Procedural, same as the app's own default.</summary>
+        public int DrumSourceMode { get; set; }
+        public string? DrumSoundFontPath { get; set; }
+        public int DrumSoundFontPresetIndex { get; set; } = -1;
+
         /// <summary>
         /// Every custom rhythm saved so far in "Sopstveni ritam" - any
         /// number can coexist (see AccompanimentEngine::SetCustomStyle).
@@ -174,12 +179,36 @@ public static class ProjectFile
         public int ScaleType { get; set; }
     }
 
-    /// <summary>The shared instrument used for live keyboard/MIDI playing in "Banka instrumenata".</summary>
+    /// <summary>The shared instrument used for live keyboard/MIDI playing in "Banka instrumenata" - "Sloj 1" of the Layer/Split feature (see PerformanceLayerData for "Sloj 2/3/4").</summary>
     public sealed class MainBankData
     {
         public string? SoundFontPath { get; set; }
         public int SoundFontPresetIndex { get; set; } = -1;
         public string? VstPath { get; set; }
+
+        public bool Enabled { get; set; } = true;
+        public float Volume { get; set; } = 1.0f;
+        public int OctaveOffset { get; set; }
+
+        /// <summary>Matches AudioEngineInterop.PerformanceLayerRange (0=Whole, 1=Lower, 2=Upper).</summary>
+        public int Range { get; set; }
+    }
+
+    /// <summary>One of the up to 3 additional instruments ("Sloj 2/3/4") that can sound alongside MainBankData ("Sloj 1") - see PerformanceLayers.h for the Layer/Split model.</summary>
+    public sealed class PerformanceLayerData
+    {
+        public bool Enabled { get; set; }
+
+        /// <summary>Matches AudioEngineInterop.PerformanceLayerMode.</summary>
+        public int Mode { get; set; }
+        public string? SoundFontPath { get; set; }
+        public int SoundFontPresetIndex { get; set; } = -1;
+        public string? VstPath { get; set; }
+        public float Volume { get; set; } = 1.0f;
+        public int OctaveOffset { get; set; }
+
+        /// <summary>Matches AudioEngineInterop.PerformanceLayerRange (0=Whole, 1=Lower, 2=Upper).</summary>
+        public int Range { get; set; }
     }
 
     public sealed class ProjectData
@@ -202,5 +231,11 @@ public static class ProjectFile
         public AccompanimentData Accompaniment { get; set; } = new();
         public AutoThirdData AutoThird { get; set; } = new();
         public MainBankData MainBank { get; set; } = new();
+
+        /// <summary>"Sloj 2/3/4" of the Layer/Split feature (see PerformanceLayerData) - always exactly 3 entries once saved by a version of the app that has this feature; missing/short on an older file just means "off" for the missing slots.</summary>
+        public List<PerformanceLayerData> ExtraPerformanceLayers { get; set; } = new();
+
+        /// <summary>Shared split point for the Layer/Split feature (see AudioEngineInterop.SetPerformanceSplitPoint) - independent of Accompaniment.SplitPoint. Defaults to c4 (60).</summary>
+        public int PerformanceSplitPoint { get; set; } = 60;
     }
 }

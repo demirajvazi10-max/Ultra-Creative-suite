@@ -244,6 +244,185 @@ public static class AudioEngineInterop
     [DllImport(NativeLibrary, EntryPoint = "UC_GetSelectedSoundFontPresetIndex")]
     public static extern int GetSelectedSoundFontPresetIndex();
 
+    // --- Performance layers ("Sloj 1/2/3/4" in Banka instrumenata) ---
+    // Two real-keyboard features built on one mechanism (see
+    // PerformanceLayerRange's own doc comment for how it unifies them):
+    // "Layer/Dual" (two or more instruments sounding together on the same
+    // keys) and "Split" (different instruments in different keyboard
+    // zones). "Sloj 1" is the pre-existing single main instrument
+    // (LoadSoundFontBank/LoadVstInstrument above) - it gets the same
+    // enabled/volume/octave/range knobs below as "Sloj 2/3/4", but all
+    // default to reproducing its old, only behavior exactly, so a project
+    // that never touches this feature sees no change. Covers every note
+    // source that already shares NoteOn/NoteOff (live keyboard/MIDI, the
+    // plain sequencer, and the arranger).
+
+    public enum PerformanceLayerMode
+    {
+        BuiltInSynth = 0,
+        SoundFont = 1,
+        Vst = 2,
+    }
+
+    public enum PerformanceLayerRange
+    {
+        Whole = 0, // "Layer": sounds across the whole keyboard
+        Lower = 1, // "Split": only below the split point
+        Upper = 2, // "Split": only at/above the split point
+    }
+
+    // "Sloj 1" (the pre-existing single main instrument above).
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_SetEnabled")]
+    public static extern void MainLayerSetEnabled([MarshalAs(UnmanagedType.I1)] bool enabled);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_IsEnabled")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool MainLayerIsEnabled();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_SetVolume")]
+    public static extern void MainLayerSetVolume(float volume);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_GetVolume")]
+    public static extern float MainLayerGetVolume();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_SetOctaveOffset")]
+    public static extern void MainLayerSetOctaveOffset(int octaves);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_GetOctaveOffset")]
+    public static extern int MainLayerGetOctaveOffset();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_SetRange")]
+    public static extern void MainLayerSetRange(PerformanceLayerRange range);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_MainLayer_GetRange")]
+    public static extern PerformanceLayerRange MainLayerGetRange();
+
+    // Shared by every layer's (including Sloj 1's) Lower/Upper range check -
+    // independent of AccompanimentSetSplitPoint (that one decides
+    // chord-input vs. melody; this one decides which layer's instrument a
+    // note sounds through). Defaults to c4 (60), same as the accompaniment one.
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_SetPerformanceSplitPoint")]
+    public static extern void SetPerformanceSplitPoint(int midiNote);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_GetPerformanceSplitPoint")]
+    public static extern int GetPerformanceSplitPoint();
+
+    // "Sloj 2/3/4" - layerIndex is 0-based (0="Sloj 2", 1="Sloj 3", 2="Sloj 4").
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SetEnabled")]
+    public static extern void ExtraLayerSetEnabled(int layerIndex, [MarshalAs(UnmanagedType.I1)] bool enabled);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_IsEnabled")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool ExtraLayerIsEnabled(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SetMode")]
+    public static extern void ExtraLayerSetMode(int layerIndex, PerformanceLayerMode mode);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetMode")]
+    public static extern PerformanceLayerMode ExtraLayerGetMode(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SetVolume")]
+    public static extern void ExtraLayerSetVolume(int layerIndex, float volume);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetVolume")]
+    public static extern float ExtraLayerGetVolume(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SetOctaveOffset")]
+    public static extern void ExtraLayerSetOctaveOffset(int layerIndex, int octaves);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetOctaveOffset")]
+    public static extern int ExtraLayerGetOctaveOffset(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SetRange")]
+    public static extern void ExtraLayerSetRange(int layerIndex, PerformanceLayerRange range);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetRange")]
+    public static extern PerformanceLayerRange ExtraLayerGetRange(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_LoadSoundFontBank", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool ExtraLayerLoadSoundFontBankNative(int layerIndex, string sf2Path, StringBuilder errorBuffer, int errorBufferSize);
+
+    /// <summary>Loads a SoundFont bank into "Sloj 2/3/4" at <paramref name="layerIndex"/> (0-based). Returns null on success, or a human-readable error message on failure.</summary>
+    public static string? ExtraLayerLoadSoundFontBank(int layerIndex, string sf2Path)
+    {
+        var errorBuffer = new StringBuilder(512);
+        bool ok = ExtraLayerLoadSoundFontBankNative(layerIndex, sf2Path, errorBuffer, errorBuffer.Capacity);
+        return ok ? null : errorBuffer.ToString();
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_UnloadSoundFontBank")]
+    public static extern void ExtraLayerUnloadSoundFontBank(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_IsSoundFontBankLoaded")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool ExtraLayerIsSoundFontBankLoaded(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetSoundFontBankName", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool ExtraLayerGetSoundFontBankNameNative(int layerIndex, StringBuilder buffer, int bufferSize);
+
+    /// <summary>File name of the SoundFont bank loaded into this layer, or null if none is loaded.</summary>
+    public static string? ExtraLayerGetSoundFontBankName(int layerIndex)
+    {
+        var buffer = new StringBuilder(256);
+        return ExtraLayerGetSoundFontBankNameNative(layerIndex, buffer, buffer.Capacity) ? buffer.ToString() : null;
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetSoundFontPresetCount")]
+    public static extern int ExtraLayerGetSoundFontPresetCount(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetSoundFontPresetName", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool ExtraLayerGetSoundFontPresetNameNative(int layerIndex, int presetIndex, StringBuilder buffer, int bufferSize);
+
+    /// <summary>Display name of this layer's instrument at <paramref name="presetIndex"/>, or null if out of range.</summary>
+    public static string? ExtraLayerGetSoundFontPresetName(int layerIndex, int presetIndex)
+    {
+        var buffer = new StringBuilder(256);
+        return ExtraLayerGetSoundFontPresetNameNative(layerIndex, presetIndex, buffer, buffer.Capacity) ? buffer.ToString() : null;
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_SelectSoundFontPreset")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool ExtraLayerSelectSoundFontPreset(int layerIndex, int presetIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetSelectedSoundFontPresetIndex")]
+    public static extern int ExtraLayerGetSelectedSoundFontPresetIndex(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_LoadVstInstrument", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool ExtraLayerLoadVstInstrumentNative(int layerIndex, string modulePath, StringBuilder errorBuffer, int errorBufferSize);
+
+    /// <summary>Loads a VST3 instrument into "Sloj 2/3/4" at <paramref name="layerIndex"/> (0-based). Returns null on success, or a human-readable error message on failure.</summary>
+    public static string? ExtraLayerLoadVstInstrument(int layerIndex, string modulePath)
+    {
+        var errorBuffer = new StringBuilder(512);
+        bool ok = ExtraLayerLoadVstInstrumentNative(layerIndex, modulePath, errorBuffer, errorBuffer.Capacity);
+        return ok ? null : errorBuffer.ToString();
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_UnloadVstInstrument")]
+    public static extern void ExtraLayerUnloadVstInstrument(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_IsVstInstrumentLoaded")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool ExtraLayerIsVstInstrumentLoaded(int layerIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_ExtraLayer_GetVstInstrumentName", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool ExtraLayerGetVstInstrumentNameNative(int layerIndex, StringBuilder buffer, int bufferSize);
+
+    /// <summary>Name of the VST3 instrument loaded into this layer, or null if none is loaded.</summary>
+    public static string? ExtraLayerGetVstInstrumentName(int layerIndex)
+    {
+        var buffer = new StringBuilder(256);
+        return ExtraLayerGetVstInstrumentNameNative(layerIndex, buffer, buffer.Capacity) ? buffer.ToString() : null;
+    }
+
     // --- Auto-third harmonization ---
     // While enabled, every note played anywhere (computer keyboard, MIDI
     // hardware, the sequencer, and the arranger) also triggers a second note
@@ -849,6 +1028,81 @@ public static class AudioEngineInterop
 
     [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetChordVoicing")]
     public static extern AccompanimentChordVoicing AccompanimentGetChordVoicing();
+
+    /// <summary>
+    /// Whether the accompaniment's drums play through the fixed, always-
+    /// available procedural kit, or through a loaded SoundFont bank's own
+    /// drum kit (the oriental dumbek strokes always stay procedural even in
+    /// SoundFont mode - see the native DrumSourceMode doc comment). Matches
+    /// the native UC_AccompanimentDrumSourceMode enum.
+    /// </summary>
+    public enum AccompanimentDrumSourceMode
+    {
+        Procedural = 0,
+        SoundFont = 1,
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_SetDrumSourceMode")]
+    public static extern void AccompanimentSetDrumSourceMode(AccompanimentDrumSourceMode mode);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetDrumSourceMode")]
+    public static extern AccompanimentDrumSourceMode AccompanimentGetDrumSourceMode();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_LoadDrumSoundFontBank", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool AccompanimentLoadDrumSoundFontBankNative(string sf2Path, StringBuilder errorBuffer, int errorBufferSize);
+
+    /// <summary>
+    /// Loads a SoundFont bank for the drum kit (independent of every other
+    /// layer's bank) and switches drums to SoundFont mode. Also tries to
+    /// land on an actual GM drum kit preset right away. Returns null on
+    /// success, or a human-readable error message on failure.
+    /// </summary>
+    public static string? AccompanimentLoadDrumSoundFontBank(string sf2Path)
+    {
+        var errorBuffer = new StringBuilder(512);
+        bool ok = AccompanimentLoadDrumSoundFontBankNative(sf2Path, errorBuffer, errorBuffer.Capacity);
+        return ok ? null : errorBuffer.ToString();
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_UnloadDrumSoundFontBank")]
+    public static extern void AccompanimentUnloadDrumSoundFontBank();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_IsDrumSoundFontBankLoaded")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool AccompanimentIsDrumSoundFontBankLoaded();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetDrumSoundFontBankName", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool AccompanimentGetDrumSoundFontBankNameNative(StringBuilder buffer, int bufferSize);
+
+    /// <summary>File name of the drum kit's loaded SoundFont bank, or null if none is loaded.</summary>
+    public static string? AccompanimentGetDrumSoundFontBankName()
+    {
+        var buffer = new StringBuilder(256);
+        return AccompanimentGetDrumSoundFontBankNameNative(buffer, buffer.Capacity) ? buffer.ToString() : null;
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetDrumSoundFontPresetCount")]
+    public static extern int AccompanimentGetDrumSoundFontPresetCount();
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetDrumSoundFontPresetName", CharSet = CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool AccompanimentGetDrumSoundFontPresetNameNative(int presetIndex, StringBuilder buffer, int bufferSize);
+
+    /// <summary>Display name of the drum kit bank's instrument/kit at <paramref name="presetIndex"/>, or null if out of range.</summary>
+    public static string? AccompanimentGetDrumSoundFontPresetName(int presetIndex)
+    {
+        var buffer = new StringBuilder(256);
+        return AccompanimentGetDrumSoundFontPresetNameNative(presetIndex, buffer, buffer.Capacity) ? buffer.ToString() : null;
+    }
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_SelectDrumSoundFontPreset")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool AccompanimentSelectDrumSoundFontPreset(int presetIndex);
+
+    [DllImport(NativeLibrary, EntryPoint = "UC_Accompaniment_GetSelectedDrumSoundFontPresetIndex")]
+    public static extern int AccompanimentGetSelectedDrumSoundFontPresetIndex();
 
     // --- Custom rhythm/style ("Sopstveni ritam") ---
     // Lets the person build their own accompaniment style in the UI: one

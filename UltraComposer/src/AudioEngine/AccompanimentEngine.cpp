@@ -1,6 +1,7 @@
 #include "AccompanimentEngine.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace
@@ -14,6 +15,56 @@ namespace
     {
         int normalized = packed < 0 ? 0 : packed;
         return Chord{normalized % 12, static_cast<ChordQuality>(normalized / 12)};
+    }
+
+    // Fixed pan/balance for each accompaniment layer - not user-adjustable
+    // (unlike a real track's pan), just enough stereo space so bass/kontra/
+    // harmonija stop stacking directly on top of each other in dead-center
+    // mono, which was making the accompaniment sound like several separate
+    // parts rather than one band during testing. Bass anchors dead center
+    // (as a bass normally does in a mix); kontra (the rhythmic chord stabs)
+    // sits a little left and harmonija (the sustained pad) a little right,
+    // so the two chordal layers separate from each other - and from the
+    // bass - instead of colliding in the same spot. Modest values
+    // deliberately: this should read as "a small band standing in a room,"
+    // not a hard-panned effect. Drums are left centered/unpanned (this
+    // engine already mixes its whole kit down to one mono voice, see
+    // RenderAdditive below). Same equal-power law as MultiTrackSequencer's
+    // per-track pan (see its SetTrackPan/RenderAdditive) for consistency.
+    constexpr float kBassPan = 0.0f;
+    constexpr float kKontraPan = -0.35f;
+    constexpr float kHarmonijaPan = 0.35f;
+
+    void EqualPowerGains(float pan, float& outLeftGain, float& outRightGain)
+    {
+        if (pan < -1.0f) pan = -1.0f;
+        if (pan > 1.0f) pan = 1.0f;
+        float angle = (pan + 1.0f) * 0.7853981633974483f; // (pan+1) * pi/4
+        outLeftGain = std::cos(angle);
+        outRightGain = std::sin(angle);
+    }
+
+    // Standard General MIDI percussion note numbers (channel 10 convention)
+    // for every DrumVoiceType that has a real GM equivalent - this is what
+    // lets a loaded SoundFont's own drum kit preset (see
+    // AccompanimentEngine::LoadDrumSoundFontBank) play the right sound for
+    // each hit, since a GM-style kit maps a different sound to each key
+    // rather than one instrument across the whole keyboard. DumbekDum/
+    // DumbekTek have no caller here - see DrumSourceMode's doc comment for
+    // why they always stay on DrumSynth instead.
+    int GmDrumNoteFor(DrumVoiceType type)
+    {
+        switch (type)
+        {
+        case DrumVoiceType::Kick: return 36;      // Bass Drum 1
+        case DrumVoiceType::Snare: return 38;     // Acoustic Snare
+        case DrumVoiceType::ClosedHat: return 42; // Closed Hi-Hat
+        case DrumVoiceType::OpenHat: return 46;   // Open Hi-Hat
+        case DrumVoiceType::Clap: return 39;      // Hand Clap
+        case DrumVoiceType::Crash: return 49;     // Crash Cymbal 1
+        case DrumVoiceType::Tom: return 45;       // Low Tom
+        default: return 36;                       // never actually reached (see caller)
+        }
     }
 
     // Flushes every pitch a layer currently has held into 'offEvents' and
@@ -432,29 +483,24 @@ Chord AccompanimentEngine::DetectChordFromHeldNotes(const std::vector<int>& held
 
 void AccompanimentEngine::NoteHeldForChordDetection(int midiNote, bool isOn)
 {
+    if (!isOn)
+    {
+        // Releasing a note (whether or not it's the last one held) never
+        // re-detects the chord - see the header's doc comment for why. Just
+        // keep the held-notes bookkeeping accurate for the next press.
+        std::lock_guard<std::mutex> lock(heldNotesMutex_);
+        heldNotes_.erase(std::remove(heldNotes_.begin(), heldNotes_.end(), midiNote), heldNotes_.end());
+        return;
+    }
+
     std::vector<int> snapshot;
     {
         std::lock_guard<std::mutex> lock(heldNotesMutex_);
-        if (isOn)
+        if (std::find(heldNotes_.begin(), heldNotes_.end(), midiNote) == heldNotes_.end())
         {
-            if (std::find(heldNotes_.begin(), heldNotes_.end(), midiNote) == heldNotes_.end())
-            {
-                heldNotes_.push_back(midiNote);
-            }
-        }
-        else
-        {
-            heldNotes_.erase(std::remove(heldNotes_.begin(), heldNotes_.end(), midiNote), heldNotes_.end());
+            heldNotes_.push_back(midiNote);
         }
         snapshot = heldNotes_;
-    }
-
-    if (snapshot.empty())
-    {
-        // Keep the last chord sounding rather than silencing the
-        // accompaniment the instant the left hand lifts - matches how
-        // real keyboards behave.
-        return;
     }
 
     currentChordPacked_.store(PackChord(DetectChordFromHeldNotes(snapshot)));
@@ -711,6 +757,68 @@ ChordVoicing AccompanimentEngine::GetChordVoicing() const
     return static_cast<ChordVoicing>(chordVoicing_.load());
 }
 
+void AccompanimentEngine::SetDrumSourceMode(DrumSourceMode mode)
+{
+    drumSourceMode_.store(static_cast<int>(mode));
+}
+
+AccompanimentEngine::DrumSourceMode AccompanimentEngine::GetDrumSourceMode() const
+{
+    return static_cast<DrumSourceMode>(drumSourceMode_.load());
+}
+
+bool AccompanimentEngine::LoadDrumSoundFontBank(const std::string& sf2Path, std::string& outError)
+{
+    bool ok = drumSoundFont_.LoadBank(sf2Path, sampleRate_, outError);
+    if (ok)
+    {
+        // Try to land on an actual GM drum kit (bank 128, program 0) right
+        // away rather than LoadBank's own generic default (GM "Acoustic
+        // Grand Piano", the right default for a melodic layer but not for
+        // a drum kit) - harmless no-op if this particular bank doesn't have
+        // one at that exact bank/program; the preset list/picker still
+        // lets the user pick a different kit by hand either way.
+        drumSoundFont_.SelectPresetByBankProgram(128, 0);
+        SetDrumSourceMode(DrumSourceMode::SoundFont);
+    }
+    return ok;
+}
+
+void AccompanimentEngine::UnloadDrumSoundFontBank()
+{
+    drumSoundFont_.UnloadBank();
+}
+
+bool AccompanimentEngine::IsDrumSoundFontBankLoaded() const
+{
+    return drumSoundFont_.IsLoaded();
+}
+
+std::string AccompanimentEngine::GetDrumSoundFontBankName() const
+{
+    return drumSoundFont_.GetLoadedBankName();
+}
+
+int AccompanimentEngine::GetDrumSoundFontPresetCount() const
+{
+    return drumSoundFont_.GetPresetCount();
+}
+
+std::string AccompanimentEngine::GetDrumSoundFontPresetName(int presetIndex) const
+{
+    return drumSoundFont_.GetPresetName(presetIndex);
+}
+
+bool AccompanimentEngine::SelectDrumSoundFontPreset(int presetIndex)
+{
+    return drumSoundFont_.SelectPreset(presetIndex);
+}
+
+int AccompanimentEngine::GetSelectedDrumSoundFontPresetIndex() const
+{
+    return drumSoundFont_.GetSelectedPresetIndex();
+}
+
 void AccompanimentEngine::Advance(int frames, double sampleRate)
 {
     std::vector<std::pair<int, float>> bassOn, kontraOn, harmonijaOn;
@@ -818,9 +926,30 @@ void AccompanimentEngine::Advance(int frames, double sampleRate)
     DispatchLayer(MelodicLayer::Kontra, kontraOff, kontraOn);
     DispatchLayer(MelodicLayer::Harmonija, harmonijaOff, harmonijaOn);
 
+    DrumSourceMode drumMode = static_cast<DrumSourceMode>(drumSourceMode_.load());
+    bool drumBankLoaded = drumSoundFont_.IsLoaded();
     for (const auto& [voice, velocity] : drumTriggers)
     {
-        drumSynth_.Trigger(static_cast<DrumVoiceType>(voice), velocity);
+        DrumVoiceType voiceType = static_cast<DrumVoiceType>(voice);
+        // DumbekDum/DumbekTek have no real GM equivalent (see
+        // DrumSourceMode's doc comment) - they always play through
+        // DrumSynth, even while every other voice is coming from a loaded
+        // bank.
+        bool hasGmNote = voiceType != DrumVoiceType::DumbekDum && voiceType != DrumVoiceType::DumbekTek;
+        if (drumMode == DrumSourceMode::SoundFont && drumBankLoaded && hasGmNote)
+        {
+            // A drum hit is a one-shot, not a held note - fire the note on
+            // then immediately off, same as how a sequencer normally
+            // programs GM percussion; the soundfont's own envelope/release
+            // takes it from there.
+            int gmNote = GmDrumNoteFor(voiceType);
+            drumSoundFont_.NoteOn(gmNote, velocity);
+            drumSoundFont_.NoteOff(gmNote);
+        }
+        else
+        {
+            drumSynth_.Trigger(voiceType, velocity);
+        }
     }
 }
 
@@ -828,6 +957,14 @@ void AccompanimentEngine::RenderAdditive(float* interleavedStereoOut, int frames
 {
     int clamped = frames < kMaxScratchFrames ? frames : kMaxScratchFrames;
 
+    float bassLeft, bassRight, kontraLeft, kontraRight, harmonijaLeft, harmonijaRight;
+    EqualPowerGains(kBassPan, bassLeft, bassRight);
+    EqualPowerGains(kKontraPan, kontraLeft, kontraRight);
+    EqualPowerGains(kHarmonijaPan, harmonijaLeft, harmonijaRight);
+
+    // Built-in-synth path: each layer renders its own mono buffer, panned
+    // into the stereo output via the gains above (drums stay centered/
+    // unpanned - this engine already mixes its whole kit to one mono voice).
     bassSynth_.Render(bassScratch_, clamped);
     kontraSynth_.Render(kontraScratch_, clamped);
     harmonijaSynth_.Render(harmonijaScratch_, clamped);
@@ -835,20 +972,56 @@ void AccompanimentEngine::RenderAdditive(float* interleavedStereoOut, int frames
 
     for (int i = 0; i < clamped; ++i)
     {
-        float mono = bassScratch_[i] + kontraScratch_[i] + harmonijaScratch_[i] + drumScratch_[i];
-        interleavedStereoOut[i * 2] += mono;
-        interleavedStereoOut[i * 2 + 1] += mono;
+        interleavedStereoOut[i * 2] += bassScratch_[i] * bassLeft
+                                      + kontraScratch_[i] * kontraLeft
+                                      + harmonijaScratch_[i] * harmonijaLeft
+                                      + drumScratch_[i];
+        interleavedStereoOut[i * 2 + 1] += bassScratch_[i] * bassRight
+                                          + kontraScratch_[i] * kontraRight
+                                          + harmonijaScratch_[i] * harmonijaRight
+                                          + drumScratch_[i];
     }
 
     // Any layer currently routed to its own SoundFont bank or VST3
-    // instrument (see LayerInstrumentMode) adds its sound here too,
-    // additively - same convention AudioEngine::PaCallback already uses to
-    // mix the shared synth/VST/SoundFont together. Harmless (and silent) to
-    // call this for a layer that has nothing loaded or no notes sounding.
-    bassSoundFont_.RenderAdditive(interleavedStereoOut, clamped);
-    kontraSoundFont_.RenderAdditive(interleavedStereoOut, clamped);
-    harmonijaSoundFont_.RenderAdditive(interleavedStereoOut, clamped);
-    bassVst_.RenderAdditive(interleavedStereoOut, clamped);
-    kontraVst_.RenderAdditive(interleavedStereoOut, clamped);
-    harmonijaVst_.RenderAdditive(interleavedStereoOut, clamped);
+    // instrument (see LayerInstrumentMode) instead renders genuine stereo
+    // output of its own - give it its own scratch buffer and apply this
+    // same layer's pan as a left/right balance (same technique
+    // MultiTrackSequencer's per-track pan already uses for its SoundFont/
+    // VST tracks), rather than adding it in flat and unpanned like before.
+    // Calling both SoundFont and VST RenderAdditive here regardless of
+    // which mode is actually selected is harmless and silent for whichever
+    // one has no notes sounding, same as this always did.
+    std::memset(bassScratchStereo_, 0, sizeof(float) * clamped * 2);
+    bassSoundFont_.RenderAdditive(bassScratchStereo_, clamped);
+    bassVst_.RenderAdditive(bassScratchStereo_, clamped);
+
+    std::memset(kontraScratchStereo_, 0, sizeof(float) * clamped * 2);
+    kontraSoundFont_.RenderAdditive(kontraScratchStereo_, clamped);
+    kontraVst_.RenderAdditive(kontraScratchStereo_, clamped);
+
+    std::memset(harmonijaScratchStereo_, 0, sizeof(float) * clamped * 2);
+    harmonijaSoundFont_.RenderAdditive(harmonijaScratchStereo_, clamped);
+    harmonijaVst_.RenderAdditive(harmonijaScratchStereo_, clamped);
+
+    for (int i = 0; i < clamped; ++i)
+    {
+        interleavedStereoOut[i * 2] += bassScratchStereo_[i * 2] * bassLeft
+                                      + kontraScratchStereo_[i * 2] * kontraLeft
+                                      + harmonijaScratchStereo_[i * 2] * harmonijaLeft;
+        interleavedStereoOut[i * 2 + 1] += bassScratchStereo_[i * 2 + 1] * bassRight
+                                          + kontraScratchStereo_[i * 2 + 1] * kontraRight
+                                          + harmonijaScratchStereo_[i * 2 + 1] * harmonijaRight;
+    }
+
+    // Drum kit's own optional SoundFont bank (see DrumSourceMode) - added
+    // flat/unpanned, same as DrumSynth's procedural output above; harmless
+    // and silent to call when nothing is loaded or no drum note is
+    // currently sounding.
+    std::memset(drumScratchStereo_, 0, sizeof(float) * clamped * 2);
+    drumSoundFont_.RenderAdditive(drumScratchStereo_, clamped);
+    for (int i = 0; i < clamped; ++i)
+    {
+        interleavedStereoOut[i * 2] += drumScratchStereo_[i * 2];
+        interleavedStereoOut[i * 2 + 1] += drumScratchStereo_[i * 2 + 1];
+    }
 }

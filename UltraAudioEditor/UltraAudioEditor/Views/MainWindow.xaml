@@ -248,6 +248,7 @@
             <MenuItem Header="{DynamicResource L_menu_help}" AutomationProperties.Name="{DynamicResource L_acc_menu_help}">
                 <MenuItem Header="{DynamicResource L_menu_shortcuts}" Click="ShowShortcuts_Click" AutomationProperties.Name="{DynamicResource L_acc_show_shortcuts}"/>
                 <MenuItem Header="{DynamicResource L_menu_log}" Command="{Binding ShowLogCommand}" AutomationProperties.Name="{DynamicResource L_menu_log}"/>
+                <MenuItem Header="{DynamicResource L_menu_support}" Click="ShowSupport_Click" AutomationProperties.Name="{DynamicResource L_acc_support}"/>
                 <MenuItem Header="{DynamicResource L_menu_about}" Click="ShowAbout_Click" AutomationProperties.Name="{DynamicResource L_acc_about}"/>
             </MenuItem>
         </Menu>

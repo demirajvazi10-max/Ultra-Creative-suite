@@ -29,11 +29,14 @@
                     Click="RemoveButton_Click"
                     Margin="0,0,20,0" Padding="8,4"/>
             <theming:ThemeSwitcher/>
+            <Button x:Name="LanguageButton"
+                    Click="LanguageButton_Click"
+                    Margin="20,0,0,0" Padding="8,4"/>
             <Button x:Name="AboutButton"
                     Content="About"
                     AutomationProperties.Name="About Ultra Player"
                     Click="AboutButton_Click"
-                    Margin="20,0,0,0" Padding="8,4"/>
+                    Margin="6,0,0,0" Padding="8,4"/>
         </StackPanel>
 
         <!-- Playlist -->
@@ -94,12 +97,12 @@
             <ComboBox x:Name="SleepTimerComboBox"
                       AutomationProperties.Name="Sleep timer"
                       Width="120" SelectionChanged="SleepTimerComboBox_SelectionChanged">
-                <ComboBoxItem Content="Off" IsSelected="True"/>
-                <ComboBoxItem Content="15 minutes"/>
-                <ComboBoxItem Content="30 minutes"/>
-                <ComboBoxItem Content="45 minutes"/>
-                <ComboBoxItem Content="60 minutes"/>
-                <ComboBoxItem Content="End of track"/>
+                <ComboBoxItem Tag="off" Content="Off" IsSelected="True"/>
+                <ComboBoxItem Tag="15" Content="15 minutes"/>
+                <ComboBoxItem Tag="30" Content="30 minutes"/>
+                <ComboBoxItem Tag="45" Content="45 minutes"/>
+                <ComboBoxItem Tag="60" Content="60 minutes"/>
+                <ComboBoxItem Tag="end" Content="End of track"/>
             </ComboBox>
         </StackPanel>
 
