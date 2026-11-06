@@ -61,7 +61,7 @@ public static class HelpContent
             "- Page Up / Page Down: pomera osnovnu oktavu naviše/naniže\n" +
             "- Strelica gore/dole: menja instrument u učitanoj SoundFont banci, a kad banka nije " +
             "učitana, zvuk Ultra FM sintisajzera\n" +
-            "- Strelice levo/desno: pitch bend - dok držiš, ton klizi naniže/naviše, a kad pustiš, vraća se\n" +
+            "- Taster levo od 1 / taster 1: pitch bend - dok držiš, ton klizi naniže/naviše, a kad pustiš, vraća se\n" +
             "- Razmak: sustain pedala (dok ga držiš, tonovi zvone i kad pustiš tastere)\n" +
             "- F2/F3: modulacioni točkić (vibrato) manje/više, F4/F5: transpozicija pola stepena dole/gore\n" +
             "- F6: arpeđator, F7: portamento, F8: poli/mono/legato, F9: svi efekti, Home: zaustavi sve tonove\n\n" +
@@ -229,6 +229,27 @@ public static class HelpContent
             "potrebe za ponovnim pokretanjem programa. Ovo uputstvo takođe prati taj izbor, ali " +
             "samo u trenutku kad ga otvoriš - ako promeniš jezik dok je uputstvo već otvoreno, " +
             "zatvori ga i ponovo otvori da vidiš novi jezik ovde."),
+
+        new Topic(
+            "Vizuelni interfejs i klavijatura na ekranu",
+            "Ultra Composer nudi pregledan vizuelni interfejs sa tamnom temom visokog kontrasta " +
+            "(u skladu sa standardima pristupačnosti), jasnim naglašenim bojama po oblastima rada " +
+            "i bočnom trakom za navigaciju:\n\n" +
+            "- Bočna navigacija (leva strana): brzi prelazak između prikaza (Banka instrumenata, " +
+            "Sekvenser, Aranžer, Multi-trake i mikser, Auto-pratnja, Zvuk i efekti) klikom miša " +
+            "ili tastaturom.\n" +
+            "- Klavijatura na ekranu: na dnu prozora prikazana je klavijatura od 5 oktava (C2 do C7) " +
+            "sa dirkama koje svetle kada ton svira iz bilo kog izvora (računarska tastatura, miš " +
+            "ili povezani MIDI uređaj). Klikom miša na dirke direktno sviraš note. U meniju \"Prikaz\" " +
+            "opcijom \"Prikaži klavijaturu na ekranu\" možeš je uključiti ili isključiti. Klavijatura " +
+            "je napravljena tako da ne ometa JAWS navigaciju i ne ulazi u Tab redosled.\n" +
+            "- Sviranje nota svuda sa tastature: podrazumevano je uključena opcija \"Sviraj note " +
+            "računarskom tastaturom svuda\" (u meniju \"Prikaz\" i u polju klavijature za sviranje). " +
+            "To omogućava da note sviraš tasterima Z-M i Q-U iz bilo kog dela programa, bez potrebe " +
+            "da prethodno Tab-om fokusiraš oblast za sviranje. Note se automatski ne sviraju dok " +
+            "kucaš tekst u poljima za unos, niti dok držiš tastere Ctrl ili Alt za prečice i menije. " +
+            "Korisnici čitača ekrana ovu opciju mogu u svakom trenutku isključiti ako žele da note " +
+            "sviraju isključivo dok je polje za sviranje fokusirano."),
     };
 
     private static List<Topic> En() => new()
@@ -258,7 +279,7 @@ public static class HelpContent
             "- Page Up / Page Down: shift the base octave up/down\n" +
             "- Up/Down arrow: cycle the instrument in the loaded SoundFont bank, or the Ultra FM " +
             "synthesizer sound when no bank is loaded\n" +
-            "- Left/Right arrows: pitch bend - the note slides down/up while you hold, and comes back when you let go\n" +
+            "- Key left of 1 / key 1: pitch bend - the note slides down/up while you hold, and comes back when you let go\n" +
             "- Space: sustain pedal (while held, notes keep ringing after you release the keys)\n" +
             "- F2/F3: modulation wheel (vibrato) less/more, F4/F5: transpose a semitone down/up\n" +
             "- F6: arpeggiator, F7: portamento, F8: poly/mono/legato, F9: all effects, Home: stop all notes\n\n" +
@@ -434,5 +455,28 @@ public static class HelpContent
             "restart needed. This guide follows that same choice, but only at the moment you open " +
             "it - if you switch language while the guide is already open, close and reopen it to " +
             "see it here in the new language."),
+
+        new Topic(
+            "Visual Interface & On-Screen Keyboard",
+            "Ultra Composer includes a modern, high-contrast dark theme (WCAG compliant) with " +
+            "distinct accent colors per section and a left-side navigation bar:\n\n" +
+            "- Left navigation bar: quickly switch between views (Instrument Bank, Sequencer, " +
+            "Arranger, Multi-track & Mixer, Auto-accompaniment, Sound and effects) using a mouse or " +
+            "the keyboard.\n" +
+            "- On-screen keyboard: docked at the bottom of the window is a 5-octave piano keyboard " +
+            "(C2 to C7). Keys light up in real time whenever a note sounds from any source " +
+            "(computer keyboard, mouse click, or connected MIDI hardware). Clicking or dragging " +
+            "across keys with the mouse plays notes directly. You can show or hide it at any time " +
+            "via \"View\" -> \"Show on-screen keyboard\". The on-screen keyboard is purely a " +
+            "visual aid and is excluded from the Tab order so it does not interfere with JAWS " +
+            "screen reader navigation.\n" +
+            "- Play notes from computer keyboard everywhere: by default, \"Play notes from computer " +
+            "keyboard everywhere\" is turned on (under the \"View\" menu and as a checkbox in the " +
+            "performance keyboard region). This lets sighted and keyboard users play notes using " +
+            "keys Z-M and Q-U from anywhere in the window without needing to Tab into the " +
+            "performance area first. Note input is automatically bypassed whenever focus is inside a " +
+            "text entry box (such as track names or pitch inputs) and whenever Ctrl/Alt modifiers " +
+            "are held for shortcuts and menus. JAWS users who prefer local-only note input can easily " +
+            "uncheck this option at any time."),
     };
 }

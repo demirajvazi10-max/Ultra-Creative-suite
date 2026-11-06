@@ -329,6 +329,7 @@ public partial class MainWindow
     private void SoundPanicButton_Click(object sender, RoutedEventArgs e)
     {
         AudioEngineInterop.PerformancePanic();
+        ReleaseAllHeldNotes();
         RefreshSoundTexts();
         AnnounceSound(SP.L("Svi tonovi zaustavljeni, pitch bend i modulacija vraćeni na nulu.", "All notes stopped, pitch bend and modulation back to zero."), SoundPanicButton);
     }
@@ -359,11 +360,6 @@ public partial class MainWindow
     {
         switch (e.Key)
         {
-            case Key.Left:
-            case Key.Right:
-                _perfControlKeysHeld.Add(e.Key);
-                UpdateKeyboardPitchBend();
-                break;
             case Key.Space:
                 if (_perfControlKeysHeld.Add(Key.Space)) AudioEngineInterop.SetSoundParam(SP.Sustain, 1);
                 break;
@@ -428,11 +424,6 @@ public partial class MainWindow
     {
         switch (e.Key)
         {
-            case Key.Left:
-            case Key.Right:
-                _perfControlKeysHeld.Remove(e.Key);
-                UpdateKeyboardPitchBend();
-                break;
             case Key.Space:
                 _perfControlKeysHeld.Remove(Key.Space);
                 AudioEngineInterop.SetSoundParam(SP.Sustain, 0);
@@ -446,9 +437,50 @@ public partial class MainWindow
         return true;
     }
 
+    // Pitch bend keys: the key left of 1 (` on US, the dead-key position on Serbian/Croatian
+    // layouts) bends down, 1 bends up. Recognised by physical scan code so it works on every
+    // keyboard layout. Arrow keys are deliberately NOT used (JAWS and list navigation need them).
+    private const Key PitchBendDownToken = Key.Oem3;
+    private const Key PitchBendUpToken = Key.D1;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+    /// <summary>-1 = bend down key, +1 = bend up key, 0 = neither.</summary>
+    private static int PitchBendKeyDirection(KeyEventArgs e)
+    {
+        Key key = e.Key == Key.DeadCharProcessed ? e.DeadCharProcessedKey
+                : e.Key == Key.ImeProcessed ? e.ImeProcessedKey
+                : e.Key;
+        if (key == Key.D1) return 1;
+        if (key == Key.None) return 0;
+        int vk = KeyInterop.VirtualKeyFromKey(key);
+        if (vk != 0 && MapVirtualKey((uint)vk, 0) == 0x29) return -1; // scan code 0x29 = key left of 1
+        return 0;
+    }
+
+    /// <summary>Called from the window-level key handlers. Returns true if the key was a pitch bend key.</summary>
+    private bool HandlePitchBendKey(KeyEventArgs e, bool isDown)
+    {
+        int dir = PitchBendKeyDirection(e);
+        if (dir == 0) return false;
+        Key token = dir < 0 ? PitchBendDownToken : PitchBendUpToken;
+        if (isDown) _perfControlKeysHeld.Add(token);
+        else _perfControlKeysHeld.Remove(token);
+        UpdateKeyboardPitchBend();
+        e.Handled = true;
+        return true;
+    }
+
+    private bool IsPitchBendKeyHeld(KeyEventArgs e)
+    {
+        int dir = PitchBendKeyDirection(e);
+        return dir != 0 && _perfControlKeysHeld.Contains(dir < 0 ? PitchBendDownToken : PitchBendUpToken);
+    }
+
     private void UpdateKeyboardPitchBend()
     {
-        bool down = _perfControlKeysHeld.Contains(Key.Left), up = _perfControlKeysHeld.Contains(Key.Right);
+        bool down = _perfControlKeysHeld.Contains(PitchBendDownToken), up = _perfControlKeysHeld.Contains(PitchBendUpToken);
         float target = down == up ? 0 : (up ? 1 : -1);
         AudioEngineInterop.SetSoundParam(SP.PitchBendKeys, target);
     }

@@ -67,6 +67,8 @@ public static class Localization
         ["Menu.View.MultiTrack"] = "_Multi-trake i mikser",
         ["Menu.View.Accompaniment"] = "_Auto-pratnja",
         ["Menu.View.Sound"] = "_Zvuk i efekti",
+        ["Menu.View.KeyboardEverywhere"] = "_Sviraj note računarskom tastaturom svuda",
+        ["Menu.View.OnScreenKeyboard"] = "_Prikaži klavijaturu na ekranu",
         ["Menu.Language"] = "_Jezik",
         ["Menu.Language.Serbian"] = "Srpski",
         ["Menu.Language.English"] = "Engleski",
@@ -189,8 +191,33 @@ public static class Localization
         // --- Klavijatura za sviranje ---
         ["Keyboard.AutomationName"] = "Klavijatura za sviranje. Fokusiraj ovo polje pa sviraj koriscenjem tastature.",
         ["Keyboard.AutomationHelp"] = "Donji red tastera Z do M svira jednu oktavu, gornji red Q do U svira oktavu iznad. Page Up i Page Down menjaju osnovnu oktavu. Strelica gore/dole menja instrument iz ucitane SoundFont banke, ako je neka ucitana.",
-        ["Keyboard.Intro"] = "Fokusiraj ovo polje (Tab) da bi tasteri Z-M i Q-U svirali note. Page Up / Page Down menjaju oktavu. Strelica gore/dole menja instrument iz učitane SoundFont banke, a bez banke zvuk Ultra FM sintisajzera. Strelice levo/desno = pitch bend dok ih držiš, razmak = sustain pedala, F2/F3 = modulacija (vibrato), F4/F5 = transpozicija, F6 = arpeđator, F7 = portamento, F8 = poli/mono/legato, F9 = efekti, Home = zaustavi sve. Sve ostalo je u meniju Prikaz, Zvuk i efekti.",
+        ["Keyboard.Intro"] = "Fokusiraj ovo polje (Tab) da bi tasteri Z-M i Q-U svirali note. Page Up / Page Down menjaju oktavu. Strelica gore/dole menja instrument iz učitane SoundFont banke, a bez banke zvuk Ultra FM sintisajzera. Taster levo od 1 / taster 1 = pitch bend dok ih držiš (radi i van ovog polja), razmak = sustain pedala, F2/F3 = modulacija (vibrato), F4/F5 = transpozicija, F6 = arpeđator, F7 = portamento, F8 = poli/mono/legato, F9 = efekti, Home = zaustavi sve. Sve ostalo je u meniju Prikaz, Zvuk i efekti.",
         ["Keyboard.Octave"] = "Trenutna oktava: {0}",
+        ["Keyboard.PlayEverywhereCheckbox"] = "Sviraj note računarskom tastaturom svuda",
+        ["Keyboard.OnScreenControlName"] = "Klavijatura na ekranu (vizuelni prikaz)",
+
+        // --- Navigacija ---
+        ["Nav.BarAutomationName"] = "Glavna navigacija kroz prikaze",
+        ["Nav.Instruments"] = "Banka instrumenata",
+        ["Nav.Sequencer"] = "Sekvenser",
+        ["Nav.Arranger"] = "Aranžer",
+        ["Nav.MultiTrack"] = "Multi-trake i mikser",
+        ["Nav.Accompaniment"] = "Auto-pratnja",
+        ["Nav.Sound"] = "Zvuk i efekti",
+
+        // --- Odeljci kartica ---
+        ["Card.InstrumentsTitle"] = "Banka instrumenata i MIDI",
+        ["Card.AutoThirdTitle"] = "Automatska terca",
+        ["Card.LayersTitle"] = "Slojevi instrumenata (Layer i Split)",
+        ["Card.KeyboardTitle"] = "Klavijatura za sviranje",
+        ["Card.SequencerTitle"] = "Sekvenser",
+        ["Card.PianoRollTitle"] = "Piano roll",
+        ["Card.ArrangerTitle"] = "Aranžer",
+        ["Card.MultiTrackTitle"] = "Multi-trake i mikser",
+        ["Card.AccompanimentTitle"] = "Auto-pratnja",
+        ["Card.AccInstrumentsTitle"] = "Instrumenti i bubnjevi pratnje",
+        ["Card.CustomRhythmTitle"] = "Sopstveni ritam",
+        ["Card.SoundTitle"] = "Zvuk i efekti",
 
         // --- Sekvenser ---
         ["Seq.Title"] = "Sekvenser (spisak nota koje se automatski sviraju u petlji):",
@@ -550,6 +577,8 @@ public static class Localization
         ["Menu.View.MultiTrack"] = "_Multi-track & Mixer",
         ["Menu.View.Accompaniment"] = "_Auto-accompaniment",
         ["Menu.View.Sound"] = "_Sound and effects",
+        ["Menu.View.KeyboardEverywhere"] = "_Play notes from computer keyboard everywhere",
+        ["Menu.View.OnScreenKeyboard"] = "_Show on-screen keyboard",
         ["Menu.Language"] = "_Language",
         ["Menu.Language.Serbian"] = "Serbian",
         ["Menu.Language.English"] = "English",
@@ -672,8 +701,33 @@ public static class Localization
         // --- Performance keyboard ---
         ["Keyboard.AutomationName"] = "Performance keyboard. Focus this field, then play using the keyboard.",
         ["Keyboard.AutomationHelp"] = "The bottom row of keys, Z to M, plays one octave; the top row, Q to U, plays the octave above. Page Up and Page Down shift the base octave. Up/Down arrow switches the instrument in the loaded SoundFont bank, if one is loaded.",
-        ["Keyboard.Intro"] = "Focus this field (Tab) so keys Z-M and Q-U play notes. Page Up / Page Down shift the octave. Up/Down arrow switches the instrument in the loaded SoundFont bank, or the Ultra FM synthesizer sound when no bank is loaded. Left/Right arrows = pitch bend while held, Space = sustain pedal, F2/F3 = modulation (vibrato), F4/F5 = transpose, F6 = arpeggiator, F7 = portamento, F8 = poly/mono/legato, F9 = effects, Home = stop everything. Everything else is in View, Sound and effects.",
+        ["Keyboard.Intro"] = "Focus this field (Tab) so keys Z-M and Q-U play notes. Page Up / Page Down shift the octave. Up/Down arrow switches the instrument in the loaded SoundFont bank, or the Ultra FM synthesizer sound when no bank is loaded. Key left of 1 / key 1 = pitch bend while held (works outside this field too), Space = sustain pedal, F2/F3 = modulation (vibrato), F4/F5 = transpose, F6 = arpeggiator, F7 = portamento, F8 = poly/mono/legato, F9 = effects, Home = stop everything. Everything else is in View, Sound and effects.",
         ["Keyboard.Octave"] = "Current octave: {0}",
+        ["Keyboard.PlayEverywhereCheckbox"] = "Play notes from computer keyboard everywhere",
+        ["Keyboard.OnScreenControlName"] = "On-screen piano keyboard (visual display)",
+
+        // --- Navigation ---
+        ["Nav.BarAutomationName"] = "Main view navigation",
+        ["Nav.Instruments"] = "Instrument Bank",
+        ["Nav.Sequencer"] = "Sequencer",
+        ["Nav.Arranger"] = "Arranger",
+        ["Nav.MultiTrack"] = "Multi-track & Mixer",
+        ["Nav.Accompaniment"] = "Auto-accompaniment",
+        ["Nav.Sound"] = "Sound and effects",
+
+        // --- Card Sections ---
+        ["Card.InstrumentsTitle"] = "Instrument Bank and MIDI",
+        ["Card.AutoThirdTitle"] = "Auto-Third Harmonization",
+        ["Card.LayersTitle"] = "Instrument Layers (Layer and Split)",
+        ["Card.KeyboardTitle"] = "Performance Keyboard",
+        ["Card.SequencerTitle"] = "Sequencer",
+        ["Card.PianoRollTitle"] = "Piano Roll",
+        ["Card.ArrangerTitle"] = "Arranger",
+        ["Card.MultiTrackTitle"] = "Multi-Track & Mixer",
+        ["Card.AccompanimentTitle"] = "Auto-Accompaniment",
+        ["Card.AccInstrumentsTitle"] = "Accompaniment Instruments & Drums",
+        ["Card.CustomRhythmTitle"] = "Custom Rhythm",
+        ["Card.SoundTitle"] = "Sound and Effects",
 
         // --- Sequencer ---
         ["Seq.Title"] = "Sequencer (a list of notes played automatically in a loop):",

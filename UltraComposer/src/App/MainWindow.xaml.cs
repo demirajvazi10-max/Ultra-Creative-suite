@@ -178,6 +178,21 @@ public partial class MainWindow : Window
             PopulateSoundSections();
             _accompanimentStatusTimer.Start();
         }
+
+        OnScreenKeyboard.NoteOnRequested += (midiNote, velocity) =>
+        {
+            if (_engineRunning)
+            {
+                AudioEngineInterop.NoteOn(midiNote, velocity);
+            }
+        };
+        OnScreenKeyboard.NoteOffRequested += (midiNote) =>
+        {
+            if (_engineRunning)
+            {
+                AudioEngineInterop.NoteOff(midiNote);
+            }
+        };
     }
 
     // --- Meni: Fajl / Prikaz / Jezik / Pomoć ---
@@ -911,6 +926,32 @@ public partial class MainWindow : Window
         SwitchView(AppView.Accompaniment);
     }
 
+    private void NavInstrumentsButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.Instruments);
+    private void NavSequencerButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.Sequencer);
+    private void NavArrangerButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.Arranger);
+    private void NavMultiTrackButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.MultiTrack);
+    private void NavAccompanimentButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.Accompaniment);
+    private void NavSoundButton_Click(object sender, RoutedEventArgs e) => SwitchView(AppView.Sound);
+
+    private bool _playEverywhere = true;
+
+    private void PlayEverywhereMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _playEverywhere = PlayEverywhereMenuItem.IsChecked;
+        PlayEverywhereCheckBox.IsChecked = _playEverywhere;
+    }
+
+    private void PlayEverywhereCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        _playEverywhere = PlayEverywhereCheckBox.IsChecked == true;
+        PlayEverywhereMenuItem.IsChecked = _playEverywhere;
+    }
+
+    private void ShowOnScreenKeyboardMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        OnScreenKeyboard.Visibility = ShowOnScreenKeyboardMenuItem.IsChecked ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private enum AppView
     {
         Instruments,
@@ -942,6 +983,13 @@ public partial class MainWindow : Window
         ShowMultiTrackMenuItem.IsChecked = view == AppView.MultiTrack;
         ShowAccompanimentMenuItem.IsChecked = view == AppView.Accompaniment;
         ShowSoundMenuItem.IsChecked = view == AppView.Sound;
+
+        NavInstrumentsButton.Tag = view == AppView.Instruments ? "Active" : null;
+        NavSequencerButton.Tag = view == AppView.Sequencer ? "Active" : null;
+        NavArrangerButton.Tag = view == AppView.Arranger ? "Active" : null;
+        NavMultiTrackButton.Tag = view == AppView.MultiTrack ? "Active" : null;
+        NavAccompanimentButton.Tag = view == AppView.Accompaniment ? "Active" : null;
+        NavSoundButton.Tag = view == AppView.Sound ? "Active" : null;
 
         if (view == AppView.Arranger)
         {
@@ -994,6 +1042,29 @@ public partial class MainWindow : Window
         ShowSequencerMenuItem.Header = T("Menu.View.Sequencer");
         ShowArrangerMenuItem.Header = T("Menu.View.Arranger");
         ShowMultiTrackMenuItem.Header = T("Menu.View.MultiTrack");
+        ShowAccompanimentMenuItem.Header = T("Menu.View.Accompaniment");
+        ShowSoundMenuItem.Header = T("Menu.View.Sound");
+        PlayEverywhereMenuItem.Header = T("Menu.View.KeyboardEverywhere");
+        ShowOnScreenKeyboardMenuItem.Header = T("Menu.View.OnScreenKeyboard");
+        PlayEverywhereCheckBox.Content = T("Keyboard.PlayEverywhereCheckbox");
+        OnScreenKeyboard.SetAutomationName(T("Keyboard.OnScreenControlName"));
+
+        NavInstrumentsText.Text = T("Nav.Instruments");
+        AutomationProperties.SetName(NavInstrumentsButton, T("Nav.Instruments"));
+        NavSequencerText.Text = T("Nav.Sequencer");
+        AutomationProperties.SetName(NavSequencerButton, T("Nav.Sequencer"));
+        NavArrangerText.Text = T("Nav.Arranger");
+        AutomationProperties.SetName(NavArrangerButton, T("Nav.Arranger"));
+        NavMultiTrackText.Text = T("Nav.MultiTrack");
+        AutomationProperties.SetName(NavMultiTrackButton, T("Nav.MultiTrack"));
+        NavAccompanimentText.Text = T("Nav.Accompaniment");
+        AutomationProperties.SetName(NavAccompanimentButton, T("Nav.Accompaniment"));
+        NavSoundText.Text = T("Nav.Sound");
+        AutomationProperties.SetName(NavSoundButton, T("Nav.Sound"));
+        AutomationProperties.SetName(NavPanel, T("Nav.BarAutomationName"));
+
+        CardInstrumentsTitleText.Text = T("Card.InstrumentsTitle");
+        CardKeyboardTitleText.Text = T("Card.KeyboardTitle");
 
         LanguageMenuItem.Header = T("Menu.Language");
         LanguageSerbianMenuItem.Header = T("Menu.Language.Serbian");
@@ -2491,6 +2562,190 @@ public partial class MainWindow : Window
         }
     }
 
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_engineRunning)
+        {
+            return;
+        }
+
+        if (e.IsRepeat)
+        {
+            // Ignore key auto-repeat so held keys don't retrigger notes.
+            if (_heldKeys.Contains(e.Key) || IsPitchBendKeyHeld(e))
+            {
+                e.Handled = true;
+            }
+            return;
+        }
+
+        // Except when Ctrl or Alt modifiers are held (so menus and shortcuts keep working)
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+        {
+            return;
+        }
+
+        // Except when focus is in a TextBox, editable ComboBox, or any text-entry control
+        if (IsTextEntryFocused())
+        {
+            return;
+        }
+
+        // With a screen reader running (JAWS, NVDA, Narrator), letters in lists and
+        // combo boxes must keep jumping to items by first letter, so global playing
+        // skips them. Without a screen reader (sighted mouse user) it plays there too.
+        if (IsScreenReaderRunning() && IsSelectorFocused())
+        {
+            return;
+        }
+
+        // If global playing is turned off, note playing only works when performance keyboard region has focus
+        if (!_playEverywhere && !PerformanceKeyboardBorder.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        // Pitch bend: key left of 1 = down, 1 = up (held; springs back on release).
+        if (HandlePitchBendKey(e, isDown: true))
+        {
+            return;
+        }
+
+        if (_heldKeys.Contains(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (_mapper.TryGetMidiNote(e.Key, out int note))
+        {
+            _heldKeys.Add(e.Key);
+            AudioEngineInterop.NoteOn(note, 0.9f);
+            OnScreenKeyboard.SetNoteActive(note, true);
+            e.Handled = true;
+        }
+    }
+
+    private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (!_engineRunning)
+        {
+            return;
+        }
+
+        // Always release a held pitch bend key, wherever focus is now.
+        if (IsPitchBendKeyHeld(e) && HandlePitchBendKey(e, isDown: false))
+        {
+            return;
+        }
+
+        if (_heldKeys.Remove(e.Key) && _mapper.TryGetMidiNote(e.Key, out int note))
+        {
+            AudioEngineInterop.NoteOff(note);
+            OnScreenKeyboard.SetNoteActive(note, false);
+            e.Handled = true;
+        }
+    }
+
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        ReleaseAllHeldNotes();
+        ReleasePerformanceControls();
+    }
+
+    private void ReleaseAllHeldNotes()
+    {
+        foreach (Key key in _heldKeys)
+        {
+            if (_mapper.TryGetMidiNote(key, out int note))
+            {
+                AudioEngineInterop.NoteOff(note);
+                OnScreenKeyboard.SetNoteActive(note, false);
+            }
+        }
+        _heldKeys.Clear();
+        OnScreenKeyboard.ClearActiveNotes();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref bool pvParam, uint fWinIni);
+
+    private const uint SPI_GETSCREENREADER = 0x0046;
+
+    /// <summary>
+    /// True while a screen reader (JAWS, NVDA, Narrator) has set the Windows
+    /// "screen reader present" flag. Checked on every key press, so starting or
+    /// closing the screen reader takes effect immediately.
+    /// </summary>
+    private static bool IsScreenReaderRunning()
+    {
+        bool running = false;
+        return SystemParametersInfo(SPI_GETSCREENREADER, 0, ref running, 0) && running;
+    }
+
+    /// <summary>
+    /// True when keyboard focus is inside a list, combo box or other selector
+    /// control (where letters are used for first-letter navigation).
+    /// </summary>
+    private static bool IsSelectorFocused()
+    {
+        DependencyObject? current = Keyboard.FocusedElement as DependencyObject;
+        while (current != null)
+        {
+            if (current is System.Windows.Controls.Primitives.Selector)
+            {
+                return true;
+            }
+            current = current is Visual || current is System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+        return false;
+    }
+
+    private static bool IsTextEntryFocused()
+    {
+        var focused = Keyboard.FocusedElement as DependencyObject;
+        if (focused == null)
+        {
+            return false;
+        }
+
+        if (focused is System.Windows.Controls.Primitives.TextBoxBase || focused is PasswordBox)
+        {
+            return true;
+        }
+
+        if (focused is ComboBox combo && combo.IsEditable)
+        {
+            return true;
+        }
+
+        DependencyObject? current = focused;
+        while (current != null)
+        {
+            if (current is System.Windows.Controls.Primitives.TextBoxBase || current is PasswordBox)
+            {
+                return true;
+            }
+            if (current is ComboBox cb && cb.IsEditable)
+            {
+                return true;
+            }
+
+            if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+            {
+                current = VisualTreeHelper.GetParent(current);
+            }
+            else
+            {
+                current = LogicalTreeHelper.GetParent(current);
+            }
+        }
+
+        return false;
+    }
+
     private void PerformanceKeyboard_GotFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         StatusText.Text = Localization.T("Status.PlayModeActive");
@@ -2499,14 +2754,7 @@ public partial class MainWindow : Window
     private void PerformanceKeyboard_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         // Release anything still held so a note can't get stuck on when focus moves away.
-        foreach (Key key in _heldKeys)
-        {
-            if (_mapper.TryGetMidiNote(key, out int note))
-            {
-                AudioEngineInterop.NoteOff(note);
-            }
-        }
-        _heldKeys.Clear();
+        ReleaseAllHeldNotes();
         ReleasePerformanceControls();
 
         StatusText.Text = _engineRunning ? Localization.T("Status.EngineRunning") : Localization.T("Status.EngineNotRunning");
@@ -2567,6 +2815,7 @@ public partial class MainWindow : Window
         {
             _heldKeys.Add(e.Key);
             AudioEngineInterop.NoteOn(note, 0.9f);
+            OnScreenKeyboard.SetNoteActive(note, true);
             e.Handled = true;
         }
     }
@@ -2586,6 +2835,7 @@ public partial class MainWindow : Window
         if (_heldKeys.Remove(e.Key) && _mapper.TryGetMidiNote(e.Key, out int note))
         {
             AudioEngineInterop.NoteOff(note);
+            OnScreenKeyboard.SetNoteActive(note, false);
             e.Handled = true;
         }
     }

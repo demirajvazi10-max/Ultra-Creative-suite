@@ -347,7 +347,7 @@ field has focus):
 
 | Key | Action |
 | --- | --- |
-| Left / Right (held) | pitch bend down / up; springs back when released |
+| Key left of 1 (`` ` `` on US layouts) / 1 (held) | pitch bend down / up; springs back when released. Recognised by physical key position, so it works on any layout, and works anywhere in the window like note playing (arrow keys stay free for JAWS and list navigation) |
 | Space (held) | sustain pedal |
 | F2 / F3 | modulation wheel (vibrato) -10% / +10% |
 | F4 / F5 | transpose a semitone down / up |
@@ -750,6 +750,60 @@ plays no matter which view is currently showing. **Fajl** also has
 **Pomoć → Uputstvo za upotrebu** opens the full in-app user guide (see
 "User Guide" below), and **Pomoć → O programu** shows the author/license
 credit.
+
+## Visual interface, on-screen keyboard, and global keyboard playing
+
+Ultra Composer features a dual-audience visual interface designed to be
+equally pleasant, responsive, and functional for sighted mouse users while
+strictly preserving full keyboard-first and JAWS screen reader accessibility:
+
+- **Cohesive dark theme**: built with high-contrast color choices exceeding
+  WCAG AA standards, with custom focus outlines (high-visibility 2.5px sky
+  blue border) on every interactive element so low-vision and keyboard users
+  can always identify current focus at a glance.
+- **Section cards with distinct accent colors**: each logical section is
+  contained within a rounded, bordered card with a prominent header and a
+  distinct accent color:
+  - *Instruments*: Cyan
+  - *Layers*: Emerald
+  - *Sequencer*: Sky Blue
+  - *Arranger*: Purple
+  - *Mixer & Multi-Track*: Orange
+  - *Auto-Accompaniment*: Rose
+  - *Sound & Effects*: Amber/Gold
+- **Left navigation bar**: large buttons featuring iconography (Segoe MDL2
+  Assets / Segoe Fluent Icons) and text labels for one-click view switching,
+  fully accessible via keyboard and synchronized with the View menu.
+- **On-screen piano keyboard**: a 5-octave piano keyboard (C2 to C7, 61 keys)
+  docked at the bottom of the window across all views. Keys light up in real
+  time whenever notes sound (from the computer keyboard, mouse interaction,
+  or connected MIDI devices). Sighted mouse users can click or drag across
+  keys to trigger notes with velocity ~100.
+  - *Accessibility integrity*: the control has `Focusable="False"` and
+    `KeyboardNavigation.IsTabStop="False"` to ensure it never steals Tab focus
+    or clutters JAWS announcements.
+  - *Visibility toggle*: can be shown or hidden at any time via the View menu
+    (**Prikaz → Prikaži klavijaturu na ekranu** / **View → Show on-screen keyboard**).
+- **Play notes from computer keyboard everywhere**: computer-keyboard note
+  playing (Z-M and Q-U) works anywhere across the main window via preview key
+  routing, eliminating the need to explicitly focus the performance keyboard
+  area first.
+  - Automatically disabled when focus is inside a `TextBox`, editable
+    `ComboBox`, or other text input control.
+  - When a screen reader is running (JAWS, NVDA, Narrator - detected through
+    the Windows "screen reader present" flag), it is also skipped while focus
+    is in a list or combo box, so first-letter navigation keeps working there.
+    Without a screen reader, notes play from lists and combo boxes too.
+  - Automatically bypassed when Ctrl or Alt modifiers are held so application
+    shortcuts, menu access, and system hotkeys continue uninterrupted.
+  - Key repeat (`e.IsRepeat`) is ignored to prevent unintended retriggering.
+  - Arrow keys (`Up`/`Down`) remain strictly scoped to list navigation and
+    only cycle instrument presets when the performance keyboard region itself
+    is focused.
+  - Sighted and JAWS users can toggle global playing on or off at any time via
+    the View menu (**Prikaz → Sviraj note računarskom tastaturom svuda** /
+    **View → Play notes from computer keyboard everywhere**) or the checkbox
+    in the performance keyboard card.
 
 ## User Guide
 

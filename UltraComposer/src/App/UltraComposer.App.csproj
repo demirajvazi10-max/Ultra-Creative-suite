@@ -29,7 +29,7 @@
          "-beta" suffix entirely for the first full release, matching Ultra Video Editor's
          "first full (non-beta) release is v1.0.0" convention - i.e. this stays 1.0.0-beta
          until it's ready, then becomes plain 1.0.0. -->
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

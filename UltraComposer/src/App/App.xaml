@@ -2,4 +2,235 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Dark Theme Core Palette (WCAG AA/AAA compliant high contrast) -->
+        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#121318" />
+        <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#151720" />
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#1A1C24" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#2E3342" />
+
+        <SolidColorBrush x:Key="InputBackgroundBrush" Color="#161820" />
+        <SolidColorBrush x:Key="InputBorderBrush" Color="#3E4459" />
+        <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#242733" />
+        <SolidColorBrush x:Key="ButtonHoverBrush" Color="#2E3345" />
+        <SolidColorBrush x:Key="ButtonPressedBrush" Color="#383E54" />
+
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#CBD5E1" />
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#94A3B8" />
+
+        <!-- Area Accent Brushes -->
+        <!-- Instruments (Cyan) -->
+        <SolidColorBrush x:Key="AccentInstrumentsBrush" Color="#06B6D4" />
+        <SolidColorBrush x:Key="AccentInstrumentsBorderBrush" Color="#0891B2" />
+        <SolidColorBrush x:Key="AccentInstrumentsSubtleBrush" Color="#164E63" />
+
+        <!-- Layers (Emerald) -->
+        <SolidColorBrush x:Key="AccentLayersBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="AccentLayersBorderBrush" Color="#059669" />
+        <SolidColorBrush x:Key="AccentLayersSubtleBrush" Color="#064E3B" />
+
+        <!-- Sequencer (Sky Blue) -->
+        <SolidColorBrush x:Key="AccentSequencerBrush" Color="#38BDF8" />
+        <SolidColorBrush x:Key="AccentSequencerBorderBrush" Color="#0284C7" />
+        <SolidColorBrush x:Key="AccentSequencerSubtleBrush" Color="#0C4A6E" />
+
+        <!-- Arranger (Purple) -->
+        <SolidColorBrush x:Key="AccentArrangerBrush" Color="#A855F7" />
+        <SolidColorBrush x:Key="AccentArrangerBorderBrush" Color="#7C3AED" />
+        <SolidColorBrush x:Key="AccentArrangerSubtleBrush" Color="#4C1D95" />
+
+        <!-- Mixer (Orange) -->
+        <SolidColorBrush x:Key="AccentMixerBrush" Color="#F97316" />
+        <SolidColorBrush x:Key="AccentMixerBorderBrush" Color="#EA580C" />
+        <SolidColorBrush x:Key="AccentMixerSubtleBrush" Color="#7C2D12" />
+
+        <!-- Auto-Accompaniment (Rose) -->
+        <SolidColorBrush x:Key="AccentAccompanimentBrush" Color="#F43F5E" />
+        <SolidColorBrush x:Key="AccentAccompanimentBorderBrush" Color="#E11D48" />
+        <SolidColorBrush x:Key="AccentAccompanimentSubtleBrush" Color="#881337" />
+
+        <!-- Effects (Amber/Gold) -->
+        <SolidColorBrush x:Key="AccentEffectsBrush" Color="#F59E0B" />
+        <SolidColorBrush x:Key="AccentEffectsBorderBrush" Color="#D97706" />
+        <SolidColorBrush x:Key="AccentEffectsSubtleBrush" Color="#78350F" />
+
+        <!-- High-Contrast Focus Visual: 2.5px thick neon sky outline -->
+        <Style x:Key="AppFocusVisualStyle">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="-2" Stroke="#38BDF8" StrokeThickness="2.5" RadiusX="3" RadiusY="3" SnapsToDevicePixels="True" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Base Button Style -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource ButtonHoverBrush}" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#64748B" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource ButtonPressedBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#1C1E26" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#2A2E3B" />
+                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Sidebar Navigation Button Style -->
+        <Style x:Key="NavButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#252834" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#475569" />
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="Tag" Value="Active">
+                                <Setter TargetName="border" Property="Background" Value="#1E2A3A" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentSequencerBrush}" />
+                                <Setter TargetName="border" Property="BorderThickness" Value="2" />
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Base TextBox Style -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="CaretBrush" Value="{StaticResource AccentSequencerBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base ComboBox Style -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base ListBox Style -->
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base ListView Style -->
+        <Style TargetType="ListView">
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base CheckBox Style -->
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base RadioButton Style -->
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base Label Style -->
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base Menu Style -->
+        <Style TargetType="Menu">
+            <Setter Property="Background" Value="#14161E" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <!-- Base MenuItem Style -->
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+        </Style>
+    </Application.Resources>
 </Application>

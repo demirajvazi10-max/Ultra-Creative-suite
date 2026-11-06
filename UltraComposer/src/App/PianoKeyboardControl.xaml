@@ -1,0 +1,27 @@
+<UserControl x:Class="UltraComposer.App.PianoKeyboardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False"
+             KeyboardNavigation.IsTabStop="False"
+             AutomationProperties.Name="Klavijatura na ekranu (vizuelni prikaz)">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="WhiteKeyNormalBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="WhiteKeyBorderBrush" Color="#475569" />
+        <SolidColorBrush x:Key="WhiteKeyActiveBrush" Color="#38BDF8" />
+
+        <SolidColorBrush x:Key="BlackKeyNormalBrush" Color="#1E293B" />
+        <SolidColorBrush x:Key="BlackKeyBorderBrush" Color="#0F172A" />
+        <SolidColorBrush x:Key="BlackKeyActiveBrush" Color="#0284C7" />
+
+        <SolidColorBrush x:Key="LabelBrush" Color="#334155" />
+        <SolidColorBrush x:Key="OctaveLabelBrush" Color="#0F172A" />
+    </UserControl.Resources>
+
+    <Border Background="#14151B" BorderBrush="#2E313D" BorderThickness="1" CornerRadius="6" Padding="8,6">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      Focusable="False" KeyboardNavigation.IsTabStop="False">
+            <Canvas x:Name="KeyboardCanvas" Width="792" Height="96" Background="Transparent"
+                    HorizontalAlignment="Center" Focusable="False" KeyboardNavigation.IsTabStop="False" />
+        </ScrollViewer>
+    </Border>
+</UserControl>
