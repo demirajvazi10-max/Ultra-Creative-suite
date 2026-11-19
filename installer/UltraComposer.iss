@@ -17,7 +17,7 @@
 #define MyAppExeName "UltraComposer.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0-beta"
+  #define MyAppVersion "2.2.0"
 #endif
 
 ; A fixed AppId keeps upgrades (installing a newer version over an older

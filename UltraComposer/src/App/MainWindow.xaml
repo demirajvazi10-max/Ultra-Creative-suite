@@ -157,6 +157,40 @@
                         <!-- ==================== Banka instrumenata ==================== -->
                         <StackPanel x:Name="InstrumentsView">
                             <!-- Card: MIDI and Main Instruments -->
+                            <!-- Sound library (MainWindow.Library.cs) -->
+                            <Border BorderBrush="{StaticResource AccentInstrumentsBorderBrush}" Background="{StaticResource CardBackgroundBrush}"
+                                    BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock x:Name="LibraryTitleText" Text="Biblioteka zvukova"
+                                               FontWeight="Bold" FontSize="14" Foreground="{StaticResource AccentInstrumentsBrush}" Margin="0,0,0,6" />
+                                    <TextBlock x:Name="LibraryIntroText" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                            <Label x:Name="LibraryCategoryLabel" Content="_Kategorija:" Padding="0" Target="{Binding ElementName=LibraryCategoryListBox}" />
+                                            <ListBox x:Name="LibraryCategoryListBox" Height="160" Margin="0,4,0,0"
+                                                     SelectionChanged="LibraryCategoryListBox_SelectionChanged" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <Label x:Name="LibrarySoundsLabel" Content="Z_vuci:" Padding="0" Target="{Binding ElementName=LibrarySoundsListBox}" />
+                                            <ListBox x:Name="LibrarySoundsListBox" Height="160" Margin="0,4,0,0"
+                                                     PreviewKeyDown="LibrarySoundsListBox_PreviewKeyDown"
+                                                     MouseDoubleClick="LibrarySoundsListBox_MouseDoubleClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <Button x:Name="LibraryLoadButton" Content="_Učitaj izabrani zvuk" Margin="0,0,8,4" Click="LibraryLoadButton_Click" />
+                                        <Button x:Name="LibraryAddButton" Content="_Dodaj zvuk u biblioteku..." Margin="0,0,8,4" Click="LibraryAddButton_Click" />
+                                        <Button x:Name="LibraryOpenFolderButton" Content="Otvori _folder biblioteke" Margin="0,0,8,4" Click="LibraryOpenFolderButton_Click" />
+                                        <Button x:Name="LibraryRefreshButton" Content="Osveži _biblioteku" Margin="0,0,8,4" Click="LibraryRefreshButton_Click" />
+                                    </WrapPanel>
+                                    <TextBlock x:Name="LibraryStatusText" AutomationProperties.LiveSetting="Polite" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
                             <Border BorderBrush="{StaticResource AccentInstrumentsBorderBrush}" Background="{StaticResource CardBackgroundBrush}"
                                     BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                                 <StackPanel>
@@ -906,6 +940,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Button x:Name="SoundResetSectionButton" Content="_Vrati odeljak na početne vrednosti" Click="SoundResetSectionButton_Click" />
                                         <Button x:Name="SoundPanicButton" Content="_Zaustavi sve tonove (panic)" Margin="8,0,0,0" Click="SoundPanicButton_Click" />
+                                        <Button x:Name="SoundImportFm8Button" Content="_Uvezi FM8 zvuk (.nfm8)..." Margin="8,0,0,0" Click="SoundImportFm8Button_Click" />
                                     </StackPanel>
                                     <TextBlock x:Name="SoundStatusText" AutomationProperties.LiveSetting="Assertive" Margin="0,8,0,0" TextWrapping="Wrap" />
                                     <TextBlock x:Name="SoundKeysHelpText" TextWrapping="Wrap" Margin="0,8,0,0" />

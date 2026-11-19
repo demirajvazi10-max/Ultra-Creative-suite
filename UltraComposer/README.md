@@ -241,6 +241,27 @@ collaborator, or just to sanity-check a pattern's shape at a glance.
   only, for now - change length through the boxes above or the list), and
   scrolling/zooming beyond the fixed grid size.
 
+## Sound library
+
+The top card of the "Instrument bank" view is a sound library, so
+nobody has to hunt for files after installing. Sounds are sorted into
+categories; each category is a folder in
+`Documents\Ultra Composer\Library` (created on first run with
+`Standard`, `FM8`, `Oriental` and `My sounds`; any folder the user adds
+becomes a category too). The bundled GeneralUser GS bank always shows
+under `Standard`, and sounds shipped with the app live in
+`src/App/Library/<category>/` (copied next to the exe and into the
+installer) - currently 11 FM8 sounds by Senad, made for Ultra Composer,
+in `FM8`.
+
+Pick a category, then in the sound list press Enter, Space or
+double-click to load. `.sf2` banks load as the main bank, `.nfm8` FM8
+sounds are imported into Ultra FM (the main bank and VST are unloaded
+first so Ultra FM is heard), `.vst3` plug-ins load as the main
+instrument. "Add a sound to the library..." copies chosen files into
+the selected category; "Open library folder" opens it in Explorer;
+"Refresh library" rescans. Code: `src/App/MainWindow.Library.cs`.
+
 ## SoundFont instrument banks
 
 Real, ready-made instruments (piano, strings, drums, guitar, etc.) loaded
@@ -254,8 +275,10 @@ TinySoundFont, a small, well-tested SoundFont synthesizer.
   works, no downloading or setup required.
 - To use a different bank instead (your own `.sf2` file, downloaded or
   from another program), type/paste its path or use "Pretraži..." to
-  browse to it, then click "Učitaj banku" - this replaces whichever bank
-  was loaded before.
+  browse to it - choosing a file with "Pretraži..." loads it immediately
+  (typing a path still needs "Učitaj banku"). This replaces whichever bank
+  was loaded before. The same applies to every "Pretraži..." button in the
+  app (layer, track, auto-accompaniment and drum banks, and VST3 plug-ins).
 - Once a bank is loaded, the "Instrument" dropdown lists every instrument
   (preset) inside it - pick one to switch instruments; switching cleanly
   stops any notes still sounding from the previous instrument first, so
@@ -401,6 +424,26 @@ languages, ranges, steps, how values are read out, effect presets) and
 `MainWindow.Sound.cs` (the view, the keyboard shortcuts and project
 save/load). Projects store the settings in a new `SoundSettings` map;
 projects from before 2.0 load with the starting values.
+
+### Importing FM8 presets (.nfm8)
+
+The "Sound and effects" view has an **Import FM8 sound (.nfm8)...**
+button. Choosing a Native Instruments FM8 preset converts it into
+Ultra FM straight away and speaks the preset's name.
+
+It is an approximation, because FM8 has 8 operators and a free
+modulation matrix while Ultra FM has 6 operators and 8 fixed
+algorithms. Converted: the ratios of operators A-F, the modulation
+routing and amounts (the importer tries every algorithm and every
+placement of A-F and keeps the closest match), output levels, feedback
+and the envelopes (reduced to attack/decay/sustain/release). Not
+converted: operators X (noise) and Z (filter), LFOs, FM8's own effects,
+keyscaling and morphing; the spoken message says when X or Z were in
+use. The file format was reverse-engineered from a set of real
+presets; the notes and a reference decoder are in `docs/fm8-import/`
+(`NFM8-FORMAT-NOTES.md`, `nfm8_decode.py`). The importer is
+`src/App/Nfm8Importer.cs`. `.nfm8` files are ignored by git so that
+third-party presets never end up in the repository.
 
 ## Instrument layers (Layer and Split)
 

@@ -160,6 +160,7 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         _engineRunning = AudioEngineInterop.Init() && AudioEngineInterop.Start();
+        InitLibrary(); // sound library (MainWindow.Library.cs)
         StatusText.Text = _engineRunning
             ? Localization.T("Status.EngineRunning")
             : Localization.T("Status.EngineFailed");
@@ -1322,6 +1323,7 @@ public partial class MainWindow : Window
         // --- Auto-pratnja ---
         ShowAccompanimentMenuItem.Header = T("Menu.View.Accompaniment");
         ApplySoundViewLanguage(); // Ultra Composer 2.0 "Zvuk i efekti" view (MainWindow.Sound.cs)
+        ApplyLibraryLanguage(); // sound library (MainWindow.Library.cs)
         AccTitleText.Text = T("Acc.Title");
         AccStyleLabelText.Text = T("Acc.StyleLabel");
         AutomationProperties.SetName(AccStyleComboBox, T("Acc.StyleAutomationName"));
@@ -1559,6 +1561,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             VstPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            LoadVstButton_Click(sender, e);
         }
     }
 
@@ -1604,6 +1608,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             SoundFontPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            LoadSoundFontButton_Click(sender, e);
         }
     }
 
@@ -2271,6 +2277,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             PerfLayerSoundFontPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            PerfLoadLayerSoundFontButton_Click(sender, e);
         }
     }
 
@@ -2330,6 +2338,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             PerfLayerVstPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            PerfLoadLayerVstButton_Click(sender, e);
         }
     }
 
@@ -3291,6 +3301,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             TrackSoundFontPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            LoadTrackSoundFontButton_Click(sender, e);
         }
     }
 
@@ -3344,6 +3356,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             TrackVstPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            LoadTrackVstButton_Click(sender, e);
         }
     }
 
@@ -4024,6 +4038,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             AccLayerSoundFontPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            AccLoadLayerSoundFontButton_Click(sender, e);
         }
     }
 
@@ -4077,6 +4093,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             AccLayerVstPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            AccLoadLayerVstButton_Click(sender, e);
         }
     }
 
@@ -4197,6 +4215,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             AccDrumSoundFontPathTextBox.Text = dialog.FileName;
+            // Load right away - no need to press the Load button after choosing a file.
+            AccLoadDrumSoundFontButton_Click(sender, e);
         }
     }
 

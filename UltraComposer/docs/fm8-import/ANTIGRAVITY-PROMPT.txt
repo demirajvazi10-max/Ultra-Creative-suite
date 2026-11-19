@@ -1,0 +1,89 @@
+You are working on "Ultra Composer", an accessible music composition app for Windows
+(.NET 8 WPF front end in src/App, native C++ audio engine in src/AudioEngine, C# interop
+in src/Interop). The author is blind and uses JAWS; every UI change must stay fully usable
+with a screen reader and keyboard, and also clear for sighted mouse users.
+
+GOAL
+Let Ultra Composer import Native Instruments FM8 presets (.nfm8 files) into its built-in
+"Ultra FM" synthesizer, as a close approximation of the original sound.
+
+READ FIRST (mandatory)
+- docs/fm8-import/NFM8-FORMAT-NOTES.md  - everything already verified about the format.
+- docs/fm8-import/nfm8_decode.py        - working reference decoder (container + LZF +
+  E8MF header + 4 snapshot names). It is verified on 61 real presets. Do not re-derive
+  this part; port it.
+- src/AudioEngine/SoundParams.h and src/App/SoundParameters.cs - the Ultra FM parameter
+  IDs (50-119): algorithm 0..7, feedback, volume, brightness, and per operator (6 of them):
+  level, ratio, detune, attack, decay, sustain, release, velocity sensitivity.
+- src/AudioEngine/FmSynth.h/.cpp - read how the 8 algorithms connect the 6 operators.
+- src/App/MainWindow.Sound.cs - the existing "Zvuk i efekti" (Sound and effects) panel.
+
+TEST CORPUS (read-only, outside the repo)
+D:\Projekat Editor\Boje Senad\BOJE FM8 SENAD  - 61 real .nfm8 presets.
+Rules: only READ these files. Never copy, move or modify them, and never put any .nfm8
+file inside the repository (some are commercial). You may write analysis output (CSV,
+notes) only inside docs/fm8-import/analysis/ and it must not contain the raw preset data.
+
+TASK 1 - Reverse-engineer the E8MF parameter block (the main job)
+Use nfm8_decode.py (or your C# port) to extract the parameter block of all 61 presets and
+work out its layout and meaning. Suggested method is in the notes ("Suggested approach").
+Key facts: mostly little-endian float32 plus u32 counts; NOT fixed length (2987..4571
+bytes) because of variable-length arrays (likely envelope breakpoints); 12 presets are
+built from FM8's "init sound" starting patch and are the best baseline.
+FM8 background: 8 operators (A-F sine-type operators, X noise operator, Z filter), a free
+modulation matrix with feedback, multi-breakpoint envelopes, keyscaling, LFOs,
+arpeggiator, effects, morph square with 4 snapshots.
+Priorities, in order: (a) parse the block structurally so every file is consumed from
+start to end without leftover bytes; (b) identify per-operator ratio, output level and
+envelope; (c) identify the modulation matrix / feedback; (d) everything else is optional.
+For every field you identify, record in NFM8-FORMAT-NOTES.md: offset or position in the
+structure, type, observed range, your interpretation and a confidence level
+(confirmed / likely / guess). Move items from "Open" to "Verified" only when confirmed.
+
+TASK 2 - C# importer
+- New file src/App/Nfm8Importer.cs: port of the decoder + your parameter parser +
+  a mapper that produces Ultra FM settings (the SoundParam IDs and values).
+- Mapping rules: choose the 6 most important FM8 operators (those that are audible or
+  modulate audible ones), pick the Ultra FM algorithm whose topology is closest to the
+  FM8 matrix, convert ratios (clamp to 0.5..16), levels (0..1), envelopes to ADSR
+  (attack/decay/sustain/release, clamped to the ranges in SoundParams.h), and feedback.
+  Ignore what Ultra FM cannot do. Keep the mapping in one clearly commented place so it
+  can be tuned later.
+- Apply the result through the existing AudioEngineInterop.SetSoundParam calls only.
+  Do NOT change the native C++ engine or any P/Invoke signatures.
+- Fail gracefully: an unreadable or unsupported file shows a clear spoken/visible message
+  (localized), never crashes.
+
+TASK 3 - UI
+- In the "Zvuk i efekti" (Sound and effects) panel, add a button "Uvezi FM8 zvuk
+  (.nfm8)..." / "Import FM8 sound (.nfm8)...". It opens a file dialog filtered to *.nfm8
+  and imports immediately after a file is chosen (no extra Load button), consistent with
+  the rest of the app.
+- After import, announce through the existing AnnounceSound mechanism, e.g.
+  "Uvezen FM8 zvuk: <preset name>" / "Imported FM8 sound: <preset name>", plus a short
+  note when parts could not be converted.
+- Accessibility: AutomationProperties.Name on the new button, normal tab order, no
+  extra live-region noise.
+- All new strings in Localization.cs in BOTH Serbian (Latin script only, never Cyrillic)
+  and English, following the existing pattern so language switching works at runtime.
+
+TASK 4 - Docs
+- README.md (English): new section "Importing FM8 presets (.nfm8)" - what it does, that it
+  is an approximation, what is and is not converted.
+- HelpContent.cs: one new topic in Serbian and English, same format as existing topics.
+- Keep NFM8-FORMAT-NOTES.md up to date with everything you learn.
+
+RULES
+- Build after each step (Visual Studio solution UltraComposer.sln). No backup copies or
+  Backup_* folders. Do not reformat unrelated code. Do not touch .github or installer files.
+- If something is ambiguous or would need native engine changes, stop and write the
+  question down instead of guessing.
+
+FINAL REPORT (required)
+Write a plain-text report (no tables) to docs/fm8-import/ANTIGRAVITY-REPORT.txt:
+1. What was completed, file by file.
+2. What the parameter block layout looks like now, and which fields are confirmed,
+   likely or guessed.
+3. How many of the 61 corpus presets import without errors.
+4. What was not completed and exactly where you stopped.
+5. Remaining build errors or warnings, with exact messages.

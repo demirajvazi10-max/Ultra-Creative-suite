@@ -147,11 +147,12 @@ public partial class MainWindow
         AutomationProperties.SetName(SoundSectionsListBox, sr ? "Odeljci zvuka i efekata" : "Sound and effects sections");
         SoundResetSectionButton.Content = sr ? "_Vrati odeljak na početne vrednosti" : "_Reset this section";
         SoundPanicButton.Content = sr ? "_Zaustavi sve tonove (panic)" : "Stop all _notes (panic)";
+        SoundImportFm8Button.Content = sr ? "_Uvezi FM8 zvuk (.nfm8)..." : "_Import FM8 sound (.nfm8)...";
         SoundKeysHelpText.Text = sr
-            ? "Na klavijaturi za sviranje: strelice levo/desno = pitch bend dok ih držiš, razmak = sustain pedala, F2/F3 = modulacija (vibrato) manje/više, " +
+            ? "Na klavijaturi za sviranje: taster levo od 1 / taster 1 = pitch bend dok ih držiš, razmak = sustain pedala, F2/F3 = modulacija (vibrato) manje/više, " +
               "F4/F5 = transpozicija pola stepena dole/gore, F6 = arpeđator, F7 = portamento, F8 = poli/mono/legato, F9 = svi efekti, Home = zaustavi sve i vrati točkiće, " +
               "strelice gore/dole = sledeći zvuk (SoundFont ili Ultra FM). Sa MIDI klavijature rade pitch bend točkić, modulacioni točkić, sustain pedala i portamento kontrole."
-            : "On the performance keyboard: Left/Right arrows = pitch bend while held, Space = sustain pedal, F2/F3 = modulation (vibrato) less/more, " +
+            : "On the performance keyboard: key left of 1 / key 1 = pitch bend while held, Space = sustain pedal, F2/F3 = modulation (vibrato) less/more, " +
               "F4/F5 = transpose a semitone down/up, F6 = arpeggiator, F7 = portamento, F8 = poly/mono/legato, F9 = all effects, Home = stop everything and centre the wheels, " +
               "Up/Down arrows = next sound (SoundFont or Ultra FM). From a MIDI keyboard the pitch bend wheel, modulation wheel, sustain pedal and portamento controls work too.";
         if (_soundViewBuilt)
@@ -324,6 +325,51 @@ public partial class MainWindow
         if (section.Params.Any(p => p.Id == SP.FxPresetPseudoId)) _fxPresetIndex = 0;
         RefreshSoundTexts();
         AnnounceSound(SP.L($"{section.Name}: vraćene početne vrednosti.", $"{section.Name}: reset to starting values."), SoundResetSectionButton);
+    }
+
+    /// <summary>Imports an FM8 preset (.nfm8) into Ultra FM right after a file is chosen.</summary>
+    private void SoundImportFm8Button_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = SP.L("Uvezi FM8 zvuk", "Import FM8 sound"),
+            Filter = SP.L("FM8 zvukovi (*.nfm8)|*.nfm8|Svi fajlovi (*.*)|*.*", "FM8 sounds (*.nfm8)|*.nfm8|All files (*.*)|*.*"),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        AnnounceSound(ImportFm8File(dialog.FileName), SoundImportFm8Button);
+    }
+
+    /// <summary>Imports an FM8 preset into Ultra FM and returns the message to speak (used by the button and the sound library).</summary>
+    private string ImportFm8File(string path)
+    {
+        Nfm8Importer.Result result;
+        try
+        {
+            result = Nfm8Importer.Import(path);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or System.IO.InvalidDataException or UnauthorizedAccessException or IndexOutOfRangeException or ArgumentException)
+        {
+            return SP.L($"Ovaj fajl ne mogu da pročitam kao FM8 zvuk ({ex.Message}).",
+                        $"This file cannot be read as an FM8 sound ({ex.Message}).");
+        }
+
+        foreach (var (id, value) in result.Values) AudioEngineInterop.SetSoundParam(id, value);
+        if (_soundViewBuilt) RefreshSoundTexts();
+
+        string name = string.IsNullOrWhiteSpace(result.PresetName) || result.PresetName == "init sound"
+            ? System.IO.Path.GetFileNameWithoutExtension(path)
+            : System.IO.Path.GetFileNameWithoutExtension(path) + " (" + result.PresetName + ")";
+        string text = SP.L($"Uvezen FM8 zvuk: {name}. Algoritam {result.Algorithm + 1}.",
+                           $"Imported FM8 sound: {name}. Algorithm {result.Algorithm + 1}.");
+        if (result.UsedNoiseOrFilter)
+            text += SP.L(" Operatori X i Z (šum i filter) nisu preneti, pa zvuk može da bude malo drugačiji.",
+                         " Operators X and Z (noise and filter) were not converted, so the sound may differ a little.");
+        if (result.RatioClamped)
+            text += SP.L(" Neki odnosi frekvencija su bili van opsega od 0,5 do 16 i skraćeni su.",
+                         " Some frequency ratios were outside 0.5 to 16 and were limited.");
+        text += SP.L(" Ultra FM se čuje kad u Sloju 1 nije učitana banka ni VST.",
+                     " Ultra FM is heard when no bank or VST is loaded in Layer 1.");
+        return text;
     }
 
     private void SoundPanicButton_Click(object sender, RoutedEventArgs e)

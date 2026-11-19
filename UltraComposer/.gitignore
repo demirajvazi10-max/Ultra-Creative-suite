@@ -13,3 +13,11 @@ Release/
 
 # vcpkg local install (if you install it inside the repo instead of elsewhere)
 vcpkg_installed/
+
+# Third-party FM8 presets - never commit them (some are commercial)
+*.nfm8
+# ...except the sounds shipped with the app (made by their authors for Ultra Composer)
+!src/App/Library/**/*.nfm8
+
+# Python cache from the analysis scripts
+__pycache__/

@@ -110,6 +110,29 @@ public static class HelpContent
             "prekida sve tonove i vraća pitch bend i modulaciju na nulu."),
 
         new Topic(
+            "Uvoz FM8 zvukova (.nfm8)",
+            "U prikazu \"Zvuk i efekti\" je dugme \"Uvezi FM8 zvuk (.nfm8)\". Izaberi .nfm8 fajl (zvuk iz " +
+            "Native Instruments FM8) i on se odmah prebaci u Ultra FM; program izgovori ime zvuka.\n\n" +
+            "Uvoz je približan, jer FM8 ima 8 operatora i slobodnu matricu, a Ultra FM 6 operatora i 8 gotovih " +
+            "algoritama. Prenose se: odnosi frekvencija (ratio) operatora A-F, ko koga moduliše i koliko jako, " +
+            "jačina izlaza, feedback i envelope (pretvoren u napad, opadanje, zadržavanje i otpuštanje). " +
+            "Operatori X (šum) i Z (filter), LFO, efekti iz FM8 i morfovanje se ne prenose - program to " +
+            "kaže kad zvuk koristi X ili Z. Posle uvoza zvuk možeš dalje da podešavaš u odeljku Ultra FM i " +
+            "da ga sačuvaš u projektu kao i svaki drugi."),
+
+        new Topic(
+            "Biblioteka zvukova",
+            "Na vrhu \"Banke instrumenata\" je \"Biblioteka zvukova\": svi tvoji zvuci na jednom mestu, po " +
+            "kategorijama (Standard, FM8, Oriental, My sounds i svaka kategorija koju sam napraviš). Izaberi " +
+            "kategoriju, Tab do liste zvukova, pa Enter, razmak ili dvoklik učitava zvuk - bez traženja fajlova.\n\n" +
+            "SoundFont banke (.sf2) se učitavaju kao glavna banka, FM8 zvukovi (.nfm8) u Ultra FM (banka i VST " +
+            "se tada isključe, da bi se Ultra FM čuo), a VST3 instrumenti kao glavni instrument. Ugrađena banka " +
+            "GeneralUser GS je uvek u kategoriji Standard, a u kategoriji FM8 već stižu Senadovi zvuci.\n\n" +
+            "Kategorije su obični folderi u Dokumenti\\Ultra Composer\\Library. Dugme \"Dodaj zvuk u " +
+            "biblioteku\" kopira izabrane fajlove u izabranu kategoriju, \"Otvori folder biblioteke\" otvara " +
+            "taj folder u Windows Exploreru, a \"Osveži biblioteku\" ponovo čita foldere kad nešto dodaš ručno."),
+
+        new Topic(
             "SoundFont i VST3 instrumenti",
             "Zajednički instrument koji se koristi u \"Banci instrumenata\" (i time i u " +
             "Sekvenseru i Aranžeru) može biti: ugrađeni sintisajzer (uvek dostupan, bez podešavanja), " +
@@ -328,6 +351,31 @@ public static class HelpContent
             "auto-accompaniment.\n\n" +
             "All of these settings are saved in the project. The \"Stop all notes\" button (or Home on the " +
             "keyboard) stops every note and centres pitch bend and modulation."),
+
+        new Topic(
+            "Importing FM8 sounds (.nfm8)",
+            "In the \"Sound and effects\" view there is an \"Import FM8 sound (.nfm8)\" button. Pick an .nfm8 " +
+            "file (a Native Instruments FM8 sound) and it is converted into Ultra FM right away; the program " +
+            "speaks the sound's name.\n\n" +
+            "The import is an approximation: FM8 has 8 operators and a free matrix, Ultra FM has 6 operators " +
+            "and 8 ready-made algorithms. Converted: the ratios of operators A-F, which operator modulates " +
+            "which and how strongly, output levels, feedback and the envelopes (turned into attack, decay, " +
+            "sustain and release). Operators X (noise) and Z (filter), LFOs, FM8's effects and morphing are " +
+            "not converted - the program says so when a sound uses X or Z. After importing you can keep " +
+            "shaping the sound in the Ultra FM section and save it in your project like any other."),
+
+        new Topic(
+            "Sound library",
+            "At the top of the \"Instrument bank\" view is the \"Sound library\": all your sounds in one " +
+            "place, by category (Standard, FM8, Oriental, My sounds and any category you create). Pick a " +
+            "category, Tab to the sound list, then press Enter, Space or double-click to load a sound - no " +
+            "searching for files.\n\n" +
+            "SoundFont banks (.sf2) load as the main bank, FM8 sounds (.nfm8) into Ultra FM (the bank and VST " +
+            "are unloaded so Ultra FM can be heard) and VST3 instruments as the main instrument. The bundled " +
+            "GeneralUser GS bank is always in the Standard category, and the FM8 category already holds Senad's sounds.\n\n" +
+            "Categories are plain folders in Documents\\Ultra Composer\\Library. \"Add a sound to the " +
+            "library\" copies the chosen files into the selected category, \"Open library folder\" opens it " +
+            "in Windows Explorer, and \"Refresh library\" reads the folders again after you add files by hand."),
 
         new Topic(
             "SoundFont & VST3 Instruments",
